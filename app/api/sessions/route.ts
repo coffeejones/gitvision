@@ -1,11 +1,15 @@
-// POST /api/sessions  — create a new session from a GitHub URL
+// POST /api/sessions  — enqueue a new session-create job. Returns
+//                       { jobId } immediately; the client polls
+//                       /api/jobs/<id> until done. (v0.25+)
 // GET  /api/sessions  — list all sessions
 
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { z } from "zod";
-import { parseRepoUrl, analyzeRepo } from "@/lib/github";
-import { validateSubdir, SubdirNotFoundError } from "@/lib/graph";
-import { createSession, listSessions } from "@/lib/storage";
+import { parseRepoUrl } from "@/lib/github";
+import { validateSubdir } from "@/lib/graph";
+import { createJob, processJob } from "@/lib/jobs";
+import { listSessions } from "@/lib/storage";
 
 const CreateSchema = z.object({
   repoUrl: z.string().min(1),
@@ -28,6 +32,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
+  // Cheap synchronous validation we can do without spinning up an analysis.
+  // Anything that requires hitting GitHub (does the repo exist? does the
+  // subdir exist?) is deferred to the background job — it surfaces in
+  // the polled status as a "failed" outcome.
   const parsedRepo = parseRepoUrl(parsed.data.repoUrl);
   if (!parsedRepo) {
     return NextResponse.json(
@@ -35,9 +43,6 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-
-  // Validate subdir format up-front so we can return a 400 instead of a
-  // 502-from-tarball-extract for malformed inputs.
   let subdir: string | null;
   try {
     subdir = validateSubdir(parsed.data.subdir);
@@ -48,29 +53,15 @@ export async function POST(req: Request) {
     );
   }
 
-  try {
-    const snapshot = await analyzeRepo(
-      parsedRepo.owner,
-      parsedRepo.repo,
-      { subdir }
-    );
-    const session = await createSession({
-      repoUrl: parsed.data.repoUrl,
-      name: parsed.data.name || snapshot.repo.fullName,
-      initialSnapshot: snapshot,
-    });
-    return NextResponse.json({ session });
-  } catch (err) {
-    // User input errors (subdir-not-found) get a 400 with the raw message
-    // — the form surfaces it next to the input. Other failures (network,
-    // rate-limit, server bugs) get the generic 502.
-    if (err instanceof SubdirNotFoundError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json(
-      { error: `Failed to analyze repo: ${message}` },
-      { status: 502 }
-    );
-  }
+  // Enqueue the job. processJob runs detached via after() — the HTTP
+  // request returns in <1s regardless of how long the actual analysis
+  // takes. This is what unlocks repos like golang/go on Railway.
+  const job = await createJob({
+    kind: "create-session",
+    repoUrl: parsed.data.repoUrl,
+    sessionName: parsed.data.name,
+    subdir,
+  });
+  after(() => processJob(job.id));
+  return NextResponse.json({ jobId: job.id });
 }

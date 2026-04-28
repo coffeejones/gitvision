@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { parseDeepLinkSubdir } from "@/lib/githubUrl";
+import { pollJob } from "@/lib/jobsClient";
 import { TOK } from "@/lib/theme";
 
 // Stage labels + rough durations (ms) used to drive the indeterminate loading UI.
@@ -97,6 +98,9 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
     const trimmedSubdir = subdir.trim();
     startTransition(async () => {
       try {
+        // POST returns immediately with a jobId — the actual analysis runs
+        // in the background via Next.js's after() hook, so big repos
+        // (golang/go, etc.) don't hit Railway's request timeout.
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -105,26 +109,38 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
             ...(trimmedSubdir ? { subdir: trimmedSubdir } : {}),
           }),
         });
-        // Railway returns its own JSON shape for upstream-timeout errors —
-        // {"status":"error","code":502,"message":"Application failed to respond"}.
-        // Try to parse JSON, but fall back to the raw text if the response
-        // isn't JSON (rare — Railway's 502 page is JSON).
-        let data: { error?: string; message?: string; session?: { id: string } } | null = null;
+        let data: {
+          error?: string;
+          message?: string;
+          jobId?: string;
+        } | null = null;
         try {
           data = await res.json();
         } catch {
-          // Response wasn't JSON. Surface a generic shape.
+          /* non-JSON response — fall through */
         }
         if (!res.ok) {
           setError(explainServerError(res.status, data));
           return;
         }
-        if (!data?.session) {
-          setError("Server returned no session — try again or pick another repo.");
+        if (!data?.jobId) {
+          setError("Server returned no jobId — try again or pick another repo.");
+          return;
+        }
+
+        // Poll the job until it reaches a terminal state. The fake
+        // stage-progress UI keeps animating during this — we don't have
+        // real per-stage events from the backend (yet), but the user
+        // sees movement instead of a frozen "analyzing..." button.
+        const finalJob = await pollJob(data.jobId, () => {
+          /* Could surface job.status here for richer UI in the future. */
+        });
+        if (!finalJob.sessionId) {
+          setError("Analysis finished but no session was created. Please try again.");
           return;
         }
         setProgress(1);
-        router.push(`/session/${data.session.id}`);
+        router.push(`/session/${finalJob.sessionId}`);
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Network error");

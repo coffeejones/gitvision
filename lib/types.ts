@@ -289,3 +289,42 @@ export interface SessionSummary {
   updatedAt: string;
   snapshotCount: number;
 }
+
+// ------------------- Jobs (v0.25) -------------------
+//
+// Long-running analyses run detached from the HTTP request that enqueued
+// them. The client polls /api/jobs/<id> until status flips to done|failed.
+// Stored in <DATA_DIR>/jobs/<id>.json — same pattern as sessions.
+
+export type JobStatus = "pending" | "running" | "done" | "failed";
+
+/** Discriminated union of inputs the queue can process. Add a new kind
+ *  here when you add a new long-running endpoint (e.g. a future
+ *  "regenerate AI summary in background"). */
+export type JobInput =
+  | {
+      kind: "create-session";
+      repoUrl: string;
+      subdir: string | null;
+      sessionName?: string;
+    }
+  | {
+      kind: "refresh-session";
+      sessionId: string;
+      repoUrl: string;
+      subdir: string | null;
+    };
+
+export interface Job {
+  id: string;
+  status: JobStatus;
+  input: JobInput;
+  createdAt: string;
+  updatedAt: string;
+  /** Populated when status transitions to "done". Refresh jobs reuse the
+   *  existing sessionId; create jobs return a fresh one. */
+  sessionId?: string;
+  /** Populated when status transitions to "failed". User-facing message;
+   *  sensitive details (full stack traces) are logged server-side. */
+  error?: string;
+}

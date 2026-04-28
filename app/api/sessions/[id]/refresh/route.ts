@@ -1,11 +1,13 @@
-// POST /api/sessions/[id]/refresh  — re-fetch data and append a new snapshot.
-// Returns the updated session plus a diff vs. previous snapshot.
+// POST /api/sessions/[id]/refresh — enqueue a refresh job that re-runs
+// the full analysis pipeline and appends a new snapshot. Returns
+// { jobId } immediately; the client polls /api/jobs/<id> until done
+// and then reloads the session page. (v0.25+)
 
 import { NextResponse } from "next/server";
-import { parseRepoUrl, analyzeRepo } from "@/lib/github";
-import { SubdirNotFoundError } from "@/lib/graph";
-import { getSession, appendSnapshot } from "@/lib/storage";
-import { diffSnapshots } from "@/lib/diff";
+import { after } from "next/server";
+import { parseRepoUrl } from "@/lib/github";
+import { createJob, processJob } from "@/lib/jobs";
+import { getSession } from "@/lib/storage";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -25,19 +27,12 @@ export async function POST(_req: Request, ctx: Ctx) {
   const prev = session.snapshots[session.snapshots.length - 1];
   const subdir = prev?.analyzedSubdir ?? null;
 
-  try {
-    const snapshot = await analyzeRepo(parsed.owner, parsed.repo, { subdir });
-    const updated = await appendSnapshot(id, snapshot);
-    const diff = prev ? diffSnapshots(prev, snapshot) : null;
-    return NextResponse.json({ session: updated, diff });
-  } catch (err) {
-    // The session's stored subdir no longer exists in the repo (renamed,
-    // moved, or branch changed). Surface as 400 with the actionable
-    // message rather than the generic refresh-failed 502.
-    if (err instanceof SubdirNotFoundError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: `Refresh failed: ${message}` }, { status: 502 });
-  }
+  const job = await createJob({
+    kind: "refresh-session",
+    sessionId: id,
+    repoUrl: session.repoUrl,
+    subdir,
+  });
+  after(() => processJob(job.id));
+  return NextResponse.json({ jobId: job.id });
 }

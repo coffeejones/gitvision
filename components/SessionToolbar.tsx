@@ -22,6 +22,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
+import { pollJob } from "@/lib/jobsClient";
 import { TOK } from "@/lib/theme";
 import { ShareCardModal } from "./ShareCardModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
@@ -87,15 +88,30 @@ export function SessionToolbar({
   function refresh() {
     startRefresh(async () => {
       setMessage(null);
-      const res = await fetch(`/api/sessions/${sessionId}/refresh`, {
-        method: "POST",
-      });
-      if (!res.ok) {
+      try {
+        // POST returns immediately with a jobId — actual refresh runs
+        // detached via Next.js's after(). Same big-repo-friendly flow as
+        // session-create.
+        const res = await fetch(`/api/sessions/${sessionId}/refresh`, {
+          method: "POST",
+        });
         const data = await res.json().catch(() => ({}));
-        setMessage(data.error || "Refresh failed");
-        return;
+        if (!res.ok) {
+          setMessage(data.error || `Refresh failed (HTTP ${res.status})`);
+          return;
+        }
+        if (!data.jobId) {
+          setMessage("Refresh enqueued but no jobId returned. Try again.");
+          return;
+        }
+        // Wait for the job to finish, then reload server-rendered data.
+        await pollJob(data.jobId, () => {
+          /* could surface job.status for richer feedback later */
+        });
+        router.refresh();
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : "Refresh failed");
       }
-      router.refresh();
     });
   }
 
