@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { parseDeepLinkSubdir } from "@/lib/githubUrl";
 import { TOK } from "@/lib/theme";
 
 // Stage labels + rough durations (ms) used to drive the indeterminate loading UI.
@@ -25,12 +27,35 @@ export type DemoRepo = string | { repo: string; lang: string };
 
 export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
   const [value, setValue] = useState("");
+  const [subdir, setSubdir] = useState("");
+  const [subdirOpen, setSubdirOpen] = useState(false);
+  const [autoFilledFromUrl, setAutoFilledFromUrl] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [stageIdx, setStageIdx] = useState(0);
   const [progress, setProgress] = useState(0);
   const router = useRouter();
   const startTime = useRef<number | null>(null);
+
+  // Auto-detect /tree/<branch>/<path> deep-links and lift the path into
+  // the subdir field. We open the disclosure too, so the auto-fill is
+  // visible (silent fills feel like magic-debug-hell).
+  useEffect(() => {
+    const detected = parseDeepLinkSubdir(value);
+    if (detected && detected !== subdir) {
+      setSubdir(detected);
+      setSubdirOpen(true);
+      setAutoFilledFromUrl(true);
+    } else if (!detected && autoFilledFromUrl) {
+      // User cleared / changed the URL away from a deep-link — drop the
+      // auto-fill so we don't keep stale subdir state. Manual edits keep
+      // their value (autoFilledFromUrl flips to false on user input).
+      setSubdir("");
+      setAutoFilledFromUrl(false);
+    }
+    // Intentionally don't depend on subdir — that would loop on user edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   useEffect(() => {
     if (!pending) {
@@ -69,12 +94,16 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
     setError(null);
     if (!value.trim()) return;
 
+    const trimmedSubdir = subdir.trim();
     startTransition(async () => {
       try {
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ repoUrl: value.trim() }),
+          body: JSON.stringify({
+            repoUrl: value.trim(),
+            ...(trimmedSubdir ? { subdir: trimmedSubdir } : {}),
+          }),
         });
         // Railway returns its own JSON shape for upstream-timeout errors —
         // {"status":"error","code":502,"message":"Application failed to respond"}.
@@ -152,6 +181,75 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
           {pending ? "Analyzing…" : "Analyze →"}
         </button>
       </div>
+
+      {/* Subdir disclosure — collapsed by default to keep first-impression
+       *  clean. Auto-opens when a /tree/<branch>/<path> URL is pasted so
+       *  the user sees the detected scope. */}
+      {!pending && (
+        <div className="flex flex-col gap-2 px-1">
+          <button
+            type="button"
+            onClick={() => setSubdirOpen((o) => !o)}
+            className="text-xs flex items-center gap-1 self-start transition"
+            style={{ color: TOK.textMuted }}
+          >
+            {subdirOpen ? (
+              <ChevronDown size={11} />
+            ) : (
+              <ChevronRight size={11} />
+            )}
+            Analyze part of repo only?
+            {!subdirOpen && subdir && (
+              <span
+                className="ml-1 font-mono"
+                style={{ color: TOK.accent }}
+              >
+                · {subdir}
+              </span>
+            )}
+          </button>
+          {subdirOpen && (
+            <div className="flex flex-col gap-1.5">
+              <div
+                className="flex items-center rounded-md"
+                style={{
+                  background: TOK.surface,
+                  border: `1px solid ${TOK.border}`,
+                }}
+              >
+                <input
+                  type="text"
+                  value={subdir}
+                  onChange={(e) => {
+                    setSubdir(e.target.value);
+                    setAutoFilledFromUrl(false);
+                  }}
+                  placeholder="src/cmd  (optional · case-sensitive · no leading slash)"
+                  className="flex-1 bg-transparent h-9 px-3 text-sm focus:outline-none"
+                  style={{ color: TOK.textPrimary }}
+                />
+              </div>
+              <p
+                className="text-[11px] leading-snug"
+                style={{ color: TOK.textMuted }}
+              >
+                {autoFilledFromUrl ? (
+                  <>
+                    Detected from URL. Clear this field to analyze the whole
+                    repo.
+                  </>
+                ) : (
+                  <>
+                    Useful for monorepos and very large repos. Root-level
+                    manifest files (package.json, go.mod, etc.) are still
+                    extracted so dep-health works.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {!pending && demoRepos.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">

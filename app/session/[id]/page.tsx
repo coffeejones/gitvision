@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, FolderTree } from "lucide-react";
 import { getSession } from "@/lib/storage";
 import { diffSnapshots } from "@/lib/diff";
 import { TOK } from "@/lib/theme";
@@ -60,6 +60,20 @@ export default async function SessionPage({
                 <span>{current.repo.fullName}</span>
                 <ExternalLink size={11} />
               </a>
+              {current.analyzedSubdir && (
+                <span
+                  className="text-xs font-mono inline-flex items-center gap-1 px-2 py-0.5 rounded"
+                  style={{
+                    background: TOK.accentSoft,
+                    color: TOK.accent,
+                    border: `1px solid ${TOK.accent}33`,
+                  }}
+                  title={`Analysis was scoped to this subdirectory. Refresh re-analyzes the same scope. Whole-repo signals (contributors, PRs, language mix) still come from the full repo.`}
+                >
+                  <FolderTree size={11} />
+                  scope: {current.analyzedSubdir}
+                </span>
+              )}
             </div>
 
             {current.repo.description && (

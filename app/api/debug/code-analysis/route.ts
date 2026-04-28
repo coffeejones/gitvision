@@ -18,7 +18,7 @@ import { NextResponse } from "next/server";
 import { Octokit } from "octokit";
 import { z } from "zod";
 import { parseRepoUrl, fetchRepoMeta } from "@/lib/github";
-import { downloadAndExtract } from "@/lib/graph";
+import { downloadAndExtract, validateSubdir } from "@/lib/graph";
 import { analyzeDirectory } from "@/lib/codeAnalysis/analyze";
 import { csharpPlugin } from "@/lib/codeAnalysis/plugins/csharp";
 import { goPlugin } from "@/lib/codeAnalysis/plugins/go";
@@ -33,6 +33,7 @@ import type { CodeGraph, ParsedFile } from "@/lib/codeAnalysis/types";
 const PostBody = z.object({
   repoUrl: z.string().min(1),
   ref: z.string().optional(),
+  subdir: z.string().optional(),
 });
 
 const octokit = new Octokit({
@@ -49,7 +50,11 @@ export async function GET(req: Request): Promise<Response> {
       { status: 400 }
     );
   }
-  return runAnalysis(repo, url.searchParams.get("ref") ?? undefined);
+  return runAnalysis(
+    repo,
+    url.searchParams.get("ref") ?? undefined,
+    url.searchParams.get("subdir") ?? undefined
+  );
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -57,18 +62,32 @@ export async function POST(req: Request): Promise<Response> {
   const parsed = PostBody.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Body must be { repoUrl: string, ref?: string }" },
+      { error: "Body must be { repoUrl: string, ref?: string, subdir?: string }" },
       { status: 400 }
     );
   }
-  return runAnalysis(parsed.data.repoUrl, parsed.data.ref);
+  return runAnalysis(parsed.data.repoUrl, parsed.data.ref, parsed.data.subdir);
 }
 
-async function runAnalysis(input: string, requestedRef?: string): Promise<Response> {
+async function runAnalysis(
+  input: string,
+  requestedRef?: string,
+  requestedSubdir?: string
+): Promise<Response> {
   const parsed = parseRepoUrl(input);
   if (!parsed) {
     return NextResponse.json(
       { error: "Could not parse GitHub URL or shorthand. Try owner/name or https://github.com/owner/name" },
+      { status: 400 }
+    );
+  }
+
+  let subdir: string | null;
+  try {
+    subdir = validateSubdir(requestedSubdir);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Invalid subdir" },
       { status: 400 }
     );
   }
@@ -81,7 +100,13 @@ async function runAnalysis(input: string, requestedRef?: string): Promise<Respon
     const ref = requestedRef ?? (await fetchRepoMeta(parsed.owner, parsed.repo)).defaultBranch;
 
     const tarballStart = Date.now();
-    const extracted = await downloadAndExtract(octokit, parsed.owner, parsed.repo, ref);
+    const extracted = await downloadAndExtract(
+      octokit,
+      parsed.owner,
+      parsed.repo,
+      ref,
+      { subdir }
+    );
     cleanup = extracted.cleanup;
     const tarballMs = Date.now() - tarballStart;
 
@@ -98,7 +123,7 @@ async function runAnalysis(input: string, requestedRef?: string): Promise<Respon
     const summary = buildSummary(result.files, result.codeGraph);
 
     return NextResponse.json({
-      repo: { owner: parsed.owner, name: parsed.repo, ref },
+      repo: { owner: parsed.owner, name: parsed.repo, ref, subdir: subdir ?? undefined },
       totals: summary.totals,
       byPlugin: result.codeGraph.byPlugin,
       filesByExt: result.codeGraph.filesByExt,

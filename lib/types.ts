@@ -257,6 +257,12 @@ export interface AnalysisSnapshot {
    *  a specific message ("skipped: timeout") rather than the generic
    *  "old snapshot, click Refresh" empty state. v0.19+. */
   codeGraphSkipReason?: string;
+  /** When the analysis was scoped to a subdirectory of the repo, this
+   *  holds the cleaned subdir path (e.g. "src/cmd"). Refresh reads it
+   *  to re-analyze the same scope. The session page surfaces it as a
+   *  "Analyzed subdir: …" indicator so users know they aren't seeing
+   *  the full repo. Absent when the whole repo was analyzed. v0.24+. */
+  analyzedSubdir?: string;
   rateLimitInfo?: {
     limit: number;
     remaining: number;

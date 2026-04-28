@@ -17,6 +17,7 @@ import {
   buildFileGraph,
   buildFileGraphFromDir,
   downloadAndExtract,
+  SubdirNotFoundError,
 } from "./graph";
 import { analyzeRepoHistory, type GitLogCommit } from "./gitLog";
 import { analyzeDependencyHealth } from "./depsHealth/index";
@@ -56,6 +57,11 @@ export function parseRepoUrl(input: string): { owner: string; repo: string } | n
   }
   return null;
 }
+
+// parseDeepLinkSubdir lives in lib/githubUrl.ts so it can be imported from
+// client components without dragging server-only deps (Octokit, tar) into
+// the browser bundle.
+export { parseDeepLinkSubdir } from "./githubUrl";
 
 export async function fetchRepoMeta(owner: string, repo: string): Promise<RepoMeta> {
   const { data } = await octokit.rest.repos.get({ owner, repo });
@@ -356,10 +362,21 @@ function gitLogCommitsToSummaries(
   }));
 }
 
+export interface AnalyzeRepoOptions {
+  /** When set, codeAnalysis + file-graph extraction is scoped to this
+   *  subdir. The result snapshot's `analyzedSubdir` is set to the same
+   *  value so refresh re-analyzes the same scope. Whole-repo metadata
+   *  (contributors, PRs, language mix, dep-health) still uses the full
+   *  repo — those signals don't make sense to scope. v0.24+. */
+  subdir?: string | null;
+}
+
 export async function analyzeRepo(
   owner: string,
-  repo: string
+  repo: string,
+  opts: AnalyzeRepoOptions = {}
 ): Promise<AnalysisSnapshot> {
+  const subdir = opts.subdir ?? null;
   const [
     repoMeta,
     contributors,
@@ -465,7 +482,8 @@ export async function analyzeRepo(
       octokit,
       owner,
       repo,
-      repoMeta.defaultBranch
+      repoMeta.defaultBranch,
+      { subdir }
     );
     cleanup = extracted.cleanup;
 
@@ -516,8 +534,17 @@ export async function analyzeRepo(
       codeGraph = cgResult.codeGraph;
     }
   } catch (err) {
-    // Tarball download itself failed — fall back to the public buildFileGraph
-    // which has its own download + cleanup, and skip codeGraph for this run.
+    // SubdirNotFoundError is a USER input error — they pointed at a path
+    // that doesn't exist in the repo. Falling back to a whole-repo
+    // analysis would be misleading (the user explicitly asked for subset
+    // scope; the session shouldn't quietly ignore that). Re-throw so the
+    // API endpoint can surface the message to the user as a 400.
+    if (cleanup) await cleanup();
+    if (err instanceof SubdirNotFoundError) throw err;
+
+    // Other tarball / network failures — fall back to the public
+    // buildFileGraph which has its own download + cleanup, and skip
+    // codeGraph for this run.
     fileGraph = await buildFileGraph(
       octokit,
       owner,
@@ -528,6 +555,7 @@ export async function analyzeRepo(
     codeGraphSkipReason = `Tarball extraction failed: ${
       err instanceof Error ? err.message : "unknown error"
     }`;
+    cleanup = null; // already cleaned up above
   } finally {
     if (cleanup) await cleanup();
   }
@@ -562,6 +590,7 @@ export async function analyzeRepo(
     historySource,
     hasReadme,
     dependencyHealths: dependencyHealths.length > 0 ? dependencyHealths : undefined,
+    analyzedSubdir: subdir ?? undefined,
     rateLimitInfo,
   };
 }

@@ -51,16 +51,177 @@ const SKIP_DIRS = new Set([
 const MAX_FILE_BYTES = 1_000_000; // 1MB — skip minified/generated files
 const MAX_TOTAL_FILES = 3000; // safety cap
 
+/** Manifest filenames we keep at the repo root even when a subdir filter
+ *  is active. Without these, dep-health (npm/pyproject/cargo plugins) +
+ *  tsconfig path-mapping in the JS plugin would lose context and produce
+ *  worse analysis. Chosen specifically from what our existing pipelines
+ *  read at the root level. */
+const ROOT_MANIFEST_FILES: ReadonlySet<string> = new Set([
+  // npm / yarn / pnpm
+  "package.json",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  // Rust
+  "Cargo.toml",
+  "Cargo.lock",
+  // Python
+  "pyproject.toml",
+  "requirements.txt",
+  "Pipfile",
+  "Pipfile.lock",
+  // Go
+  "go.mod",
+  "go.sum",
+  // Java / Kotlin
+  "pom.xml",
+  "build.gradle",
+  "build.gradle.kts",
+  // PHP
+  "composer.json",
+  "composer.lock",
+  // Ruby
+  "Gemfile",
+  "Gemfile.lock",
+  // TypeScript / JavaScript (path mapping)
+  "tsconfig.json",
+  "jsconfig.json",
+]);
+
+/** Normalize + validate a user-supplied subdir spec. Returns the cleaned
+ *  subdir (without leading/trailing slashes), null when input is empty,
+ *  or throws on invalid input.
+ *
+ *  Rejects:
+ *   - path-traversal segments (`..`)
+ *   - absolute paths (handled by stripping leading slash; only invalid
+ *     if the stripped result is still bad)
+ *   - empty path segments (e.g. `foo//bar`)
+ *   - over-long inputs (>200 chars) */
+export function validateSubdir(
+  input: string | null | undefined
+): string | null {
+  if (!input) return null;
+  const trimmed = input.trim().replace(/^\/+|\/+$/g, "");
+  if (trimmed === "") return null;
+  if (trimmed.length > 200) {
+    throw new Error("Subdir is too long (max 200 chars)");
+  }
+  const segments = trimmed.split("/");
+  for (const seg of segments) {
+    if (seg === "" || seg === "." || seg === "..") {
+      throw new Error(
+        `Invalid subdir "${input}" — empty segments and path traversal are not allowed`
+      );
+    }
+  }
+  return trimmed;
+}
+
+/** Build the tar-extract filter callback. Allows entries inside `subdir`
+ *  through, plus root-level manifest files. Everything else is skipped.
+ *
+ *  The filter receives paths BEFORE strip:1 is applied — i.e. paths still
+ *  carry the GitHub top-level dir prefix (`owner-repo-sha/...`). We strip
+ *  the first segment ourselves before matching. */
+function buildSubdirExtractFilter(
+  subdir: string
+): (entryPath: string) => boolean {
+  const subdirSlash = subdir + "/";
+  return (entryPath: string) => {
+    // First-segment strip: equivalent of tar's strip:1 but applied here so
+    // we can match against repo-rel paths.
+    const slashIdx = entryPath.indexOf("/");
+    if (slashIdx < 0) {
+      // The very first archive entry is sometimes the top-level dir name
+      // alone. Letting it through is harmless — tar handles it.
+      return true;
+    }
+    const stripped = entryPath.slice(slashIdx + 1);
+    if (stripped === "") return true; // bare dir-entry, harmless
+
+    // Inside subdir → extract (matches both the dir itself and files
+    // beneath it)
+    if (stripped === subdir || stripped.startsWith(subdirSlash)) {
+      return true;
+    }
+
+    // Top-level manifest file → extract (only single-segment paths
+    // qualify; nested files don't even when their basename matches)
+    if (!stripped.includes("/")) {
+      return ROOT_MANIFEST_FILES.has(stripped);
+    }
+
+    return false;
+  };
+}
+
+/** Distinct error class for "user pointed at a subdir that doesn't exist
+ *  in the repo". The analyzeRepo wrapper distinguishes this from generic
+ *  tarball-extraction failures and re-throws to the caller — falling back
+ *  to a whole-repo analysis would be misleading (user explicitly asked
+ *  for subset scope, the session should reflect that scope or fail). */
+export class SubdirNotFoundError extends Error {
+  readonly subdir: string;
+  constructor(subdir: string) {
+    super(
+      `Subdirectory "${subdir}" not found in this repo. Double-check the path (case-sensitive) and try again.`
+    );
+    this.name = "SubdirNotFoundError";
+    this.subdir = subdir;
+  }
+}
+
+/** After extraction with a subdir filter, verify the subdir actually
+ *  produced output. Otherwise the user supplied a path that doesn't
+ *  exist in the repo — we'd silently analyze just root manifests, which
+ *  is misleading. */
+async function ensureSubdirExtracted(
+  extractDir: string,
+  subdir: string
+): Promise<void> {
+  const target = path.join(extractDir, subdir);
+  try {
+    const stat = await fs.stat(target);
+    if (!stat.isDirectory()) {
+      throw new SubdirNotFoundError(subdir);
+    }
+  } catch (err) {
+    // Preserve our typed error if we just threw it; otherwise wrap stat
+    // failures (ENOENT etc.) as the same.
+    if (err instanceof SubdirNotFoundError) throw err;
+    throw new SubdirNotFoundError(subdir);
+  }
+}
+
+export interface DownloadAndExtractOptions {
+  /** Optional subdirectory to limit extraction to. When set, only files
+   *  beneath this path (plus root-level manifest files) are extracted.
+   *  Reduces disk + parse time for very large repos that would otherwise
+   *  hit our analysis caps. Pass null/undefined to extract the whole
+   *  repo (legacy default). Subdir must already be validated via
+   *  `validateSubdir` — this function throws if it doesn't exist in
+   *  the extracted tarball. */
+  subdir?: string | null;
+}
+
 /** Download a GitHub repo tarball, extract it to a temp dir, return the
  *  extracted-source path plus a cleanup function. Exported so codeAnalysis
  *  can reuse the same primitive for its own pipeline (and a future dev/debug
- *  endpoint) without duplicating tar logic. */
+ *  endpoint) without duplicating tar logic.
+ *
+ *  When `opts.subdir` is set, only files beneath that subdir + root-level
+ *  manifest files are extracted. Original repo-relative paths are
+ *  preserved, so consumers (codeAnalysis, dep-health, etc.) see paths
+ *  identical to a full extraction — no special-casing needed downstream. */
 export async function downloadAndExtract(
   octokit: Octokit,
   owner: string,
   repo: string,
-  ref: string
+  ref: string,
+  opts: DownloadAndExtractOptions = {}
 ): Promise<{ extractDir: string; cleanup: () => Promise<void> }> {
+  const subdir = opts.subdir ?? null;
   const tmpRoot = path.join(os.tmpdir(), `gitvision-${nanoid(8)}`);
   await fs.mkdir(tmpRoot, { recursive: true });
 
@@ -79,14 +240,26 @@ export async function downloadAndExtract(
   const extractDir = path.join(tmpRoot, "src");
   await fs.mkdir(extractDir, { recursive: true });
 
-  // GitHub tarballs have one top-level dir like `owner-repo-<sha>/`. Strip it.
-  await tar.x({
-    file: tarballPath,
-    cwd: extractDir,
-    strip: 1,
-  });
+  // GitHub tarballs have one top-level dir like `owner-repo-<sha>/`. Strip
+  // it. When a subdir is set, we additionally filter to keep only relevant
+  // entries.
+  try {
+    await tar.x({
+      file: tarballPath,
+      cwd: extractDir,
+      strip: 1,
+      filter: subdir ? buildSubdirExtractFilter(subdir) : undefined,
+    });
+    if (subdir) await ensureSubdirExtracted(extractDir, subdir);
+    await fs.unlink(tarballPath).catch(() => {});
+  } catch (err) {
+    // Clean up tmpRoot on tar / validation failure so we don't leak temp
+    // dirs. The cleanup function returned below would normally handle it,
+    // but the caller never gets the chance when we throw.
+    await fs.rm(tmpRoot, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
 
-  await fs.unlink(tarballPath).catch(() => {});
   return {
     extractDir,
     cleanup: async () => {
