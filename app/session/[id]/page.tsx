@@ -109,7 +109,12 @@ export default async function SessionPage({
           </section>
 
           {/* Since last visit */}
-          {diff && <SinceLastVisit diff={diff} />}
+          {diff && (
+            <SinceLastVisit
+              diff={diff}
+              repoFullName={current.repo.fullName}
+            />
+          )}
 
           {/* AI Summary */}
           <AiSummaryPanel sessionId={session.id} snapshot={current} />

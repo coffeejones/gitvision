@@ -80,7 +80,14 @@ describe("filterSessionsByOwner", () => {
   });
 
   it("handles all-ownerless input (all legacy sessions)", () => {
-    const legacyOnly = [{ id: "x" }, { id: "y" }, { id: "z" }];
+    // Annotate the type so TS knows ownerId is at least optionally present
+    // — without the annotation, T is narrowed to `{ id: string }` and the
+    // generic's `extends { ownerId?: string }` constraint isn't satisfied.
+    const legacyOnly: { id: string; ownerId?: string }[] = [
+      { id: "x" },
+      { id: "y" },
+      { id: "z" },
+    ];
     const out = filterSessionsByOwner(legacyOnly, "any-id");
     expect(out).toHaveLength(3);
   });
