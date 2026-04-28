@@ -18,52 +18,54 @@ A desktop-grade repo visualizer that feels like a Figma canvas — paste a GitHu
 
 ---
 
-## Strategy & current focus (post-v0.20)
+## Strategy & current focus (post-v0.25)
 
-GitVision is intentionally **not launching publicly** until the core experience covers most languages and most repos. Decision logged end of session 6 after a strategy discussion: hellere bruge tiden på at finpudse end at risikere et dårligt første-indtryk på en bredere audience.
+GitVision is intentionally **not launching publicly** until the core experience covers most languages and most repos. Decision logged end of session 6: hellere bruge tiden på at finpudse end at risikere et dårligt første-indtryk på en bredere audience.
+
+**Fase 1 + 2 are now COMPLETE** (end of session 7). Kerneproduktet covers 7/8 supported languages on AST + parseDirect AND can analyze any repo that fits within reasonable disk + memory budgets — the 60s Railway request timeout no longer caps the size of analyzable repos. We are now in **Fase 3: polish & wow**.
 
 ### Vision (held open until validated)
 
-A tool people integrate into their daily workflow — solo or team. Not a quick try-it-and-leave SaaS. The bar for launch is therefore high. The "profile · login · upgrade-account" pivot question is genuinely on the table but **paused** until Fase 1 + 2 below are done and we have a product worth showing. Validation comes from real-user signal post-launch, not up-front investment in tier mechanics.
+A tool people integrate into their daily workflow — solo or team. Not a quick try-it-and-leave SaaS. The bar for launch is therefore high. The "profile · login · upgrade-account" pivot question is genuinely on the table but **paused** until Fase 3 lands and we have a product worth showing. Validation comes from real-user signal post-launch, not up-front investment in tier mechanics.
 
 ### Phases (in order)
 
-**Fase 1 — Sprog-coverage (~3-4 aftener total)**
-- v0.21: C# tree-sitter migration. Java-style mønster (package + class FQN indexing), strong type system → Phase 5 type-aware lands cleanly.
-- v0.22: PHP tree-sitter migration. Typed signatures where present (PHP 7+), dynamic elsewhere.
-- v0.23: Ruby tree-sitter migration. Fully dynamic — Phase 5 falls back to same-file / imported-file resolver, containerType still holds for class-method scoping.
-- ⚠️ Kotlin stays blocked (WASM ABI mismatch — see "Next up" section below).
+**✅ Fase 1 — Sprog-coverage (shipped, ~3 aftener total)**
+- ✅ v0.21: C# tree-sitter migration. Java-style mønster (package + class FQN indexing), strong type system → Phase 5 type-aware lands cleanly. Live-validated against `serilog/serilog`: 214 files, 1554 functions, 5580 calls, 40.8% resolved.
+- ✅ v0.22: PHP tree-sitter migration. Typed signatures where present (PHP 7+), dynamic elsewhere. Live-validated against `Seldaek/monolog`: 121 files, 671 functions, 35% resolved.
+- ✅ v0.23: Ruby tree-sitter migration. Fully dynamic — Phase 5 falls back to same-file / imported-file resolver, containerType still holds for class-method scoping. Introduced `ParsedCall.hasReceiver` contract so receiver-having calls without inferable type don't single-candidate-match (cut 76 spurious lib→spec edges in `rspec/rspec-core` to 3). Live-validated: 233 files, 1405 functions, 24,518 calls, 16.2% resolved.
+- ⚠️ Kotlin stays blocked (WASM ABI mismatch with web-tree-sitter@0.26.8 — see "Next up" section below).
 - Outcome: **7 of 8 supported languages on AST + parseDirect**, only Kotlin on regex-fallback.
 
 Grammar smoke-test passed end of session 6: `tree-sitter-c-sharp.wasm` (5.1 MB), `tree-sitter-php.wasm` (1.0 MB), `tree-sitter-ruby.wasm` (2.1 MB) all ship with `@vscode/tree-sitter-wasm@0.3.1` and load + parse cleanly via `web-tree-sitter@0.26.8`. No Kotlin-style ABI surprise.
 
-**Fase 2 — Stor-repo-håndtering (~1-3 uger total)**
-- v0.24: Subset analysis. Let user pick a subdir (`golang/go/src/cmd`) before tarball extract. Fast UX win, low technical risk, gives user agency over scope.
-- v0.25: Job queue + async. `POST /api/sessions` returns `job_id`; frontend polls `/api/jobs/:id` until `done|failed`. No request timeout. The proper fix for chromium / linux-class repos. ~1-2 weeks retrofit.
-- Outcome: **any repo that fits within reasonable disk + memory budgets analyzes successfully**, no silent timeout-skip.
+**✅ Fase 2 — Stor-repo-håndtering (shipped, ~5 aftener total)**
+- ✅ v0.24: Subset analysis. `downloadAndExtract` takes optional `{ subdir }` and uses `tar.x`'s filter callback to keep only entries inside that subdir + a curated list of root-level manifest files (package.json, go.mod, tsconfig.json, …). `validateSubdir` rejects path-traversal / over-long inputs. `SubdirNotFoundError` propagates as a 400 (not silently fallback to whole-repo). UI: collapsed disclosure with auto-fill from `https://github.com/owner/repo/tree/branch/path` deep-links. Live-validated: `golang/go` with `src/cmd` → 1909 files, 22,041 functions, 203,558 call-sites — repos that previously timed out on the codeAnalysis stage now analyze end-to-end on localhost.
+- ✅ v0.25: Job queue + async. `POST /api/sessions` enqueues a job and returns `{ jobId }` in <1s via Next.js's `after()` hook; the analysis runs detached from the HTTP request. Frontend polls `GET /api/jobs/:id` every 2s. File-based job storage (`<DATA_DIR>/jobs/<id>.json`, atomic write via temp+rename) survives Railway redeploys. Orphan-recovery sweep on first request after a fresh server boot marks `pending`/`running` jobs as failed. Same flow used by `POST /api/sessions/:id/refresh` so refresh is also unbounded by request timeout.
+- Outcome: **any repo that fits within reasonable disk + memory budgets analyzes successfully** on Railway, no request-timeout cap.
 
-**Fase 3 — Polish & wow (TBD post-Fase 2)**
+**Fase 3 — Polish & wow (next up)**
 - Refresh banner with real "what changed" narrative (currently functional, not screenshot-worthy alone — fails Guiding-Principle 2).
 - Test-to-code mapping via call-graph (we have the data, UI doesn't surface it).
 - AST-based duplicate detection (subtree-similarity hashes).
 - Per-user session isolation light: anonymous owner-id in localStorage. NOT OAuth — just "don't show other people's sessions on the landing page".
 - CallEdge.toContainerType extension (revisit chip-dedup; right now overloads collapse on the BFS engine — see commit `2d4fede`).
 
-### Explicitly paused — revisit after Fase 2
+### Explicitly paused — revisit after Fase 3
 
 Real items, intentionally on hold:
 
-- ~~OAuth / "Login with GitHub"~~ — pivot question, not feature. Fase 2's outcome tells us if the SaaS-platform direction is justified.
+- ~~OAuth / "Login with GitHub"~~ — pivot question, not feature. Validates whether the SaaS-platform direction is justified; defer until kerneproduktet is polished enough that real users come back day 2+.
 - ~~Token-felt as launch fallback~~ — would be obviated by OAuth; no point doing both.
 - ~~Launch-prep~~ (landing copy, public-beta framing, feedback channel, analytics tagging).
 - ~~"Upgrade account" / SaaS billing~~ — depends entirely on real-user signal post-launch.
-- ~~Stor-repo gate as graceful-skip patch~~ — Fase 2's job queue makes it unnecessary.
+- ~~Stor-repo gate as graceful-skip patch~~ — Fase 2's job queue obsoleted it.
 
-The 6-step launch-readiness list discussed end of session 6 is on hold until kerneproduktet is "good enough for users" — defined as Fase 1 + 2 landing.
+The 6-step launch-readiness list discussed end of session 6 stays on hold until Fase 3 lands.
 
 ---
 
-## Current state (v0.20, end of session 6)
+## Current state (v0.25, end of session 7)
 
 ### What works end-to-end
 
@@ -100,8 +102,8 @@ The 6-step launch-readiness list discussed end of session 6 is on hold until ker
 - **Refresh:** append snapshot, show "Since your last visit" diff banner with emerald gradient.
 - **Session CRUD:** rename, delete, multiple sessions. Session actions grouped: Share dropdown (Wrapped / Share card / Screenshot), primary Refresh, overflow menu for Delete.
 - **Rate-limit aware:** shows remaining in footer.
-- **Code tab (v0.11, function-level blast radius added in v0.20):** AST-based blast-radius UI on top of the codeAnalysis pipeline. Picks the heaviest file by default, shows incoming + outgoing dependency hops (3 deep, capped at 200 files per direction), the file's top-6 functions in the header (now clickable), plus side-by-side "heaviest files" and "most complex functions" lists for quick navigation. **Click a function chip or a top-functions item → zooms into function-level blast radius**: callers (functions that call this) and callees (functions this calls), same hop-3 / cap-200 BFS, distinct icons (PhoneIncoming/PhoneOutgoing). Empty-state hint when a function has no resolved calls (regex-fallback file or leaf-level). Coverage chip is honest: full call-graph + complexity for JS/TS, imports only for the 7 fallback languages. New snapshots get `codeGraph` populated automatically; old snapshots show an empty state pointing to the Refresh button.
-- **Code-analysis pipeline (v0.10 foundation):** AST-based parser for JS/TS via tree-sitter (WASM), regex-fallback for the other 7 languages, unified `CodeGraph` aggregate persisted on every fresh snapshot since Phase 4a. Also exposed standalone via `/api/debug/code-analysis` for live testing and `npm run analyze <path>` for local inspection. See "Code-analysis pipeline" below.
+- **Code tab (v0.11, function-level blast radius added in v0.20):** AST-based blast-radius UI on top of the codeAnalysis pipeline. Picks the heaviest file by default, shows incoming + outgoing dependency hops (3 deep, capped at 200 files per direction), the file's top-6 functions in the header (now clickable), plus side-by-side "heaviest files" and "most complex functions" lists for quick navigation. **Click a function chip or a top-functions item → zooms into function-level blast radius**: callers (functions that call this) and callees (functions this calls), same hop-3 / cap-200 BFS, distinct icons (PhoneIncoming/PhoneOutgoing). Empty-state hint when a function has no resolved calls. Coverage chip (generalized in v0.21) sums across every AST plugin and lists active languages inline ("214 AST files (C#)"). New snapshots get `codeGraph` populated automatically; old snapshots show an empty state pointing to the Refresh button.
+- **Code-analysis pipeline (v0.10 foundation, expanded through v0.23):** AST-based parsers via tree-sitter (WASM) for **7 of 8 supported languages** (JS/TS, Python, Go, Java, C#, PHP, Ruby); regex-fallback only handles Kotlin (blocked by WASM ABI mismatch) plus HTML/CSS as render-target file types. Unified `CodeGraph` aggregate persisted on every fresh snapshot since Phase 4a. Also exposed standalone via `/api/debug/code-analysis` for live testing and `npm run analyze <path>` for local inspection. See "Code-analysis pipeline" below.
 
 ### Dependency-health pipeline (v0.9 architecture)
 
@@ -370,7 +372,7 @@ Estimated 1-2 weeks to retrofit. Not blocking anything else right now.
 - **PR review stages not tracked** — sankey is Opened → Outcome → duration.
 - **Linux-kernel-sized repos won't fit** — 10k commit / 120k file-change caps protect the server.
 - **Monorepo hotspots still dominated by version-bump files.** Metadata-dominance signal flags it; the `hide-metadata` canvas toggle masks it in the visual.
-- **JS/TS code analysis is AST-based (tree-sitter); the other 7 languages still go through regex.** Functions, call-graph and complexity are JS/TS-only as of v0.10 — regex-fallback contributes imports only. Migrating each of Java/Kotlin/C#/PHP/Ruby/Python/Go to tree-sitter is one plugin file each, no architectural work.
+- **7 of 8 languages on AST + parseDirect with Phase 5 type-aware** (JS/TS, Python, Go, Java, C#, PHP, Ruby — see migration history v0.10 / v0.12 / v0.13 / v0.14 / v0.21 / v0.22 / v0.23). Only Kotlin remains on regex-fallback (`tree-sitter-wasms@0.1.13`'s Kotlin grammar is ABI-incompatible with `web-tree-sitter@0.26.8`; the maintained alternative ships only `.c` source — needs Emscripten setup we haven't tackled yet).
 - **Dep-health ecosystem coverage:** npm / Cargo / PyPI only as of v0.9. Go / Maven / NuGet / etc. are plugin-additions (one file each) — not architectural work.
 - **React Flow console warning** about fresh `nodeTypes` object refs — harmless but noisy.
 
@@ -400,7 +402,17 @@ lib/__tests__/
                             for Java/Python/Go (9 tests)
 ```
 
-**278 tests total, all passing.** Run with `npm test` (watch) or `npm run test:run` (CI). v0.17 added 12 tests in `codeAnalysis.test.ts` for TS/JS type-aware (class fields, constructor parameter properties, method params, typed locals, `new Foo()` inference, generic stripping, `this.method()`, multi-field disambiguation, JS-bare-calls-stay-undefined behavior, arrow-functions-as-named). v0.18 added 10 tests in `python.test.ts` for Python type-aware (containerType, self.method() resolution, PEP 526 fields, typed params, typed locals, `x = SomeClass()` constructor inference, generic stripping for both `subscript` and `generic_type` shapes, untyped fallthrough, multi-field disambiguation, __init__ self.X = typed-param patterns). v0.20 added 10 tests in `blastRadius.test.ts` for function-level blast radius (callers, callees, transitive hops, module-scope skip, unresolved skip, same-name disambiguation across files, function-level cycles, maxHops cap, maxNodes cap with "functions" unit message).
+**393 tests total, all passing.** Run with `npm test` (watch) or `npm run test:run` (CI).
+
+Test-count history:
+- v0.17 added 12 in `codeAnalysis.test.ts` for TS/JS type-aware (class fields, constructor parameter properties, method params, typed locals, `new Foo()` inference, generic stripping, `this.method()`, multi-field disambiguation, JS-bare-calls-stay-undefined behavior, arrow-functions-as-named).
+- v0.18 added 10 in `python.test.ts` for Python type-aware (containerType, self.method() resolution, PEP 526 fields, typed params, typed locals, `x = SomeClass()` constructor inference, generic stripping for both `subscript` and `generic_type` shapes, untyped fallthrough, multi-field disambiguation, __init__ self.X = typed-param patterns).
+- v0.20 added 10 in `blastRadius.test.ts` for function-level blast radius (callers, callees, transitive hops, module-scope skip, unresolved skip, same-name disambiguation across files, function-level cycles, maxHops cap, maxNodes cap with "functions" unit message).
+- v0.21 added 24 in `csharp.test.ts` + 2 in `codeGraph.test.ts` for `pickCallTarget` strict-typing semantics (typed receiver that doesn't match → unresolved, not silently fallthrough).
+- v0.22 added 25 in `php.test.ts`.
+- v0.23 added 24 in `ruby.test.ts` + 3 in `codeGraph.test.ts` for the `hasReceiver` contract (receiver-having calls without resolved type refuse single-candidate-match).
+- v0.24 added 17 in `subdir.test.ts` covering `validateSubdir` (path-traversal rejection, length cap, leading-slash strip) and `parseDeepLinkSubdir` (multi-segment / single-segment / non-github URLs / branch-with-slash heuristic limitation).
+- v0.25 added 20 in `jobs.test.ts` covering filesystem CRUD, atomic-write contract, `processJob` idempotency across all four states, `recoverOrphanedJobs` on cold start + mixed states + corrupted files.
 
 Tests have caught real bugs at every stage: v0.8 found `lib/` incorrectly in `OUTPUT_LIKE_FOLDERS`; v0.10 caught query-syntax issues and the `../../` trailing-slash edge case before they shipped to production.
 
@@ -464,20 +476,26 @@ Ranked "bang per buck". ✅ = shipped.
 - ✅ v0.17 — **Phase 5c: type-aware call resolution for TypeScript** (and its JS-family siblings, where containerType still applies). javascriptPlugin switched to parseDirect with manual AST walk: tracks `public_field_definition` types, constructor parameter properties (TS shorthand: `constructor(private x: Foo)` creates an implicit `this.x: Foo`), method parameter types via `required_parameter`, typed local `const x: Foo = ...`, and `new Foo()` initializer inference for untyped const declarations. Critical JS-vs-Java/Go difference handled: bare calls inside JS methods do NOT get implicit-this, because that's not how JS works.
 - ✅ v0.18 — **Phase 5d: type-aware call resolution for Python.** parseDirect walks class bodies for PEP-526 annotated attributes (`name: Type`), `__init__` self.X assignments (when the source param has a type hint, the field inherits it), function parameter type hints (`def f(x: Foo)`), and typed local assignments (`x: Foo = ...`). Class instantiation patterns like `x = Widget()` are recognized as constructor calls and the variable gets the class type. self/cls in class methods automatically resolve to the enclosing class. Untyped Python falls back to name-match gracefully.
 
-**Phase 5 is complete.** All 4 statically-typed languages we support (JS/TS family, Python, Go, Java) now do deterministic type-aware call resolution where their grammar provides type information. The plugin contract has held up cleanly across four very different type systems.
+**Phase 5 is complete across all 7 AST-supported languages** (JS/TS, Python, Go, Java, C#, PHP, Ruby). Statically-typed languages do deterministic type-aware call resolution; dynamically-typed languages (Ruby, parts of Python/PHP) fall back gracefully to proximity heuristics. The plugin contract has held up cleanly across very different type systems.
 
-- ✅ v0.20 — **Function-level blast radius + curated demo row.** `computeFunctionBlastRadius(cg, file, fnName)` shares the BFS engine with the file-level version but uses CallEdge endpoints (fromFile, fromFunction) → (toFile, toFunction); module-scope and unresolved calls are skipped. UI: clicking a function chip in the SelectedFileHeader OR an item in TopFunctionsList zooms into function mode, "back to file" button restores file mode. BlastSection refactored to a generic two-line entry shape so file mode shows just the path and function mode shows function name + muted file path underneath. Landing page demo row replaced with a curated 4-pick set spanning each AST plugin (zod TS, gin Go, flask Python, spring-petclinic Java) with muted language labels — small enough to stay under the 25s codeAnalysis timeout.
+- ✅ v0.20 — **Function-level blast radius + curated demo row.** `computeFunctionBlastRadius(cg, file, fnName)` shares the BFS engine with the file-level version but uses CallEdge endpoints (fromFile, fromFunction) → (toFile, toFunction); module-scope and unresolved calls are skipped. UI: clicking a function chip in the SelectedFileHeader OR an item in TopFunctionsList zooms into function mode, "back to file" button restores file mode. BlastSection refactored to a generic two-line entry shape so file mode shows just the path and function mode shows function name + muted file path underneath. Landing page demo row replaced with a curated 4-pick set spanning each AST plugin (zod TS, gin Go, flask Python, spring-petclinic Java) with muted language labels.
+- ✅ v0.21 — **C# tree-sitter migration + chip multi-plugin + pickCallTarget strict-typing.** First Fase-1 migration. Live-validated on serilog/serilog: 145 false-positive resolutions eliminated by the strict-typing fix (typed receivers that don't match any candidate's containerType refuse to silently fallthrough to single-candidate-match). CoverageChip generalized to sum across every AST plugin (was hardcoded to read javascript-only stats — gave "0 call-sites" on a 100% C# repo).
+- ✅ v0.22 — **PHP tree-sitter migration.** Property + parameter type tracking (PHP 7+), constructor parameter promotion (PHP 8+), `else_if_clause` as its own decision-point node. Live-validated on Seldaek/monolog.
+- ✅ v0.23 — **Ruby tree-sitter migration + `hasReceiver` contract for dynamic langs.** First fully-dynamic language. Phase 5 type-aware works only via constructor-initializer inference (`x = SomeClass.new`, `@x = SomeClass.new`). `Klass.new` is rewritten to `initialize` for constructor matching. New `ParsedCall.hasReceiver?: boolean` lets `pickCallTarget` refuse single-candidate-match when receiver was present but type unknown — cut 76 spurious lib→spec edges in rspec-core to 3 (97% reduction).
+- ✅ v0.24 — **Subset analysis.** `downloadAndExtract` filter callback keeps only entries inside the subdir + a curated list of root-level manifest files. `validateSubdir` + `SubdirNotFoundError` for clean error handling. UI: collapsed disclosure with auto-fill from `https://github.com/owner/repo/tree/branch/path` deep-links. Live: golang/go src/cmd → 1909 files, 22,041 functions, 203,558 call-sites (previously hit 25s codeAnalysis timeout).
+- ✅ v0.25 — **Job queue + async (Fase 2 complete).** `POST /api/sessions` enqueues a job via Next.js's `after()` hook and returns `{ jobId }` in <1s; the analysis runs detached from the HTTP request. Frontend polls `GET /api/jobs/:id` every 2s until terminal state. File-based job storage with atomic writes (temp+rename), survives Railway redeploys. Orphan-recovery sweep on first request after a fresh server boot. Same flow used by Refresh.
 
-### Next up — Fase 1 of the post-v0.20 roadmap
+### Next up — Fase 3: polish & wow
 
-See the "Strategy & current focus" section near the top for full context. Fase 1 is the sprog-coverage push:
+See the "Strategy & current focus" section near the top for full phase context. Candidates ordered by my best guess at user-facing impact:
 
-- **v0.21 — C# migration.** Up next. Smoke-tested at end of session 6 (`tree-sitter-c-sharp.wasm` shipped via `@vscode/tree-sitter-wasm@0.3.1`, loads + parses cleanly). Java-style FQN indexing pattern transfers; Phase 5 type-aware should land naturally.
-- **v0.22 — PHP migration.**
-- **v0.23 — Ruby migration.**
-- ⚠️ **Kotlin migration: blocked.** Attempted in v0.20 — `tree-sitter-wasms@0.1.13`'s Kotlin grammar fails ABI compatibility with `web-tree-sitter@0.26.8` (`failIf` at `getDylinkMetadata`). The maintained alternative `@tree-sitter-grammars/tree-sitter-kotlin@1.1.0` ships only `.c` source — building WASM ourselves needs Emscripten setup. Kotlin stays on regex-fallback until a compatible WASM grammar appears upstream.
+- **Refresh banner narrative.** "Since your last visit" works but reads as metadata diff, not as a story. Should be screenshot-worthy alone — failing Guiding-Principle 2.
+- **Anonymous owner-id session isolation.** Lightweight: write a UUID to localStorage on first visit, attach to every session-create, filter the landing page sessions list to "yours". NOT OAuth — no sign-up flow, no server-side identity. Defaults the soft-launch UX (no "47 random people's sessions" first-impression).
+- **CallEdge.toContainerType extension.** Resolves chip-dedup limitation from v0.20 (commit `2d4fede`): currently same-named overloads collapse on the BFS engine because CallEdge only tracks toFunction by string. Adding toContainerType lets us treat `Blueprint.__init__` and `BlueprintSetupState.__init__` as separate function-blast-radius targets.
+- **Test-to-code mapping.** Use call-graph data to identify which test files exercise which production functions. UI surface: per-function "tested by" list, per-file test coverage estimate.
+- **AST-based duplicate detection.** Subtree-similarity hashes across all AST-parsed files. UI surface: "X functions look near-identical" panel in the Code tab.
 
-Other items (test-to-code mapping, AST duplicate detection) move to Fase 3 in the strategy section.
+⚠️ **Kotlin migration: still blocked.** Attempted in v0.20 — `tree-sitter-wasms@0.1.13`'s Kotlin grammar fails ABI compatibility with `web-tree-sitter@0.26.8` (`failIf` at `getDylinkMetadata`). The maintained alternative `@tree-sitter-grammars/tree-sitter-kotlin@1.1.0` ships only `.c` source — building WASM ourselves needs Emscripten setup. Kotlin stays on regex-fallback until a compatible WASM grammar appears upstream.
 
 ### Dep-health follow-ups (small, anytime)
 
@@ -570,4 +588,4 @@ Sessions stored in `.gitvision/sessions/` — not committed, machine-local.
 
 ---
 
-*Last updated: end of session 6 (v0.20 + strategy decision — function-level blast radius landed in the Code tab; landing page demo row replaced with a curated set spanning each AST plugin; Kotlin migration attempted and rolled back due to WASM ABI mismatch; chip-dedup follow-up shipped as `2d4fede`. Strategy discussion at end of session: deliberate decision to NOT launch publicly until Fase 1 (sprog-coverage: C#/PHP/Ruby tree-sitter migrations) and Fase 2 (stor-repo-håndtering: subset analysis + job queue) are complete. OAuth / launch-prep / upgrade-account explicitly paused. Vision: integrated work-tool, validated by real-user signal post-launch — not a quick try-it-and-leave SaaS.).*
+*Last updated: end of session 7 (Fase 1 + Fase 2 complete). Five releases shipped in this session-cluster: v0.21 C# migration + pickCallTarget strict-typing, v0.22 PHP migration, v0.23 Ruby migration + `hasReceiver` contract, v0.24 subset analysis, v0.25 job queue + async. 7 of 8 supported languages now on AST + parseDirect (only Kotlin remains on regex-fallback, blocked by WASM ABI). Big-repo handling: subset analysis lets users scope to a subdir, job queue runs analyses detached from the HTTP request — Railway's request timeout no longer caps repo size. Test-count history: 268 (v0.20 entry) → 393 (end of session 7). Next up: Fase 3 (refresh-banner narrative, anonymous owner-id session isolation, CallEdge.toContainerType extension, test-to-code mapping, AST duplicate detection). OAuth / launch-prep / upgrade-account remain paused — revisit after Fase 3.*
