@@ -24,6 +24,10 @@ export async function createSession(params: {
   repoUrl: string;
   name: string;
   initialSnapshot: AnalysisSnapshot;
+  /** Anonymous owner-id supplied by the client via the X-Owner-Id header
+   *  (v0.26+). Optional for backward compat with internal callers; in
+   *  practice every session created through the API now carries one. */
+  ownerId?: string;
 }): Promise<Session> {
   await ensureDir();
   const now = new Date().toISOString();
@@ -31,6 +35,7 @@ export async function createSession(params: {
     id: nanoid(10),
     name: params.name,
     repoUrl: params.repoUrl,
+    ownerId: params.ownerId,
     createdAt: now,
     updatedAt: now,
     snapshots: [params.initialSnapshot],
@@ -68,6 +73,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
           createdAt: session.createdAt,
           updatedAt: session.updatedAt,
           snapshotCount: session.snapshots.length,
+          ownerId: session.ownerId,
         });
       } catch {
         // skip corrupted session file

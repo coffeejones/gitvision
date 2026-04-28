@@ -1,11 +1,10 @@
 // Landing page — Linear-lighter direction.
 // URL input, demo chips, how-it-works, saved sessions as a clean list.
 
-import Link from "next/link";
 import { listSessions } from "@/lib/storage";
 import { TOK } from "@/lib/theme";
 import { RepoInputForm, type DemoRepo } from "@/components/RepoInputForm";
-import { SessionRow } from "@/components/SessionRow";
+import { HomeSessionsList } from "@/components/HomeSessionsList";
 
 export const dynamic = "force-dynamic";
 
@@ -115,50 +114,8 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Sessions */}
-      <section className="flex flex-col gap-5">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">
-            Your sessions
-          </h2>
-          <div className="text-xs" style={{ color: TOK.textMuted }}>
-            {sessions.length} saved
-          </div>
-        </div>
-
-        {sessions.length === 0 ? (
-          <div
-            className="rounded-xl border border-dashed p-10 text-center text-sm"
-            style={{
-              borderColor: TOK.border,
-              color: TOK.textMuted,
-            }}
-          >
-            No sessions yet. Paste a URL above to start.
-          </div>
-        ) : (
-          <div
-            className="rounded-xl overflow-hidden"
-            style={{
-              background: TOK.surface,
-              border: `1px solid ${TOK.border}`,
-            }}
-          >
-            {sessions.map((s, i) => (
-              <Link
-                key={s.id}
-                href={`/session/${s.id}`}
-                className="block"
-              >
-                <SessionRow
-                  session={s}
-                  isLast={i === sessions.length - 1}
-                />
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* Sessions — filtered client-side by anonymous owner-id (v0.26+) */}
+      <HomeSessionsList initialSessions={sessions} />
 
       {/* Footer */}
       <footer

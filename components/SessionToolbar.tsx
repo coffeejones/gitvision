@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { pollJob } from "@/lib/jobsClient";
+import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { TOK } from "@/lib/theme";
 import { ShareCardModal } from "./ShareCardModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
@@ -92,8 +93,10 @@ export function SessionToolbar({
         // POST returns immediately with a jobId — actual refresh runs
         // detached via Next.js's after(). Same big-repo-friendly flow as
         // session-create.
+        const ownerId = getOrCreateOwnerId();
         const res = await fetch(`/api/sessions/${sessionId}/refresh`, {
           method: "POST",
+          headers: ownerId ? { [OWNER_ID_HEADER]: ownerId } : {},
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -118,7 +121,16 @@ export function SessionToolbar({
   function remove() {
     if (!confirm(`Delete session "${sessionName}"? This cannot be undone.`)) return;
     startDelete(async () => {
-      await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+      const ownerId = getOrCreateOwnerId();
+      const res = await fetch(`/api/sessions/${sessionId}`, {
+        method: "DELETE",
+        headers: ownerId ? { [OWNER_ID_HEADER]: ownerId } : {},
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setMessage(data.error || `Delete failed (HTTP ${res.status})`);
+        return;
+      }
       router.push("/");
       router.refresh();
     });

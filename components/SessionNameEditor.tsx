@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { TOK } from "@/lib/theme";
 
 export function SessionNameEditor({
@@ -25,9 +26,13 @@ export function SessionNameEditor({
       setName(initialName);
       return;
     }
+    const ownerId = getOrCreateOwnerId();
     await fetch(`/api/sessions/${sessionId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(ownerId ? { [OWNER_ID_HEADER]: ownerId } : {}),
+      },
       body: JSON.stringify({ name: trimmed }),
     });
     setEditing(false);

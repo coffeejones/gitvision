@@ -9,6 +9,7 @@ import { z } from "zod";
 import { parseRepoUrl } from "@/lib/github";
 import { validateSubdir } from "@/lib/graph";
 import { createJob, processJob } from "@/lib/jobs";
+import { OWNER_ID_HEADER } from "@/lib/ownerId";
 import { listSessions } from "@/lib/storage";
 
 const CreateSchema = z.object({
@@ -53,6 +54,12 @@ export async function POST(req: Request) {
     );
   }
 
+  // Read the anonymous owner-id from the X-Owner-Id header (v0.26+).
+  // The client populates this from localStorage; absent header means an
+  // older client or a direct curl call — we accept it and the resulting
+  // session has no owner (legacy treatment, visible to anyone).
+  const ownerId = req.headers.get(OWNER_ID_HEADER) ?? undefined;
+
   // Enqueue the job. processJob runs detached via after() — the HTTP
   // request returns in <1s regardless of how long the actual analysis
   // takes. This is what unlocks repos like golang/go on Railway.
@@ -61,6 +68,7 @@ export async function POST(req: Request) {
     repoUrl: parsed.data.repoUrl,
     sessionName: parsed.data.name,
     subdir,
+    ownerId,
   });
   after(() => processJob(job.id));
   return NextResponse.json({ jobId: job.id });

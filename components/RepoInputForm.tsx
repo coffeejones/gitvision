@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { parseDeepLinkSubdir } from "@/lib/githubUrl";
 import { pollJob } from "@/lib/jobsClient";
+import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { TOK } from "@/lib/theme";
 
 // Stage labels + rough durations (ms) used to drive the indeterminate loading UI.
@@ -101,9 +102,13 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
         // POST returns immediately with a jobId — the actual analysis runs
         // in the background via Next.js's after() hook, so big repos
         // (golang/go, etc.) don't hit Railway's request timeout.
+        const ownerId = getOrCreateOwnerId();
         const res = await fetch("/api/sessions", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(ownerId ? { [OWNER_ID_HEADER]: ownerId } : {}),
+          },
           body: JSON.stringify({
             repoUrl: value.trim(),
             ...(trimmedSubdir ? { subdir: trimmedSubdir } : {}),

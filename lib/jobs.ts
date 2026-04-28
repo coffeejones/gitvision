@@ -168,6 +168,7 @@ async function runCreateSession(job: Job): Promise<void> {
     repoUrl: job.input.repoUrl,
     name: job.input.sessionName || snapshot.repo.fullName,
     initialSnapshot: snapshot,
+    ownerId: job.input.ownerId,
   });
   await patchJob(job.id, { status: "done", sessionId: session.id });
 }

@@ -276,6 +276,11 @@ export interface Session {
   repoUrl: string;
   createdAt: string;
   updatedAt: string;
+  /** Anonymous owner-id from the creator's localStorage (v0.26+).
+   *  Soft-isolates sessions on the landing page list. Sessions created
+   *  before this field existed have ownerId undefined; they remain
+   *  visible + editable for everyone (backward compat). */
+  ownerId?: string;
   // All snapshots kept for "since last visit" diffs. Latest = current view.
   snapshots: AnalysisSnapshot[];
 }
@@ -288,6 +293,9 @@ export interface SessionSummary {
   createdAt: string;
   updatedAt: string;
   snapshotCount: number;
+  /** Mirrors Session.ownerId so the landing page can filter without
+   *  reading the full Session record. Undefined for legacy sessions. */
+  ownerId?: string;
 }
 
 // ------------------- Jobs (v0.25) -------------------
@@ -307,6 +315,10 @@ export type JobInput =
       repoUrl: string;
       subdir: string | null;
       sessionName?: string;
+      /** Anonymous owner-id from the requester's X-Owner-Id header
+       *  (v0.26+). Persisted on the resulting Session so future requests
+       *  can be checked against it for soft ownership enforcement. */
+      ownerId?: string;
     }
   | {
       kind: "refresh-session";

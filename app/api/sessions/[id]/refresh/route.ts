@@ -7,14 +7,30 @@ import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { parseRepoUrl } from "@/lib/github";
 import { createJob, processJob } from "@/lib/jobs";
+import { OWNER_ID_HEADER } from "@/lib/ownerId";
 import { getSession } from "@/lib/storage";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function POST(_req: Request, ctx: Ctx) {
+export async function POST(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const session = await getSession(id);
   if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Refresh creates a new snapshot — that's a mutation. Enforce
+  // ownership unless the session is legacy (no ownerId).
+  if (session.ownerId) {
+    const callerOwnerId = req.headers.get(OWNER_ID_HEADER);
+    if (callerOwnerId !== session.ownerId) {
+      return NextResponse.json(
+        {
+          error:
+            "This session belongs to a different browser. Open the original tab to refresh it, or create a new analysis.",
+        },
+        { status: 403 }
+      );
+    }
+  }
 
   const parsed = parseRepoUrl(session.repoUrl);
   if (!parsed) {
