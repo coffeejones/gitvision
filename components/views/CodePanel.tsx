@@ -27,6 +27,7 @@ import {
   ChevronRight,
   Code as CodeIcon,
   FileCode,
+  Copy,
   FlaskConical,
   PhoneIncoming,
   PhoneOutgoing,
@@ -47,6 +48,11 @@ import {
   computeTestCoverage,
   type TestCoverage,
 } from "@/lib/codeAnalysis/testCoverage";
+import {
+  findDuplicateGroups,
+  summarizeDuplicates,
+  type DuplicateGroup,
+} from "@/lib/codeAnalysis/duplicates";
 
 const INITIAL_LIST_SIZE = 10;
 const EXPANDED_LIST_SIZE = 60;
@@ -113,6 +119,10 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
   // v0.29: test-to-code coverage. Pure-function compute — fast enough to
   // recompute on every cg change without memoizing more aggressively.
   const coverage = useMemo(() => computeTestCoverage(cg), [cg]);
+
+  // v0.30: structural duplicate detection. Runs in browser; the heavy
+  // lifting (AST hashing) already happened server-side at analysis time.
+  const duplicateGroups = useMemo(() => findDuplicateGroups(cg), [cg]);
 
   const fnBlast = useMemo(() => {
     if (!selected || !selectedFunction) return null;
@@ -205,6 +215,17 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
             onPick={pickFunction}
           />
         )}
+
+      {/* Near-duplicate functions — v0.30 actionable insight panel. Only
+       *  renders when at least one group of structurally-identical functions
+       *  was found above the complexity floor. Brand-new / tiny repos that
+       *  have no real duplicates skip this panel entirely. */}
+      {duplicateGroups.length > 0 && (
+        <NearDuplicatesPanel
+          groups={duplicateGroups}
+          onPick={pickFunction}
+        />
+      )}
 
       {/* Twin lists: heavy files + top complex functions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -967,6 +988,237 @@ function UntestedHotspotsPanel({
             </button>
           </li>
         ))}
+      </ul>
+    </div>
+  );
+}
+
+// ------------------- Near-duplicates panel (v0.30) -------------------
+
+/** Grouped list of structurally-identical functions. Each group expands to
+ *  reveal every member; clicking a member zooms the blast radius into that
+ *  exact (file, name, containerType) tuple so users can immediately see who
+ *  depends on each copy.
+ *
+ *  We default the most-painful group expanded (top of the list, highest
+ *  groupSize × maxComplexity) so the panel tells a story at a glance:
+ *  "this 23-line block of logic exists in 5 different files — here they are."
+ *  Subsequent groups are collapsed to keep the panel scannable. */
+function NearDuplicatesPanel({
+  groups,
+  onPick,
+}: {
+  groups: DuplicateGroup[];
+  onPick: (file: string, fnName: string, containerType?: string) => void;
+}) {
+  const stats = summarizeDuplicates(groups);
+  // Track which groups are expanded. Default: only the first (worst) group
+  // is open so the panel previews the worst offender without flooding the
+  // viewport when there are 15 groups.
+  const [openGroups, setOpenGroups] = useState<Set<string>>(
+    () => new Set(groups[0] ? [groups[0].hash] : [])
+  );
+
+  function toggle(hash: string) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(hash)) next.delete(hash);
+      else next.add(hash);
+      return next;
+    });
+  }
+
+  return (
+    <div
+      className="rounded-xl p-5 flex flex-col gap-4"
+      style={{
+        background: TOK.surface,
+        border: `1px solid ${TOK.border}`,
+      }}
+    >
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Copy size={15} style={{ color: TOK.accent }} />
+          <span
+            className="text-xs uppercase tracking-wider font-medium"
+            style={{ color: TOK.textPrimary, letterSpacing: "0.08em" }}
+          >
+            Near-duplicate functions
+          </span>
+          <span style={{ color: TOK.textMuted }}>·</span>
+          <span className="text-xs" style={{ color: TOK.textSecondary }}>
+            structurally identical bodies — candidates for extraction
+          </span>
+        </div>
+        <span
+          className="text-[11px] font-mono inline-flex items-center gap-1.5"
+          style={{ color: TOK.textMuted }}
+          title={`${stats.totalDuplicateFunctions} duplicate functions across ${stats.totalGroups} groups; the largest group has ${stats.largestGroupSize} copies`}
+        >
+          {stats.totalGroups} groups · {stats.totalDuplicateFunctions} fns ·
+          largest ×{stats.largestGroupSize}
+        </span>
+      </div>
+
+      <ul className="flex flex-col gap-1.5">
+        {groups.map((g) => {
+          const isOpen = openGroups.has(g.hash);
+          const first = g.members[0];
+          return (
+            <li
+              key={g.hash}
+              className="rounded-lg"
+              style={{
+                background: TOK.bg,
+                border: `1px solid ${TOK.border}`,
+              }}
+            >
+              <button
+                onClick={() => toggle(g.hash)}
+                className="w-full flex items-center gap-3 py-2 px-2.5 rounded-lg text-left transition cursor-pointer"
+                style={{ color: TOK.textSecondary }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = TOK.surfaceElevated;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+                title={
+                  isOpen
+                    ? "Click to collapse this group"
+                    : "Click to expand and see every copy"
+                }
+              >
+                <span
+                  className="text-[10px] font-mono tabular-nums w-10 text-right"
+                  style={{ color: complexityColor(g.maxComplexity) }}
+                  title={`Highest complexity in group: ${g.maxComplexity}`}
+                >
+                  {g.maxComplexity}
+                </span>
+                <span
+                  className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded shrink-0"
+                  style={{
+                    background: TOK.surfaceElevated,
+                    color: TOK.accent,
+                    border: `1px solid ${TOK.accent}33`,
+                  }}
+                  title={`${g.members.length} structurally identical copies`}
+                >
+                  ×{g.members.length}
+                </span>
+                <div className="flex-1 min-w-0 flex flex-col">
+                  <span
+                    className="text-xs font-mono truncate"
+                    style={{ color: TOK.textPrimary }}
+                    title={
+                      first.containerType
+                        ? `${first.containerType}.${first.name}`
+                        : first.name
+                    }
+                  >
+                    {first.containerType && (
+                      <span style={{ color: TOK.textMuted }}>
+                        {first.containerType}.
+                      </span>
+                    )}
+                    {first.name}
+                    {g.members.length > 1 && (
+                      <span style={{ color: TOK.textMuted }}>
+                        {" "}
+                        + {g.members.length - 1} more
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    className="text-[10px] font-mono truncate"
+                    style={{ color: TOK.textMuted }}
+                    title={first.filePath}
+                  >
+                    {first.filePath}
+                  </span>
+                </div>
+                {isOpen ? (
+                  <ChevronDown
+                    size={14}
+                    style={{ color: TOK.textMuted }}
+                  />
+                ) : (
+                  <ChevronRight
+                    size={14}
+                    style={{ color: TOK.textMuted }}
+                  />
+                )}
+              </button>
+
+              {isOpen && (
+                <ul
+                  className="flex flex-col gap-0.5 px-2 pb-2"
+                  style={{ borderTop: `1px solid ${TOK.border}` }}
+                >
+                  {g.members.map((m, idx) => (
+                    <li key={`${m.filePath}:${m.containerType ?? ""}:${m.name}@${m.startRow}`}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPick(m.filePath, m.name, m.containerType);
+                        }}
+                        className="w-full flex items-center gap-3 py-1 px-2 rounded text-left transition mt-1"
+                        style={{ color: TOK.textSecondary }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = TOK.surfaceElevated;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                        }}
+                        title="Click to zoom blast radius into this copy"
+                      >
+                        <span
+                          className="text-[9px] font-mono tabular-nums w-5 text-right"
+                          style={{ color: TOK.textMuted }}
+                        >
+                          {idx + 1}
+                        </span>
+                        <span
+                          className="text-[10px] font-mono tabular-nums w-8 text-right"
+                          style={{ color: complexityColor(m.complexity) }}
+                          title={`complexity ${m.complexity}`}
+                        >
+                          {m.complexity}
+                        </span>
+                        <div className="flex-1 min-w-0 flex flex-col">
+                          <span
+                            className="text-[11px] font-mono truncate"
+                            style={{ color: TOK.textPrimary }}
+                            title={
+                              m.containerType
+                                ? `${m.containerType}.${m.name}`
+                                : m.name
+                            }
+                          >
+                            {m.containerType && (
+                              <span style={{ color: TOK.textMuted }}>
+                                {m.containerType}.
+                              </span>
+                            )}
+                            {m.name}
+                          </span>
+                          <span
+                            className="text-[10px] font-mono truncate"
+                            style={{ color: TOK.textMuted }}
+                            title={m.filePath}
+                          >
+                            {m.filePath}:{m.startRow + 1}
+                          </span>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

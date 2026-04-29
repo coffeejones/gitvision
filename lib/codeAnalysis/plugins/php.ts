@@ -47,6 +47,7 @@ import type {
   SourceFile,
 } from "../types";
 import { loadBuiltinGrammar } from "../runtime";
+import { hashSubtree } from "../astHash";
 
 const PLUGIN_NAME = "php";
 const EXTENSIONS = ["php"] as const;
@@ -517,6 +518,7 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
           endRow,
           complexity: 1 + ms.decisionPoints,
           containerType: currentClass()?.name,
+          bodyHash: body ? hashSubtree(body) : undefined,
         });
         return;
       }

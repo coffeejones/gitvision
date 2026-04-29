@@ -37,6 +37,7 @@ import type {
   SourceFile,
 } from "../types";
 import { loadBuiltinGrammar } from "../runtime";
+import { hashSubtree } from "../astHash";
 
 const PLUGIN_NAME = "go";
 const EXTENSIONS = ["go"] as const;
@@ -386,6 +387,7 @@ function parseGoDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           endRow,
           complexity: 1 + ms.decisionPoints,
           // free functions have no containerType
+          bodyHash: body ? hashSubtree(body) : undefined,
         });
         return;
       }
@@ -425,6 +427,7 @@ function parseGoDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           endRow,
           complexity: 1 + ms.decisionPoints,
           containerType: receiverType ?? undefined,
+          bodyHash: body ? hashSubtree(body) : undefined,
         });
         return;
       }

@@ -43,6 +43,7 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
         endRow: fn.endRow,
         complexity: fn.complexity,
         containerType: fn.containerType,
+        bodyHash: fn.bodyHash,
       };
       functions.push(def);
       const arr = funcsByName.get(fn.name) ?? [];

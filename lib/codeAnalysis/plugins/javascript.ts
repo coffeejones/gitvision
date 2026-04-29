@@ -25,6 +25,7 @@ import type {
   SourceFile,
 } from "../types";
 import { loadBuiltinGrammar } from "../runtime";
+import { hashSubtree } from "../astHash";
 import {
   applyPathMapping,
   loadTsconfigPaths,
@@ -724,6 +725,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           endRow,
           complexity: 1 + ms.decisionPoints,
           containerType: currentClass()?.name,
+          bodyHash: body ? hashSubtree(body) : undefined,
         });
         return;
       }
@@ -754,6 +756,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           endRow,
           complexity: 1 + ms.decisionPoints,
           containerType: currentClass()?.name,
+          bodyHash: body ? hashSubtree(body) : undefined,
         });
         return;
       }
@@ -816,6 +819,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             endRow,
             complexity: 1 + ms.decisionPoints,
             containerType: currentClass()?.name,
+            bodyHash: body ? hashSubtree(body) : undefined,
           });
           return; // already visited the body above
         }

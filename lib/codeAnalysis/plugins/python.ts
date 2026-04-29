@@ -25,6 +25,7 @@ import type {
   SourceFile,
 } from "../types";
 import { loadBuiltinGrammar } from "../runtime";
+import { hashSubtree } from "../astHash";
 
 const PLUGIN_NAME = "python";
 const EXTENSIONS = ["py"] as const;
@@ -605,6 +606,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           endRow,
           complexity: 1 + ms.decisionPoints,
           containerType: isInClass ? currentClass()?.name : undefined,
+          bodyHash: body ? hashSubtree(body) : undefined,
         });
         return;
       }

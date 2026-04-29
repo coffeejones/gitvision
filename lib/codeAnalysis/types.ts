@@ -75,6 +75,14 @@ export interface ParsedFunction {
    *  scope functions leave this undefined. Drives type-aware call
    *  resolution in buildCodeGraph (Phase 5+). */
   containerType?: string;
+  /** Structural hash of the function body's AST subtree (v0.30+).
+   *  Identifier names + literal values are NOT hashed; only node types
+   *  and operator tokens are. Two functions with the same shape but
+   *  different variable names produce identical hashes — that's the
+   *  basis for the duplicate-detection panel in the Code tab. Plugins
+   *  that don't yet compute hashes leave this undefined; the duplicate
+   *  detector skips functions without a hash. */
+  bodyHash?: string;
 }
 
 export interface ParsedCall {
@@ -173,6 +181,10 @@ export interface FunctionDef {
    *  function belongs to, when known. Used for type-aware call resolution
    *  in pickCallTarget. */
   containerType?: string;
+  /** Mirrors ParsedFunction.bodyHash (v0.30+). 16 hex chars from
+   *  FNV-1a 64. Used by duplicates.ts to find structurally identical
+   *  functions across the codebase. */
+  bodyHash?: string;
 }
 
 /** A call edge — function X in file A calls callable Y, possibly resolved to
