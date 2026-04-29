@@ -122,7 +122,7 @@ export default async function SessionPage({
           {/* Health Check */}
           <HealthPanel sessionId={session.id} snapshot={current} />
 
-          {/* Tabs (Canvas / Dependencies / PRs / Overview) */}
+          {/* Tabs (Canvas / Imports / Code / Packages / PRs / Overview) */}
           <SessionTabs snap={current} />
 
           {/* Footer */}

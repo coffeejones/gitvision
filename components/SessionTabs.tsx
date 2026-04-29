@@ -14,7 +14,7 @@ import { LanguageBar } from "./views/LanguageBar";
 import { BusFactorPanel } from "./views/BusFactorPanel";
 import { CommitActivity } from "./views/CommitActivity";
 
-type TabName = "canvas" | "dependencies" | "code" | "packages" | "prs" | "overview";
+type TabName = "canvas" | "imports" | "code" | "packages" | "prs" | "overview";
 
 export function SessionTabs({ snap }: { snap: AnalysisSnapshot }) {
   const [tab, setTab] = useState<TabName>("canvas");
@@ -54,8 +54,8 @@ export function SessionTabs({ snap }: { snap: AnalysisSnapshot }) {
           label="Imports"
           count={hasGraph ? depCount : undefined}
           hint={hasGraph ? undefined : "refresh"}
-          active={tab === "dependencies"}
-          onClick={() => setTab("dependencies")}
+          active={tab === "imports"}
+          onClick={() => setTab("imports")}
         />
         <Tab
           label="Code"
@@ -94,7 +94,7 @@ export function SessionTabs({ snap }: { snap: AnalysisSnapshot }) {
         </div>
       )}
 
-      {tab === "dependencies" && (
+      {tab === "imports" && (
         <div className="flex flex-col gap-4">
           {snap.fileGraph ? (
             <DependencyCanvas graph={snap.fileGraph} />

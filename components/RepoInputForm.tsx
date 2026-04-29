@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Circle, Loader2 } from "lucide-react";
 import { parseDeepLinkSubdir } from "@/lib/githubUrl";
 import { pollJob } from "@/lib/jobsClient";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
@@ -12,11 +12,11 @@ import { TOK } from "@/lib/theme";
 // Real server progress isn't streamed (yet) — we cycle through these as a UX
 // scaffold so users don't stare at a blank button for 30 seconds.
 const STAGES = [
-  { label: "Henter repo-metadata", weight: 2 },
-  { label: "Henter commits og contributors", weight: 4 },
-  { label: "Analyserer filændringer", weight: 6 },
-  { label: "Bygger dependency-graf", weight: 10 },
-  { label: "Gemmer session", weight: 2 },
+  { label: "Fetching repo metadata", weight: 2 },
+  { label: "Fetching commits & contributors", weight: 4 },
+  { label: "Analyzing file changes", weight: 6 },
+  { label: "Building dependency graph", weight: 10 },
+  { label: "Saving session", weight: 2 },
 ];
 const TOTAL_WEIGHT = STAGES.reduce((a, s) => a + s.weight, 0);
 const ESTIMATED_MS = 22_000;
@@ -377,7 +377,16 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
                       : TOK.textMuted,
                   }}
                 >
-                  {done ? "✓" : active ? "●" : "○"} {s.label}
+                  <span className="inline-flex items-center justify-center w-3 h-3">
+                    {done ? (
+                      <Check size={11} />
+                    ) : active ? (
+                      <Loader2 size={11} className="animate-spin" />
+                    ) : (
+                      <Circle size={9} />
+                    )}
+                  </span>{" "}
+                  {s.label}
                 </li>
               );
             })}

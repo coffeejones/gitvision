@@ -36,7 +36,7 @@ export default async function Home() {
             className="text-xs uppercase tracking-[0.18em] font-medium"
             style={{ color: TOK.textSecondary }}
           >
-            v0.6 · now with AI health checks
+            Alpha · code analysis across 7 languages
           </span>
         </div>
 
@@ -123,23 +123,18 @@ export default async function Home() {
         style={{ borderColor: TOK.border, color: TOK.textMuted }}
       >
         <span>GitVision · made by SoosFire</span>
-        <span>
-          Set{" "}
-          <code
-            className="font-mono px-1 rounded"
-            style={{ background: TOK.surface }}
+        <div className="flex items-center gap-3">
+          <a
+            href="https://github.com/SoosFire/gitvision"
+            target="_blank"
+            rel="noopener"
+            className="transition hover:underline"
           >
-            GITHUB_TOKEN
-          </code>{" "}
-          in{" "}
-          <code
-            className="font-mono px-1 rounded"
-            style={{ background: TOK.surface }}
-          >
-            .env.local
-          </code>{" "}
-          for 5000 req/hr
-        </span>
+            GitHub
+          </a>
+          <span style={{ color: TOK.border }}>·</span>
+          <span>PolyForm Noncommercial</span>
+        </div>
       </footer>
     </main>
   );

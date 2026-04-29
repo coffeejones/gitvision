@@ -32,6 +32,7 @@ import {
   type Edge,
   type NodeProps,
 } from "@xyflow/react";
+import { AlertTriangle } from "lucide-react";
 import type {
   FileGraph,
   FileGraphEdge,
@@ -516,8 +517,8 @@ function DependencyCanvasInner({ graph }: Props) {
 
         <div className="h-4 w-px bg-white/15" />
         <span className="text-white/50 tabular-nums">
-          {visibleIds.size}/{graph.nodes.length} filer
-          {selected ? ` · valgt: ${selected.split("/").pop()}` : ""}
+          {visibleIds.size}/{graph.nodes.length} files
+          {selected ? ` · selected: ${selected.split("/").pop()}` : ""}
         </span>
       </div>
 
@@ -525,20 +526,21 @@ function DependencyCanvasInner({ graph }: Props) {
         className="absolute z-10 bottom-3 left-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] text-white/70 border border-white/10 shadow-lg"
         style={{ background: "rgba(10, 10, 12, 0.92)" }}
       >
-        Klik en fil for at isolere dens naboer · Pil = A → B betyder A bruger B
-        · Entry-badge = intet andet peger på den
+        Click a file to isolate its neighbors · Arrow A → B means A uses B
+        · Entry badge = nothing else points here
       </div>
 
       {graph.truncated && (
         <div
-          className="absolute z-10 top-3 right-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] border shadow-lg"
+          className="absolute z-10 top-3 right-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] border shadow-lg flex items-center gap-1.5"
           style={{
             background: "rgba(120, 70, 10, 0.85)",
             color: "rgba(253, 224, 171, 0.95)",
             borderColor: "rgba(253, 186, 116, 0.25)",
           }}
         >
-          ⚠ {graph.truncated}
+          <AlertTriangle size={11} />
+          {graph.truncated}
         </div>
       )}
 
