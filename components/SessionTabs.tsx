@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { TOK } from "@/lib/theme";
 import { Constellation } from "./views/Constellation";
@@ -16,8 +17,27 @@ import { CommitActivity } from "./views/CommitActivity";
 
 type TabName = "canvas" | "imports" | "code" | "packages" | "prs" | "overview";
 
+const VALID_TABS: ReadonlySet<TabName> = new Set([
+  "canvas",
+  "imports",
+  "code",
+  "packages",
+  "prs",
+  "overview",
+]);
+
 export function SessionTabs({ snap }: { snap: AnalysisSnapshot }) {
+  // v0.37: deep-link support. ?tab=code (or imports / packages / etc.)
+  // selects the matching tab on mount. Falls back to "canvas" silently
+  // for unknown values so a stale URL doesn't break the page.
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<TabName>("canvas");
+  useEffect(() => {
+    const requested = searchParams.get("tab");
+    if (requested && VALID_TABS.has(requested as TabName)) {
+      setTab(requested as TabName);
+    }
+  }, [searchParams]);
   const hasGraph = !!snap.fileGraph;
   const prCount = snap.pullRequests?.length ?? 0;
   const depCount = snap.fileGraph?.nodes.length ?? 0;

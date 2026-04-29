@@ -18,7 +18,8 @@
 // + complexity, the other 7 languages contribute imports only via the
 // regex-fallback plugin. Honest accounting beats over-promised UI.
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -37,6 +38,7 @@ import {
 } from "lucide-react";
 import type { AnalysisSnapshot, CodeGraph } from "@/lib/types";
 import { STYLE, TOK } from "@/lib/theme";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { SearchInput } from "@/components/SearchInput";
 import {
   computeBlastRadius,
@@ -103,6 +105,8 @@ export function CodePanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
 // ------------------- Inner panel -------------------
 
 function CodePanelInner({ cg }: { cg: CodeGraph }) {
+  const searchParams = useSearchParams();
+
   // Files sorted by fileComplexity desc — the "real heavy" filter.
   // We deliberately don't sort by function count because tests inflate that
   // (one it() = one function), which we saw on Vue: apiOptions.spec.ts has
@@ -126,7 +130,7 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
 
   // Default: heaviest file in the codebase. Empty state is boring; opening on
   // top-complex-file lands the user where the most interesting blast radius
-  // lives.
+  // lives. Deep-link `?file=...` overrides this on mount (effect below).
   const [selected, setSelected] = useState<string | null>(
     heavyFiles[0]?.file ?? null
   );
@@ -141,6 +145,40 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
   } | null>(null);
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
+
+  // v0.37: deep-link support. URL params steer which file/function to
+  // focus and which insight panel to scroll into view. Applied once on
+  // mount only — subsequent navigation inside the page is in-component
+  // state and shouldn't fight the URL.
+  const untestedRef = useRef<HTMLDivElement>(null);
+  const duplicatesRef = useRef<HTMLDivElement>(null);
+  const blastRadiusRef = useRef<HTMLDivElement>(null);
+  const deepLinkApplied = useRef(false);
+  useEffect(() => {
+    if (deepLinkApplied.current) return;
+    const file = searchParams.get("file");
+    const fn = searchParams.get("fn");
+    const container = searchParams.get("container") ?? undefined;
+    const focus = searchParams.get("focus");
+    if (file) {
+      setSelected(file);
+      if (fn) setSelectedFunction({ name: fn, containerType: container });
+    }
+    // Scroll target — uses requestAnimationFrame to wait for the panels
+    // to render with the new selected state before measuring scroll.
+    if (focus === "untested" || focus === "duplicates" || focus === "blast") {
+      requestAnimationFrame(() => {
+        const target =
+          focus === "untested"
+            ? untestedRef.current
+            : focus === "duplicates"
+            ? duplicatesRef.current
+            : blastRadiusRef.current;
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+    deepLinkApplied.current = true;
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     if (!deferredQuery) return [] as string[];
@@ -211,6 +249,7 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
 
       {/* Hero: selected file + blast radius (file mode or function mode) */}
       <div
+        ref={blastRadiusRef}
         className="rounded-xl p-5 flex flex-col gap-4"
         style={{
           background: TOK.surface,
@@ -235,9 +274,10 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
           <FunctionBlastRadiusView
             blast={fnBlast}
             onBack={() => setSelectedFunction(null)}
+            file={selected!}
           />
         ) : (
-          blast && <BlastRadiusView blast={blast} />
+          blast && <BlastRadiusView blast={blast} file={selected!} />
         )}
       </div>
 
@@ -247,10 +287,12 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
        *  "everything is untested" lecture. */}
       {coverage.totals.testFiles > 0 &&
         coverage.untestedHotspots.length > 0 && (
-          <UntestedHotspotsPanel
-            coverage={coverage}
-            onPick={pickFunction}
-          />
+          <div ref={untestedRef}>
+            <UntestedHotspotsPanel
+              coverage={coverage}
+              onPick={pickFunction}
+            />
+          </div>
         )}
 
       {/* Near-duplicate functions — v0.30 actionable insight panel. Only
@@ -258,10 +300,12 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
        *  was found above the complexity floor. Brand-new / tiny repos that
        *  have no real duplicates skip this panel entirely. */}
       {duplicateGroups.length > 0 && (
-        <NearDuplicatesPanel
-          groups={duplicateGroups}
-          onPick={pickFunction}
-        />
+        <div ref={duplicatesRef}>
+          <NearDuplicatesPanel
+            groups={duplicateGroups}
+            onPick={pickFunction}
+          />
+        </div>
       )}
 
       {/* Twin lists: heavy files + top complex functions */}
@@ -542,33 +586,55 @@ interface BlastListEntry {
   hop: number;
 }
 
-function BlastRadiusView({ blast }: { blast: BlastRadius }) {
+function BlastRadiusView({
+  blast,
+  file,
+}: {
+  blast: BlastRadius;
+  file: string;
+}) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <BlastSection
-        title="Incoming — what breaks if this changes"
-        icon={<ArrowDownToLine size={14} />}
-        accent={TOK.amber}
-        unit="files"
-        entries={blast.incoming.map((e) => ({ primary: e.filePath, hop: e.hop }))}
-        byHop={blast.byHop.incoming}
-      />
-      <BlastSection
-        title="Outgoing — what this depends on"
-        icon={<ArrowUpFromLine size={14} />}
-        accent={TOK.accent}
-        unit="files"
-        entries={blast.outgoing.map((e) => ({ primary: e.filePath, hop: e.hop }))}
-        byHop={blast.byHop.outgoing}
-      />
-      {blast.truncated && (
-        <div
-          className="md:col-span-2 text-[11px] flex items-center gap-2 px-2"
-          style={{ color: TOK.textMuted }}
-        >
-          {blast.truncated} — list above is partial.
-        </div>
-      )}
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-end -mb-1">
+        <CopyLinkButton
+          variant="labeled"
+          params={{
+            tab: "code",
+            file,
+            focus: "blast",
+            fn: undefined,
+            container: undefined,
+            group: undefined,
+          }}
+          title="Copy link to this file's blast radius"
+        />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <BlastSection
+          title="Incoming — what breaks if this changes"
+          icon={<ArrowDownToLine size={14} />}
+          accent={TOK.amber}
+          unit="files"
+          entries={blast.incoming.map((e) => ({ primary: e.filePath, hop: e.hop }))}
+          byHop={blast.byHop.incoming}
+        />
+        <BlastSection
+          title="Outgoing — what this depends on"
+          icon={<ArrowUpFromLine size={14} />}
+          accent={TOK.accent}
+          unit="files"
+          entries={blast.outgoing.map((e) => ({ primary: e.filePath, hop: e.hop }))}
+          byHop={blast.byHop.outgoing}
+        />
+        {blast.truncated && (
+          <div
+            className="md:col-span-2 text-[11px] flex items-center gap-2 px-2"
+            style={{ color: TOK.textMuted }}
+          >
+            {blast.truncated} — list above is partial.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -576,51 +642,67 @@ function BlastRadiusView({ blast }: { blast: BlastRadius }) {
 function FunctionBlastRadiusView({
   blast,
   onBack,
+  file,
 }: {
   blast: FunctionBlastRadius;
   onBack: () => void;
+  file: string;
 }) {
   const totalCalls = blast.incoming.length + blast.outgoing.length;
   const isEmpty = totalCalls === 0;
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={onBack}
-          className="text-[11px] flex items-center gap-1 px-2 py-1 rounded transition cursor-pointer"
-          style={{
-            background: TOK.surfaceElevated,
-            color: TOK.textSecondary,
-            border: `1px solid ${TOK.border}`,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = TOK.borderStrong;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = TOK.border;
-          }}
-        >
-          <ArrowLeft size={11} />
-          Back to file blast radius
-        </button>
-        <span
-          className="text-[11px] flex items-center gap-1"
-          style={{ color: TOK.textMuted }}
-        >
-          <Target size={11} style={{ color: TOK.accent }} />
-          Zoomed into <span
-            className="font-mono"
-            style={{ color: TOK.textPrimary }}
+      <div className="flex items-center gap-2 flex-wrap justify-between">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={onBack}
+            className="text-[11px] flex items-center gap-1 px-2 py-1 rounded transition cursor-pointer"
+            style={{
+              background: TOK.surfaceElevated,
+              color: TOK.textSecondary,
+              border: `1px solid ${TOK.border}`,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = TOK.borderStrong;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = TOK.border;
+            }}
           >
-            {blast.target.containerType && (
-              <span style={{ color: TOK.textMuted }}>
-                {blast.target.containerType}.
-              </span>
-            )}
-            {blast.target.name}
+            <ArrowLeft size={11} />
+            Back to file blast radius
+          </button>
+          <span
+            className="text-[11px] flex items-center gap-1"
+            style={{ color: TOK.textMuted }}
+          >
+            <Target size={11} style={{ color: TOK.accent }} />
+            Zoomed into <span
+              className="font-mono"
+              style={{ color: TOK.textPrimary }}
+            >
+              {blast.target.containerType && (
+                <span style={{ color: TOK.textMuted }}>
+                  {blast.target.containerType}.
+                </span>
+              )}
+              {blast.target.name}
+            </span>
           </span>
-        </span>
+        </div>
+        <CopyLinkButton
+          variant="labeled"
+          params={{
+            tab: "code",
+            file,
+            fn: blast.target.name,
+            container: blast.target.containerType,
+            focus: "blast",
+            group: undefined,
+          }}
+          title="Copy link to this function's blast radius"
+        />
       </div>
 
       {/* Call-edge availability hint when both directions are empty.
@@ -936,12 +1018,12 @@ function UntestedHotspotsPanel({
         border: `1px solid ${TOK.border}`,
       }}
     >
-      <button
-        onClick={toggle}
-        className="flex items-center justify-between gap-3 flex-wrap text-left -m-1 p-1 rounded transition cursor-pointer"
-        title={isExpanded ? "Collapse panel" : "Expand panel"}
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <button
+          onClick={toggle}
+          className="flex items-center gap-2 text-left -m-1 p-1 rounded transition cursor-pointer min-w-0 flex-1"
+          title={isExpanded ? "Collapse panel" : "Expand panel"}
+        >
           {isExpanded ? (
             <ChevronDown size={14} style={{ color: TOK.textMuted }} />
           ) : (
@@ -952,19 +1034,32 @@ function UntestedHotspotsPanel({
             Untested hotspots
           </span>
           <span style={{ color: TOK.textMuted }}>·</span>
-          <span className="text-xs" style={{ color: TOK.textSecondary }}>
+          <span className="text-xs truncate" style={{ color: TOK.textSecondary }}>
             most complex functions with no direct test callers
           </span>
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className="text-[11px] font-mono inline-flex items-center gap-1.5"
+            style={{ color: TOK.textMuted }}
+            title={`${testedProdFunctions} of ${prodFunctions} prod functions have a direct caller from one of ${testFiles} test files`}
+          >
+            <FlaskConical size={11} />
+            {coveragePct}% prod fns covered
+          </span>
+          <CopyLinkButton
+            params={{
+              tab: "code",
+              focus: "untested",
+              file: undefined,
+              fn: undefined,
+              container: undefined,
+              group: undefined,
+            }}
+            title="Copy link to the Untested Hotspots panel"
+          />
         </div>
-        <span
-          className="text-[11px] font-mono inline-flex items-center gap-1.5"
-          style={{ color: TOK.textMuted }}
-          title={`${testedProdFunctions} of ${prodFunctions} prod functions have a direct caller from one of ${testFiles} test files`}
-        >
-          <FlaskConical size={11} />
-          {coveragePct}% prod fns covered
-        </span>
-      </button>
+      </div>
 
       {isExpanded && (
       <ul className="flex flex-col gap-0.5">
@@ -1049,6 +1144,7 @@ function NearDuplicatesPanel({
   onPick: (file: string, fnName: string, containerType?: string) => void;
 }) {
   const stats = summarizeDuplicates(groups);
+  const searchParams = useSearchParams();
   // Track which groups are expanded. Default: only the first (worst) group
   // is open so the panel previews the worst offender without flooding the
   // viewport when there are 15 groups.
@@ -1058,6 +1154,19 @@ function NearDuplicatesPanel({
   const [isPanelExpanded, togglePanel] = usePanelExpansion(
     "gitvision:codepanel:duplicates-expanded"
   );
+
+  // v0.37: deep-link `?group=<hash>` auto-expands a specific group on
+  // mount. Applied once via deepLinkApplied so subsequent in-component
+  // toggling isn't fought by the URL.
+  const deepLinkApplied = useRef(false);
+  useEffect(() => {
+    if (deepLinkApplied.current) return;
+    const groupHash = searchParams.get("group");
+    if (groupHash && groups.some((g) => g.hash === groupHash)) {
+      setOpenGroups((prev) => new Set([...prev, groupHash]));
+    }
+    deepLinkApplied.current = true;
+  }, [searchParams, groups]);
 
   function toggleGroup(hash: string) {
     setOpenGroups((prev) => {
@@ -1076,12 +1185,12 @@ function NearDuplicatesPanel({
         border: `1px solid ${TOK.border}`,
       }}
     >
-      <button
-        onClick={togglePanel}
-        className="flex items-center justify-between gap-3 flex-wrap text-left -m-1 p-1 rounded transition cursor-pointer"
-        title={isPanelExpanded ? "Collapse panel" : "Expand panel"}
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <button
+          onClick={togglePanel}
+          className="flex items-center gap-2 text-left -m-1 p-1 rounded transition cursor-pointer min-w-0 flex-1"
+          title={isPanelExpanded ? "Collapse panel" : "Expand panel"}
+        >
           {isPanelExpanded ? (
             <ChevronDown size={14} style={{ color: TOK.textMuted }} />
           ) : (
@@ -1092,19 +1201,32 @@ function NearDuplicatesPanel({
             Near-duplicate functions
           </span>
           <span style={{ color: TOK.textMuted }}>·</span>
-          <span className="text-xs" style={{ color: TOK.textSecondary }}>
+          <span className="text-xs truncate" style={{ color: TOK.textSecondary }}>
             structurally identical bodies — candidates for extraction
           </span>
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className="text-[11px] font-mono inline-flex items-center gap-1.5"
+            style={{ color: TOK.textMuted }}
+            title={`${stats.totalDuplicateFunctions} duplicate functions across ${stats.totalGroups} groups; the largest group has ${stats.largestGroupSize} copies`}
+          >
+            {stats.totalGroups} groups · {stats.totalDuplicateFunctions} fns ·
+            largest ×{stats.largestGroupSize}
+          </span>
+          <CopyLinkButton
+            params={{
+              tab: "code",
+              focus: "duplicates",
+              file: undefined,
+              fn: undefined,
+              container: undefined,
+              group: undefined,
+            }}
+            title="Copy link to the Near-Duplicates panel"
+          />
         </div>
-        <span
-          className="text-[11px] font-mono inline-flex items-center gap-1.5"
-          style={{ color: TOK.textMuted }}
-          title={`${stats.totalDuplicateFunctions} duplicate functions across ${stats.totalGroups} groups; the largest group has ${stats.largestGroupSize} copies`}
-        >
-          {stats.totalGroups} groups · {stats.totalDuplicateFunctions} fns ·
-          largest ×{stats.largestGroupSize}
-        </span>
-      </button>
+      </div>
 
       {isPanelExpanded && (
       <ul className="flex flex-col gap-1.5">
@@ -1199,10 +1321,24 @@ function NearDuplicatesPanel({
               </button>
 
               {isOpen && (
-                <ul
-                  className="flex flex-col gap-0.5 px-2 pb-2"
+                <div
+                  className="px-2 pb-2"
                   style={{ borderTop: `1px solid ${TOK.border}` }}
                 >
+                  <div className="flex justify-end pt-1">
+                    <CopyLinkButton
+                      params={{
+                        tab: "code",
+                        focus: "duplicates",
+                        group: g.hash,
+                        file: undefined,
+                        fn: undefined,
+                        container: undefined,
+                      }}
+                      title="Copy link to this duplicate group"
+                    />
+                  </div>
+                  <ul className="flex flex-col gap-0.5">
                   {g.members.map((m, idx) => (
                     <li key={`${m.filePath}:${m.containerType ?? ""}:${m.name}@${m.startRow}`}>
                       <button
@@ -1261,7 +1397,8 @@ function NearDuplicatesPanel({
                       </button>
                     </li>
                   ))}
-                </ul>
+                  </ul>
+                </div>
               )}
             </li>
           );
