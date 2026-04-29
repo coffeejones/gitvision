@@ -153,6 +153,10 @@ export default async function Home() {
             GitHub
           </a>
           <span style={{ color: TOK.border }}>·</span>
+          <a href="/legal" className="transition hover:underline">
+            Privacy &amp; terms
+          </a>
+          <span style={{ color: TOK.border }}>·</span>
           <span>PolyForm Noncommercial</span>
         </div>
       </footer>

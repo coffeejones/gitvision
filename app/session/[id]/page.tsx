@@ -127,19 +127,25 @@ export default async function SessionPage({
 
           {/* Footer */}
           <footer
-            className="pt-6 text-xs flex items-center justify-between border-t"
+            className="pt-6 text-xs flex items-center justify-between border-t flex-wrap gap-3"
             style={{ borderColor: TOK.border, color: TOK.textMuted }}
           >
             <span>
               GitVision ·{" "}
               <span className="font-mono">{current.repo.fullName}</span>
             </span>
-            {current.rateLimitInfo && (
-              <span>
-                Rate limit: {current.rateLimitInfo.remaining.toLocaleString()}/
-                {current.rateLimitInfo.limit.toLocaleString()}
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {current.rateLimitInfo && (
+                <span>
+                  Rate limit:{" "}
+                  {current.rateLimitInfo.remaining.toLocaleString()}/
+                  {current.rateLimitInfo.limit.toLocaleString()}
+                </span>
+              )}
+              <a href="/legal" className="transition hover:underline">
+                Privacy &amp; terms
+              </a>
+            </div>
           </footer>
         </div>
       </main>
