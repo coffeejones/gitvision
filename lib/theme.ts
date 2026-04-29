@@ -32,3 +32,26 @@ export const TOK = {
 } as const;
 
 export type ThemeTokens = typeof TOK;
+
+/** Reusable className strings for consistent typography across panels.
+ *  Use with Tailwind's className prop. Combine with `style={{ color: TOK.* }}`
+ *  for color, since color depends on context (some eyebrows are textMuted,
+ *  others textPrimary). Two standards covering 90% of section-header use:
+ *
+ *    STYLE.eyebrow      Panel section headers — "BLAST RADIUS FOR",
+ *                       "UNTESTED HOTSPOTS", "NEAR-DUPLICATES". Tight,
+ *                       small caps. The 0.08em tracking matches the
+ *                       Linear-lighter aesthetic.
+ *
+ *    STYLE.sectionTitle Full-page section headings — landing page's
+ *                       "HOW IT WORKS". Slightly bolder + wider tracking
+ *                       to read as a top-level divider rather than a
+ *                       panel label.
+ *
+ *  Smaller `text-[9px]/text-[10px] uppercase` patterns used for inline
+ *  badges (e.g. "untested" status pill) are NOT covered — those have
+ *  context-specific sizing that we keep as-is. */
+export const STYLE = {
+  eyebrow: "text-xs uppercase tracking-[0.08em] font-medium",
+  sectionTitle: "text-sm font-semibold uppercase tracking-[0.2em]",
+} as const;

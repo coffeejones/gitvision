@@ -31,13 +31,13 @@ import {
   FlaskConical,
   PhoneIncoming,
   PhoneOutgoing,
-  Search,
   ShieldOff,
   Sparkles,
   Target,
 } from "lucide-react";
 import type { AnalysisSnapshot, CodeGraph } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/theme";
+import { SearchInput } from "@/components/SearchInput";
 import {
   computeBlastRadius,
   computeFunctionBlastRadius,
@@ -448,24 +448,13 @@ function SelectedFileHeader({
 
       {/* File picker */}
       <div className="relative">
-        <div
-          className="flex items-center gap-2 px-3 h-9 rounded-lg"
-          style={{
-            background: TOK.bg,
-            border: `1px solid ${TOK.border}`,
-          }}
-        >
-          <Search size={13} style={{ color: TOK.textMuted }} />
-          <input
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            onFocus={() => setPickerOpen(true)}
-            onBlur={() => setTimeout(() => setPickerOpen(false), 150)}
-            placeholder="Pick another file… (search by path)"
-            className="flex-1 bg-transparent text-sm outline-none"
-            style={{ color: TOK.textPrimary }}
-          />
-        </div>
+        <SearchInput
+          value={query}
+          onChange={onQueryChange}
+          onFocus={() => setPickerOpen(true)}
+          onBlur={() => setTimeout(() => setPickerOpen(false), 150)}
+          placeholder="Pick another file… (search by path)"
+        />
         {showResults && filtered.length > 0 && (
           <div
             className="absolute z-10 left-0 right-0 mt-1 rounded-lg overflow-hidden"
@@ -910,10 +899,7 @@ function UntestedHotspotsPanel({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <ShieldOff size={15} style={{ color: TOK.amber }} />
-          <span
-            className="text-xs uppercase tracking-wider font-medium"
-            style={{ color: TOK.textPrimary, letterSpacing: "0.08em" }}
-          >
+          <span className={STYLE.eyebrow} style={{ color: TOK.textPrimary }}>
             Untested hotspots
           </span>
           <span style={{ color: TOK.textMuted }}>·</span>
@@ -1039,10 +1025,7 @@ function NearDuplicatesPanel({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <Copy size={15} style={{ color: TOK.accent }} />
-          <span
-            className="text-xs uppercase tracking-wider font-medium"
-            style={{ color: TOK.textPrimary, letterSpacing: "0.08em" }}
-          >
+          <span className={STYLE.eyebrow} style={{ color: TOK.textPrimary }}>
             Near-duplicate functions
           </span>
           <span style={{ color: TOK.textMuted }}>·</span>

@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import type { SnapshotDiff, Headline } from "@/lib/diff";
 import { pickHeadline } from "@/lib/diff";
-import { TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/theme";
 
 function formatRel(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -489,10 +489,7 @@ export function SinceLastVisit({ diff, repoFullName }: Props) {
           >
             <RefreshCw size={11} />
           </span>
-          <span
-            className="uppercase tracking-wider font-medium"
-            style={{ color: TOK.textMuted, letterSpacing: "0.08em" }}
-          >
+          <span className={STYLE.eyebrow} style={{ color: TOK.textMuted }}>
             Since your last visit
           </span>
         </div>

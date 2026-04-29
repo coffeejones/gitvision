@@ -2,7 +2,7 @@
 // URL input, demo chips, how-it-works, saved sessions as a clean list.
 
 import { listSessions } from "@/lib/storage";
-import { TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/theme";
 import { RepoInputForm, type DemoRepo } from "@/components/RepoInputForm";
 import { HomeSessionsList } from "@/components/HomeSessionsList";
 
@@ -62,9 +62,7 @@ export default async function Home() {
       {/* How it works */}
       <section className="flex flex-col gap-8">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">
-            How it works
-          </h2>
+          <h2 className={STYLE.sectionTitle}>How it works</h2>
           <div className="text-xs" style={{ color: TOK.textMuted }}>
             ~20 seconds end-to-end
           </div>

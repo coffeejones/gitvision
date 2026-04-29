@@ -13,7 +13,6 @@ import {
   Clock,
   ExternalLink,
   PackageX,
-  Search,
   ShieldAlert,
 } from "lucide-react";
 import type {
@@ -24,6 +23,7 @@ import type {
   VulnerableDep,
 } from "@/lib/types";
 import { TOK } from "@/lib/theme";
+import { SearchInput } from "@/components/SearchInput";
 
 // ------------------- Link builders -------------------
 
@@ -163,22 +163,12 @@ export function PackagesPanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
       </div>
 
       {/* Search */}
-      <div
-        className="flex items-center rounded-lg"
-        style={{
-          background: TOK.surface,
-          border: `1px solid ${TOK.border}`,
-        }}
-      >
-        <Search size={14} className="ml-3" style={{ color: TOK.textMuted }} />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Filter by package name..."
-          className="flex-1 bg-transparent h-9 px-3 text-sm focus:outline-none"
-          style={{ color: TOK.textPrimary }}
-        />
-      </div>
+      <SearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder="Filter by package name…"
+        surface="elevated"
+      />
 
       {/* Per-ecosystem sections */}
       {healths.map((h) => (
