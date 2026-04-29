@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GitVision",
-  description: "A beautiful, explorable dashboard for any GitHub repository.",
+  title: "GitVision — map any GitHub repo",
+  description:
+    "Find what's risky, duplicated, or untested in any GitHub repo. Blast radius, structural duplicates, untested hotspots, and an AI health verdict — across 7 languages.",
 };
 
 export default function RootLayout({
@@ -22,6 +24,21 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Analytics is opt-in via env: set NEXT_PUBLIC_PLAUSIBLE_DOMAIN to the
+  // domain you've configured in your Plausible dashboard (e.g. gitvision.app
+  // or a self-hosted equivalent). Unset → no analytics, no script tag, no
+  // tracking. Keeps the local-dev experience analytics-free without code
+  // changes.
+  //
+  // We chose Plausible because:
+  //   - Cookie-free, IP-anonymized — no GDPR consent banner needed.
+  //   - Lightweight (~1 KB script).
+  //   - Self-hostable if we ever care to.
+  //   - Captures only aggregate pageviews/referrers — no session replay,
+  //     no fingerprinting, no individual-user tracking. Matches what we
+  //     promise on the /legal page.
+  const plausibleDomain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN;
+
   return (
     <html
       lang="en"
@@ -32,6 +49,14 @@ export default function RootLayout({
         style={{ background: "var(--background)", color: "var(--foreground)" }}
       >
         {children}
+        {plausibleDomain && (
+          <Script
+            defer
+            data-domain={plausibleDomain}
+            src="https://plausible.io/js/script.js"
+            strategy="afterInteractive"
+          />
+        )}
       </body>
     </html>
   );

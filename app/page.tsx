@@ -137,13 +137,16 @@ export default async function Home() {
       {/* Sessions — filtered client-side by anonymous owner-id (v0.26+) */}
       <HomeSessionsList initialSessions={sessions} />
 
-      {/* Footer */}
+      {/* Footer. Feedback link is opt-in via env: set
+       *  NEXT_PUBLIC_FEEDBACK_URL to a Tally / Cal.com / Typeform URL
+       *  to surface a dedicated "Feedback" link. Otherwise we point
+       *  at GitHub Issues, which is always-available. */}
       <footer
-        className="pt-8 text-xs flex items-center justify-between border-t"
+        className="pt-8 text-xs flex items-center justify-between border-t flex-wrap gap-3"
         style={{ borderColor: TOK.border, color: TOK.textMuted }}
       >
         <span>GitVision · made by SoosFire</span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <a
             href="https://github.com/SoosFire/gitvision"
             target="_blank"
@@ -151,6 +154,18 @@ export default async function Home() {
             className="transition hover:underline"
           >
             GitHub
+          </a>
+          <span style={{ color: TOK.border }}>·</span>
+          <a
+            href={
+              process.env.NEXT_PUBLIC_FEEDBACK_URL ??
+              "https://github.com/SoosFire/gitvision/issues"
+            }
+            target="_blank"
+            rel="noopener"
+            className="transition hover:underline"
+          >
+            Feedback
           </a>
           <span style={{ color: TOK.border }}>·</span>
           <a href="/legal" className="transition hover:underline">
