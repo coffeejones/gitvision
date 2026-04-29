@@ -3,16 +3,56 @@
 // don't re-hit the Anthropic API.
 
 import { NextResponse } from "next/server";
+import { consumeAiBudget } from "@/lib/aiBudget";
+import {
+  RATE_LIMITS,
+  checkRateLimit,
+  getClientIp,
+} from "@/lib/rateLimit";
 import { getSession, patchLatestSnapshot } from "@/lib/storage";
 import { generateHealthAnalysis } from "@/lib/healthAnalysis";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function POST(_req: Request, ctx: Ctx) {
+export async function POST(req: Request, ctx: Ctx) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
       { error: "ANTHROPIC_API_KEY is not set" },
       { status: 501 }
+    );
+  }
+
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`health:${ip}`, RATE_LIMITS.aiGenerate);
+  if (!rl.ok) {
+    const retryAfterSec = Math.ceil((rl.resetAt - Date.now()) / 1000);
+    return NextResponse.json(
+      {
+        error: `Rate limit reached. Try again in ${Math.ceil(
+          retryAfterSec / 60
+        )} minutes.`,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(retryAfterSec),
+          "X-RateLimit-Reset": String(rl.resetAt),
+        },
+      }
+    );
+  }
+
+  const budget = consumeAiBudget();
+  if (!budget.ok) {
+    return NextResponse.json(
+      {
+        error:
+          "AI features are paused for today (daily budget exhausted). Try again after UTC midnight.",
+      },
+      {
+        status: 503,
+        headers: { "X-AI-Budget-Reset": String(budget.resetAt) },
+      }
     );
   }
 

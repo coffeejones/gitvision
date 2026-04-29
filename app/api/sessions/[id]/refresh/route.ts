@@ -8,11 +8,36 @@ import { after } from "next/server";
 import { parseRepoUrl } from "@/lib/github";
 import { createJob, processJob } from "@/lib/jobs";
 import { OWNER_ID_HEADER } from "@/lib/ownerId";
+import {
+  RATE_LIMITS,
+  checkRateLimit,
+  getClientIp,
+} from "@/lib/rateLimit";
 import { getSession } from "@/lib/storage";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`refresh:${ip}`, RATE_LIMITS.sessionRefresh);
+  if (!rl.ok) {
+    const retryAfterSec = Math.ceil((rl.resetAt - Date.now()) / 1000);
+    return NextResponse.json(
+      {
+        error: `Rate limit reached. Try again in ${Math.ceil(
+          retryAfterSec / 60
+        )} minutes.`,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(retryAfterSec),
+          "X-RateLimit-Reset": String(rl.resetAt),
+        },
+      }
+    );
+  }
+
   const { id } = await ctx.params;
   const session = await getSession(id);
   if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });

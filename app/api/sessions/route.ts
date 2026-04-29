@@ -10,6 +10,11 @@ import { parseRepoUrl } from "@/lib/github";
 import { validateSubdir } from "@/lib/graph";
 import { createJob, processJob } from "@/lib/jobs";
 import { OWNER_ID_HEADER } from "@/lib/ownerId";
+import {
+  RATE_LIMITS,
+  checkRateLimit,
+  getClientIp,
+} from "@/lib/rateLimit";
 import { listSessions } from "@/lib/storage";
 
 const CreateSchema = z.object({
@@ -27,6 +32,28 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Rate limit BEFORE input parsing — even malformed payloads cost us
+  // CPU + bandwidth, and rejecting a bot loop quickly matters.
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`sessions:${ip}`, RATE_LIMITS.sessionCreate);
+  if (!rl.ok) {
+    const retryAfterSec = Math.ceil((rl.resetAt - Date.now()) / 1000);
+    return NextResponse.json(
+      {
+        error: `Rate limit reached. Try again in ${Math.ceil(
+          retryAfterSec / 60
+        )} minutes.`,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(retryAfterSec),
+          "X-RateLimit-Reset": String(rl.resetAt),
+        },
+      }
+    );
+  }
+
   const body = await req.json().catch(() => null);
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) {
