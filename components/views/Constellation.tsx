@@ -19,7 +19,9 @@ import {
   Position,
 } from "@xyflow/react";
 import * as d3 from "d3";
+import { Pause, Play, Users } from "lucide-react";
 import type { AnalysisSnapshot, FileHotspot, CoChangeEdge } from "@/lib/types";
+import { TOK } from "@/lib/theme";
 import { FileDetailsPanel } from "./FileDetailsPanel";
 
 // ------------------- Visual helpers -------------------
@@ -242,12 +244,15 @@ const FileNode = memo(function FileNode({ data }: NodeProps) {
 
       {/* churn bar */}
       <div className="mt-1.5 flex items-center gap-1.5">
-        <span className="text-[9px] font-mono text-white/50 tabular-nums w-4 text-right">
+        <span
+          className="text-[9px] font-mono tabular-nums w-4 text-right"
+          style={{ color: TOK.textMuted }}
+        >
           {hotspot.churn}
         </span>
         <div
           className="flex-1 h-1 rounded-full overflow-hidden"
-          style={{ background: "rgba(255,255,255,0.08)" }}
+          style={{ background: TOK.border }}
         >
           <div
             className="h-full rounded-full"
@@ -259,10 +264,12 @@ const FileNode = memo(function FileNode({ data }: NodeProps) {
         </div>
         {hotspot.authors > 1 && (
           <span
-            className="text-[9px] font-mono text-white/70 tabular-nums"
+            className="text-[9px] font-mono tabular-nums inline-flex items-center gap-0.5"
+            style={{ color: TOK.textSecondary }}
             title={`${hotspot.authors} unique authors`}
           >
-            {hotspot.authors}👥
+            {hotspot.authors}
+            <Users size={9} />
           </span>
         )}
       </div>
@@ -840,19 +847,28 @@ function ConstellationInner({ snapshot }: Props) {
     >
       {/* Controls */}
       <div
-        className="absolute z-10 top-3 left-3 flex items-center gap-3 backdrop-blur rounded-lg px-3 py-2 text-xs text-white border border-white/10 shadow-lg flex-wrap max-w-[calc(100%-24px)]"
-        style={{ background: "rgba(10, 10, 12, 0.92)" }}
+        className="absolute z-10 top-3 left-3 flex items-center gap-3 backdrop-blur rounded-lg px-3 py-2 text-xs shadow-lg flex-wrap max-w-[calc(100%-24px)]"
+        style={{
+          background: "rgba(10, 10, 12, 0.92)",
+          color: TOK.textPrimary,
+          border: `1px solid ${TOK.border}`,
+        }}
       >
         <input
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="filter path…"
-          className="bg-white/5 text-white placeholder:text-white/40 rounded px-2 py-0.5 border border-white/10 text-xs outline-none w-36 focus:border-white/30"
+          className="rounded px-2 py-0.5 text-xs outline-none w-36"
+          style={{
+            background: TOK.surfaceElevated,
+            color: TOK.textPrimary,
+            border: `1px solid ${TOK.border}`,
+          }}
         />
-        <div className="h-4 w-px bg-white/15" />
+        <div className="h-4 w-px" style={{ background: TOK.border }} />
         <div className="flex items-center gap-2">
-          <label className="text-white/60">Min churn</label>
+          <label style={{ color: TOK.textSecondary }}>Min churn</label>
           <input
             type="range"
             min={1}
@@ -863,7 +879,7 @@ function ConstellationInner({ snapshot }: Props) {
           />
           <span className="tabular-nums w-5 text-right">{minChurnInput}</span>
         </div>
-        <div className="h-4 w-px bg-white/15" />
+        <div className="h-4 w-px" style={{ background: TOK.border }} />
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input
             type="checkbox"
@@ -893,20 +909,25 @@ function ConstellationInner({ snapshot }: Props) {
             <span>Hide metadata ({metadataCount})</span>
           </label>
         )}
-        <div className="h-4 w-px bg-white/15" />
+        <div className="h-4 w-px" style={{ background: TOK.border }} />
         <label className="flex items-center gap-1.5">
-          <span className="text-white/60">Color</span>
+          <span style={{ color: TOK.textSecondary }}>Color</span>
           <select
             value={colorBy}
             onChange={(e) => setColorBy(e.target.value as "type" | "author")}
-            className="bg-white/5 text-white rounded px-1.5 py-0.5 border border-white/10 text-xs outline-none cursor-pointer"
+            className="rounded px-1.5 py-0.5 text-xs outline-none cursor-pointer"
+            style={{
+              background: TOK.surfaceElevated,
+              color: TOK.textPrimary,
+              border: `1px solid ${TOK.border}`,
+            }}
           >
             <option value="type">by type</option>
             <option value="author">by author</option>
           </select>
         </label>
-        <div className="h-4 w-px bg-white/15" />
-        <span className="text-white/40 tabular-nums">
+        <div className="h-4 w-px" style={{ background: TOK.border }} />
+        <span className="tabular-nums" style={{ color: TOK.textMuted }}>
           {visibleHotspots.length}
           {allHotspots.length > visibleHotspots.length
             ? ` / ${allHotspots.length}`
@@ -917,13 +938,18 @@ function ConstellationInner({ snapshot }: Props) {
 
       {/* Legend */}
       <div
-        className="absolute z-10 bottom-3 left-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] text-white/70 border border-white/10 shadow-lg max-w-[calc(100%-24px)]"
-        style={{ background: "rgba(10, 10, 12, 0.92)" }}
+        className="absolute z-10 bottom-3 left-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] shadow-lg max-w-[calc(100%-24px)]"
+        style={{
+          background: "rgba(10, 10, 12, 0.92)",
+          color: TOK.textSecondary,
+          border: `1px solid ${TOK.border}`,
+        }}
       >
         {colorBy === "type" ? (
-          <div>
-            Color = file type · Bar = churn · Green dot = recent · 👥 =
-            multi-author
+          <div className="inline-flex items-center gap-1 flex-wrap">
+            Color = file type · Bar = churn · Green dot = recent ·
+            <Users size={10} />
+            = multi-author
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">
@@ -936,8 +962,11 @@ function ConstellationInner({ snapshot }: Props) {
                 {authorLegend.map((a) => (
                   <span
                     key={a.login}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-white/10"
-                    style={{ background: "rgba(255,255,255,0.03)" }}
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full"
+                    style={{
+                      background: TOK.surfaceElevated,
+                      border: `1px solid ${TOK.border}`,
+                    }}
                   >
                     <span
                       className="h-2 w-2 rounded-full"
@@ -1001,16 +1030,21 @@ function ConstellationInner({ snapshot }: Props) {
       )}
 
       {allHotspots.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center text-white/60 text-sm">
+        <div
+          className="absolute inset-0 flex items-center justify-center text-sm"
+          style={{ color: TOK.textSecondary }}
+        >
           No hotspot data yet — try Refresh to fetch fresh commits.
         </div>
       )}
 
       {timeBuckets.length > 1 && (
         <div
-          className="absolute z-10 bottom-3 right-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] text-white/80 border border-white/10 shadow-lg flex items-center gap-3"
+          className="absolute z-10 bottom-3 right-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] shadow-lg flex items-center gap-3"
           style={{
             background: "rgba(10, 10, 12, 0.92)",
+            color: TOK.textPrimary,
+            border: `1px solid ${TOK.border}`,
             width: "min(560px, calc(100% - 260px))",
           }}
         >
@@ -1019,17 +1053,32 @@ function ConstellationInner({ snapshot }: Props) {
               if (timeIndex == null) setTimeIndex(0);
               setPlaying((p) => !p);
             }}
-            className="h-7 w-7 rounded-md bg-white/10 hover:bg-white/20 transition flex items-center justify-center shrink-0"
+            className="h-7 w-7 rounded-md transition flex items-center justify-center shrink-0"
+            style={{
+              background: TOK.surfaceElevated,
+              color: TOK.textPrimary,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = TOK.borderStrong;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = TOK.surfaceElevated;
+            }}
             title={playing ? "Pause" : "Play timeline"}
           >
-            {playing ? "⏸" : "▶"}
+            {playing ? <Pause size={12} /> : <Play size={12} />}
           </button>
           <select
             value={granularity}
             onChange={(e) =>
               setGranularity(e.target.value as "week" | "day" | "commit")
             }
-            className="bg-white/5 text-white rounded px-1.5 py-0.5 border border-white/10 text-[11px] outline-none cursor-pointer shrink-0"
+            className="rounded px-1.5 py-0.5 text-[11px] outline-none cursor-pointer shrink-0"
+            style={{
+              background: TOK.surfaceElevated,
+              color: TOK.textPrimary,
+              border: `1px solid ${TOK.border}`,
+            }}
             title="Timeline granularity"
           >
             <option value="week">Week</option>
@@ -1047,7 +1096,10 @@ function ConstellationInner({ snapshot }: Props) {
             }}
             className="flex-1 min-w-0"
           />
-          <span className="text-white/70 tabular-nums font-mono shrink-0">
+          <span
+            className="tabular-nums font-mono shrink-0"
+            style={{ color: TOK.textSecondary }}
+          >
             {timeIndex != null
               ? timeBuckets[Math.min(timeIndex, timeBuckets.length - 1)].label
               : "now"}
@@ -1058,7 +1110,14 @@ function ConstellationInner({ snapshot }: Props) {
                 setTimeIndex(null);
                 setPlaying(false);
               }}
-              className="text-white/60 hover:text-white transition text-[11px] shrink-0"
+              className="transition text-[11px] shrink-0"
+              style={{ color: TOK.textSecondary }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = TOK.textPrimary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = TOK.textSecondary;
+              }}
               title="Show full timeline"
             >
               reset

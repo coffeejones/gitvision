@@ -196,11 +196,17 @@ export function SessionToolbar({
           <div ref={shareMenuRef} className="relative">
             <button
               onClick={() => setShareMenuOpen((v) => !v)}
-              className="h-8 px-3 rounded-md text-xs transition flex items-center gap-1.5 hover:bg-white/5"
+              className="h-8 px-3 rounded-md text-xs transition flex items-center gap-1.5"
               style={{
                 background: TOK.surface,
                 border: `1px solid ${TOK.border}`,
                 color: TOK.textSecondary,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = TOK.borderStrong;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = TOK.border;
               }}
             >
               <Share2 size={14} />
@@ -264,11 +270,19 @@ export function SessionToolbar({
           <div ref={overflowMenuRef} className="relative">
             <button
               onClick={() => setOverflowOpen((v) => !v)}
-              className="h-8 w-8 rounded-md transition flex items-center justify-center hover:bg-white/5"
+              className="h-8 w-8 rounded-md transition flex items-center justify-center"
               style={{
                 background: TOK.surface,
                 border: `1px solid ${TOK.border}`,
                 color: TOK.textMuted,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = TOK.borderStrong;
+                e.currentTarget.style.color = TOK.textSecondary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = TOK.border;
+                e.currentTarget.style.color = TOK.textMuted;
               }}
               aria-label="More actions"
             >
@@ -341,9 +355,15 @@ function MenuItem({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition hover:bg-white/5 disabled:opacity-40"
+      className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition disabled:opacity-40"
       style={{
         color: danger ? TOK.rose : TOK.textPrimary,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = TOK.surface;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "transparent";
       }}
     >
       <span className="shrink-0 mt-0.5" aria-hidden>

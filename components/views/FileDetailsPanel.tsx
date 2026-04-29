@@ -1,6 +1,8 @@
 // Side-panel shown when the user clicks a node in the Constellation.
 
+import { X } from "lucide-react";
 import type { FileHotspot, CoChangeEdge, CommitSummary, RepoMeta } from "@/lib/types";
+import { TOK } from "@/lib/theme";
 
 interface Props {
   hotspot: FileHotspot;
@@ -33,10 +35,26 @@ export function FileDetailsPanel({
   const ghUrl = `https://github.com/${repo.fullName}/blob/${repo.defaultBranch}/${hotspot.path}`;
 
   return (
-    <aside className="absolute z-20 top-0 right-0 h-full w-[360px] bg-zinc-900/95 backdrop-blur border-l border-white/10 text-zinc-100 overflow-y-auto">
-      <div className="sticky top-0 bg-zinc-900/95 backdrop-blur border-b border-white/10 px-4 py-3 flex items-start justify-between gap-2">
+    <aside
+      className="absolute z-20 top-0 right-0 h-full w-[360px] backdrop-blur overflow-y-auto"
+      style={{
+        background: `${TOK.surface}f2`,
+        color: TOK.textPrimary,
+        borderLeft: `1px solid ${TOK.border}`,
+      }}
+    >
+      <div
+        className="sticky top-0 backdrop-blur px-4 py-3 flex items-start justify-between gap-2"
+        style={{
+          background: `${TOK.surface}f2`,
+          borderBottom: `1px solid ${TOK.border}`,
+        }}
+      >
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-wider text-white/50">
+          <div
+            className="text-[10px] uppercase tracking-wider"
+            style={{ color: TOK.textMuted }}
+          >
             File
           </div>
           <a
@@ -44,16 +62,26 @@ export function FileDetailsPanel({
             target="_blank"
             rel="noopener"
             className="font-mono text-sm break-all hover:underline"
+            style={{ color: TOK.textPrimary }}
           >
             {hotspot.path}
           </a>
         </div>
         <button
           onClick={onClose}
-          className="shrink-0 h-7 w-7 rounded-full hover:bg-white/10 transition flex items-center justify-center text-white/60 hover:text-white"
+          className="shrink-0 h-7 w-7 rounded-full transition flex items-center justify-center"
+          style={{ color: TOK.textSecondary }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = TOK.surfaceElevated;
+            e.currentTarget.style.color = TOK.textPrimary;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.color = TOK.textSecondary;
+          }}
           aria-label="Close"
         >
-          ✕
+          <X size={14} />
         </button>
       </div>
 
@@ -78,7 +106,18 @@ export function FileDetailsPanel({
                   href={`https://github.com/${login}`}
                   target="_blank"
                   rel="noopener"
-                  className="text-xs px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10"
+                  className="text-xs px-2 py-0.5 rounded-full transition"
+                  style={{
+                    background: TOK.surfaceElevated,
+                    color: TOK.textSecondary,
+                    border: `1px solid ${TOK.border}`,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = TOK.borderStrong;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = TOK.border;
+                  }}
                 >
                   @{login}
                 </a>
@@ -99,7 +138,10 @@ export function FileDetailsPanel({
                   <span className="font-mono truncate flex-1" title={p.path}>
                     {p.path}
                   </span>
-                  <span className="text-white/50 tabular-nums shrink-0">
+                  <span
+                    className="tabular-nums shrink-0"
+                    style={{ color: TOK.textMuted }}
+                  >
                     ×{p.count}
                   </span>
                 </li>
@@ -118,10 +160,24 @@ export function FileDetailsPanel({
                     href={`https://github.com/${repo.fullName}/commit/${c.sha}`}
                     target="_blank"
                     rel="noopener"
-                    className="block hover:bg-white/5 rounded px-2 py-1.5 -mx-2"
+                    className="block rounded px-2 py-1.5 -mx-2 transition"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = TOK.surfaceElevated;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
                   >
-                    <div className="truncate text-white/90">{c.message}</div>
-                    <div className="text-white/40 mt-0.5 flex items-center gap-2">
+                    <div
+                      className="truncate"
+                      style={{ color: TOK.textPrimary }}
+                    >
+                      {c.message}
+                    </div>
+                    <div
+                      className="mt-0.5 flex items-center gap-2"
+                      style={{ color: TOK.textMuted }}
+                    >
                       <span>{c.authorLogin ?? c.authorName}</span>
                       <span>·</span>
                       <span>{new Date(c.date).toLocaleDateString()}</span>
@@ -141,7 +197,10 @@ export function FileDetailsPanel({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h4 className="text-[10px] uppercase tracking-wider text-white/50 mb-2 font-medium">
+    <h4
+      className="text-[10px] uppercase tracking-wider mb-2 font-medium"
+      style={{ color: TOK.textMuted }}
+    >
       {children}
     </h4>
   );
@@ -149,10 +208,33 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg bg-white/5 border border-white/10 p-2">
-      <div className="text-[10px] uppercase tracking-wider text-white/50">{label}</div>
-      <div className="text-lg font-semibold tabular-nums mt-0.5">{value}</div>
-      {sub && <div className="text-[10px] text-white/40">{sub}</div>}
+    <div
+      className="rounded-lg p-2"
+      style={{
+        background: TOK.surfaceElevated,
+        border: `1px solid ${TOK.border}`,
+      }}
+    >
+      <div
+        className="text-[10px] uppercase tracking-wider"
+        style={{ color: TOK.textMuted }}
+      >
+        {label}
+      </div>
+      <div
+        className="text-lg font-semibold tabular-nums mt-0.5"
+        style={{ color: TOK.textPrimary }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          className="text-[10px]"
+          style={{ color: TOK.textMuted }}
+        >
+          {sub}
+        </div>
+      )}
     </div>
   );
 }

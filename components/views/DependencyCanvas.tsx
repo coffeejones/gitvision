@@ -33,6 +33,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import { AlertTriangle } from "lucide-react";
+import { TOK } from "@/lib/theme";
 import type {
   FileGraph,
   FileGraphEdge,
@@ -451,15 +452,24 @@ function DependencyCanvasInner({ graph }: Props) {
       }}
     >
       <div
-        className="absolute z-10 top-3 left-3 flex items-center gap-3 backdrop-blur rounded-lg px-3 py-2 text-xs text-white border border-white/10 shadow-lg max-w-[calc(100%-24px)] flex-wrap"
-        style={{ background: "rgba(10, 10, 12, 0.92)" }}
+        className="absolute z-10 top-3 left-3 flex items-center gap-3 backdrop-blur rounded-lg px-3 py-2 text-xs shadow-lg max-w-[calc(100%-24px)] flex-wrap"
+        style={{
+          background: "rgba(10, 10, 12, 0.92)",
+          color: TOK.textPrimary,
+          border: `1px solid ${TOK.border}`,
+        }}
       >
         <input
           type="text"
           value={filterInput}
           onChange={(e) => setFilterInput(e.target.value)}
           placeholder="filter path…"
-          className="bg-white/5 text-white placeholder:text-white/40 rounded px-2 py-0.5 border border-white/10 text-xs outline-none w-40 focus:border-white/30"
+          className="rounded px-2 py-0.5 text-xs outline-none w-40"
+          style={{
+            background: TOK.surfaceElevated,
+            color: TOK.textPrimary,
+            border: `1px solid ${TOK.border}`,
+          }}
         />
 
         {isolatedCount > 0 && (
@@ -472,8 +482,8 @@ function DependencyCanvasInner({ graph }: Props) {
               checked={hideIsolated}
               onChange={(e) => setHideIsolated(e.target.checked)}
             />
-            <span className="text-white/75">
-              Skjul isolerede ({isolatedCount})
+            <span style={{ color: TOK.textSecondary }}>
+              Hide isolated ({isolatedCount})
             </span>
           </label>
         )}
@@ -484,10 +494,10 @@ function DependencyCanvasInner({ graph }: Props) {
             checked={showMinimap}
             onChange={(e) => setShowMinimap(e.target.checked)}
           />
-          <span className="text-white/75">Minimap</span>
+          <span style={{ color: TOK.textSecondary }}>Minimap</span>
         </label>
 
-        <div className="h-4 w-px bg-white/15" />
+        <div className="h-4 w-px" style={{ background: TOK.border }} />
 
         {(Object.keys(enabledKinds) as FileGraphEdgeKind[])
           .filter((k) => presentKinds.has(k))
@@ -515,16 +525,20 @@ function DependencyCanvasInner({ graph }: Props) {
             );
           })}
 
-        <div className="h-4 w-px bg-white/15" />
-        <span className="text-white/50 tabular-nums">
+        <div className="h-4 w-px" style={{ background: TOK.border }} />
+        <span className="tabular-nums" style={{ color: TOK.textMuted }}>
           {visibleIds.size}/{graph.nodes.length} files
           {selected ? ` · selected: ${selected.split("/").pop()}` : ""}
         </span>
       </div>
 
       <div
-        className="absolute z-10 bottom-3 left-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] text-white/70 border border-white/10 shadow-lg"
-        style={{ background: "rgba(10, 10, 12, 0.92)" }}
+        className="absolute z-10 bottom-3 left-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] shadow-lg"
+        style={{
+          background: "rgba(10, 10, 12, 0.92)",
+          color: TOK.textSecondary,
+          border: `1px solid ${TOK.border}`,
+        }}
       >
         Click a file to isolate its neighbors · Arrow A → B means A uses B
         · Entry badge = nothing else points here
