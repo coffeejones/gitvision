@@ -18,11 +18,13 @@ A desktop-grade repo visualizer that feels like a Figma canvas — paste a GitHu
 
 ---
 
-## Strategy & current focus (post-v0.25)
+## Strategy & current focus (post-v0.30)
 
-GitVision is intentionally **not launching publicly** until the core experience covers most languages and most repos. Decision logged end of session 6: hellere bruge tiden på at finpudse end at risikere et dårligt første-indtryk på en bredere audience.
+GitVision deliberately delayed public launch until the core experience covered most languages, most repos, and three actionable insight surfaces (refresh-banner, untested hotspots, near-duplicates). Decision logged end of session 6: hellere bruge tiden på at finpudse end at risikere et dårligt første-indtryk på en bredere audience.
 
-**Fase 1 + 2 are now COMPLETE** (end of session 7). Kerneproduktet covers 7/8 supported languages on AST + parseDirect AND can analyze any repo that fits within reasonable disk + memory budgets — the 60s Railway request timeout no longer caps the size of analyzable repos. We are now in **Fase 3: polish & wow**.
+**Fase 1 + 2 + 3 are now COMPLETE** (end of session 8). Five releases shipped in Fase 3: v0.26 anonymous owner-id session isolation, v0.27 refresh-banner narrative, v0.28 CallEdge.toContainerType overload disambiguation, v0.29 test-to-code mapping with coverage badges + Untested Hotspots panel, v0.30 AST duplicate detection with Near-Duplicates panel.
+
+**Launch readiness is now a genuine decision point** — kerneproduktet has the depth (7/8 languages on AST + Phase 5 type-aware), the scaling (subset analysis + job queue, no request-timeout cap), the safety (anonymous session isolation), and the actionable insight panels (story-driven refresh banner + two compute-heavy "what to do next" panels). The 6-step launch-readiness list discussed end of session 6 is unblocked.
 
 ### Vision (held open until validated)
 
@@ -44,28 +46,26 @@ Grammar smoke-test passed end of session 6: `tree-sitter-c-sharp.wasm` (5.1 MB),
 - ✅ v0.25: Job queue + async. `POST /api/sessions` enqueues a job and returns `{ jobId }` in <1s via Next.js's `after()` hook; the analysis runs detached from the HTTP request. Frontend polls `GET /api/jobs/:id` every 2s. File-based job storage (`<DATA_DIR>/jobs/<id>.json`, atomic write via temp+rename) survives Railway redeploys. Orphan-recovery sweep on first request after a fresh server boot marks `pending`/`running` jobs as failed. Same flow used by `POST /api/sessions/:id/refresh` so refresh is also unbounded by request timeout.
 - Outcome: **any repo that fits within reasonable disk + memory budgets analyzes successfully** on Railway, no request-timeout cap.
 
-**Fase 3 — Polish & wow (next up)**
-- Refresh banner with real "what changed" narrative (currently functional, not screenshot-worthy alone — fails Guiding-Principle 2).
-- Test-to-code mapping via call-graph (we have the data, UI doesn't surface it).
-- AST-based duplicate detection (subtree-similarity hashes).
-- Per-user session isolation light: anonymous owner-id in localStorage. NOT OAuth — just "don't show other people's sessions on the landing page".
-- CallEdge.toContainerType extension (revisit chip-dedup; right now overloads collapse on the BFS engine — see commit `2d4fede`).
+**✅ Fase 3 — Polish & wow (shipped, ~5 aftener total)**
+- ✅ v0.26: Anonymous owner-id session isolation. UUID written to localStorage on first visit, attached as `X-Owner-Id` header to every session-create. Landing page filters to "yours" — no "47 random people's sessions" first-impression.
+- ✅ v0.27: Refresh-banner narrative. `pickHeadline` priority logic produces a story-driven headline ("Code complexity grew by 45 — new branching logic added across the codebase") instead of a metadata diff. Primary/secondary chip emphasis, brand line, "ago" wording. Screenshot-worthy alone (Guiding-Principle 2).
+- ✅ v0.28: CallEdge.toContainerType extension. Resolved the v0.20 chip-dedup workaround (commit `2d4fede`) — same-named overloads (`Blueprint.__init__` vs `BlueprintSetupState.__init__`) are now distinct function-blast-radius targets. Live-validated on Flask: `Blueprint.add_url_rule` (3 callees) vs `BlueprintSetupState.add_url_rule` (0 callees) prove disambiguation works end-to-end.
+- ✅ v0.29: Test-to-code mapping via call-graph. `computeTestCoverage` classifies functions into prod/test by path/filename heuristics (no external coverage data needed), then walks call edges to mark prod functions called by test files as "covered". UI: per-file coverage badge ("5/8" with color scaling 0% rose → 50% amber → 100% accent), Untested Hotspots panel with most-complex-no-test-callers list. Headline stat: "X% prod fns covered".
+- ✅ v0.30: AST-based duplicate detection. FNV-1a 64-bit hash over tree-sitter subtrees walks named children + binary/assignment/unary operators but ignores identifier names + literals. All 7 plugins emit `bodyHash` per function. `findDuplicateGroups` filters by complexity ≥5, group size ≥2, sorts by `groupSize × maxComplexity`, caps at 15. Live-validated on golang/go src/cmd: 15 groups, 118 functions, largest ×36 — caught the canonical SSA-rewrite families (`OpAdd16/32/64/8`, `OpLsh<size>x<size>`, ARM register-shift opcodes).
 
-### Explicitly paused — revisit after Fase 3
+### Unblocked — Fase 3 has landed
 
-Real items, intentionally on hold:
+Items that were on hold pending Fase 3 are now genuine candidates:
 
-- ~~OAuth / "Login with GitHub"~~ — pivot question, not feature. Validates whether the SaaS-platform direction is justified; defer until kerneproduktet is polished enough that real users come back day 2+.
-- ~~Token-felt as launch fallback~~ — would be obviated by OAuth; no point doing both.
-- ~~Launch-prep~~ (landing copy, public-beta framing, feedback channel, analytics tagging).
-- ~~"Upgrade account" / SaaS billing~~ — depends entirely on real-user signal post-launch.
+- **Launch-prep** (landing copy, public-beta framing, feedback channel, analytics tagging) — actionable now. Anonymous owner-id (v0.26) makes the first-impression UX safe; the three insight panels make the value proposition obvious in screenshot form.
+- **OAuth / "Login with GitHub"** — still a pivot question, not a feature. Validates whether the SaaS-platform direction is justified. Worth deferring until real-user signal post-launch tells us whether day-2+ retention exists.
+- **"Upgrade account" / SaaS billing** — depends entirely on real-user signal post-launch.
+- ~~Token-felt as launch fallback~~ — obviated by job queue + anonymous sessions.
 - ~~Stor-repo gate as graceful-skip patch~~ — Fase 2's job queue obsoleted it.
-
-The 6-step launch-readiness list discussed end of session 6 stays on hold until Fase 3 lands.
 
 ---
 
-## Current state (v0.25, end of session 7)
+## Current state (v0.30, end of session 8)
 
 ### What works end-to-end
 
@@ -102,7 +102,7 @@ The 6-step launch-readiness list discussed end of session 6 stays on hold until 
 - **Refresh:** append snapshot, show "Since your last visit" diff banner with emerald gradient.
 - **Session CRUD:** rename, delete, multiple sessions. Session actions grouped: Share dropdown (Wrapped / Share card / Screenshot), primary Refresh, overflow menu for Delete.
 - **Rate-limit aware:** shows remaining in footer.
-- **Code tab (v0.11, function-level blast radius added in v0.20):** AST-based blast-radius UI on top of the codeAnalysis pipeline. Picks the heaviest file by default, shows incoming + outgoing dependency hops (3 deep, capped at 200 files per direction), the file's top-6 functions in the header (now clickable), plus side-by-side "heaviest files" and "most complex functions" lists for quick navigation. **Click a function chip or a top-functions item → zooms into function-level blast radius**: callers (functions that call this) and callees (functions this calls), same hop-3 / cap-200 BFS, distinct icons (PhoneIncoming/PhoneOutgoing). Empty-state hint when a function has no resolved calls. Coverage chip (generalized in v0.21) sums across every AST plugin and lists active languages inline ("214 AST files (C#)"). New snapshots get `codeGraph` populated automatically; old snapshots show an empty state pointing to the Refresh button.
+- **Code tab (v0.11, function-level blast radius added in v0.20, three insight panels added in v0.28-v0.30):** AST-based blast-radius UI on top of the codeAnalysis pipeline. Picks the heaviest file by default, shows incoming + outgoing dependency hops (3 deep, capped at 200 files per direction), the file's top-6 functions in the header (now clickable), plus side-by-side "heaviest files" and "most complex functions" lists for quick navigation. **Click a function chip or a top-functions item → zooms into function-level blast radius**: callers (functions that call this) and callees (functions this calls), same hop-3 / cap-200 BFS, distinct icons (PhoneIncoming/PhoneOutgoing), `(file, name, containerType)` tuple targeting since v0.28 keeps overloads distinct. Empty-state hint when a function has no resolved calls. Coverage chip (generalized in v0.21) sums across every AST plugin and lists active languages inline ("214 AST files (C#)"). **Untested Hotspots panel (v0.29):** most-complex production functions with no test caller, ranked, click to zoom blast radius. Per-file coverage badges ("5/8") on the heaviest-files list with color scaling 0% rose → 50% amber → 100% accent. **Near-Duplicates panel (v0.30):** structural duplicate groups detected via per-function `bodyHash`, sorted by `groupSize × maxComplexity`, expandable with click-to-zoom on each member. Header stat: "X groups · Y fns · largest ×Z". New snapshots get `codeGraph` populated automatically; old snapshots show an empty state pointing to the Refresh button.
 - **Code-analysis pipeline (v0.10 foundation, expanded through v0.23):** AST-based parsers via tree-sitter (WASM) for **7 of 8 supported languages** (JS/TS, Python, Go, Java, C#, PHP, Ruby); regex-fallback only handles Kotlin (blocked by WASM ABI mismatch) plus HTML/CSS as render-target file types. Unified `CodeGraph` aggregate persisted on every fresh snapshot since Phase 4a. Also exposed standalone via `/api/debug/code-analysis` for live testing and `npm run analyze <path>` for local inspection. See "Code-analysis pipeline" below.
 
 ### Dependency-health pipeline (v0.9 architecture)
@@ -402,7 +402,7 @@ lib/__tests__/
                             for Java/Python/Go (9 tests)
 ```
 
-**393 tests total, all passing.** Run with `npm test` (watch) or `npm run test:run` (CI).
+**501 tests total, all passing.** Run with `npm test` (watch) or `npm run test:run` (CI).
 
 Test-count history:
 - v0.17 added 12 in `codeAnalysis.test.ts` for TS/JS type-aware (class fields, constructor parameter properties, method params, typed locals, `new Foo()` inference, generic stripping, `this.method()`, multi-field disambiguation, JS-bare-calls-stay-undefined behavior, arrow-functions-as-named).
@@ -413,6 +413,11 @@ Test-count history:
 - v0.23 added 24 in `ruby.test.ts` + 3 in `codeGraph.test.ts` for the `hasReceiver` contract (receiver-having calls without resolved type refuse single-candidate-match).
 - v0.24 added 17 in `subdir.test.ts` covering `validateSubdir` (path-traversal rejection, length cap, leading-slash strip) and `parseDeepLinkSubdir` (multi-segment / single-segment / non-github URLs / branch-with-slash heuristic limitation).
 - v0.25 added 20 in `jobs.test.ts` covering filesystem CRUD, atomic-write contract, `processJob` idempotency across all four states, `recoverOrphanedJobs` on cold start + mixed states + corrupted files.
+- v0.26 added tests in `ownerId.test.ts` covering UUID minting, persistence across restarts, header attachment + filtering semantics.
+- v0.27 added tests in `refreshHeadline.test.ts` covering `pickHeadline` priority logic (complexity-shift > new functions > author shift > issues > commits) and the diff-fixture for hotspot rank changes.
+- v0.28 added tests in `blastRadius.test.ts` for (file, name, containerType) tuple targeting — Blueprint.__init__ vs BlueprintSetupState.__init__ stay distinct.
+- v0.29 added tests in `testCoverage.test.ts` covering prod-vs-test classification by path heuristics (including paths only present in `cg.calls` not `cg.functions`), coverage walk via call edges, untestedHotspots ranking, percent-covered totals.
+- v0.30 added 28 tests in `duplicates.test.ts` covering FNV-1a basics (5), `hashSubtree` end-to-end with real JS parsing including invariance under identifier rename + literal substitution + sensitivity to operator differences (8), `findDuplicateGroups` filtering + sorting + capping (12), `summarizeDuplicates` totals (3).
 
 Tests have caught real bugs at every stage: v0.8 found `lib/` incorrectly in `OUTPUT_LIKE_FOLDERS`; v0.10 caught query-syntax issues and the `../../` trailing-slash edge case before they shipped to production.
 
@@ -484,16 +489,20 @@ Ranked "bang per buck". ✅ = shipped.
 - ✅ v0.23 — **Ruby tree-sitter migration + `hasReceiver` contract for dynamic langs.** First fully-dynamic language. Phase 5 type-aware works only via constructor-initializer inference (`x = SomeClass.new`, `@x = SomeClass.new`). `Klass.new` is rewritten to `initialize` for constructor matching. New `ParsedCall.hasReceiver?: boolean` lets `pickCallTarget` refuse single-candidate-match when receiver was present but type unknown — cut 76 spurious lib→spec edges in rspec-core to 3 (97% reduction).
 - ✅ v0.24 — **Subset analysis.** `downloadAndExtract` filter callback keeps only entries inside the subdir + a curated list of root-level manifest files. `validateSubdir` + `SubdirNotFoundError` for clean error handling. UI: collapsed disclosure with auto-fill from `https://github.com/owner/repo/tree/branch/path` deep-links. Live: golang/go src/cmd → 1909 files, 22,041 functions, 203,558 call-sites (previously hit 25s codeAnalysis timeout).
 - ✅ v0.25 — **Job queue + async (Fase 2 complete).** `POST /api/sessions` enqueues a job via Next.js's `after()` hook and returns `{ jobId }` in <1s; the analysis runs detached from the HTTP request. Frontend polls `GET /api/jobs/:id` every 2s until terminal state. File-based job storage with atomic writes (temp+rename), survives Railway redeploys. Orphan-recovery sweep on first request after a fresh server boot. Same flow used by Refresh.
+- ✅ v0.26 — **Anonymous owner-id session isolation (Fase 3 step 1).** UUID written to localStorage on first visit, attached to every session-create + list call as `X-Owner-Id` header. Landing page filters its session list to "yours" — no "47 random people's sessions" first-impression on a public deploy. NOT OAuth: no sign-up flow, no server-side identity, no PII. Backward-compat: pre-v0.26 sessions stay accessible by direct URL but don't show on someone else's landing page.
+- ✅ v0.27 — **Refresh-banner narrative.** Replaces metadata-diff banner ("3 commits, 2 stars") with story-driven framing. `pickHeadline` priority logic surfaces the most-interesting change per snapshot (code complexity grew/shrank, new functions added, big author shift, issues closed). Primary/secondary chip emphasis in green/orange. Brand line "GitVision · owner/repo" in textSecondary. Time on right as "1d ago" not "earlier" or "since". Screenshot-worthy alone (Guiding-Principle 2). Live-validated on golang/go: `Code complexity grew by 45 — new branching logic added across the codebase`.
+- ✅ v0.28 — **CallEdge.toContainerType — overload disambiguation in blast radius.** Resolved the v0.20 chip-dedup workaround (commit `2d4fede`). Plugins now emit `CallEdge.toContainerType` alongside `toFunction`; `computeFunctionBlastRadius` uses (file, name, containerType) as its target tuple. Live-validated on Flask: `Blueprint.add_url_rule` (3 callees) vs `BlueprintSetupState.add_url_rule` (0 callees) prove distinct overloads now produce distinct blast radii. Chip dedup logic deleted.
+- ✅ v0.29 — **Test-to-code mapping — coverage badges + Untested Hotspots panel.** `computeTestCoverage(cg)` classifies every function path/file into prod or test by convention heuristics (no external coverage data: looks at `__tests__/`, `*.test.*`, `*.spec.*`, `tests/`, `_test.go`, `_spec.rb`, etc.). Walks call edges to mark prod functions called by test files as "covered". UI: per-file coverage badge ("5/8" with color scaling 0% rose → 50% amber → 100% accent) on the heaviest-files list. Untested Hotspots panel: most-complex prod functions with zero test callers, ranked, click to zoom blast radius. Header stat: "X% prod fns covered". Panel hidden on repos with zero test files (no false-positive lecture).
+- ✅ v0.30 — **AST duplicate detection — bodyHash + Near-Duplicates panel (Fase 3 complete).** FNV-1a 64-bit hash over each function's tree-sitter subtree, walking named children + capturing binary/assignment/unary operator tokens but ignoring identifier names + literal values. All 7 AST plugins emit `bodyHash` per function. `findDuplicateGroups` filters by complexity ≥5, group size ≥2, sorts by `groupSize × maxComplexity` descending, caps at 15. Near-Duplicates panel: collapsible group rows, top group expanded by default, members clickable to zoom blast radius into that exact (file, name, containerType) copy. Live-validated on golang/go src/cmd: 15 groups · 118 functions · largest ×36. Caught canonical SSA-rewrite families: `OpAdd16/32/64/8` (×4 at complexity 176), `OpLsh<size>x<size>` (×36 across 4×4 grid + signed variants), ARM register-shift opcodes (×36). Hash invariance under literal/identifier changes proven: `OpAdd8` and `OpAdd64` share a hash despite different opcodes/literals, identical structure.
 
-### Next up — Fase 3: polish & wow
+### Next up — post-Fase 3 menu
 
-See the "Strategy & current focus" section near the top for full phase context. Candidates ordered by my best guess at user-facing impact:
+See the "Strategy & current focus" section near the top for context: Fase 1 + 2 + 3 are all shipped, launch readiness is now a genuine decision point. Candidates:
 
-- **Refresh banner narrative.** "Since your last visit" works but reads as metadata diff, not as a story. Should be screenshot-worthy alone — failing Guiding-Principle 2.
-- **Anonymous owner-id session isolation.** Lightweight: write a UUID to localStorage on first visit, attach to every session-create, filter the landing page sessions list to "yours". NOT OAuth — no sign-up flow, no server-side identity. Defaults the soft-launch UX (no "47 random people's sessions" first-impression).
-- **CallEdge.toContainerType extension.** Resolves chip-dedup limitation from v0.20 (commit `2d4fede`): currently same-named overloads collapse on the BFS engine because CallEdge only tracks toFunction by string. Adding toContainerType lets us treat `Blueprint.__init__` and `BlueprintSetupState.__init__` as separate function-blast-radius targets.
-- **Test-to-code mapping.** Use call-graph data to identify which test files exercise which production functions. UI surface: per-function "tested by" list, per-file test coverage estimate.
-- **AST-based duplicate detection.** Subtree-similarity hashes across all AST-parsed files. UI surface: "X functions look near-identical" panel in the Code tab.
+- **Public launch.** Landing copy, public-beta framing, feedback channel, analytics tagging. Anonymous owner-id (v0.26) makes the first-impression UX safe; the three insight panels (refresh banner, untested hotspots, near-duplicates) make the value proposition obvious in screenshot form. Lowest implementation cost, highest signal — real users will tell us where the next effort should go.
+- **Fase 4: deeper insights.** Candidates: PR-level blast radius ("this PR touches X functions with Y callers"), trends-over-time (complexity graph across snapshots), cross-repo comparison (analyze two repos side-by-side), conversational codebase ("chat with your repo").
+- **UX polish-pass.** Surface the 15-group cap on the duplicates panel ("showing top 15 of N total"), filter toggles for cross-file vs same-file duplicate groups, sort-by toggle (score / size / complexity).
+- **More dep-health ecosystems.** Go modules, Maven, NuGet, RubyGems, Composer — each ~1 evening, plugin-pattern.
 
 ⚠️ **Kotlin migration: still blocked.** Attempted in v0.20 — `tree-sitter-wasms@0.1.13`'s Kotlin grammar fails ABI compatibility with `web-tree-sitter@0.26.8` (`failIf` at `getDylinkMetadata`). The maintained alternative `@tree-sitter-grammars/tree-sitter-kotlin@1.1.0` ships only `.c` source — building WASM ourselves needs Emscripten setup. Kotlin stays on regex-fallback until a compatible WASM grammar appears upstream.
 
@@ -588,4 +597,4 @@ Sessions stored in `.gitvision/sessions/` — not committed, machine-local.
 
 ---
 
-*Last updated: end of session 7 (Fase 1 + Fase 2 complete). Five releases shipped in this session-cluster: v0.21 C# migration + pickCallTarget strict-typing, v0.22 PHP migration, v0.23 Ruby migration + `hasReceiver` contract, v0.24 subset analysis, v0.25 job queue + async. 7 of 8 supported languages now on AST + parseDirect (only Kotlin remains on regex-fallback, blocked by WASM ABI). Big-repo handling: subset analysis lets users scope to a subdir, job queue runs analyses detached from the HTTP request — Railway's request timeout no longer caps repo size. Test-count history: 268 (v0.20 entry) → 393 (end of session 7). Next up: Fase 3 (refresh-banner narrative, anonymous owner-id session isolation, CallEdge.toContainerType extension, test-to-code mapping, AST duplicate detection). OAuth / launch-prep / upgrade-account remain paused — revisit after Fase 3.*
+*Last updated: end of session 8 (Fase 1 + Fase 2 + Fase 3 complete). Five releases shipped in this session-cluster: v0.26 anonymous owner-id session isolation, v0.27 refresh-banner narrative ("Code complexity grew by 45 — new branching logic added across the codebase"), v0.28 CallEdge.toContainerType for overload disambiguation in blast radius, v0.29 test-to-code mapping with coverage badges + Untested Hotspots panel, v0.30 AST duplicate detection with bodyHash + Near-Duplicates panel. The Code tab now ships three actionable insight surfaces beyond the blast-radius hero: untested hotspots ("most complex functions with no test caller"), per-file coverage badges, and near-duplicates ("structurally identical bodies — candidates for extraction"). Live-validated v0.30 on golang/go src/cmd: 15 groups, 118 functions, largest ×36, caught the canonical SSA-rewrite families. Test-count history: 393 (end of session 7) → 501 (end of session 8). Launch readiness is now a genuine decision point — kerneproduktet has the depth, scaling, safety, and screenshot-worthy panels for a public soft-launch. Post-Fase 3 menu: public launch / Fase 4 deeper insights / UX polish-pass / more dep-health ecosystems.*
