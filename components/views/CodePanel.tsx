@@ -18,7 +18,7 @@
 // + complexity, the other 7 languages contribute imports only via the
 // regex-fallback plugin. Honest accounting beats over-promised UI.
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -56,6 +56,43 @@ import {
 
 const INITIAL_LIST_SIZE = 10;
 const EXPANDED_LIST_SIZE = 60;
+
+/** Persisted boolean state for "is this panel expanded". Default-expanded
+ *  matches what the server-rendered HTML shows, so there's no hydration
+ *  mismatch. Returning visitors who collapsed a panel get a brief flash of
+ *  the expanded state on first paint, then it collapses to their preference
+ *  once the effect runs. Acceptable because:
+ *    1. The Code tab is below the fold of the hero blast-radius card —
+ *       by the time you scroll there, the effect has fired.
+ *    2. The flash signals "panel exists" which is good discovery.
+ *    3. localStorage isolation per panel (each panel has its own key)
+ *       means toggling one doesn't affect the other. */
+function usePanelExpansion(
+  storageKey: string
+): [boolean, () => void] {
+  const [isExpanded, setIsExpanded] = useState(true);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored === "false") setIsExpanded(false);
+    } catch {
+      // localStorage can throw in private mode / cross-origin frames.
+      // Falling back to the default-expanded state is the right move.
+    }
+  }, [storageKey]);
+  function toggle() {
+    setIsExpanded((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(storageKey, String(next));
+      } catch {
+        /* see comment above */
+      }
+      return next;
+    });
+  }
+  return [isExpanded, toggle];
+}
 
 export function CodePanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
   const cg = snapshot.codeGraph;
@@ -887,6 +924,9 @@ function UntestedHotspotsPanel({
     prodFunctions > 0
       ? Math.round((testedProdFunctions / prodFunctions) * 100)
       : 0;
+  const [isExpanded, toggle] = usePanelExpansion(
+    "gitvision:codepanel:untested-expanded"
+  );
 
   return (
     <div
@@ -896,8 +936,17 @@ function UntestedHotspotsPanel({
         border: `1px solid ${TOK.border}`,
       }}
     >
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <button
+        onClick={toggle}
+        className="flex items-center justify-between gap-3 flex-wrap text-left -m-1 p-1 rounded transition cursor-pointer"
+        title={isExpanded ? "Collapse panel" : "Expand panel"}
+      >
         <div className="flex items-center gap-2">
+          {isExpanded ? (
+            <ChevronDown size={14} style={{ color: TOK.textMuted }} />
+          ) : (
+            <ChevronRight size={14} style={{ color: TOK.textMuted }} />
+          )}
           <ShieldOff size={15} style={{ color: TOK.amber }} />
           <span className={STYLE.eyebrow} style={{ color: TOK.textPrimary }}>
             Untested hotspots
@@ -915,8 +964,9 @@ function UntestedHotspotsPanel({
           <FlaskConical size={11} />
           {coveragePct}% prod fns covered
         </span>
-      </div>
+      </button>
 
+      {isExpanded && (
       <ul className="flex flex-col gap-0.5">
         {items.map((h) => (
           <li key={`${h.filePath}:${h.containerType ?? ""}:${h.name}`}>
@@ -975,6 +1025,7 @@ function UntestedHotspotsPanel({
           </li>
         ))}
       </ul>
+      )}
     </div>
   );
 }
@@ -1004,8 +1055,11 @@ function NearDuplicatesPanel({
   const [openGroups, setOpenGroups] = useState<Set<string>>(
     () => new Set(groups[0] ? [groups[0].hash] : [])
   );
+  const [isPanelExpanded, togglePanel] = usePanelExpansion(
+    "gitvision:codepanel:duplicates-expanded"
+  );
 
-  function toggle(hash: string) {
+  function toggleGroup(hash: string) {
     setOpenGroups((prev) => {
       const next = new Set(prev);
       if (next.has(hash)) next.delete(hash);
@@ -1022,8 +1076,17 @@ function NearDuplicatesPanel({
         border: `1px solid ${TOK.border}`,
       }}
     >
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <button
+        onClick={togglePanel}
+        className="flex items-center justify-between gap-3 flex-wrap text-left -m-1 p-1 rounded transition cursor-pointer"
+        title={isPanelExpanded ? "Collapse panel" : "Expand panel"}
+      >
         <div className="flex items-center gap-2">
+          {isPanelExpanded ? (
+            <ChevronDown size={14} style={{ color: TOK.textMuted }} />
+          ) : (
+            <ChevronRight size={14} style={{ color: TOK.textMuted }} />
+          )}
           <Copy size={15} style={{ color: TOK.accent }} />
           <span className={STYLE.eyebrow} style={{ color: TOK.textPrimary }}>
             Near-duplicate functions
@@ -1041,8 +1104,9 @@ function NearDuplicatesPanel({
           {stats.totalGroups} groups · {stats.totalDuplicateFunctions} fns ·
           largest ×{stats.largestGroupSize}
         </span>
-      </div>
+      </button>
 
+      {isPanelExpanded && (
       <ul className="flex flex-col gap-1.5">
         {groups.map((g) => {
           const isOpen = openGroups.has(g.hash);
@@ -1057,7 +1121,7 @@ function NearDuplicatesPanel({
               }}
             >
               <button
-                onClick={() => toggle(g.hash)}
+                onClick={() => toggleGroup(g.hash)}
                 className="w-full flex items-center gap-3 py-2 px-2.5 rounded-lg text-left transition cursor-pointer"
                 style={{ color: TOK.textSecondary }}
                 onMouseEnter={(e) => {
@@ -1203,6 +1267,7 @@ function NearDuplicatesPanel({
           );
         })}
       </ul>
+      )}
     </div>
   );
 }

@@ -67,13 +67,17 @@ export function HomeSessionsList({ initialSessions }: Props) {
 
       {visible.length === 0 ? (
         <div
-          className="rounded-xl border border-dashed p-10 text-center text-sm"
+          className="rounded-xl border border-dashed p-10 text-center text-sm flex flex-col gap-1"
           style={{
             borderColor: TOK.border,
             color: TOK.textMuted,
           }}
         >
-          No sessions yet. Paste a URL above to start.
+          <div>No sessions yet.</div>
+          <div className="text-[11px]">
+            Paste a GitHub URL above, or try one of the demo repos to see
+            what GitVision does.
+          </div>
         </div>
       ) : (
         <div

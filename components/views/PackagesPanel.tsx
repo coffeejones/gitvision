@@ -90,9 +90,12 @@ export function PackagesPanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
         }}
       >
         <PackageX size={20} className="mx-auto" style={{ color: TOK.textMuted }} />
-        <div>No package manifests detected.</div>
+        <div style={{ color: TOK.textSecondary }}>
+          No package manifests in this repo.
+        </div>
         <div className="text-[11px]">
-          GitVision scans{" "}
+          Try a JavaScript, Rust, or Python project to see vulnerable /
+          outdated / deprecated dependencies surfaced here. GitVision reads{" "}
           <code className="font-mono" style={{ color: TOK.textSecondary }}>
             package.json
           </code>
