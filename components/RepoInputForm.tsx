@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, ChevronRight, Circle, Loader2 } from "lucide-react";
+import {
+  ArrowDown,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  Loader2,
+} from "lucide-react";
 import { parseDeepLinkSubdir } from "@/lib/githubUrl";
 import { pollJob } from "@/lib/jobsClient";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
@@ -38,6 +45,29 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
   const [progress, setProgress] = useState(0);
   const router = useRouter();
   const startTime = useRef<number | null>(null);
+
+  // v0.38: first-visit nudge. Shows a one-line "first time? try a demo"
+  // hint until the user takes ANY meaningful action — clicking a demo,
+  // typing a URL, or successfully submitting. Persisted in localStorage
+  // so returning visitors don't see it.
+  const [showFirstVisitHint, setShowFirstVisitHint] = useState(false);
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("gitvision:has-visited")) {
+        setShowFirstVisitHint(true);
+      }
+    } catch {
+      // localStorage unavailable — skip the nudge silently.
+    }
+  }, []);
+  function dismissFirstVisitHint() {
+    setShowFirstVisitHint(false);
+    try {
+      localStorage.setItem("gitvision:has-visited", "1");
+    } catch {
+      /* no-op */
+    }
+  }
 
   // Auto-detect /tree/<branch>/<path> deep-links and lift the path into
   // the subdir field. We open the disclosure too, so the auto-fill is
@@ -184,7 +214,10 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
         <input
           type="text"
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            setValue(e.target.value);
+            if (e.target.value.length > 0) dismissFirstVisitHint();
+          }}
           placeholder="github.com/owner/repo"
           disabled={pending}
           className="flex-1 bg-transparent h-12 px-4 text-base focus:outline-none disabled:opacity-50"
@@ -273,40 +306,55 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
       )}
 
       {!pending && demoRepos.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs" style={{ color: TOK.textMuted }}>
-            Try with:
-          </span>
-          {demoRepos.map((entry) => {
-            const item =
-              typeof entry === "string" ? { repo: entry, lang: "" } : entry;
-            return (
-              <button
-                key={item.repo}
-                type="button"
-                onClick={() => setValue(item.repo)}
-                className="text-xs font-mono px-2 py-1 rounded-md transition hover:scale-[1.02] flex items-center gap-1.5"
-                style={{
-                  background: TOK.surface,
-                  border: `1px solid ${TOK.border}`,
-                  color: TOK.textSecondary,
-                }}
-                title={
-                  item.lang ? `${item.repo} — ${item.lang}` : item.repo
-                }
-              >
-                <span>{item.repo}</span>
-                {item.lang && (
-                  <span
-                    className="text-[10px]"
-                    style={{ color: TOK.textMuted }}
-                  >
-                    · {item.lang}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="flex flex-col gap-2">
+          {showFirstVisitHint && (
+            <div
+              className="text-[11px] inline-flex items-center gap-1.5 self-start animate-pulse"
+              style={{ color: TOK.accent }}
+            >
+              <ArrowDown size={11} />
+              First time? Click any of these to see GitVision on a real
+              codebase.
+            </div>
+          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs" style={{ color: TOK.textMuted }}>
+              Try with:
+            </span>
+            {demoRepos.map((entry) => {
+              const item =
+                typeof entry === "string" ? { repo: entry, lang: "" } : entry;
+              return (
+                <button
+                  key={item.repo}
+                  type="button"
+                  onClick={() => {
+                    setValue(item.repo);
+                    dismissFirstVisitHint();
+                  }}
+                  className="text-xs font-mono px-2 py-1 rounded-md transition hover:scale-[1.02] flex items-center gap-1.5"
+                  style={{
+                    background: TOK.surface,
+                    border: `1px solid ${TOK.border}`,
+                    color: TOK.textSecondary,
+                  }}
+                  title={
+                    item.lang ? `${item.repo} — ${item.lang}` : item.repo
+                  }
+                >
+                  <span>{item.repo}</span>
+                  {item.lang && (
+                    <span
+                      className="text-[10px]"
+                      style={{ color: TOK.textMuted }}
+                    >
+                      · {item.lang}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
