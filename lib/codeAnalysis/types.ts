@@ -188,6 +188,14 @@ export interface CallEdge {
   toFile: string | null;
   /** Function name in toFile, when resolvable. */
   toFunction: string | null;
+  /** Container (class/struct/etc.) of the resolved target, when known
+   *  (v0.28+). Lets the function-level blast radius distinguish between
+   *  same-named overloads in the same file (e.g. `Blueprint.__init__`
+   *  vs `BlueprintSetupState.__init__` in flask/sansio/blueprints.py).
+   *  Without this, both __init__ entries collapse to one BFS node and
+   *  produce identical results — the v0.20 chip-dedup workaround.
+   *  Top-level / module-scope target functions leave this undefined. */
+  toContainerType?: string;
 }
 
 /** A module-level edge between files. */

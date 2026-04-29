@@ -469,6 +469,91 @@ describe("buildCodeGraph", () => {
     expect(g.calls[0].toFunction).toBe("doIt");
   });
 
+  it("populates toContainerType on resolved CallEdges (v0.28)", () => {
+    // pickCallTarget returns a FunctionDef; codeGraph copies its
+    // containerType onto the resulting CallEdge so blast-radius BFS
+    // can distinguish same-named overloads in different classes.
+    const files = [
+      pf({
+        rel: "Blueprint.py",
+        functions: [
+          {
+            name: "__init__",
+            startRow: 1,
+            endRow: 5,
+            complexity: 1,
+            containerType: "Blueprint",
+          },
+        ],
+      }),
+      pf({
+        rel: "Caller.py",
+        calls: [
+          {
+            calleeName: "__init__",
+            inFunction: "factory",
+            calleeType: "Blueprint",
+          },
+        ],
+      }),
+    ];
+    const g = buildCodeGraph({
+      parsedFiles: files,
+      pluginByFile: new Map(),
+    });
+    expect(g.calls[0].toFile).toBe("Blueprint.py");
+    expect(g.calls[0].toFunction).toBe("__init__");
+    expect(g.calls[0].toContainerType).toBe("Blueprint");
+  });
+
+  it("leaves toContainerType undefined when the resolved target has no container", () => {
+    // Top-level / module-scope functions have no container. The CallEdge
+    // reflects that: toContainerType stays undefined rather than ""
+    // — so consumers can disambiguate "no container" from "container =
+    // empty-string".
+    const files = [
+      pf({
+        rel: "helpers.ts",
+        functions: [
+          {
+            name: "fetchUser",
+            startRow: 1,
+            endRow: 3,
+            complexity: 1,
+            // no containerType — top-level function
+          },
+        ],
+      }),
+      pf({
+        rel: "page.ts",
+        calls: [{ calleeName: "fetchUser", inFunction: "render" }],
+      }),
+    ];
+    const g = buildCodeGraph({
+      parsedFiles: files,
+      pluginByFile: new Map(),
+    });
+    expect(g.calls[0].toFile).toBe("helpers.ts");
+    expect(g.calls[0].toContainerType).toBeUndefined();
+  });
+
+  it("leaves toContainerType undefined on unresolved CallEdges", () => {
+    // No candidates → toFile is null, toFunction is null, toContainerType
+    // also stays undefined. Defensive check for the chain.
+    const files = [
+      pf({
+        rel: "page.ts",
+        calls: [{ calleeName: "missing", inFunction: "render" }],
+      }),
+    ];
+    const g = buildCodeGraph({
+      parsedFiles: files,
+      pluginByFile: new Map(),
+    });
+    expect(g.calls[0].toFile).toBeNull();
+    expect(g.calls[0].toContainerType).toBeUndefined();
+  });
+
   it("emits import edges only for resolved targets and dedupes by (kind, from, to)", () => {
     const files = [
       pf({

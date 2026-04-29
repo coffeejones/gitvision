@@ -49,11 +49,15 @@ export interface FunctionBlastEntry {
   filePath: string;
   /** Name of the function as captured by the plugin's parser. */
   name: string;
+  /** Container (class/struct/etc.) when known. v0.28+ — distinguishes
+   *  same-named overloads in the same file. Undefined for top-level /
+   *  module-scope functions or for legacy data without container info. */
+  containerType?: string;
   hop: number;
 }
 
 export interface FunctionBlastRadius {
-  target: { filePath: string; name: string };
+  target: { filePath: string; name: string; containerType?: string };
   incoming: FunctionBlastEntry[];
   outgoing: FunctionBlastEntry[];
   byHop: {
@@ -113,15 +117,34 @@ export function computeBlastRadius(
 /** Function-level blast radius. Uses cg.calls only; an edge contributes when
  *  both endpoints are functions inside files we know about. Module-scope
  *  calls (fromFunction === null) are excluded because we'd have nothing
- *  meaningful to display on the source side. */
+ *  meaningful to display on the source side.
+ *
+ *  v0.28: now disambiguates same-named overloads via the new
+ *  CallEdge.toContainerType field. Pass `targetContainerType` when you
+ *  want a specific class's method (e.g. `Blueprint.__init__`); leave it
+ *  undefined to match any function with the given name in the file
+ *  (legacy behavior, useful for snapshots without container data).
+ *
+ *  fromFunction's container is NOT tracked in CallEdge — we infer
+ *  source-side from cg.functions when needed for display. For BFS
+ *  matching we rely on toContainerType only. */
 export function computeFunctionBlastRadius(
   codeGraph: CodeGraph,
   targetFile: string,
   targetFunction: string,
-  opts: BlastRadiusOptions = {}
+  opts: BlastRadiusOptions & { targetContainerType?: string } = {}
 ): FunctionBlastRadius {
   const maxHops = opts.maxHops ?? DEFAULT_MAX_HOPS;
   const maxNodes = opts.maxNodes ?? DEFAULT_MAX_NODES;
+  const targetContainerType = opts.targetContainerType;
+
+  // Build a (file, name) -> container lookup for the source side. CallEdge
+  // doesn't carry fromContainerType; we look it up from cg.functions to
+  // populate FunctionBlastEntry.containerType for callers in the result.
+  const fromContainerLookup = new Map<string, string | undefined>();
+  for (const fn of codeGraph.functions) {
+    fromContainerLookup.set(`${fn.filePath}::${fn.name}`, fn.containerType);
+  }
 
   const incomingAdj = new Map<string, Set<string>>();
   const outgoingAdj = new Map<string, Set<string>>();
@@ -129,17 +152,23 @@ export function computeFunctionBlastRadius(
   for (const c of codeGraph.calls) {
     if (c.fromFunction === null) continue; // module-scope; no source-side fn id
     if (c.toFile === null || c.toFunction === null) continue; // unresolved
-    const fromId = encodeFn(c.fromFile, c.fromFunction);
-    const toId = encodeFn(c.toFile, c.toFunction);
+    const fromContainer =
+      fromContainerLookup.get(`${c.fromFile}::${c.fromFunction}`) ?? undefined;
+    const fromId = encodeFn(c.fromFile, c.fromFunction, fromContainer);
+    const toId = encodeFn(c.toFile, c.toFunction, c.toContainerType);
     addEdge(outgoingAdj, incomingAdj, fromId, toId);
   }
 
-  const targetId = encodeFn(targetFile, targetFunction);
+  const targetId = encodeFn(targetFile, targetFunction, targetContainerType);
   const inc = bfs(targetId, incomingAdj, maxHops, maxNodes);
   const out = bfs(targetId, outgoingAdj, maxHops, maxNodes);
 
   return {
-    target: { filePath: targetFile, name: targetFunction },
+    target: {
+      filePath: targetFile,
+      name: targetFunction,
+      containerType: targetContainerType,
+    },
     incoming: inc.entries.map((e) => ({ ...decodeFn(e.filePath), hop: e.hop })),
     outgoing: out.entries.map((e) => ({ ...decodeFn(e.filePath), hop: e.hop })),
     byHop: {
@@ -156,17 +185,33 @@ export function computeFunctionBlastRadius(
 
 // ---------------- internals ----------------
 
-/** Encode a (file, fnName) pair as a single string id for the BFS engine.
- *  The separator "::" doesn't collide with valid path or identifier chars in
- *  any of our supported languages. */
-function encodeFn(filePath: string, name: string): string {
-  return `${filePath}::${name}`;
+/** Encode a (file, fnName, containerType?) tuple as a single string id for
+ *  the BFS engine. We use ASCII Record Separator (\x1E, U+001E) — a
+ *  control character that can't appear in file paths, identifiers, or
+ *  type names in any language we support. Empty containerType slot means
+ *  "no container known"; functions in the same file with the same name
+ *  but different containers (e.g. two classes' __init__) get distinct ids. */
+const SEP = "";
+
+function encodeFn(
+  filePath: string,
+  name: string,
+  containerType: string | undefined
+): string {
+  return `${filePath}${SEP}${name}${SEP}${containerType ?? ""}`;
 }
 
-function decodeFn(id: string): { filePath: string; name: string } {
-  const idx = id.lastIndexOf("::");
-  if (idx < 0) return { filePath: id, name: "" };
-  return { filePath: id.slice(0, idx), name: id.slice(idx + 2) };
+function decodeFn(id: string): {
+  filePath: string;
+  name: string;
+  containerType?: string;
+} {
+  const parts = id.split(SEP);
+  return {
+    filePath: parts[0] ?? "",
+    name: parts[1] ?? "",
+    containerType: parts[2] ? parts[2] : undefined,
+  };
 }
 
 function truncationMessage(

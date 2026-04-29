@@ -82,9 +82,14 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
     heavyFiles[0]?.file ?? null
   );
   // Function-level zoom. null = file-level blast radius, set = function mode.
-  // Tied to `selected` (the file): switching files clears the function. Names
-  // are scoped to (file, name) pairs in the call graph.
-  const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
+  // Tied to `selected` (the file): switching files clears the function.
+  // Functions are identified by (file, name, containerType?) since v0.28 —
+  // overloads with the same name in different classes (e.g. Blueprint.__init__
+  // vs BlueprintSetupState.__init__) are now distinct selections.
+  const [selectedFunction, setSelectedFunction] = useState<{
+    name: string;
+    containerType?: string;
+  } | null>(null);
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
 
@@ -101,47 +106,30 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
 
   const fnBlast = useMemo(() => {
     if (!selected || !selectedFunction) return null;
-    return computeFunctionBlastRadius(cg, selected, selectedFunction, {
+    return computeFunctionBlastRadius(cg, selected, selectedFunction.name, {
       maxHops: 3,
+      targetContainerType: selectedFunction.containerType,
     });
   }, [cg, selected, selectedFunction]);
 
   const selectedComplexity = selected
     ? cg.fileComplexity[selected] ?? 0
     : null;
-  // Functions in the selected file, deduped on name. CallEdges collapse
-  // same-name overloads (cg.calls.toFunction is a plain string, no container
-  // info), so two chips with the same name would produce identical blast
-  // radius — we'd be showing fake granularity. Keep the highest-complexity
-  // entry (already first after the desc sort) and remember the dropped
-  // siblings so the tooltip can be honest about what was hidden.
+  // Functions in the selected file. v0.28 removed the name-dedup workaround
+  // that v0.20 introduced — CallEdge.toContainerType now lets us
+  // distinguish overloads (Blueprint.__init__ vs BlueprintSetupState.__init__),
+  // so showing both chips produces distinct, accurate blast radii.
   const selectedFunctions = useMemo(() => {
     if (!selected) return [];
-    const all = cg.functions
+    return cg.functions
       .filter((f) => f.filePath === selected)
-      .sort((a, b) => b.complexity - a.complexity);
-    const counts = new Map<string, number>();
-    for (const f of all) counts.set(f.name, (counts.get(f.name) ?? 0) + 1);
-    const seen = new Set<string>();
-    const out: Array<{
-      name: string;
-      complexity: number;
-      startRow: number;
-      containerType?: string;
-      siblingCount: number;
-    }> = [];
-    for (const f of all) {
-      if (seen.has(f.name)) continue;
-      seen.add(f.name);
-      out.push({
+      .map((f) => ({
         name: f.name,
         complexity: f.complexity,
         startRow: f.startRow,
         containerType: f.containerType,
-        siblingCount: (counts.get(f.name) ?? 1) - 1,
-      });
-    }
-    return out;
+      }))
+      .sort((a, b) => b.complexity - a.complexity);
   }, [cg.functions, selected]);
 
   function pickFile(f: string) {
@@ -150,9 +138,13 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
     setQuery("");
   }
 
-  function pickFunction(file: string, fnName: string) {
+  function pickFunction(
+    file: string,
+    fnName: string,
+    containerType?: string
+  ) {
     setSelected(file);
-    setSelectedFunction(fnName);
+    setSelectedFunction({ name: fnName, containerType });
     setQuery("");
   }
 
@@ -173,8 +165,8 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
           complexity={selectedComplexity}
           functions={selectedFunctions}
           activeFunction={selectedFunction}
-          onSelectFunction={(name) =>
-            selected && setSelectedFunction(name)
+          onSelectFunction={(name, containerType) =>
+            selected && setSelectedFunction({ name, containerType })
           }
           query={query}
           onQueryChange={setQuery}
@@ -303,20 +295,20 @@ function SelectedFileHeader({
 }: {
   selected: string | null;
   complexity: number | null;
-  /** Functions to render as chips, already deduped on name by the parent.
-   *  containerType is shown as a muted prefix (Blueprint.__init__) when
-   *  available; siblingCount > 0 means there were same-name overloads we
-   *  collapsed for the user (CallEdge can't distinguish them). */
+  /** Functions to render as chips. v0.28: every function shows as its
+   *  own chip — no name-dedup. (containerType, name) tuples are unique
+   *  in the call graph so each chip produces a distinct blast radius
+   *  when clicked. */
   functions: {
     name: string;
     complexity: number;
     startRow: number;
     containerType?: string;
-    siblingCount: number;
   }[];
-  /** When set, the matching chip lights up to indicate function mode is on. */
-  activeFunction: string | null;
-  onSelectFunction: (name: string) => void;
+  /** When set, the matching chip lights up to indicate function mode is on.
+   *  Match is on (name, containerType) tuple — overloads stay distinct. */
+  activeFunction: { name: string; containerType?: string } | null;
+  onSelectFunction: (name: string, containerType?: string) => void;
   query: string;
   onQueryChange: (q: string) => void;
   filtered: string[];
@@ -363,33 +355,29 @@ function SelectedFileHeader({
       )}
 
       {/* Top functions in the selected file. Clickable: zooms blast radius
-       *  in to function-level for the picked one. The active chip lights up
-       *  with the accent so users can find their way back. ContainerType
-       *  (when set) shows up as a muted prefix so Blueprint.__init__ and
-       *  BlueprintSetupState.__init__ are visually distinct. Same-name
-       *  siblings have been deduped by the parent — the tooltip notes how
-       *  many were collapsed, since they'd produce identical blast radius. */}
+       *  in to function-level for the picked one. v0.28: each (name,
+       *  containerType) tuple is its own chip — overloads stay distinct.
+       *  The active chip is matched on the same tuple so e.g.
+       *  Blueprint.__init__ highlights without lighting up
+       *  BlueprintSetupState.__init__. */}
       {functions.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {functions.slice(0, 6).map((fn) => {
-            const active = fn.name === activeFunction;
-            const overloadHint =
-              fn.siblingCount > 0
-                ? ` · ${fn.siblingCount} other definition${
-                    fn.siblingCount === 1 ? "" : "s"
-                  } with this name (combined blast radius)`
-                : "";
+            const active =
+              activeFunction !== null &&
+              activeFunction.name === fn.name &&
+              activeFunction.containerType === fn.containerType;
             return (
               <button
-                key={`${fn.name}@${fn.startRow}`}
-                onClick={() => onSelectFunction(fn.name)}
+                key={`${fn.containerType ?? ""}@${fn.name}@${fn.startRow}`}
+                onClick={() => onSelectFunction(fn.name, fn.containerType)}
                 className="text-[11px] px-1.5 py-0.5 rounded font-mono transition cursor-pointer"
                 style={{
                   background: active ? TOK.accentSoft : TOK.surfaceElevated,
                   color: active ? TOK.textPrimary : TOK.textSecondary,
                   border: `1px solid ${active ? TOK.accent : TOK.border}`,
                 }}
-                title={`Line ${fn.startRow + 1} · complexity ${fn.complexity}${overloadHint}${
+                title={`Line ${fn.startRow + 1} · complexity ${fn.complexity}${
                   active ? "" : " — click to focus"
                 }`}
                 onMouseEnter={(e) => {
@@ -555,6 +543,11 @@ function FunctionBlastRadiusView({
             className="font-mono"
             style={{ color: TOK.textPrimary }}
           >
+            {blast.target.containerType && (
+              <span style={{ color: TOK.textMuted }}>
+                {blast.target.containerType}.
+              </span>
+            )}
             {blast.target.name}
           </span>
         </span>
@@ -586,7 +579,7 @@ function FunctionBlastRadiusView({
           accent={TOK.amber}
           unit="functions"
           entries={blast.incoming.map((e) => ({
-            primary: e.name,
+            primary: e.containerType ? `${e.containerType}.${e.name}` : e.name,
             secondary: e.filePath,
             hop: e.hop,
           }))}
@@ -598,7 +591,7 @@ function FunctionBlastRadiusView({
           accent={TOK.accent}
           unit="functions"
           entries={blast.outgoing.map((e) => ({
-            primary: e.name,
+            primary: e.containerType ? `${e.containerType}.${e.name}` : e.name,
             secondary: e.filePath,
             hop: e.hop,
           }))}
@@ -827,9 +820,10 @@ function TopFunctionsList({
      *  Python. Top-level functions stay undefined. */
     containerType?: string;
   }[];
-  /** Receives both the file and the function name so the panel can zoom
-   *  straight into function-level blast radius. */
-  onPick: (file: string, fnName: string) => void;
+  /** Receives the file, name, and containerType so the panel can zoom
+   *  straight into function-level blast radius for the exact (file,
+   *  name, container) tuple — distinguishing same-named overloads. */
+  onPick: (file: string, fnName: string, containerType?: string) => void;
 }) {
   return (
     <div
@@ -849,9 +843,9 @@ function TopFunctionsList({
 
       <ul className="flex flex-col gap-0.5">
         {functions.slice(0, 15).map((fn) => (
-          <li key={`${fn.filePath}:${fn.name}@${fn.startRow}`}>
+          <li key={`${fn.filePath}:${fn.containerType ?? ""}:${fn.name}@${fn.startRow}`}>
             <button
-              onClick={() => onPick(fn.filePath, fn.name)}
+              onClick={() => onPick(fn.filePath, fn.name, fn.containerType)}
               className="w-full flex items-center gap-3 py-1.5 px-2 rounded text-left transition"
               style={{ color: TOK.textSecondary }}
               onMouseEnter={(e) => {

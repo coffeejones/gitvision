@@ -68,6 +68,8 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
   //    plugin gave us a calleeType (Java's type-aware extractor in v0.15),
   //    we prefer candidates whose containerType matches — that's the
   //    deterministic answer when receiver type is known.
+  //    toContainerType (v0.28) carries the resolved target's container so
+  //    function-level blast radius can distinguish same-named overloads.
   const calls: CallEdge[] = [];
   for (const f of parsedFiles) {
     for (const c of f.calls) {
@@ -85,6 +87,7 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
         calleeName: c.calleeName,
         toFile: target?.filePath ?? null,
         toFunction: target?.name ?? null,
+        toContainerType: target?.containerType,
       });
     }
   }

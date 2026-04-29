@@ -389,4 +389,175 @@ describe("computeFunctionBlastRadius", () => {
     expect(b.incoming.length).toBe(10);
     expect(b.truncated).toMatch(/Capped at 10 functions/);
   });
+
+  // ------------------- v0.28: containerType disambiguation -------------------
+
+  it("distinguishes same-named overloads in the same file via toContainerType", () => {
+    // Flask blueprints scenario: Blueprint.__init__ and
+    // BlueprintSetupState.__init__ both live in blueprints.py. Without
+    // toContainerType (pre-v0.28), BFS keys on (file, name) and both
+    // collapse to one node. With it, each is distinct.
+    const cg = emptyCodeGraph();
+    cg.functions = [
+      {
+        filePath: "blueprints.py",
+        name: "__init__",
+        startRow: 10,
+        endRow: 15,
+        complexity: 4,
+        containerType: "Blueprint",
+      },
+      {
+        filePath: "blueprints.py",
+        name: "__init__",
+        startRow: 100,
+        endRow: 110,
+        complexity: 3,
+        containerType: "BlueprintSetupState",
+      },
+    ];
+    cg.calls = [
+      // factory() calls Blueprint.__init__
+      {
+        fromFile: "factory.py",
+        fromFunction: "make_blueprint",
+        calleeName: "__init__",
+        toFile: "blueprints.py",
+        toFunction: "__init__",
+        toContainerType: "Blueprint",
+      },
+      // setup() calls BlueprintSetupState.__init__
+      {
+        fromFile: "app.py",
+        fromFunction: "setup",
+        calleeName: "__init__",
+        toFile: "blueprints.py",
+        toFunction: "__init__",
+        toContainerType: "BlueprintSetupState",
+      },
+    ];
+
+    // Blast on Blueprint.__init__ → only the factory caller
+    const blueprint = computeFunctionBlastRadius(cg, "blueprints.py", "__init__", {
+      targetContainerType: "Blueprint",
+    });
+    expect(blueprint.incoming).toEqual([
+      {
+        filePath: "factory.py",
+        name: "make_blueprint",
+        containerType: undefined,
+        hop: 1,
+      },
+    ]);
+
+    // Blast on BlueprintSetupState.__init__ → only the setup caller
+    const state = computeFunctionBlastRadius(cg, "blueprints.py", "__init__", {
+      targetContainerType: "BlueprintSetupState",
+    });
+    expect(state.incoming).toEqual([
+      {
+        filePath: "app.py",
+        name: "setup",
+        containerType: undefined,
+        hop: 1,
+      },
+    ]);
+  });
+
+  it("collapses overloads when targetContainerType is undefined (legacy snapshots)", () => {
+    // Pre-v0.28 callers and snapshots without toContainerType all encode
+    // with empty container slot. Pre-v0.28 behavior is preserved when no
+    // target container is supplied — same as before.
+    const cg = emptyCodeGraph();
+    cg.calls = [
+      {
+        fromFile: "a.py",
+        fromFunction: "x",
+        calleeName: "init",
+        toFile: "b.py",
+        toFunction: "init",
+        // no toContainerType
+      },
+      {
+        fromFile: "c.py",
+        fromFunction: "y",
+        calleeName: "init",
+        toFile: "b.py",
+        toFunction: "init",
+      },
+    ];
+    const b = computeFunctionBlastRadius(cg, "b.py", "init");
+    // Without container disambiguation, both callers reach the same node
+    expect(b.incoming).toHaveLength(2);
+  });
+
+  it("populates source-side containerType from cg.functions when rendering callers", () => {
+    // CallEdge doesn't carry fromContainerType — we infer it from
+    // cg.functions for display so callers' chips show "Class.method".
+    const cg = emptyCodeGraph();
+    cg.functions = [
+      {
+        filePath: "callers.py",
+        name: "main",
+        startRow: 1,
+        endRow: 10,
+        complexity: 1,
+        containerType: "App",
+      },
+    ];
+    cg.calls = [
+      {
+        fromFile: "callers.py",
+        fromFunction: "main",
+        calleeName: "doStuff",
+        toFile: "lib.py",
+        toFunction: "doStuff",
+        toContainerType: "Worker",
+      },
+    ];
+    const b = computeFunctionBlastRadius(cg, "lib.py", "doStuff", {
+      targetContainerType: "Worker",
+    });
+    expect(b.incoming).toEqual([
+      {
+        filePath: "callers.py",
+        name: "main",
+        containerType: "App",
+        hop: 1,
+      },
+    ]);
+  });
+
+  it("preserves containerType on outgoing entries (callees) too", () => {
+    const cg = emptyCodeGraph();
+    cg.functions = [
+      {
+        filePath: "lib.py",
+        name: "helper",
+        startRow: 1,
+        endRow: 5,
+        complexity: 1,
+        containerType: "Helper",
+      },
+    ];
+    cg.calls = [
+      {
+        fromFile: "main.py",
+        fromFunction: "run",
+        calleeName: "helper",
+        toFile: "lib.py",
+        toFunction: "helper",
+        toContainerType: "Helper",
+      },
+    ];
+    const b = computeFunctionBlastRadius(cg, "main.py", "run");
+    expect(b.outgoing).toEqual([
+      {
+        filePath: "lib.py",
+        name: "helper",
+        containerType: "Helper",
+        hop: 1,
+      },
+    ]);
+  });
 });
