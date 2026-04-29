@@ -27,9 +27,11 @@ import {
   ChevronRight,
   Code as CodeIcon,
   FileCode,
+  FlaskConical,
   PhoneIncoming,
   PhoneOutgoing,
   Search,
+  ShieldOff,
   Sparkles,
   Target,
 } from "lucide-react";
@@ -41,6 +43,10 @@ import {
   type BlastRadius,
   type FunctionBlastRadius,
 } from "@/lib/codeAnalysis/blastRadius";
+import {
+  computeTestCoverage,
+  type TestCoverage,
+} from "@/lib/codeAnalysis/testCoverage";
 
 const INITIAL_LIST_SIZE = 10;
 const EXPANDED_LIST_SIZE = 60;
@@ -103,6 +109,10 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
     if (!selected) return null;
     return computeBlastRadius(cg, selected, { maxHops: 3 });
   }, [cg, selected]);
+
+  // v0.29: test-to-code coverage. Pure-function compute — fast enough to
+  // recompute on every cg change without memoizing more aggressively.
+  const coverage = useMemo(() => computeTestCoverage(cg), [cg]);
 
   const fnBlast = useMemo(() => {
     if (!selected || !selectedFunction) return null;
@@ -184,10 +194,23 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
         )}
       </div>
 
+      {/* Untested hotspots — v0.29 actionable insight panel. Only renders
+       *  when the repo has at least one test file we identified, so brand
+       *  new repos / projects without tests don't get a confusing
+       *  "everything is untested" lecture. */}
+      {coverage.totals.testFiles > 0 &&
+        coverage.untestedHotspots.length > 0 && (
+          <UntestedHotspotsPanel
+            coverage={coverage}
+            onPick={pickFunction}
+          />
+        )}
+
       {/* Twin lists: heavy files + top complex functions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <HeavyFilesList
           files={heavyFiles}
+          coverage={coverage}
           selected={selected}
           onPick={pickFile}
         />
@@ -742,10 +765,14 @@ function BlastSection({
 
 function HeavyFilesList({
   files,
+  coverage,
   selected,
   onPick,
 }: {
   files: { file: string; complexity: number }[];
+  /** v0.29: per-file coverage stats. Pass undefined to suppress the
+   *  badge column (e.g. on legacy snapshots without codeGraph). */
+  coverage: TestCoverage;
   selected: string | null;
   onPick: (f: string) => void;
 }) {
@@ -770,6 +797,7 @@ function HeavyFilesList({
       <ul className="flex flex-col gap-0.5">
         {top.map(({ file, complexity }) => {
           const isSelected = file === selected;
+          const fileCov = coverage.byFile.get(file);
           return (
             <li key={file}>
               <button
@@ -795,10 +823,150 @@ function HeavyFilesList({
                 <span className="text-[11px] font-mono truncate flex-1" title={file}>
                   {file}
                 </span>
+                {fileCov && fileCov.total > 0 && (
+                  <CoverageBadge
+                    tested={fileCov.tested}
+                    total={fileCov.total}
+                  />
+                )}
               </button>
             </li>
           );
         })}
+      </ul>
+    </div>
+  );
+}
+
+/** Compact coverage chip — "5/8" with a color indicating the ratio.
+ *  - 0% covered  → rose (untested, needs attention)
+ *  - 1-50% covered → amber (partial coverage)
+ *  - 51-100% covered → accent / green (good coverage)
+ *  Tooltip explains the numbers since the chip itself is dense. */
+function CoverageBadge({ tested, total }: { tested: number; total: number }) {
+  const ratio = tested / total;
+  const color =
+    ratio === 0 ? TOK.rose : ratio < 0.5 ? TOK.amber : TOK.accent;
+  return (
+    <span
+      className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded shrink-0"
+      style={{
+        background: TOK.surfaceElevated,
+        border: `1px solid ${color}33`,
+        color,
+      }}
+      title={`${tested} of ${total} function${total === 1 ? "" : "s"} have a direct test caller`}
+    >
+      {tested}/{total}
+    </span>
+  );
+}
+
+// ------------------- Untested hotspots panel (v0.29) -------------------
+
+function UntestedHotspotsPanel({
+  coverage,
+  onPick,
+}: {
+  coverage: TestCoverage;
+  onPick: (file: string, fnName: string, containerType?: string) => void;
+}) {
+  const items = coverage.untestedHotspots.slice(0, 8);
+  const { prodFunctions, testedProdFunctions, testFiles } = coverage.totals;
+  const coveragePct =
+    prodFunctions > 0
+      ? Math.round((testedProdFunctions / prodFunctions) * 100)
+      : 0;
+
+  return (
+    <div
+      className="rounded-xl p-5 flex flex-col gap-4"
+      style={{
+        background: TOK.surface,
+        border: `1px solid ${TOK.border}`,
+      }}
+    >
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <ShieldOff size={15} style={{ color: TOK.amber }} />
+          <span
+            className="text-xs uppercase tracking-wider font-medium"
+            style={{ color: TOK.textPrimary, letterSpacing: "0.08em" }}
+          >
+            Untested hotspots
+          </span>
+          <span style={{ color: TOK.textMuted }}>·</span>
+          <span className="text-xs" style={{ color: TOK.textSecondary }}>
+            most complex functions with no direct test callers
+          </span>
+        </div>
+        <span
+          className="text-[11px] font-mono inline-flex items-center gap-1.5"
+          style={{ color: TOK.textMuted }}
+          title={`${testedProdFunctions} of ${prodFunctions} prod functions have a direct caller from one of ${testFiles} test files`}
+        >
+          <FlaskConical size={11} />
+          {coveragePct}% prod fns covered
+        </span>
+      </div>
+
+      <ul className="flex flex-col gap-0.5">
+        {items.map((h) => (
+          <li key={`${h.filePath}:${h.containerType ?? ""}:${h.name}`}>
+            <button
+              onClick={() => onPick(h.filePath, h.name, h.containerType)}
+              className="w-full flex items-center gap-3 py-1.5 px-2 rounded text-left transition"
+              style={{ color: TOK.textSecondary }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = TOK.surfaceElevated;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <span
+                className="text-[10px] font-mono tabular-nums w-10 text-right"
+                style={{ color: complexityColor(h.complexity) }}
+              >
+                {h.complexity}
+              </span>
+              <div className="flex-1 min-w-0 flex flex-col">
+                <span
+                  className="text-xs font-mono truncate"
+                  style={{ color: TOK.textPrimary }}
+                  title={
+                    h.containerType ? `${h.containerType}.${h.name}` : h.name
+                  }
+                >
+                  {h.containerType && (
+                    <span style={{ color: TOK.textMuted }}>
+                      {h.containerType}.
+                    </span>
+                  )}
+                  {h.name}
+                </span>
+                <span
+                  className="text-[10px] font-mono truncate"
+                  style={{ color: TOK.textMuted }}
+                  title={h.filePath}
+                >
+                  {h.filePath}
+                </span>
+              </div>
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+                style={{
+                  background: TOK.surfaceElevated,
+                  color: TOK.amber,
+                  border: `1px solid ${TOK.amber}33`,
+                }}
+                title="No test file directly calls this function"
+              >
+                untested
+              </span>
+            </button>
+          </li>
+        ))}
       </ul>
     </div>
   );
