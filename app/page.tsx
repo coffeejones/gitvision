@@ -44,63 +44,76 @@ export default async function Home() {
           className="text-5xl sm:text-6xl font-semibold tracking-tight leading-[1.05]"
           style={{ letterSpacing: "-0.03em" }}
         >
-          See any repo as{" "}
-          <span style={{ color: TOK.accent }}>a living map</span>.
+          Map any GitHub repo.{" "}
+          <span style={{ color: TOK.accent }}>
+            Find what&apos;s risky, duplicated, or untested.
+          </span>
         </h1>
 
         <p
-          className="text-lg max-w-xl leading-relaxed"
+          className="text-lg max-w-2xl leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          Paste a GitHub URL. Get an explorable canvas, an honest health
-          verdict, and an AI briefing — in under 20 seconds.
+          Paste a URL. Get blast radius, structural duplicates, untested
+          hotspots, and an AI health verdict grounded in 17 deterministic
+          signals — in under 20 seconds, across 7 languages.
         </p>
 
         <RepoInputForm demoRepos={DEMO_REPOS} />
       </section>
 
-      {/* How it works */}
+      {/* What you'll see — feature-specific cards highlighting the
+       *  insight panels users get on a session page. Concrete + screenshot-
+       *  worthy claims, not generic "explore your code". */}
       <section className="flex flex-col gap-8">
         <div className="flex items-baseline justify-between">
-          <h2 className={STYLE.sectionTitle}>How it works</h2>
+          <h2 className={STYLE.sectionTitle}>What you&apos;ll see</h2>
           <div className="text-xs" style={{ color: TOK.textMuted }}>
-            ~20 seconds end-to-end
+            on every session page
           </div>
         </div>
 
         <div
-          className="grid grid-cols-1 md:grid-cols-3 gap-px overflow-hidden rounded-xl"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px overflow-hidden rounded-xl"
           style={{ background: TOK.border }}
         >
           {[
             {
-              n: "01",
-              t: "Paste",
-              d: "Any public GitHub URL. No auth needed for public repos.",
+              t: "Blast radius",
+              d: "Click a file, see what breaks if you change it. Click a function, zoom into callers and callees three hops deep.",
             },
             {
-              n: "02",
-              t: "Analyze",
-              d: "We clone history with git log, parse imports, fetch PRs, compute signals.",
+              t: "Near-duplicates",
+              d: "Structural AST hashing across the codebase. On golang/go src/cmd we found 36 copies of one ARM rewrite pattern.",
             },
             {
-              n: "03",
-              t: "Explore",
-              d: "Canvas, dependency graph, PR flow, health check. Save as a session.",
+              t: "Untested hotspots",
+              d: "Most-complex production functions with no test caller. Per-file coverage badges scaled by ratio.",
+            },
+            {
+              t: "AI health verdict",
+              d: "Hybrid: 17 deterministic rule-based signals feed a constrained Claude narrative. Zero hallucination room.",
+            },
+            {
+              t: "Dependency health",
+              d: "Vulnerable / outdated / deprecated packages across npm, Cargo, PyPI. CVEs from OSV.dev with direct registry links.",
+            },
+            {
+              t: "Refresh story",
+              d: "Snapshot diffs become a screenshot-worthy hero card: complexity grew, new functions added, who&apos;s the new top committer.",
             },
           ].map((s) => (
             <div
-              key={s.n}
-              className="p-6 flex flex-col gap-3"
+              key={s.t}
+              className="p-6 flex flex-col gap-2"
               style={{ background: TOK.bg }}
             >
-              <span
-                className="font-mono text-sm"
-                style={{ color: TOK.accent }}
+              <h3
+                className="text-base font-semibold"
+                style={{ color: TOK.textPrimary }}
               >
-                {s.n}
-              </span>
-              <h3 className="text-base font-semibold">{s.t}</h3>
+                {s.t}
+              </h3>
               <p
                 className="text-sm leading-relaxed"
                 style={{ color: TOK.textSecondary }}
@@ -109,6 +122,15 @@ export default async function Home() {
               </p>
             </div>
           ))}
+        </div>
+
+        <div
+          className="text-xs"
+          style={{ color: TOK.textMuted }}
+        >
+          Tree-sitter AST across JS/TS, Python, Go, Java, C#, PHP, Ruby.
+          Kotlin via regex fallback (imports only). Big monorepos? Paste
+          a deep-link to a subdirectory to scope the analysis.
         </div>
       </section>
 
