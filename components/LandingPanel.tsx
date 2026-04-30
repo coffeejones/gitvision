@@ -1,29 +1,24 @@
 "use client";
 
-// Landing-page interactive area (v0.50).
+// Landing-page interactive area (v0.50, reshaped in v0.51).
 //
-// Wraps the URL paste form + a two-card row underneath:
-//   • "Try a demo" — pre-analyzed repos showcasing the AST plugins.
-//     Clicking a demo pre-fills the URL field above (which is
-//     controlled state lifted into this component).
-//   • "Your sessions" — owner-id-filtered list of saved sessions.
-//     Reuses the same SessionRow component the workspace knows.
+// Wraps the URL paste form, a compact horizontal demo-chip row, and a
+// full-width "Your sessions" card. The v0.50 attempt at two
+// side-by-side cards looked workspace-y but cramped both lists into
+// ~480px columns — sessions got truncated, demos felt over-framed for
+// what's really a 4-button action row. v0.51 splits the two by intent:
 //
-// Why a two-pane card layout instead of the v0.49 "demo row inline +
-// sessions list below" shape: the workspace pivot (v0.42-v0.47) made
-// the session pages feel like a tool, but the landing still read as
-// a long marketing scroll. Two cards side-by-side mirrors the
-// workspace's "two areas visible at once" feel and balances first-
-// time visitors (who want to try a demo) with returning users (who
-// want their sessions).
+//   • Demos = action shortcuts → inline horizontal chips, no card
+//     frame. They're a "click to start" surface, not saved content.
+//   • Sessions = saved state → full-width card with eyebrow header,
+//     enough horizontal space for SessionRow to breathe.
 //
-// Both cards always render — no click-to-expand. Hiding either path
-// behind a click is friction; we want users to see both options at a
-// glance.
+// First-visit hint and chip styling preserved from the v0.50
+// implementation; only the layout changes.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Beaker, Folder } from "lucide-react";
+import { ArrowDown, Folder } from "lucide-react";
 import type { SessionSummary } from "@/lib/types";
 import { filterSessionsByOwner, getOrCreateOwnerId } from "@/lib/ownerId";
 import { STYLE, TOK } from "@/lib/theme";
@@ -40,10 +35,9 @@ const HAS_VISITED_KEY = "gitvision:has-visited";
 export function LandingPanel({ demoRepos, initialSessions }: Props) {
   const [value, setValue] = useState("");
 
-  // First-visit nudge — accent eyebrow ("Click any demo to start") in
-  // the Try-a-demo card until the user does something meaningful.
-  // Logic moved from RepoInputForm in v0.50 so the visual lives where
-  // the action is.
+  // First-visit nudge — accent text under the form that points to
+  // the demo chips. Persists in localStorage so returning visitors
+  // don't see it.
   const [showHint, setShowHint] = useState(false);
   useEffect(() => {
     try {
@@ -76,9 +70,8 @@ export function LandingPanel({ demoRepos, initialSessions }: Props) {
     });
   }
 
-  // Owner-id filter for "Your sessions". Mirrors the v0.26 logic from
-  // HomeSessionsList — which we replace with this component's right
-  // card.
+  // Owner-id filter for "Your sessions". Mirrors the v0.26 logic
+  // from the deleted HomeSessionsList.
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
@@ -92,163 +85,131 @@ export function LandingPanel({ demoRepos, initialSessions }: Props) {
   const hiddenCount = initialSessions.length - visibleSessions.length;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-7">
       <RepoInputForm
         value={value}
         onValueChange={setValue}
         onUserInteract={dismissHint}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Try a demo */}
-        <PanelCard
-          icon={<Beaker size={14} />}
-          title="Try a demo"
-          subtitle="Pre-analyzed across each AST plugin"
-          accent={showHint}
-        >
-          {showHint && (
-            <div
-              className="text-[11px] mb-1.5 inline-flex items-center gap-1.5 self-start animate-pulse"
-              style={{ color: TOK.accent }}
-            >
-              First time? Click any of these to see GitVision on a real
-              codebase.
-            </div>
-          )}
-          <ul className="flex flex-col gap-0.5">
-            {demoRepos.map((entry) => {
-              const item =
-                typeof entry === "string" ? { repo: entry, lang: "" } : entry;
-              return (
-                <li key={item.repo}>
-                  <button
-                    onClick={() => pickDemo(item.repo)}
-                    className="w-full flex items-center gap-2 py-1.5 px-2 rounded-md text-left transition group"
-                    style={{ color: TOK.textSecondary }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = TOK.surfaceElevated;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                    }}
+      {/* Demo chips — horizontal action row, no card frame. Compact
+       *  by design: one line of chips at most viewports, wraps
+       *  gracefully when narrow. */}
+      <div className="flex flex-col gap-2">
+        {showHint && (
+          <div
+            className="text-[11px] inline-flex items-center gap-1.5 self-start animate-pulse"
+            style={{ color: TOK.accent }}
+          >
+            <ArrowDown size={11} />
+            First time? Click any of these to see GitVision on a real
+            codebase.
+          </div>
+        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className={STYLE.eyebrow}
+            style={{ color: TOK.textMuted }}
+          >
+            Try a demo
+          </span>
+          {demoRepos.map((entry) => {
+            const item =
+              typeof entry === "string" ? { repo: entry, lang: "" } : entry;
+            return (
+              <button
+                key={item.repo}
+                onClick={() => pickDemo(item.repo)}
+                className="text-xs font-mono px-2.5 py-1 rounded-md transition flex items-center gap-1.5"
+                style={{
+                  background: TOK.surface,
+                  border: `1px solid ${TOK.border}`,
+                  color: TOK.textSecondary,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = TOK.borderStrong;
+                  e.currentTarget.style.color = TOK.textPrimary;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = TOK.border;
+                  e.currentTarget.style.color = TOK.textSecondary;
+                }}
+                title={item.lang ? `${item.repo} — ${item.lang}` : item.repo}
+              >
+                <span>{item.repo}</span>
+                {item.lang && (
+                  <span
+                    className="text-[10px]"
+                    style={{ color: TOK.textMuted }}
                   >
-                    <span
-                      className="text-xs font-mono truncate flex-1"
-                      style={{ color: TOK.textPrimary }}
-                    >
-                      {item.repo}
-                    </span>
-                    {item.lang && (
-                      <span
-                        className="text-[10px] shrink-0"
-                        style={{ color: TOK.textMuted }}
-                      >
-                        {item.lang}
-                      </span>
-                    )}
-                    <ArrowRight
-                      size={11}
-                      className="opacity-30 group-hover:opacity-100 transition shrink-0"
-                      style={{ color: TOK.textSecondary }}
-                    />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </PanelCard>
+                    · {item.lang}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-        {/* Your sessions */}
-        <PanelCard
-          icon={<Folder size={14} />}
-          title="Your sessions"
-          subtitle={
-            visibleSessions.length === 0
+      {/* Your sessions — full-width card. Workspace-style: eyebrow
+       *  header with subtitle on the right, list of SessionRow inside.
+       *  Variable content (0 to many sessions) gets full ~5xl width
+       *  to breathe instead of being squeezed into half a column. */}
+      <div
+        className="rounded-xl flex flex-col"
+        style={{
+          background: TOK.surface,
+          border: `1px solid ${TOK.border}`,
+        }}
+      >
+        <div
+          className="flex items-baseline justify-between gap-2 px-5 py-3 flex-wrap"
+          style={{ borderBottom: `1px solid ${TOK.border}` }}
+        >
+          <div className="flex items-center gap-2">
+            <Folder size={14} style={{ color: TOK.textSecondary }} />
+            <span
+              className={STYLE.eyebrow}
+              style={{ color: TOK.textPrimary }}
+            >
+              Your sessions
+            </span>
+          </div>
+          <span className="text-[11px]" style={{ color: TOK.textMuted }}>
+            {visibleSessions.length === 0
               ? "Saved analyses appear here"
               : `${visibleSessions.length} saved${
                   hiddenCount > 0
                     ? ` · ${hiddenCount} from other browsers hidden`
                     : ""
-                }`
-          }
-        >
-          {visibleSessions.length === 0 ? (
-            <div
-              className="text-[11px] flex flex-col gap-1 py-2"
-              style={{ color: TOK.textMuted }}
-            >
-              <div>No sessions yet.</div>
-              <div>
-                Paste a URL above or click any demo to start your first
-                analysis.
-              </div>
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-0.5 max-h-[280px] overflow-y-auto -mx-1">
-              {visibleSessions.map((s, i) => (
-                <li key={s.id}>
-                  <Link
-                    href={`/session/${s.id}`}
-                    className="block rounded-md px-1 transition"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = TOK.surfaceElevated;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                    }}
-                  >
-                    <SessionRow
-                      session={s}
-                      isLast={i === visibleSessions.length - 1}
-                    />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </PanelCard>
-      </div>
-    </div>
-  );
-}
-
-interface PanelCardProps {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  /** Accent border when there's something the user should look at —
-   *  e.g. the first-visit hint pulsing. */
-  accent?: boolean;
-  children: React.ReactNode;
-}
-
-function PanelCard({ icon, title, subtitle, accent, children }: PanelCardProps) {
-  return (
-    <div
-      className="rounded-xl p-4 flex flex-col gap-3"
-      style={{
-        background: TOK.surface,
-        border: `1px solid ${accent ? `${TOK.accent}33` : TOK.border}`,
-      }}
-    >
-      <div className="flex items-baseline justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span style={{ color: accent ? TOK.accent : TOK.textSecondary }}>
-            {icon}
-          </span>
-          <span
-            className={STYLE.eyebrow}
-            style={{ color: TOK.textPrimary }}
-          >
-            {title}
+                }`}
           </span>
         </div>
-        <span className="text-[11px]" style={{ color: TOK.textMuted }}>
-          {subtitle}
-        </span>
+
+        {visibleSessions.length === 0 ? (
+          <div
+            className="text-sm flex flex-col gap-1 px-5 py-6 text-center"
+            style={{ color: TOK.textMuted }}
+          >
+            <div>No sessions yet.</div>
+            <div className="text-[11px]">
+              Paste a URL above or click any demo to start your first
+              analysis.
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col">
+            {visibleSessions.map((s, i) => (
+              <Link key={s.id} href={`/session/${s.id}`} className="block">
+                <SessionRow
+                  session={s}
+                  isLast={i === visibleSessions.length - 1}
+                />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
-      <div className="flex flex-col">{children}</div>
     </div>
   );
 }
