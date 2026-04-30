@@ -19,6 +19,7 @@
 //     target"), so screenshots capture exactly the active workspace
 //     view, not the full session.
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -29,10 +30,12 @@ import {
   Home,
   Network,
   Package,
+  Search,
   Sparkles,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { STYLE, TOK } from "@/lib/theme";
+import { CommandPalette } from "./CommandPalette";
 
 interface Props {
   sessionId: string;
@@ -63,6 +66,23 @@ type NavEntry = NavItem | null;
 export function SessionShell({ sessionId, snapshot, children }: Props) {
   const pathname = usePathname();
   const base = `/session/${sessionId}`;
+
+  // v0.47 Cmd+K palette state lives here so the sidebar's "Search…"
+  // trigger can open it without poking at internal CommandPalette
+  // state. The keyboard handler also lives here so Cmd+K works even
+  // when CommandPalette isn't currently rendering anything (it
+  // returns null when closed).
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   // Counts that drive the sidebar badges. Same logic as the v0.3 tab
   // bar — preserved here so users still see "Code · 22,041" at a
@@ -148,7 +168,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
         }}
       >
         <div
-          className="px-2 pb-3 mb-1"
+          className="px-2 pb-3 mb-1 flex flex-col gap-2"
           style={{ borderBottom: `1px solid ${TOK.border}` }}
         >
           <Link
@@ -158,6 +178,34 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
           >
             ← All sessions
           </Link>
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="flex items-center gap-2 px-2 h-8 rounded-md text-xs transition cursor-text text-left"
+            style={{
+              background: TOK.surface,
+              border: `1px solid ${TOK.border}`,
+              color: TOK.textMuted,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = TOK.borderStrong;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = TOK.border;
+            }}
+            title="Cmd+K — jump to a page, file, or function"
+          >
+            <Search size={11} />
+            <span className="flex-1">Search…</span>
+            <span
+              className="text-[9px] font-mono px-1 rounded shrink-0"
+              style={{
+                background: TOK.surfaceElevated,
+                border: `1px solid ${TOK.border}`,
+              }}
+            >
+              ⌘K
+            </span>
+          </button>
         </div>
 
         <span
@@ -198,6 +246,13 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       </aside>
 
       <main className="flex-1 min-w-0">{children}</main>
+
+      <CommandPalette
+        sessionId={sessionId}
+        snapshot={snapshot}
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+      />
     </div>
   );
 }
