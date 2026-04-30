@@ -8,6 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  DEMO_OWNER_ID,
   filterSessionsByOwner,
   OWNER_ID_HEADER,
 } from "../ownerId";
@@ -116,5 +117,46 @@ describe("filterSessionsByOwner", () => {
       { id: "1", ownerId: "alice", extra: "foo" },
       { id: "2", extra: "bar" },
     ]);
+  });
+
+  describe("demo sessions (v0.52)", () => {
+    it("hides demo-owned sessions from a matching caller", () => {
+      const items = [
+        { id: "user-a", ownerId: "alice" },
+        { id: "demo-zod", ownerId: DEMO_OWNER_ID },
+      ];
+      const out = filterSessionsByOwner(items, "alice");
+      expect(out.map((s) => s.id)).toEqual(["user-a"]);
+    });
+
+    it("hides demo sessions from a non-matching caller (still filtered)", () => {
+      const items = [
+        { id: "demo-zod", ownerId: DEMO_OWNER_ID },
+        { id: "demo-flask", ownerId: DEMO_OWNER_ID },
+        { id: "user-a", ownerId: "alice" },
+      ];
+      const out = filterSessionsByOwner(items, "bob");
+      expect(out).toHaveLength(0);
+    });
+
+    it("hides demo sessions on the pre-hydration ownerId=null path", () => {
+      // SSR first paint passes null ownerId. We must still hide demos
+      // there so they don't briefly flash before client-side hydration.
+      const items = [
+        { id: "demo-zod", ownerId: DEMO_OWNER_ID },
+        { id: "user-a", ownerId: "alice" },
+        { id: "legacy" },
+      ];
+      const out = filterSessionsByOwner(items, null);
+      expect(out.map((s) => s.id)).toEqual(["user-a", "legacy"]);
+    });
+
+    it('reserves "demo" as the canonical demo ownerId', () => {
+      // Sentinel test — if anyone changes DEMO_OWNER_ID, on-disk demo
+      // sessions tagged with the old value would silently start
+      // appearing in user lists. Catching the rename forces a
+      // matching data migration.
+      expect(DEMO_OWNER_ID).toBe("demo");
+    });
   });
 });

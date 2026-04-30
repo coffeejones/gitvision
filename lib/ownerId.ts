@@ -95,16 +95,31 @@ export function _clearOwnerIdForTest(): void {
  *  coding the string. */
 export const OWNER_ID_HEADER = "X-Owner-Id";
 
+/** Reserved owner-id for showcase / demo sessions (v0.52). Tagging a
+ *  session with this id has two effects:
+ *    1. It's hidden from every user's "Your sessions" list — landings
+ *       stay clean for both first-time and returning visitors.
+ *    2. It's read-only via the v0.26 ownership check on refresh /
+ *       rename / delete: no caller's randomly-generated UUID will ever
+ *       equal "demo", so the API rejects mutations from the public.
+ *  Demo sessions remain reachable by URL — they're meant to be linked
+ *  from the landing's "Try a demo" buttons or shared in launch posts. */
+export const DEMO_OWNER_ID = "demo";
+
 /** Pure filter helper: keep sessions that either have no ownerId
  *  (legacy, pre-v0.26) or whose ownerId matches the caller's. Pre-
- *  hydration the caller passes ownerId=null, in which case we don't
- *  filter at all (server-rendered first paint shows everything;
- *  client narrows the list once localStorage is read). Generic so it
- *  works with both Session and SessionSummary records. */
+ *  hydration the caller passes ownerId=null, in which case we still
+ *  filter out demo sessions so the SSR first paint doesn't briefly
+ *  flash showcase content into "Your sessions" before the client
+ *  hydrates. Generic so it works with both Session and SessionSummary
+ *  records. */
 export function filterSessionsByOwner<T extends { ownerId?: string }>(
   sessions: readonly T[],
   ownerId: string | null
 ): T[] {
-  if (!ownerId) return [...sessions];
-  return sessions.filter((s) => !s.ownerId || s.ownerId === ownerId);
+  // Demo sessions are NEVER part of "Your sessions" regardless of
+  // ownerId state — including on the SSR pre-hydration paint.
+  const nonDemo = sessions.filter((s) => s.ownerId !== DEMO_OWNER_ID);
+  if (!ownerId) return [...nonDemo];
+  return nonDemo.filter((s) => !s.ownerId || s.ownerId === ownerId);
 }
