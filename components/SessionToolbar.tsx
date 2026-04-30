@@ -1,17 +1,28 @@
 "use client";
 
-// Session topbar. Actions grouped:
-//   - Primary: Refresh (accent)
-//   - Share dropdown: Wrapped, Share card, Screenshot
-//   - Overflow menu: Delete (destructive)
-// Rename is still triggered by clicking the session name in the hero.
+// Session topbar — slim workspace bar (v0.43+).
+//
+// Sits above the SessionShell sidebar+main area. Full width, 48px tall,
+// only contains identity + primary actions:
+//   - Repo path + snapshot age (left)
+//   - Refresh (accent button)
+//   - Share dropdown (Wrapped / Share card / Screenshot)
+//   - Overflow menu (Delete)
+//
+// What used to be here but moved out:
+//   - "← All sessions" link → SessionShell sidebar (dedup)
+//   - Session name editor → Overview hero (only editable from one place)
+//   - "Snapshot N of N" verbose phrasing → compact "N snapshots · 1d ago"
+//
+// Rename is still triggered by clicking the session name on the
+// Overview page (SessionNameEditor). Keeping it there means the
+// rename action is always co-located with the visible name; adding
+// it to the topbar would split the affordance.
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import * as htmlToImage from "html-to-image";
 import {
-  ArrowLeft,
   Camera,
   ChevronDown,
   Gift,
@@ -162,20 +173,11 @@ export function SessionToolbar({
 
   return (
     <div
-      className="border-b"
-      style={{ borderColor: TOK.border }}
+      className="border-b sticky top-0 z-30"
+      style={{ borderColor: TOK.border, background: TOK.bgDeep }}
     >
-      <div className="max-w-6xl mx-auto px-8 h-14 flex items-center gap-4">
-        <Link
-          href="/"
-          className="flex items-center gap-1.5 text-sm transition"
-          style={{ color: TOK.textSecondary }}
-        >
-          <ArrowLeft size={14} />
-          <span>All sessions</span>
-        </Link>
-        <div className="h-5 w-px" style={{ background: TOK.border }} />
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="px-5 h-12 flex items-center gap-3">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
           <span
             className="font-mono text-sm truncate"
             style={{ color: TOK.textPrimary }}
@@ -183,11 +185,16 @@ export function SessionToolbar({
             {snapshot.repo.fullName}
           </span>
           <span
-            className="text-xs shrink-0"
+            className="text-[11px] shrink-0 inline-flex items-center gap-1"
             style={{ color: TOK.textMuted }}
+            title={`Snapshot ${snapshotCount} of ${snapshotCount} · ${updatedAtISO}`}
           >
-            · updated {formatRel(updatedAtISO)} · snapshot {snapshotCount} of{" "}
-            {snapshotCount}
+            <span style={{ color: TOK.border }}>·</span>
+            <span>
+              {snapshotCount} snapshot{snapshotCount === 1 ? "" : "s"}
+            </span>
+            <span style={{ color: TOK.border }}>·</span>
+            <span>{formatRel(updatedAtISO)}</span>
           </span>
         </div>
 
@@ -314,8 +321,8 @@ export function SessionToolbar({
 
       {message && (
         <div
-          className="max-w-6xl mx-auto px-8 py-2 text-xs"
-          style={{ color: TOK.rose }}
+          className="px-5 py-2 text-xs border-t"
+          style={{ color: TOK.rose, borderColor: TOK.border }}
         >
           {message}
         </div>

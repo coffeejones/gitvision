@@ -121,12 +121,18 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
   return (
     <div className="flex w-full">
       <aside
-        className="shrink-0 sticky top-0 self-start flex flex-col gap-1 px-3 py-5"
+        className="shrink-0 sticky self-start flex flex-col gap-1 px-3 py-5 z-20"
         style={{
+          // Sit immediately below the 48px sticky topbar.
+          top: 48,
           width: 224,
-          height: "100vh",
+          // Fill the rest of the viewport so the bottom of the sidebar
+          // never floats. Use 100dvh on browsers that support it for
+          // mobile address-bar correctness.
+          height: "calc(100dvh - 48px)",
           borderRight: `1px solid ${TOK.border}`,
           background: TOK.bg,
+          overflowY: "auto",
         }}
       >
         <div
