@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowDown,
   Check,
   ChevronDown,
   ChevronRight,
@@ -31,11 +30,29 @@ const ESTIMATED_MS = 22_000;
 /** Demo-row entry. The language label shows up muted next to the repo path
  *  so users can see at a glance which plugin (JS/TS, Go, Python, Java, …)
  *  the row exercises. Plain string entries are still accepted for callers
- *  that don't care about the label. */
+ *  that don't care about the label. v0.50: demos no longer rendered inline;
+ *  LandingPanel renders them in a dedicated "Try a demo" card next to
+ *  "Your sessions". This type stays exported so that card can keep the
+ *  same shape. */
 export type DemoRepo = string | { repo: string; lang: string };
 
-export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
-  const [value, setValue] = useState("");
+interface RepoInputFormProps {
+  /** Controlled URL value. The form is fully controlled (v0.50) so the
+   *  parent landing component can pre-fill it from a "Try a demo"
+   *  click in a sibling card. */
+  value: string;
+  onValueChange: (next: string) => void;
+  /** Optional callback fired when the user types into the URL field.
+   *  Used by LandingPanel to dismiss the first-visit nudge once any
+   *  meaningful interaction happens. */
+  onUserInteract?: () => void;
+}
+
+export function RepoInputForm({
+  value,
+  onValueChange,
+  onUserInteract,
+}: RepoInputFormProps) {
   const [subdir, setSubdir] = useState("");
   const [subdirOpen, setSubdirOpen] = useState(false);
   const [autoFilledFromUrl, setAutoFilledFromUrl] = useState(false);
@@ -45,29 +62,6 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
   const [progress, setProgress] = useState(0);
   const router = useRouter();
   const startTime = useRef<number | null>(null);
-
-  // v0.38: first-visit nudge. Shows a one-line "first time? try a demo"
-  // hint until the user takes ANY meaningful action — clicking a demo,
-  // typing a URL, or successfully submitting. Persisted in localStorage
-  // so returning visitors don't see it.
-  const [showFirstVisitHint, setShowFirstVisitHint] = useState(false);
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem("gitvision:has-visited")) {
-        setShowFirstVisitHint(true);
-      }
-    } catch {
-      // localStorage unavailable — skip the nudge silently.
-    }
-  }, []);
-  function dismissFirstVisitHint() {
-    setShowFirstVisitHint(false);
-    try {
-      localStorage.setItem("gitvision:has-visited", "1");
-    } catch {
-      /* no-op */
-    }
-  }
 
   // Auto-detect /tree/<branch>/<path> deep-links and lift the path into
   // the subdir field. We open the disclosure too, so the auto-fill is
@@ -215,8 +209,8 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
           type="text"
           value={value}
           onChange={(e) => {
-            setValue(e.target.value);
-            if (e.target.value.length > 0) dismissFirstVisitHint();
+            onValueChange(e.target.value);
+            if (e.target.value.length > 0) onUserInteract?.();
           }}
           placeholder="github.com/owner/repo"
           disabled={pending}
@@ -305,58 +299,9 @@ export function RepoInputForm({ demoRepos = [] }: { demoRepos?: DemoRepo[] }) {
         </div>
       )}
 
-      {!pending && demoRepos.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {showFirstVisitHint && (
-            <div
-              className="text-[11px] inline-flex items-center gap-1.5 self-start animate-pulse"
-              style={{ color: TOK.accent }}
-            >
-              <ArrowDown size={11} />
-              First time? Click any of these to see GitVision on a real
-              codebase.
-            </div>
-          )}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs" style={{ color: TOK.textMuted }}>
-              Try with:
-            </span>
-            {demoRepos.map((entry) => {
-              const item =
-                typeof entry === "string" ? { repo: entry, lang: "" } : entry;
-              return (
-                <button
-                  key={item.repo}
-                  type="button"
-                  onClick={() => {
-                    setValue(item.repo);
-                    dismissFirstVisitHint();
-                  }}
-                  className="text-xs font-mono px-2 py-1 rounded-md transition hover:scale-[1.02] flex items-center gap-1.5"
-                  style={{
-                    background: TOK.surface,
-                    border: `1px solid ${TOK.border}`,
-                    color: TOK.textSecondary,
-                  }}
-                  title={
-                    item.lang ? `${item.repo} — ${item.lang}` : item.repo
-                  }
-                >
-                  <span>{item.repo}</span>
-                  {item.lang && (
-                    <span
-                      className="text-[10px]"
-                      style={{ color: TOK.textMuted }}
-                    >
-                      · {item.lang}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* v0.50: demo row removed — moved to LandingPanel's "Try a demo"
+       *  card next to "Your sessions". The first-visit nudge ("First
+       *  time? Click any of these…") also lives in LandingPanel now. */}
 
       {error && (
         <p className="text-sm px-1" style={{ color: TOK.rose }}>

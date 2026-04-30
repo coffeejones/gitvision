@@ -9,8 +9,8 @@
 
 import { listSessions } from "@/lib/storage";
 import { STYLE, TOK } from "@/lib/theme";
-import { RepoInputForm, type DemoRepo } from "@/components/RepoInputForm";
-import { HomeSessionsList } from "@/components/HomeSessionsList";
+import { type DemoRepo } from "@/components/RepoInputForm";
+import { LandingPanel } from "@/components/LandingPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,9 @@ export default async function Home() {
 
   return (
     <main className="max-w-5xl w-full mx-auto px-8 pt-16 pb-20 flex flex-col gap-16">
-      {/* Hero */}
+      {/* Hero — text only. Form + Try-a-demo + Your-sessions live in
+       *  LandingPanel below so the URL field, demo picker, and saved
+       *  sessions share one client component (lifted value state). */}
       <section className="flex flex-col gap-7">
         <div className="flex items-center gap-2">
           <span
@@ -65,13 +67,8 @@ export default async function Home() {
           signals — in under 20 seconds, across 7 languages.
         </p>
 
-        <RepoInputForm demoRepos={DEMO_REPOS} />
+        <LandingPanel demoRepos={DEMO_REPOS} initialSessions={sessions} />
       </section>
-
-      {/* Sessions — filtered client-side by anonymous owner-id (v0.26+).
-       *  Promoted above "What you'll see" in v0.49 so returning users
-       *  hit their work first instead of scrolling past marketing. */}
-      <HomeSessionsList initialSessions={sessions} />
 
       {/* What you'll see — feature-specific cards highlighting the
        *  insight panels users get on a session page. v0.49 trimmed
