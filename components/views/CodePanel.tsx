@@ -130,7 +130,9 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
 
   // Default: heaviest file in the codebase. Empty state is boring; opening on
   // top-complex-file lands the user where the most interesting blast radius
-  // lives. Deep-link `?file=...` overrides this on mount (effect below).
+  // lives. Deep-link `?file=...` overrides this on mount (effect below);
+  // localStorage selection (v0.46) is the second-line fallback so a user's
+  // previous selection persists across tab navigation in the workspace.
   const [selected, setSelected] = useState<string | null>(
     heavyFiles[0]?.file ?? null
   );
@@ -146,20 +148,82 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
 
-  // v0.37: deep-link support. URL params steer which file/function to
-  // focus and which insight panel to scroll into view. Applied once on
-  // mount only — subsequent navigation inside the page is in-component
-  // state and shouldn't fight the URL.
+  // v0.46: persist selection across tab navigation. When the user
+  // picks a file or function on /code, save it; when they come back
+  // to /code from /canvas / /imports / wherever, restore it. Single-
+  // session scope — keys aren't per-session-id because the typical
+  // user has one session open at a time. Multi-session collision is
+  // unfortunate but rare.
+  function rememberSelection(
+    file: string | null,
+    fn: { name: string; containerType?: string } | null
+  ) {
+    try {
+      if (file) {
+        localStorage.setItem("gitvision:codepanel:file", file);
+      } else {
+        localStorage.removeItem("gitvision:codepanel:file");
+      }
+      if (fn) {
+        localStorage.setItem("gitvision:codepanel:fn", fn.name);
+        if (fn.containerType) {
+          localStorage.setItem("gitvision:codepanel:container", fn.containerType);
+        } else {
+          localStorage.removeItem("gitvision:codepanel:container");
+        }
+      } else {
+        localStorage.removeItem("gitvision:codepanel:fn");
+        localStorage.removeItem("gitvision:codepanel:container");
+      }
+    } catch {
+      /* localStorage unavailable — selection just doesn't persist */
+    }
+  }
+
+  // v0.37 deep-link + v0.46 localStorage fallback. Priority order:
+  //   1. URL search params (someone shared a deep-link)
+  //   2. localStorage (you came back to /code from another tab)
+  //   3. Default (heaviest file, set by useState above)
+  // Applied once on mount only — subsequent in-page navigation
+  // shouldn't fight the URL or restore stale state.
   const untestedRef = useRef<HTMLDivElement>(null);
   const duplicatesRef = useRef<HTMLDivElement>(null);
   const blastRadiusRef = useRef<HTMLDivElement>(null);
   const deepLinkApplied = useRef(false);
   useEffect(() => {
     if (deepLinkApplied.current) return;
-    const file = searchParams.get("file");
-    const fn = searchParams.get("fn");
-    const container = searchParams.get("container") ?? undefined;
+    const urlFile = searchParams.get("file");
+    const urlFn = searchParams.get("fn");
+    const urlContainer = searchParams.get("container") ?? undefined;
     const focus = searchParams.get("focus");
+
+    let file = urlFile;
+    let fn = urlFn;
+    let container = urlContainer;
+
+    // localStorage fallback when no URL deep-link is present.
+    if (!file) {
+      try {
+        const storedFile = localStorage.getItem("gitvision:codepanel:file");
+        const storedFn = localStorage.getItem("gitvision:codepanel:fn");
+        const storedContainer = localStorage.getItem(
+          "gitvision:codepanel:container"
+        );
+        if (storedFile) {
+          // Only restore if the stored file still exists in this
+          // snapshot. A different repo or a refreshed snapshot can
+          // make stored selections stale.
+          if (cg.fileComplexity[storedFile] !== undefined) {
+            file = storedFile;
+            fn = storedFn;
+            container = storedContainer ?? undefined;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     if (file) {
       setSelected(file);
       if (fn) setSelectedFunction({ name: fn, containerType: container });
@@ -231,6 +295,7 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
     setSelected(f);
     setSelectedFunction(null); // reset zoom — different file means different fns
     setQuery("");
+    rememberSelection(f, null);
   }
 
   function pickFunction(
@@ -241,6 +306,7 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
     setSelected(file);
     setSelectedFunction({ name: fnName, containerType });
     setQuery("");
+    rememberSelection(file, { name: fnName, containerType });
   }
 
   return (
@@ -261,9 +327,11 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
           complexity={selectedComplexity}
           functions={selectedFunctions}
           activeFunction={selectedFunction}
-          onSelectFunction={(name, containerType) =>
-            selected && setSelectedFunction({ name, containerType })
-          }
+          onSelectFunction={(name, containerType) => {
+            if (!selected) return;
+            setSelectedFunction({ name, containerType });
+            rememberSelection(selected, { name, containerType });
+          }}
           query={query}
           onQueryChange={setQuery}
           filtered={filtered}
@@ -273,7 +341,10 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
         {selectedFunction && fnBlast ? (
           <FunctionBlastRadiusView
             blast={fnBlast}
-            onBack={() => setSelectedFunction(null)}
+            onBack={() => {
+              setSelectedFunction(null);
+              if (selected) rememberSelection(selected, null);
+            }}
             file={selected!}
           />
         ) : (
