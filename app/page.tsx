@@ -8,6 +8,7 @@
 // own work; first-time visitors see an empty-state nudge and read on.
 
 import { listSessions } from "@/lib/storage";
+import { DEMO_OWNER_ID } from "@/lib/ownerId";
 import { STYLE, TOK } from "@/lib/theme";
 import { type DemoRepo } from "@/components/RepoInputForm";
 import { LandingPanel } from "@/components/LandingPanel";
@@ -28,6 +29,32 @@ const DEMO_REPOS: DemoRepo[] = [
 
 export default async function Home() {
   const sessions = await listSessions();
+
+  // v0.53: build a `repoFullName → sessionId` map for demo-tagged
+  // sessions so the LandingPanel can wire each demo button to a
+  // direct navigation instead of triggering a fresh 20-second
+  // analysis. Falls back to the prior pre-fill behaviour when a
+  // demo button has no pre-analyzed counterpart on disk.
+  //
+  // Multiple demos for the same repo: take the most-recently
+  // updated. updatedAt is an ISO8601 string, lexicographically
+  // sortable, so a simple .reduce() picks the right one.
+  const demoSessions: Record<string, string> = {};
+  for (const s of sessions) {
+    if (s.ownerId !== DEMO_OWNER_ID) continue;
+    const existing = demoSessions[s.repoFullName];
+    if (!existing) {
+      demoSessions[s.repoFullName] = s.id;
+    } else {
+      // Prefer the more recently updated one. Look up the older
+      // session's updatedAt; if the new one is newer, replace.
+      const olderUpdatedAt =
+        sessions.find((x) => x.id === existing)?.updatedAt ?? "";
+      if (s.updatedAt > olderUpdatedAt) {
+        demoSessions[s.repoFullName] = s.id;
+      }
+    }
+  }
 
   return (
     <main className="max-w-5xl w-full mx-auto px-8 pt-16 pb-20 flex flex-col gap-16">
@@ -67,7 +94,11 @@ export default async function Home() {
           signals — in under 20 seconds, across 7 languages.
         </p>
 
-        <LandingPanel demoRepos={DEMO_REPOS} initialSessions={sessions} />
+        <LandingPanel
+          demoRepos={DEMO_REPOS}
+          demoSessions={demoSessions}
+          initialSessions={sessions}
+        />
       </section>
 
       {/* What you'll see — feature-specific cards highlighting the

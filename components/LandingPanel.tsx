@@ -18,7 +18,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, Folder } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowDown, Folder, Zap } from "lucide-react";
 import type { SessionSummary } from "@/lib/types";
 import { filterSessionsByOwner, getOrCreateOwnerId } from "@/lib/ownerId";
 import { STYLE, TOK } from "@/lib/theme";
@@ -27,12 +28,22 @@ import { SessionRow } from "./SessionRow";
 
 interface Props {
   demoRepos: DemoRepo[];
+  /** v0.53: pre-analyzed demo sessions keyed by repoFullName. Demo
+   *  buttons with a match navigate directly (instant load); buttons
+   *  without one fall back to pre-filling the URL field for a fresh
+   *  analysis. */
+  demoSessions: Record<string, string>;
   initialSessions: SessionSummary[];
 }
 
 const HAS_VISITED_KEY = "gitvision:has-visited";
 
-export function LandingPanel({ demoRepos, initialSessions }: Props) {
+export function LandingPanel({
+  demoRepos,
+  demoSessions,
+  initialSessions,
+}: Props) {
+  const router = useRouter();
   const [value, setValue] = useState("");
 
   // First-visit nudge — accent text under the form that points to
@@ -56,11 +67,22 @@ export function LandingPanel({ demoRepos, initialSessions }: Props) {
   }
 
   function pickDemo(repo: string) {
-    setValue(repo);
     dismissHint();
-    // Scroll the form into view + focus its input. The repo gets
-    // pre-filled; the user clicks Analyze themselves so they retain
-    // the option to add a subdir for monorepos.
+    // v0.53: instant demo path. If we have a pre-analyzed demo
+    // session for this repo, navigate straight to it — no 20-second
+    // wait, no fresh analysis. The session is read-only (ownerId
+    // "demo" blocks the v0.26 ownership check on refresh) so the
+    // visitor can explore but can't accidentally overwrite the demo.
+    const sessionId = demoSessions[repo];
+    if (sessionId) {
+      router.push(`/session/${sessionId}`);
+      return;
+    }
+    // Fallback: no pre-analyzed session yet. Pre-fill the URL field
+    // and scroll/focus so the user can trigger a fresh analysis. This
+    // path activates when DEMO_REPOS includes a repo we haven't yet
+    // pre-analyzed and tagged with ownerId="demo".
+    setValue(repo);
     requestAnimationFrame(() => {
       const input = document.querySelector<HTMLInputElement>(
         'input[placeholder^="github.com"]'
@@ -116,6 +138,7 @@ export function LandingPanel({ demoRepos, initialSessions }: Props) {
           {demoRepos.map((entry) => {
             const item =
               typeof entry === "string" ? { repo: entry, lang: "" } : entry;
+            const isInstant = !!demoSessions[item.repo];
             return (
               <button
                 key={item.repo}
@@ -134,8 +157,21 @@ export function LandingPanel({ demoRepos, initialSessions }: Props) {
                   e.currentTarget.style.borderColor = TOK.border;
                   e.currentTarget.style.color = TOK.textSecondary;
                 }}
-                title={item.lang ? `${item.repo} — ${item.lang}` : item.repo}
+                title={
+                  isInstant
+                    ? `${item.repo} — opens pre-analyzed session instantly`
+                    : item.lang
+                    ? `${item.repo} — ${item.lang} (will run a fresh analysis)`
+                    : item.repo
+                }
               >
+                {isInstant && (
+                  <Zap
+                    size={10}
+                    style={{ color: TOK.accent }}
+                    aria-label="Instant — pre-analyzed"
+                  />
+                )}
                 <span>{item.repo}</span>
                 {item.lang && (
                   <span
