@@ -29,6 +29,7 @@ import {
   Home,
   Network,
   Package,
+  Sparkles,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { STYLE, TOK } from "@/lib/theme";
@@ -54,6 +55,11 @@ interface NavItem {
   hint?: string;
 }
 
+/** A null entry between groups marks a sidebar separator. Keeps the
+ *  rendering loop simple: walk the array, render a separator on null,
+ *  render a link otherwise. */
+type NavEntry = NavItem | null;
+
 export function SessionShell({ sessionId, snapshot, children }: Props) {
   const pathname = usePathname();
   const base = `/session/${sessionId}`;
@@ -78,7 +84,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
     0
   );
 
-  const items: NavItem[] = [
+  const items: NavEntry[] = [
     {
       label: "Overview",
       href: base,
@@ -115,6 +121,12 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       href: `${base}/prs`,
       icon: <GitPullRequest size={14} />,
       count: prCount > 0 ? prCount : undefined,
+    },
+    null, // separator
+    {
+      label: "Insights",
+      href: `${base}/insights`,
+      icon: <Sparkles size={14} />,
     },
   ];
 
@@ -156,7 +168,16 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
         </span>
 
         <nav className="flex flex-col gap-0.5 mt-1">
-          {items.map((item) => {
+          {items.map((item, idx) => {
+            if (item === null) {
+              return (
+                <div
+                  key={`sep-${idx}`}
+                  className="h-px my-2 mx-2"
+                  style={{ background: TOK.border }}
+                />
+              );
+            }
             // Active = exact path match. Sub-routes (e.g. /code with
             // future ?file=... params) all share the /code segment so
             // exact-match keeps the Code item highlighted regardless
