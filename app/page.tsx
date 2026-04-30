@@ -1,5 +1,11 @@
 // Landing page — Linear-lighter direction.
-// URL input, demo chips, how-it-works, saved sessions as a clean list.
+//
+// Section order chosen for the dual-audience problem: this URL serves
+// BOTH first-time visitors (HN/Reddit traffic — need the marketing
+// pitch) and returning users (need their sessions fast). v0.49 puts
+// the sessions list above the "What you'll see" feature grid so
+// returning users don't scroll past 6 marketing cards to find their
+// own work; first-time visitors see an empty-state nudge and read on.
 
 import { listSessions } from "@/lib/storage";
 import { STYLE, TOK } from "@/lib/theme";
@@ -24,7 +30,7 @@ export default async function Home() {
   const sessions = await listSessions();
 
   return (
-    <main className="max-w-5xl w-full mx-auto px-8 pt-16 pb-20 flex flex-col gap-24">
+    <main className="max-w-5xl w-full mx-auto px-8 pt-16 pb-20 flex flex-col gap-16">
       {/* Hero */}
       <section className="flex flex-col gap-7">
         <div className="flex items-center gap-2">
@@ -62,45 +68,42 @@ export default async function Home() {
         <RepoInputForm demoRepos={DEMO_REPOS} />
       </section>
 
+      {/* Sessions — filtered client-side by anonymous owner-id (v0.26+).
+       *  Promoted above "What you'll see" in v0.49 so returning users
+       *  hit their work first instead of scrolling past marketing. */}
+      <HomeSessionsList initialSessions={sessions} />
+
       {/* What you'll see — feature-specific cards highlighting the
-       *  insight panels users get on a session page. Concrete + screenshot-
-       *  worthy claims, not generic "explore your code". */}
-      <section className="flex flex-col gap-8">
+       *  insight panels users get on a session page. v0.49 trimmed
+       *  from 6 to 3, focused on the most differentiating findings:
+       *  things GitHub Insights doesn't give you. The other 3
+       *  (untested hotspots, dependency health, refresh story) are
+       *  great features but less unique angles for first-impression
+       *  marketing. */}
+      <section className="flex flex-col gap-6">
         <div className="flex items-baseline justify-between">
-          <h2 className={STYLE.sectionTitle}>What you&apos;ll see</h2>
+          <h2 className={STYLE.sectionTitle}>What you&apos;ll find</h2>
           <div className="text-xs" style={{ color: TOK.textMuted }}>
-            on every session page
+            things GitHub Insights doesn&apos;t show
           </div>
         </div>
 
         <div
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px overflow-hidden rounded-xl"
+          className="grid grid-cols-1 md:grid-cols-3 gap-px overflow-hidden rounded-xl"
           style={{ background: TOK.border }}
         >
           {[
             {
               t: "Blast radius",
-              d: "Click a file, see what breaks if you change it. Click a function, zoom into callers and callees three hops deep.",
+              d: "Click any file or function. See what breaks if you change it — three hops deep across the call graph.",
             },
             {
               t: "Near-duplicates",
-              d: "Structural AST hashing across the codebase. On golang/go src/cmd we found 36 copies of one ARM rewrite pattern.",
-            },
-            {
-              t: "Untested hotspots",
-              d: "Most-complex production functions with no test caller. Per-file coverage badges scaled by ratio.",
+              d: "Structural AST hashing finds 36 copies of one ARM rewrite pattern in golang/go src/cmd. Across 7 languages.",
             },
             {
               t: "AI health verdict",
-              d: "Hybrid: 17 deterministic rule-based signals feed a constrained Claude narrative. Zero hallucination room.",
-            },
-            {
-              t: "Dependency health",
-              d: "Vulnerable / outdated / deprecated packages across npm, Cargo, PyPI. CVEs from OSV.dev with direct registry links.",
-            },
-            {
-              t: "Refresh story",
-              d: "Snapshot diffs become a screenshot-worthy hero card: complexity grew, new functions added, who&apos;s the new top committer.",
+              d: "17 deterministic signals feed a constrained Claude narrative. Every claim grounded in real data — zero hallucination.",
             },
           ].map((s) => (
             <div
@@ -124,18 +127,12 @@ export default async function Home() {
           ))}
         </div>
 
-        <div
-          className="text-xs"
-          style={{ color: TOK.textMuted }}
-        >
+        <div className="text-xs" style={{ color: TOK.textMuted }}>
           Tree-sitter AST across JS/TS, Python, Go, Java, C#, PHP, Ruby.
           Kotlin via regex fallback (imports only). Big monorepos? Paste
           a deep-link to a subdirectory to scope the analysis.
         </div>
       </section>
-
-      {/* Sessions — filtered client-side by anonymous owner-id (v0.26+) */}
-      <HomeSessionsList initialSessions={sessions} />
 
       {/* Footer. Feedback link is opt-in via env: set
        *  NEXT_PUBLIC_FEEDBACK_URL to a Tally / Cal.com / Typeform URL
