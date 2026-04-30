@@ -1,8 +1,9 @@
 "use client";
 
 // Small "copy this finding's URL" button. Pairs with the deep-link URL
-// params read by SessionTabs + CodePanel. Click → writes the URL to
-// clipboard, shows a 1.5s "Copied!" badge, then resets.
+// params read by CodePanel + the multi-route session shell. Click →
+// writes the URL to clipboard, shows a 1.5s "Copied!" badge, then
+// resets.
 //
 // We deliberately don't use `navigator.share()` even though it'd be a
 // nicer mobile UX — the share-sheet hides the URL behind a system

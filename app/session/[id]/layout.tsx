@@ -1,0 +1,56 @@
+// Session route layout (v0.42).
+//
+// Wraps every /session/[id]/... page with the SessionToolbar (top-bar
+// actions: refresh / share / overflow) and the SessionShell (left
+// sidebar with workspace navigation). Each tab now has its own route
+// rendered as `children` here.
+//
+// Why a layout: the toolbar + sidebar must persist across tab
+// navigation without flicker, so they live in a shared layout.
+// Next.js App Router re-renders only the changed segment, which means
+// switching from /code to /canvas keeps the sidebar instance, the
+// scrolltop, and any client state we hang on the shell.
+//
+// The session is fetched once here and passed to SessionToolbar +
+// SessionShell. Each route's page.tsx fetches its own copy too —
+// Next.js dedupes within a request, and the per-page fetch keeps
+// pages independently testable + composable without a layout-context
+// dance.
+
+import { notFound } from "next/navigation";
+import { getSession } from "@/lib/storage";
+import { SessionToolbar } from "@/components/SessionToolbar";
+import { SessionShell } from "@/components/SessionShell";
+
+export const dynamic = "force-dynamic";
+
+export default async function SessionLayout({
+  params,
+  children,
+}: {
+  params: Promise<{ id: string }>;
+  children: React.ReactNode;
+}) {
+  const { id } = await params;
+  const session = await getSession(id);
+  if (!session) notFound();
+
+  const current = session.snapshots[session.snapshots.length - 1];
+
+  return (
+    <>
+      <SessionToolbar
+        sessionId={session.id}
+        sessionName={session.name}
+        snapshot={current}
+        targetId="screenshot-target"
+        updatedAtISO={session.updatedAt}
+        snapshotCount={session.snapshots.length}
+      />
+
+      <SessionShell sessionId={session.id} snapshot={current}>
+        {children}
+      </SessionShell>
+    </>
+  );
+}
