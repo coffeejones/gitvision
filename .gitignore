@@ -49,3 +49,10 @@ next-env.d.ts
 
 # Claude Code local prefs (keep launch.json tracked for team DX)
 .claude/settings.local.json
+
+# Behind-the-scenes docs — kept locally for AI-assistant onboarding
+# and launch-strategy drafting, but not part of the public repo.
+# (Accessible in git history of older commits; not destructively rewritten.)
+/CLAUDE.md
+/AGENTS.md
+/doc/launch/
