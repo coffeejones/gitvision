@@ -9,13 +9,10 @@ under 20 seconds, across 7 languages.
 ![GitVision alpha](https://img.shields.io/badge/status-alpha-amber)
 ![Next.js 16](https://img.shields.io/badge/next.js-16-black)
 ![React 19](https://img.shields.io/badge/react-19-blue)
-![Tests](https://img.shields.io/badge/tests-527%20passing-emerald)
+![Tests](https://img.shields.io/badge/tests-531%20passing-emerald)
 ![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-purple)
 
-<!-- TODO: hero screenshot of a session page on a recognizable repo
-     (e.g. golang/go src/cmd) showing the Code tab with Near-Duplicates
-     panel expanded. -->
-<!-- ![GitVision Code tab — Near-Duplicates on golang/go](docs/screenshots/hero.png) -->
+![GitVision landing page — paste any GitHub URL, click any of 4 instant demos](doc/screenshots/Landing.png)
 
 ## Why GitVision
 
@@ -38,8 +35,7 @@ server-side. Zero hallucination room.
 
 ## Try it
 
-<!-- TODO: replace with the live deploy URL once gitvision.app is set up -->
-<!-- 👉 [gitvision.app](https://gitvision.app) -->
+👉 **[gitvision.net](https://gitvision.net)** — 4 pre-analyzed demo repos load instantly. No signup, no setup.
 
 Or run it locally:
 
@@ -67,13 +63,14 @@ Node 20.9+ required (tested on 25.x).
 
 ## What you'll see
 
-Each session page has six tabs:
+Each session opens as a workspace with a persistent sidebar — every
+tab is its own URL, screenshot-worthy alone.
+
+![Overview — workspace shell with quick-look cards into each tab](doc/screenshots/Overview.png)
 
 **Canvas** — Folder frames + file cards laid out as a packed map. Color
 by file type or by dominant author. Time-scrub to see the codebase
 evolve commit-by-commit.
-
-<!-- ![Canvas tab](docs/screenshots/canvas.png) -->
 
 **Imports** — File-to-file import graph as a brick-stagger layered
 layout. Click a file to isolate its 1-hop neighborhood.
@@ -90,7 +87,7 @@ twin lists:
   `groupSize × maxComplexity` so the worst tech-debt finds rise to
   the top.
 
-<!-- ![Code tab — Near-Duplicates panel expanded](docs/screenshots/code-near-duplicates.png) -->
+![Code tab — Near-Duplicates panel surfaces structurally identical functions](doc/screenshots/NearDuplicate.png)
 
 **Packages** — Multi-ecosystem dependency health (npm, Cargo, PyPI).
 Vulnerable / outdated / deprecated packages with direct CVE links.
@@ -98,17 +95,25 @@ Vulnerable / outdated / deprecated packages with direct CVE links.
 **PRs** — Sankey of cycle-time flow: Opened → Outcome → time-to-merge
 bucket.
 
-**Overview** — Hotspot treemap, contributor list, language mix, weekly
-commit activity, bus-factor approximation per folder.
-
-Plus the session header:
+Plus, on the Overview page:
 
 - **Refresh banner** — "Since your last visit": story-driven headline
-  ("Code complexity grew by 45 — new branching logic added across the
-  codebase") + the metric chips behind it.
-- **AI summary** — 150-200 word repo profile.
+  ("1 new contributor joined — colinhacks led with 6 commits") + the
+  metric chips behind it.
+
+  ![Refresh banner — story-driven diff between snapshots](doc/screenshots/Refresh.png)
+
+- **AI summary** — 150-200 word repo profile. Grounded in computed
+  facts; no hallucinated claims.
 - **AI health verdict** — three-column "What works / Where to dig
-  deeper / Open questions" grounded in 17 deterministic signals.
+  deeper / Open questions". Each bullet maps to one of 17
+  deterministic signals computed server-side.
+
+  ![Health Check — three-column verdict grounded in deterministic signals](doc/screenshots/HealthCheck.png)
+
+**Cmd+K palette** — keyboard navigation across pages, files, and
+functions. Linear / Raycast / Sublime pattern — type to filter, arrows
+to navigate, Enter to jump.
 
 ## Language coverage
 
