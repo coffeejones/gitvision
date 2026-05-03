@@ -16,7 +16,7 @@ Welcome. This file is the primary context you need to work effectively on GitVis
 
 ## 👤 Who you're working with
 
-**Name:** Jonas (GitHub: SoosFire)
+**Name:** Jonas (GitHub: coffeejones)
 **Age:** 24
 **Location:** Denmark
 **Education:** Datamatiker student at Zealand, currently 2nd semester. Graduates summer 2027.

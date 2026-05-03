@@ -55,7 +55,7 @@ export default function LegalPage() {
           you to actually read it. If anything is unclear, open an issue
           on{" "}
           <a
-            href="https://github.com/SoosFire/gitvision/issues"
+            href="https://github.com/coffeejones/gitvision/issues"
             target="_blank"
             rel="noopener"
             className="underline underline-offset-2"
@@ -136,7 +136,7 @@ export default function LegalPage() {
         <P>
           <strong>License.</strong> The GitVision source code is{" "}
           <a
-            href="https://github.com/SoosFire/gitvision/blob/main/LICENSE"
+            href="https://github.com/coffeejones/gitvision/blob/main/LICENSE"
             target="_blank"
             rel="noopener"
             className="underline underline-offset-2"
@@ -161,7 +161,7 @@ export default function LegalPage() {
           updated version replaces this one. The git history of this
           file is the source of truth — see{" "}
           <a
-            href="https://github.com/SoosFire/gitvision/commits/main/app/legal/page.tsx"
+            href="https://github.com/coffeejones/gitvision/commits/main/app/legal/page.tsx"
             target="_blank"
             rel="noopener"
             className="underline underline-offset-2"
@@ -179,12 +179,12 @@ export default function LegalPage() {
       >
         Last updated: 2026-04-29 · GitVision is made by{" "}
         <a
-          href="https://github.com/SoosFire"
+          href="https://github.com/coffeejones"
           target="_blank"
           rel="noopener"
           className="underline underline-offset-2"
         >
-          SoosFire
+          coffeejones
         </a>
         .
       </footer>

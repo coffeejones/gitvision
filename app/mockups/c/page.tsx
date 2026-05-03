@@ -332,7 +332,7 @@ export default function MockupC() {
               Docs
             </Link>
             <Link href="#" style={{ color: TOK.textSecondary }}>
-              @SoosFire
+              @coffeejones
             </Link>
           </div>
         </footer>

@@ -22,7 +22,7 @@ const SIDEBAR_SESSIONS = [
   { name: "vercel/next.js", active: true },
   { name: "advisor-ledger", active: false },
   { name: "anthropics/claude-code", active: false },
-  { name: "SoosFire/improveapp", active: false },
+  { name: "coffeejones/improveapp", active: false },
 ];
 
 const TABLE_ROWS = [
@@ -54,7 +54,7 @@ const TABLE_ROWS = [
     status: "healthy",
   },
   {
-    repo: "SoosFire/improveapp",
+    repo: "coffeejones/improveapp",
     contribs: "1",
     hotspots: 11,
     lang: "Swift",
@@ -173,7 +173,7 @@ export default function MockupA3() {
               className="h-5 w-5 rounded-full shrink-0"
               style={{ background: "#8B4FE0" }}
             />
-            <span className="truncate">SoosFire</span>
+            <span className="truncate">coffeejones</span>
           </div>
         </div>
       </aside>

@@ -95,7 +95,7 @@ Tech: Next.js 16, tree-sitter WASM (AST + Phase 5 type-aware call
 resolution), 531 unit tests, file-based storage. Anonymous, no
 signup, free. PolyForm Noncommercial.
 
-Source: https://github.com/SoosFire/gitvision
+Source: https://github.com/coffeejones/gitvision
 ```
 
 ### Tweet 7 — backstory + CTA (the indie hook)

@@ -194,7 +194,7 @@ async function fetchPyPiMeta(
       `https://pypi.org/pypi/${encodeURIComponent(name)}/json`,
       {
         headers: {
-          "User-Agent": "GitVision (https://github.com/SoosFire/gitvision)",
+          "User-Agent": "GitVision (https://github.com/coffeejones/gitvision)",
           Accept: "application/json",
         },
       }

@@ -40,8 +40,8 @@ describe("parseRepoUrl", () => {
   });
 
   it("accepts owner/repo shorthand", () => {
-    expect(parseRepoUrl("SoosFire/gitvision")).toEqual({
-      owner: "SoosFire",
+    expect(parseRepoUrl("coffeejones/gitvision")).toEqual({
+      owner: "coffeejones",
       repo: "gitvision",
     });
   });

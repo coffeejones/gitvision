@@ -275,7 +275,7 @@ export default function MockupA() {
           className="pt-8 text-xs flex items-center justify-between border-t"
           style={{ borderColor: TOK.border, color: TOK.textMuted }}
         >
-          <span>GitVision · made by SoosFire</span>
+          <span>GitVision · made by coffeejones</span>
           <span>
             Set{" "}
             <code

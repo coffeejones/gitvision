@@ -170,10 +170,10 @@ export default async function Home() {
         className="pt-8 text-xs flex items-center justify-between border-t flex-wrap gap-3"
         style={{ borderColor: TOK.border, color: TOK.textMuted }}
       >
-        <span>GitVision · made by SoosFire</span>
+        <span>GitVision · made by coffeejones</span>
         <div className="flex items-center gap-3 flex-wrap">
           <a
-            href="https://github.com/SoosFire/gitvision"
+            href="https://github.com/coffeejones/gitvision"
             target="_blank"
             rel="noopener"
             className="transition hover:underline"
@@ -184,7 +184,7 @@ export default async function Home() {
           <a
             href={
               process.env.NEXT_PUBLIC_FEEDBACK_URL ??
-              "https://github.com/SoosFire/gitvision/issues"
+              "https://github.com/coffeejones/gitvision/issues"
             }
             target="_blank"
             rel="noopener"

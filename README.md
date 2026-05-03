@@ -41,7 +41,7 @@ Or run it locally:
 
 ```bash
 # 1. Install
-git clone https://github.com/SoosFire/gitvision
+git clone https://github.com/coffeejones/gitvision
 cd gitvision
 npm install
 
@@ -182,7 +182,7 @@ npm scripts; `.gitattributes` pins LF line endings.
 ## Contributing
 
 Project status is **alpha**. Bug reports and feature ideas are welcome
-via [GitHub Issues](https://github.com/SoosFire/gitvision/issues). Note
+via [GitHub Issues](https://github.com/coffeejones/gitvision/issues). Note
 the license — see below.
 
 ## License
@@ -195,7 +195,7 @@ GitVision is licensed under the **PolyForm Noncommercial License 1.0.0**
 - **No** to using this code (or derivatives) in a commercial product
   or for-profit service without a separate commercial license.
 
-If you want to use GitVision commercially, [open an issue](https://github.com/SoosFire/gitvision/issues)
+If you want to use GitVision commercially, [open an issue](https://github.com/coffeejones/gitvision/issues)
 or get in touch.
 
 Copyright © 2026 Jonas Hansen.

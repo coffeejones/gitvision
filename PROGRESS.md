@@ -565,7 +565,7 @@ Full-history analysis already works server-side in Node (v0.4) — Tauri port no
 ## Running locally on a fresh machine
 
 ```bash
-git clone https://github.com/SoosFire/gitvision
+git clone https://github.com/coffeejones/gitvision
 cd gitvision
 npm install
 cp .env.example .env.local

@@ -56,7 +56,7 @@ typical Go codebase.
 Curious what other rewrite-heavy Go projects look like under
 structural-hash. CockroachDB? K8s? Suggestions welcome.
 
-Source: https://github.com/SoosFire/gitvision (PolyForm Noncommercial)
+Source: https://github.com/coffeejones/gitvision (PolyForm Noncommercial)
 ```
 
 ## Likely conversations

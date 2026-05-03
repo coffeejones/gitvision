@@ -63,7 +63,7 @@ ANTHROPIC_API_KEY), every other panel still works.
 
 Solo dev, hobby project, alpha. PolyForm Noncommercial license.
 
-Source: https://github.com/SoosFire/gitvision
+Source: https://github.com/coffeejones/gitvision
 
 Curious what Django / Pyramid / FastAPI / Sanic codebases look like
 under this — try analyzing your favorite Python repo and let me know

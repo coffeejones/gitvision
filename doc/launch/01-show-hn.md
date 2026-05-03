@@ -68,7 +68,7 @@ in golang/go src/cmd. Try the gin or spring-petclinic demo for a
 smaller-repo view first.
 
 Built solo on hobby evenings over 8 weeks. Source:
-https://github.com/SoosFire/gitvision
+https://github.com/coffeejones/gitvision
 
 Happy to answer technical or design questions.
 ```

@@ -45,7 +45,7 @@ This is genuinely alpha. I'm specifically looking for:
 - What broke / surprised you / confused you?
 - Anything you'd actively use this for?
 
-Source: https://github.com/SoosFire/gitvision (PolyForm Noncommercial)
+Source: https://github.com/coffeejones/gitvision (PolyForm Noncommercial)
 
 Tear it apart. Thanks!
 ```
