@@ -11,7 +11,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { extractHealthSignals } from "./signals";
 import type { AnalysisSnapshot, HealthAnalysis, HealthSignals } from "./types";
 
-export const HEALTH_MODEL = "claude-sonnet-4-5";
+// Haiku 4.5: ~10x cheaper than Sonnet for the same task. The health
+// analysis is "translate computed signals into a structured JSON narrative"
+// — a constrained output task, not a deep-reasoning one. Sonnet was overkill;
+// Haiku produces equivalent output. Switched on alpha launch May 2026 based
+// on user feedback. If JSON-shape compliance drops or narratives start
+// hallucinating signals not in the input, upgrade back.
+export const HEALTH_MODEL = "claude-haiku-4-5";
 const MAX_TOKENS = 800;
 
 const SYSTEM_PROMPT = `You are a senior engineer writing a brief health check for a GitHub repository's maintainer.

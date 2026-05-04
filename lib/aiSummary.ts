@@ -5,11 +5,19 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AnalysisSnapshot } from "./types";
 
-// Sonnet 4.5 is ~5x cheaper than Opus 4.7 and delivers ~90-95% of the quality
-// for this task (prose briefing, not deep reasoning). Upgrade to Opus later
-// only if we ship a feature that genuinely needs the extra reasoning depth
-// (e.g. the "what works / what needs work" health panel).
-export const SUMMARY_MODEL = "claude-sonnet-4-5";
+// Haiku 4.5 is ~10x cheaper than Sonnet 4.5 for this task. The summary is a
+// constrained prose-output task (translate the compactSnapshot into 150-200
+// words following an explicit style guide) — not a reasoning task. Sonnet
+// gave equivalent output for ~10x the cost. Switched to Haiku based on
+// alpha-launch feedback (May 2026) where a user pointed out: "the analysis
+// isn't really deep enough to be using a frontier model. More about saving
+// money — over time it adds up."
+//
+// If output quality drops below an acceptable threshold (we hit the
+// SYSTEM_PROMPT's HARD RULES inconsistently), upgrade back to Sonnet. So
+// far Haiku has handled the style constraints (varied sentence length, em-
+// dash limits, ban-list of corporate words) reliably.
+export const SUMMARY_MODEL = "claude-haiku-4-5";
 // Output budget — thinking tokens are separate, so this strictly caps prose.
 // 600 is ~450 words of output text: plenty of slack above the 200-word target
 // without enabling the 340-word walls we saw on v1 of the prompt.

@@ -81,7 +81,7 @@ export default async function Home() {
         >
           Map any GitHub repo.{" "}
           <span style={{ color: TOK.accent }}>
-            Find what&apos;s risky, duplicated, or untested.
+            See blast radius, structural duplicates, and untested code.
           </span>
         </h1>
 
@@ -89,9 +89,9 @@ export default async function Home() {
           className="text-lg max-w-2xl leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          Paste a URL. Get blast radius, structural duplicates, untested
-          hotspots, and an AI health verdict grounded in 17 deterministic
-          signals — in under 20 seconds, across 7 languages.
+          Paste a URL. Click any file or function — see exactly what
+          breaks if you change it. AST-based analysis across 7 languages,
+          in under 20 seconds. Every insight links to its source.
         </p>
 
         <LandingPanel
@@ -101,13 +101,16 @@ export default async function Home() {
         />
       </section>
 
-      {/* What you'll see — feature-specific cards highlighting the
-       *  insight panels users get on a session page. v0.49 trimmed
-       *  from 6 to 3, focused on the most differentiating findings:
-       *  things GitHub Insights doesn't give you. The other 3
-       *  (untested hotspots, dependency health, refresh story) are
-       *  great features but less unique angles for first-impression
-       *  marketing. */}
+      {/* What you'll find — feature-specific cards highlighting the
+       *  three concrete signals users get on a session page. v0.49
+       *  trimmed from 6 to 3; v0.56 swapped "AI health verdict" for
+       *  "Untested hotspots" after three independent commenters across
+       *  r/vibecoding, r/coolgithubprojects, and r/devtools all said the
+       *  same thing: "health verdict" reads as abstract / marketing,
+       *  concrete signals (untested hotspots, blast radius, structural
+       *  duplicates) read as actionable. The AI narrative still exists
+       *  on the Insights page — just not promoted as the hero. The
+       *  signals do the work; the AI translates. */}
       <section className="flex flex-col gap-6">
         <div className="flex items-baseline justify-between">
           <h2 className={STYLE.sectionTitle}>What you&apos;ll find</h2>
@@ -130,8 +133,8 @@ export default async function Home() {
               d: "Structural AST hashing finds 36 copies of one ARM rewrite pattern in golang/go src/cmd. Across 7 languages.",
             },
             {
-              t: "AI health verdict",
-              d: "17 deterministic signals feed a constrained Claude narrative. Every claim grounded in real data — zero hallucination.",
+              t: "Untested hotspots",
+              d: "Most-complex production functions with zero test caller. Computed by walking the call graph from test files into production code.",
             },
           ].map((s) => (
             <div
