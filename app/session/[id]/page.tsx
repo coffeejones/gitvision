@@ -1,4 +1,4 @@
-// /session/[id] — Overview route (v0.42, reshaped in v0.44).
+// /session/[id] — Overview route (v0.42, reshaped in v0.44, v0.57).
 //
 // In workspace mode this is the landing page for a session — the
 // "what is this repo, and where do I go to dig in" view.
@@ -8,13 +8,16 @@
 //      topics chips.
 //   2. Refresh banner ("Since your last visit") — only when there's a
 //      diff. Story-driven headline + supporting chips.
-//   3. Quick-look cards — one card per workspace tab, each showing a
+//   3. Headline finding (v0.57) — one concrete actionable signal picked
+//      by lib/intelligence/headline.ts. The 30-second rule from
+//      r/devtools alpha feedback: visitors need to see impact fast.
+//   4. Quick-look cards — one card per workspace tab, each showing a
 //      stat preview and linking to the dedicated route. This is the
 //      "navigation that tells a story" surface.
-//   4. Demographics — hotspot treemap, contributors, language mix,
+//   5. Demographics — hotspot treemap, contributors, language mix,
 //      bus factor, weekly commit activity. The "high-level read" of
 //      the repo.
-//   5. Footer.
+//   6. Footer.
 //
 // What's NOT here anymore (compared to pre-v0.44):
 //   - AI Summary and Health Check moved to /session/[id]/insights so
@@ -43,9 +46,11 @@ import { getSession } from "@/lib/storage";
 import { diffSnapshots } from "@/lib/diff";
 import { findDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
 import { computeTestCoverage } from "@/lib/codeAnalysis/testCoverage";
+import { pickHeadline } from "@/lib/intelligence/headline";
 import { STYLE, TOK } from "@/lib/theme";
 import { StatGrid } from "@/components/views/StatGrid";
 import { SinceLastVisit } from "@/components/views/SinceLastVisit";
+import { HeadlineFinding } from "@/components/HeadlineFinding";
 import { SessionNameEditor } from "@/components/SessionNameEditor";
 import { HotspotTreemap } from "@/components/views/HotspotTreemap";
 import { ContributorList } from "@/components/views/ContributorList";
@@ -113,6 +118,10 @@ export default async function OverviewPage({
     (s, h) => s + h.vulnerable.length + h.deprecated.length,
     0
   );
+
+  // v0.57: pick the single most-actionable signal for above-the-fold.
+  // Pure function — server-rendered, no AI call.
+  const headline = pickHeadline(current);
 
   const base = `/session/${session.id}`;
 
@@ -191,6 +200,11 @@ export default async function OverviewPage({
             repoFullName={current.repo.fullName}
           />
         )}
+
+        {/* Headline finding (v0.57) — the 30-second-rule signal. One
+         *  concrete actionable thing per session, picked by the waterfall
+         *  in lib/intelligence/headline.ts. */}
+        <HeadlineFinding headline={headline} sessionId={session.id} />
 
         {/* Quick-look cards: navigation that tells a story. Each card
          *  shows the headline stat for its tab so users can scan
