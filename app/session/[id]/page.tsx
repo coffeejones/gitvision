@@ -1,4 +1,4 @@
-// /session/[id] — Overview route (v0.42, reshaped in v0.44, v0.57, v0.58).
+// /session/[id] — Overview route (v0.42, reshaped in v0.44, v0.57, v0.58, v0.59).
 //
 // In workspace mode this is the landing page for a session — the
 // "what is this repo, and where do I go to dig in" view.
@@ -11,16 +11,19 @@
 //   3. Headline finding (v0.57) — one concrete actionable signal picked
 //      by lib/intelligence/headline.ts. The 30-second rule from
 //      r/devtools alpha feedback: visitors need to see impact fast.
-//   4. Quick-look cards — one card per workspace tab, each showing a
+//   4. Health-at-a-glance strip (v0.59) — six traffic-light tiles,
+//      one per dimension. Promotes the deterministic signal layer
+//      out of the Insights tab into the landing view.
+//   5. Quick-look cards — one card per workspace tab, each showing a
 //      stat preview and linking to the dedicated route. This is the
 //      "navigation that tells a story" surface.
-//   5. Touch-with-care panel (v0.58) — top blast-radius functions,
+//   6. Touch-with-care panel (v0.58) — top blast-radius functions,
 //      promoted out of the Code tab. Click a row to drill into the full
 //      blast view. Only renders when there are ranked functions.
-//   6. Demographics — hotspot treemap, contributors, language mix,
+//   7. Demographics — hotspot treemap, contributors, language mix,
 //      bus factor, weekly commit activity. The "high-level read" of
 //      the repo.
-//   7. Footer.
+//   8. Footer.
 //
 // What's NOT here anymore (compared to pre-v0.44):
 //   - AI Summary and Health Check moved to /session/[id]/insights so
@@ -51,11 +54,13 @@ import { findDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
 import { computeTestCoverage } from "@/lib/codeAnalysis/testCoverage";
 import { rankFunctionsByBlast } from "@/lib/codeAnalysis/blastRanking";
 import { pickHeadline } from "@/lib/intelligence/headline";
+import { summarizeHealth } from "@/lib/intelligence/healthSummary";
 import { STYLE, TOK } from "@/lib/theme";
 import { StatGrid } from "@/components/views/StatGrid";
 import { SinceLastVisit } from "@/components/views/SinceLastVisit";
 import { HeadlineFinding } from "@/components/HeadlineFinding";
 import { BlastRadiusPanel } from "@/components/views/BlastRadiusPanel";
+import { HealthSummary } from "@/components/views/HealthSummary";
 import { SessionNameEditor } from "@/components/SessionNameEditor";
 import { HotspotTreemap } from "@/components/views/HotspotTreemap";
 import { ContributorList } from "@/components/views/ContributorList";
@@ -133,6 +138,10 @@ export default async function OverviewPage({
   // Empty array when there are no resolved calls (regex-fallback-only
   // langs, tiny repos) — the panel hides itself in that case.
   const blastRanking = codeGraph ? rankFunctionsByBlast(codeGraph) : [];
+
+  // v0.59: traffic-light health summary. Pure mapping over the existing
+  // signal layer — no new compute. Six dimensions, one tile each.
+  const healthSummaries = summarizeHealth(current);
 
   const base = `/session/${session.id}`;
 
@@ -216,6 +225,11 @@ export default async function OverviewPage({
          *  concrete actionable thing per session, picked by the waterfall
          *  in lib/intelligence/headline.ts. */}
         <HeadlineFinding headline={headline} sessionId={session.id} />
+
+        {/* Health at a glance (v0.59) — six traffic-light tiles. Hides
+         *  itself when every dimension is "unknown" (e.g. a brand-new
+         *  snapshot before the first refresh). */}
+        <HealthSummary summaries={healthSummaries} sessionId={session.id} />
 
         {/* Quick-look cards: navigation that tells a story. Each card
          *  shows the headline stat for its tab so users can scan
