@@ -1,4 +1,4 @@
-// /session/[id] — Overview route (v0.42, reshaped in v0.44, v0.57).
+// /session/[id] — Overview route (v0.42, reshaped in v0.44, v0.57, v0.58).
 //
 // In workspace mode this is the landing page for a session — the
 // "what is this repo, and where do I go to dig in" view.
@@ -14,10 +14,13 @@
 //   4. Quick-look cards — one card per workspace tab, each showing a
 //      stat preview and linking to the dedicated route. This is the
 //      "navigation that tells a story" surface.
-//   5. Demographics — hotspot treemap, contributors, language mix,
+//   5. Touch-with-care panel (v0.58) — top blast-radius functions,
+//      promoted out of the Code tab. Click a row to drill into the full
+//      blast view. Only renders when there are ranked functions.
+//   6. Demographics — hotspot treemap, contributors, language mix,
 //      bus factor, weekly commit activity. The "high-level read" of
 //      the repo.
-//   6. Footer.
+//   7. Footer.
 //
 // What's NOT here anymore (compared to pre-v0.44):
 //   - AI Summary and Health Check moved to /session/[id]/insights so
@@ -46,11 +49,13 @@ import { getSession } from "@/lib/storage";
 import { diffSnapshots } from "@/lib/diff";
 import { findDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
 import { computeTestCoverage } from "@/lib/codeAnalysis/testCoverage";
+import { rankFunctionsByBlast } from "@/lib/codeAnalysis/blastRanking";
 import { pickHeadline } from "@/lib/intelligence/headline";
 import { STYLE, TOK } from "@/lib/theme";
 import { StatGrid } from "@/components/views/StatGrid";
 import { SinceLastVisit } from "@/components/views/SinceLastVisit";
 import { HeadlineFinding } from "@/components/HeadlineFinding";
+import { BlastRadiusPanel } from "@/components/views/BlastRadiusPanel";
 import { SessionNameEditor } from "@/components/SessionNameEditor";
 import { HotspotTreemap } from "@/components/views/HotspotTreemap";
 import { ContributorList } from "@/components/views/ContributorList";
@@ -122,6 +127,12 @@ export default async function OverviewPage({
   // v0.57: pick the single most-actionable signal for above-the-fold.
   // Pure function — server-rendered, no AI call.
   const headline = pickHeadline(current);
+
+  // v0.58: rank functions by transitive blast radius for the
+  // "Touch with care" panel. Pure server compute, default top 5.
+  // Empty array when there are no resolved calls (regex-fallback-only
+  // langs, tiny repos) — the panel hides itself in that case.
+  const blastRanking = codeGraph ? rankFunctionsByBlast(codeGraph) : [];
 
   const base = `/session/${session.id}`;
 
@@ -294,6 +305,11 @@ export default async function OverviewPage({
             />
           </div>
         </section>
+
+        {/* Touch-with-care (v0.58) — promotes blast radius out of the
+         *  Code tab. Hides itself when ranking is empty (small repos,
+         *  regex-fallback-only langs). */}
+        <BlastRadiusPanel ranked={blastRanking} sessionId={session.id} />
 
         {/* Demographics — high-level read of the repo. Stays on
          *  Overview because these are at-a-glance stats that pair
