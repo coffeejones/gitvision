@@ -30,6 +30,11 @@ import { phpPlugin } from "./codeAnalysis/plugins/php";
 import { pythonPlugin } from "./codeAnalysis/plugins/python";
 import { rubyPlugin } from "./codeAnalysis/plugins/ruby";
 import { regexFallbackPlugin } from "./codeAnalysis/plugins/regexFallback";
+import {
+  scanForSecrets,
+  walkRepoForSecrets,
+} from "./security/secretsScan";
+import type { SecretScanResult } from "./security/types";
 
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN || undefined,
@@ -476,6 +481,7 @@ export async function analyzeRepo(
   let fileGraph;
   let codeGraph: import("./types").CodeGraph | undefined;
   let codeGraphSkipReason: string | undefined;
+  let secretFindings: SecretScanResult | undefined;
   let cleanup: (() => Promise<void>) | null = null;
   try {
     const extracted = await downloadAndExtract(
@@ -515,12 +521,35 @@ export async function analyzeRepo(
       setTimeout(() => resolve(TIMEOUT), CODE_ANALYSIS_TIMEOUT_MS)
     );
 
-    const [fg, cgResult] = await Promise.all([
+    // Secret-scan pass — own walk so it sees .env / config files that
+    // analyze.ts skips. Runs in parallel with codeAnalysis + fileGraph
+    // since all three read from the same extracted tarball directory.
+    // .catch returns undefined so a scan failure doesn't tank the whole
+    // analysis (secrets are an additive signal, not a critical path).
+    const secretsPromise = walkRepoForSecrets(extracted.extractDir)
+      .then(({ files, truncated }) => {
+        const result = scanForSecrets(files);
+        if (truncated && !result.truncated) {
+          result.truncated = `Walker hit file cap — repo may have additional secret-bearing files.`;
+        }
+        return result;
+      })
+      .catch((err) => {
+        console.error(
+          `secretScan failed for ${owner}/${repo}:`,
+          err instanceof Error ? err.message : err
+        );
+        return undefined;
+      });
+
+    const [fg, cgResult, secResult] = await Promise.all([
       buildFileGraphFromDir(extracted.extractDir),
       Promise.race([codeAnalysisPromise, timeoutPromise]),
+      secretsPromise,
     ]);
 
     fileGraph = fg;
+    secretFindings = secResult;
     if (cgResult === TIMEOUT) {
       codeGraph = undefined;
       codeGraphSkipReason = `Code analysis exceeded ${
@@ -591,6 +620,7 @@ export async function analyzeRepo(
     hasReadme,
     dependencyHealths: dependencyHealths.length > 0 ? dependencyHealths : undefined,
     analyzedSubdir: subdir ?? undefined,
+    secretFindings,
     rateLimitInfo,
   };
 }

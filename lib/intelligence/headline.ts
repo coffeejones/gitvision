@@ -1,4 +1,5 @@
-// Headline-finding picker for the session Overview page (v0.57 / A1).
+// Headline-finding picker for the session Overview page (v0.57 / A1,
+// extended v0.61 / B1 with secret-leak override).
 //
 // Goal: surface ONE concrete actionable signal per session as the
 // "above the fold" headline. Drives the 30-second rule from r/devtools
@@ -10,6 +11,7 @@
 // fall through to neutral / informational headlines.
 //
 // Design:
+//   0. Secret leak (v0.61)    — credentials detected; trumps everything
 //   1. Critical duplicates    — high-complexity duplicate groups
 //   2. Many untested hotspots — concrete actionable signal
 //   3. Low coverage           — broader test-debt observation
@@ -34,6 +36,7 @@ import type { AnalysisSnapshot } from "../types";
 export type HeadlineSeverity = "critical" | "warning" | "info";
 
 export type HeadlineKind =
+  | "secret-leak"
   | "critical-duplicates"
   | "many-untested-hotspots"
   | "low-coverage"
@@ -104,7 +107,31 @@ const STALE_DAYS = 90;
 export function pickHeadline(snap: AnalysisSnapshot): Headline {
   const cg = snap.codeGraph;
 
-  // 0. Without a codeGraph, most signals aren't computable. Surface
+  // 0a. Secret leak (v0.61) — credentials in source trump every other
+  // signal. A high-confidence high/critical finding turns into the
+  // page's loudest banner with a direct CTA to the rotation list.
+  // Medium-only findings don't trigger the override (those are often
+  // legitimate JWTs / public claims and shouldn't dominate).
+  const secrets = snap.secretFindings;
+  if (secrets) {
+    const seriousFindings = secrets.findings.filter(
+      (f) => f.severity === "critical" || f.severity === "high"
+    );
+    if (seriousFindings.length > 0) {
+      const top = seriousFindings[0];
+      const word = seriousFindings.length === 1 ? "secret" : "secrets";
+      return {
+        kind: "secret-leak",
+        severity: "critical",
+        primary: `${seriousFindings.length} possible ${word} detected — top match: ${top.patternLabel}`,
+        detail: `${top.filePath}:${top.line} (${top.preview}). Rotate the credential and purge it from git history. Low-confidence test fixtures already filtered out.`,
+        ctaLink: "?focus=secrets",
+        ctaLabel: "View possible secrets",
+      };
+    }
+  }
+
+  // 0b. Without a codeGraph, most signals aren't computable. Surface
   // an honest "no data" rather than guessing.
   if (!cg) {
     return {

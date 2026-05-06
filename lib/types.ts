@@ -263,6 +263,12 @@ export interface AnalysisSnapshot {
    *  "Analyzed subdir: …" indicator so users know they aren't seeing
    *  the full repo. Absent when the whole repo was analyzed. v0.24+. */
   analyzedSubdir?: string;
+  /** Secret-scan results from the analyze pipeline (v0.61+). Pure
+   *  regex-based pass over .env / config / source files at refresh
+   *  time. Only stores redacted previews — the raw credential never
+   *  hits disk. Absent on pre-v0.61 snapshots; the UI hides the panel
+   *  when the field is missing or `findings` is empty. */
+  secretFindings?: import("./security/types").SecretScanResult;
   rateLimitInfo?: {
     limit: number;
     remaining: number;

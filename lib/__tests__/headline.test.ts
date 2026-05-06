@@ -131,7 +131,111 @@ function commit(date: string): CommitSummary {
   };
 }
 
-// ------------------- Rule 0: no-data -------------------
+// ------------------- Rule 0a: secret leak -------------------
+
+describe("pickHeadline · secret-leak override", () => {
+  it("fires when a critical-severity finding exists", () => {
+    const headline = pickHeadline(
+      snap({
+        secretFindings: {
+          findings: [
+            {
+              filePath: "src/aws.ts",
+              line: 12,
+              patternId: "aws-access-key",
+              patternLabel: "AWS Access Key ID",
+              preview: "AKIAQ4...7890",
+              severity: "critical",
+              confidence: 1.0,
+            },
+          ],
+          filesScanned: 1,
+        },
+      })
+    );
+    expect(headline.kind).toBe("secret-leak");
+    expect(headline.severity).toBe("critical");
+    expect(headline.primary).toContain("AWS Access Key");
+    expect(headline.detail).toContain("AKIAQ4...7890");
+    expect(headline.ctaLink).toBe("?focus=secrets");
+  });
+
+  it("trumps every other rule (incl. critical-duplicates)", () => {
+    const cg = emptyGraph();
+    cg.functions = [
+      fn("src/a.ts", "render", 60, "hashA"),
+      fn("src/b.ts", "render", 55, "hashA"),
+    ];
+    const headline = pickHeadline(
+      snap({
+        codeGraph: cg,
+        secretFindings: {
+          findings: [
+            {
+              filePath: "src/aws.ts",
+              line: 12,
+              patternId: "aws-access-key",
+              patternLabel: "AWS Access Key ID",
+              preview: "AKIAQ4...7890",
+              severity: "critical",
+              confidence: 1.0,
+            },
+          ],
+          filesScanned: 1,
+        },
+      })
+    );
+    // critical duplicate would normally fire — secret leak overrides
+    expect(headline.kind).toBe("secret-leak");
+  });
+
+  it("does NOT fire on medium-only findings (likely public JWTs)", () => {
+    const cg = emptyGraph();
+    cg.functions = [fn("src/foo.ts", "f", 2)];
+    cg.byPlugin = {
+      javascript: { files: 1, functions: 1, calls: 0, imports: 0 },
+    };
+    const headline = pickHeadline(
+      snap({
+        codeGraph: cg,
+        secretFindings: {
+          findings: [
+            {
+              filePath: "src/jwt.ts",
+              line: 1,
+              patternId: "jwt-token",
+              patternLabel: "JWT-like Token",
+              preview: "eyJhbG...12ab",
+              severity: "medium",
+              confidence: 0.8,
+            },
+          ],
+          filesScanned: 1,
+        },
+      })
+    );
+    expect(headline.kind).not.toBe("secret-leak");
+    // falls through to generic-healthy because no other rule fires
+    expect(headline.kind).toBe("generic-healthy");
+  });
+
+  it("does not fire on empty findings array", () => {
+    const cg = emptyGraph();
+    cg.functions = [fn("src/foo.ts", "f", 2)];
+    cg.byPlugin = {
+      javascript: { files: 1, functions: 1, calls: 0, imports: 0 },
+    };
+    const headline = pickHeadline(
+      snap({
+        codeGraph: cg,
+        secretFindings: { findings: [], filesScanned: 5 },
+      })
+    );
+    expect(headline.kind).not.toBe("secret-leak");
+  });
+});
+
+// ------------------- Rule 0b: no-data -------------------
 
 describe("pickHeadline · no-data fallback", () => {
   it("returns no-data when codeGraph is missing", () => {

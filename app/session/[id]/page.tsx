@@ -61,6 +61,7 @@ import { SinceLastVisit } from "@/components/views/SinceLastVisit";
 import { HeadlineFinding } from "@/components/HeadlineFinding";
 import { BlastRadiusPanel } from "@/components/views/BlastRadiusPanel";
 import { HealthSummary } from "@/components/views/HealthSummary";
+import { SecretFindingsPanel } from "@/components/views/SecretFindingsPanel";
 import { SessionNameEditor } from "@/components/SessionNameEditor";
 import { HotspotTreemap } from "@/components/views/HotspotTreemap";
 import { ContributorList } from "@/components/views/ContributorList";
@@ -230,6 +231,14 @@ export default async function OverviewPage({
          *  itself when every dimension is "unknown" (e.g. a brand-new
          *  snapshot before the first refresh). */}
         <HealthSummary summaries={healthSummaries} sessionId={session.id} />
+
+        {/* Possible secrets (v0.61) — regex-pass findings. Hides itself
+         *  when the snapshot has no findings (cleanest case) or no
+         *  scan ran (pre-v0.61 sessions). The headline-finding above
+         *  already shouts about critical leaks; this is the drilldown. */}
+        {current.secretFindings && (
+          <SecretFindingsPanel result={current.secretFindings} />
+        )}
 
         {/* Quick-look cards: navigation that tells a story. Each card
          *  shows the headline stat for its tab so users can scan
