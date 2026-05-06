@@ -67,7 +67,7 @@ describe("MCP server · initialization", () => {
 });
 
 describe("MCP server · tools/list", () => {
-  it("exposes all five GitVision tools", async () => {
+  it("exposes all six GitVision tools", async () => {
     const { client, cleanup } = await connectInMemory();
     try {
       const result = await client.listTools();
@@ -75,6 +75,7 @@ describe("MCP server · tools/list", () => {
       expect(names).toEqual([
         "analyze_repo",
         "blast_radius",
+        "compare_sessions",
         "find_duplicates",
         "signals",
         "untested_hotspots",
@@ -99,7 +100,7 @@ describe("MCP server · tools/list", () => {
     }
   });
 
-  it("downstream tools require sessionId in their schema", async () => {
+  it("single-session downstream tools require sessionId in their schema", async () => {
     const { client, cleanup } = await connectInMemory();
     try {
       const result = await client.listTools();
@@ -112,6 +113,20 @@ describe("MCP server · tools/list", () => {
           "sessionId"
         );
       }
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("compare_sessions requires fromSessionId + toSessionId", async () => {
+    const { client, cleanup } = await connectInMemory();
+    try {
+      const result = await client.listTools();
+      const tool = result.tools.find((t) => t.name === "compare_sessions");
+      expect(tool).toBeDefined();
+      const schema = tool!.inputSchema as { required?: string[] };
+      expect(schema.required).toContain("fromSessionId");
+      expect(schema.required).toContain("toSessionId");
     } finally {
       await cleanup();
     }
@@ -171,6 +186,23 @@ describe("MCP server · tool error paths", () => {
         arguments: { sessionId: "nope" },
       });
       expect(result.isError).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("compare_sessions returns an error when either side is missing", async () => {
+    const { client, cleanup } = await connectInMemory();
+    try {
+      const result = await client.callTool({
+        name: "compare_sessions",
+        arguments: { fromSessionId: "nope-from", toSessionId: "nope-to" },
+      });
+      expect(result.isError).toBe(true);
+      const content = result.content as Array<{ type: string; text: string }>;
+      // The first-missing path fires first — the error should name the
+      // earlier session that wasn't found.
+      expect(content[0].text).toMatch(/nope-from/);
     } finally {
       await cleanup();
     }

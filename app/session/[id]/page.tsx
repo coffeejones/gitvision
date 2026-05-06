@@ -1,4 +1,4 @@
-// /session/[id] — Overview route (v0.42, reshaped in v0.44, v0.57, v0.58, v0.59).
+// /session/[id] — Overview route (v0.42, reshaped in v0.44, v0.57-v0.67).
 //
 // In workspace mode this is the landing page for a session — the
 // "what is this repo, and where do I go to dig in" view.
@@ -8,22 +8,25 @@
 //      topics chips.
 //   2. Refresh banner ("Since your last visit") — only when there's a
 //      diff. Story-driven headline + supporting chips.
-//   3. Headline finding (v0.57) — one concrete actionable signal picked
+//   3. Structural diff panel (v0.67) — per-function / per-file diff
+//      between snapshots. Sits between aggregate (SinceLastVisit) and
+//      single-best (Headline) so the page reads at three zoom levels.
+//   4. Headline finding (v0.57) — one concrete actionable signal picked
 //      by lib/intelligence/headline.ts. The 30-second rule from
 //      r/devtools alpha feedback: visitors need to see impact fast.
-//   4. Health-at-a-glance strip (v0.59) — six traffic-light tiles,
+//   5. Health-at-a-glance strip (v0.59) — six traffic-light tiles,
 //      one per dimension. Promotes the deterministic signal layer
 //      out of the Insights tab into the landing view.
-//   5. Quick-look cards — one card per workspace tab, each showing a
+//   6. Quick-look cards — one card per workspace tab, each showing a
 //      stat preview and linking to the dedicated route. This is the
 //      "navigation that tells a story" surface.
-//   6. Touch-with-care panel (v0.58) — top blast-radius functions,
+//   7. Touch-with-care panel (v0.58) — top blast-radius functions,
 //      promoted out of the Code tab. Click a row to drill into the full
 //      blast view. Only renders when there are ranked functions.
-//   7. Demographics — hotspot treemap, contributors, language mix,
+//   8. Demographics — hotspot treemap, contributors, language mix,
 //      bus factor, weekly commit activity. The "high-level read" of
 //      the repo.
-//   8. Footer.
+//   9. Footer.
 //
 // What's NOT here anymore (compared to pre-v0.44):
 //   - AI Summary and Health Check moved to /session/[id]/insights so
@@ -58,6 +61,10 @@ import {
   diffHealthSummaries,
   summarizeHealth,
 } from "@/lib/intelligence/healthSummary";
+import {
+  structuralDiff,
+  structuralDiffHasContent,
+} from "@/lib/intelligence/structuralDiff";
 import { STYLE, TOK } from "@/lib/theme";
 import { StatGrid } from "@/components/views/StatGrid";
 import { SinceLastVisit } from "@/components/views/SinceLastVisit";
@@ -65,6 +72,7 @@ import { HeadlineFinding } from "@/components/HeadlineFinding";
 import { BlastRadiusPanel } from "@/components/views/BlastRadiusPanel";
 import { HealthSummary } from "@/components/views/HealthSummary";
 import { SecretFindingsPanel } from "@/components/views/SecretFindingsPanel";
+import { StructuralDiffPanel } from "@/components/views/StructuralDiffPanel";
 import { SessionNameEditor } from "@/components/SessionNameEditor";
 import { HotspotTreemap } from "@/components/views/HotspotTreemap";
 import { ContributorList } from "@/components/views/ContributorList";
@@ -155,6 +163,13 @@ export default async function OverviewPage({
     ? diffHealthSummaries(previous, current)
     : undefined;
 
+  // v0.67: per-function / per-file structural diff. Computed only
+  // when there's a previous snapshot AND there's actual content to
+  // show — small refreshes that touched no code don't need a panel.
+  const structDiff = previous ? structuralDiff(previous, current) : null;
+  const showStructuralDiff =
+    structDiff !== null && structuralDiffHasContent(structDiff);
+
   const base = `/session/${session.id}`;
 
   return (
@@ -231,6 +246,16 @@ export default async function OverviewPage({
             diff={diff}
             repoFullName={current.repo.fullName}
           />
+        )}
+
+        {/* Structural changes (v0.67 / C2) — per-function / per-file
+         *  diff between snapshots. Lives between SinceLastVisit
+         *  (aggregate) and Headline finding (single-best signal) so
+         *  the page reads at three zoom levels: high-level deltas →
+         *  detailed deltas → top finding to act on. Hides itself
+         *  when there's no previous snapshot or no actual change. */}
+        {showStructuralDiff && structDiff && (
+          <StructuralDiffPanel diff={structDiff} />
         )}
 
         {/* Headline finding (v0.57) — the 30-second-rule signal. One

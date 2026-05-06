@@ -28,9 +28,13 @@ import {
   signalsInputSchema,
   handleSignals,
 } from "./tools/signals.js";
+import {
+  compareSessionsInputSchema,
+  handleCompareSessions,
+} from "./tools/compareSessions.js";
 
 export const SERVER_NAME = "gitvision";
-export const SERVER_VERSION = "0.66.0";
+export const SERVER_VERSION = "0.67.0";
 
 /** Build a fully-configured GitVision MCP server with all tools
  *  registered. The caller decides which transport to attach (stdio
@@ -89,6 +93,16 @@ export function buildServer(): McpServer {
       inputSchema: signalsInputSchema,
     },
     handleSignals
+  );
+
+  server.registerTool(
+    "compare_sessions",
+    {
+      description:
+        "Diff two analyses of the same repo. Returns added/removed functions, duplicate-group net change, coverage delta, and per-file complexity shifts. Useful for verifying that a refactor moved the needle: analyze before, apply changes, analyze again, then compare. Both session ids must already be in the cache (call analyze_repo first for each).",
+      inputSchema: compareSessionsInputSchema,
+    },
+    handleCompareSessions
   );
 
   return server;

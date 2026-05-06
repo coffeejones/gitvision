@@ -14,7 +14,7 @@ codebase?", today it grep-greps and guesses. With this server
 connected, it gets actual answers from a tree-sitter AST + call
 graph — no LLM in the analysis path.
 
-Five tools are exposed. Each takes JSON in, returns JSON out, and
+Six tools are exposed. Each takes JSON in, returns JSON out, and
 runs in milliseconds against a cached snapshot.
 
 | Tool | Purpose |
@@ -24,6 +24,7 @@ runs in milliseconds against a cached snapshot.
 | `find_duplicates` | Functions with identical structural shape (FNV-1a AST hash) across the codebase. Refactor candidates. |
 | `untested_hotspots` | Production functions with no direct test caller, ranked by complexity. |
 | `signals` | 17-signal health verdict — what works, what needs work, what needs human judgment. Plus a 6-dimension rollup. |
+| `compare_sessions` | Diff two analyses of the same repo. Verify a refactor moved the needle: analyze before, apply, analyze after, then compare. |
 
 ## Install
 
