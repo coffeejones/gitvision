@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM"],
+    "outDir": "./dist",
+    "rootDir": "..",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": true,
+    "noEmit": false,
+    "isolatedModules": true,
+    "incremental": false,
+    "types": ["node"]
+  },
+  // Only MCP entry points + their direct imports. tsc follows the
+  // import graph from these files, so we get exactly the lib/ files
+  // we actually depend on without needing to enumerate them. lib/ is
+  // not included as a glob — that would pull in browser-coupled files
+  // (lib/ownerId.ts uses `window`) and tests.
+  "include": ["./**/*.ts"],
+  "exclude": ["node_modules", "../node_modules", "./dist"]
+}

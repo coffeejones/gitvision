@@ -2,6 +2,9 @@
   "name": "gitvision",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "gitvision-mcp": "./mcp/dist/mcp/server.js"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
@@ -9,11 +12,14 @@
     "lint": "eslint",
     "test": "vitest",
     "test:run": "vitest run",
-    "analyze": "tsx lib/codeAnalysis/cli.ts"
+    "analyze": "tsx lib/codeAnalysis/cli.ts",
+    "mcp:build": "tsc -p mcp/tsconfig.json",
+    "mcp": "npm run mcp:build && node mcp/dist/mcp/server.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
     "@iarna/toml": "^2.2.5",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/d3-sankey": "^0.12.5",
     "@vscode/tree-sitter-wasm": "^0.3.1",
     "@xyflow/react": "^12.10.2",

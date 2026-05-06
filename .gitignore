@@ -41,6 +41,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# MCP server build output (regenerated via `npm run mcp:build`)
+/mcp/dist/
+
 # GitVision user data (sessions are per-machine, regeneratable)
 /.gitvision/
 
