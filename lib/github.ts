@@ -63,6 +63,23 @@ export function parseRepoUrl(input: string): { owner: string; repo: string } | n
   return null;
 }
 
+/** When a user pastes an org / user profile URL (https://github.com/ZeebleChat)
+ *  parseRepoUrl returns null because there's no repo segment. This helper
+ *  detects that specific case and returns the org / user name so the API
+ *  layer can surface a more actionable error than the generic
+ *  "Could not parse GitHub URL" message.
+ *
+ *  Returns null when the input doesn't match an org / user URL shape —
+ *  including random garbage and full repo URLs (those parseRepoUrl
+ *  already handles). */
+export function extractOrgOrUserFromUrl(input: string): string | null {
+  const trimmed = input.trim().replace(/\/$/, "");
+  // Only the bare-org URL shape — exactly one path segment after
+  // github.com, no trailing /repo, /tree, /blob, etc.
+  const m = trimmed.match(/^https?:\/\/github\.com\/([^\/\s?#]+)$/);
+  return m ? m[1] : null;
+}
+
 // parseDeepLinkSubdir lives in lib/githubUrl.ts so it can be imported from
 // client components without dragging server-only deps (Octokit, tar) into
 // the browser bundle.

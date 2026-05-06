@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import {
   parseRepoUrl,
+  extractOrgOrUserFromUrl,
   computeHotspots,
   computeCoChange,
   computeCommitActivity,
@@ -50,6 +51,59 @@ describe("parseRepoUrl", () => {
     expect(parseRepoUrl("")).toBeNull();
     expect(parseRepoUrl("not a url")).toBeNull();
     expect(parseRepoUrl("just-one-segment")).toBeNull();
+  });
+});
+
+describe("extractOrgOrUserFromUrl", () => {
+  it("detects an org / user URL with no repo segment", () => {
+    expect(extractOrgOrUserFromUrl("https://github.com/ZeebleChat")).toBe(
+      "ZeebleChat"
+    );
+  });
+
+  it("detects with trailing slash", () => {
+    expect(extractOrgOrUserFromUrl("https://github.com/vercel/")).toBe(
+      "vercel"
+    );
+  });
+
+  it("detects http (not just https)", () => {
+    expect(extractOrgOrUserFromUrl("http://github.com/anthropics")).toBe(
+      "anthropics"
+    );
+  });
+
+  it("returns null for full repo URLs (parseRepoUrl handles those)", () => {
+    expect(
+      extractOrgOrUserFromUrl("https://github.com/vercel/next.js")
+    ).toBeNull();
+  });
+
+  it("returns null for URLs with extra path segments", () => {
+    expect(
+      extractOrgOrUserFromUrl("https://github.com/vercel/next.js/tree/main")
+    ).toBeNull();
+  });
+
+  it("returns null for query strings on org URL (those are tab-pages)", () => {
+    expect(
+      extractOrgOrUserFromUrl(
+        "https://github.com/vercel?tab=repositories"
+      )
+    ).toBeNull();
+  });
+
+  it("returns null for non-github URLs", () => {
+    expect(
+      extractOrgOrUserFromUrl("https://gitlab.com/some-org")
+    ).toBeNull();
+    expect(extractOrgOrUserFromUrl("not a url")).toBeNull();
+    expect(extractOrgOrUserFromUrl("")).toBeNull();
+  });
+
+  it("returns null for shorthand owner/repo", () => {
+    // The owner/repo shorthand isn't an org URL — parseRepoUrl handles it.
+    expect(extractOrgOrUserFromUrl("coffeejones/gitvision")).toBeNull();
   });
 });
 

@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { z } from "zod";
-import { parseRepoUrl } from "@/lib/github";
+import { extractOrgOrUserFromUrl, parseRepoUrl } from "@/lib/github";
 import { validateSubdir } from "@/lib/graph";
 import { createJob, processJob } from "@/lib/jobs";
 import { OWNER_ID_HEADER } from "@/lib/ownerId";
@@ -66,6 +66,19 @@ export async function POST(req: Request) {
   // the polled status as a "failed" outcome.
   const parsedRepo = parseRepoUrl(parsed.data.repoUrl);
   if (!parsedRepo) {
+    // Detect the common case where a user pasted a GitHub organization
+    // or user-profile URL (https://github.com/ZeebleChat) instead of a
+    // specific repo URL. Generic parse-error doesn't help them; this
+    // tells them what to do next.
+    const orgOrUser = extractOrgOrUserFromUrl(parsed.data.repoUrl);
+    if (orgOrUser) {
+      return NextResponse.json(
+        {
+          error: `That looks like a GitHub organization or user URL (${orgOrUser}), not a specific repository. GitVision analyzes one repo at a time — pick a repo from https://github.com/${orgOrUser}?tab=repositories and paste its URL.`,
+        },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
       { error: "Could not parse GitHub URL. Expected e.g. https://github.com/owner/repo" },
       { status: 400 }
