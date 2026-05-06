@@ -1,14 +1,16 @@
-// /session/[id]/insights — AI Summary + Health Check (v0.44).
+// /session/[id]/insights — AI Summary + Health Check (v0.44, slimmed v0.60).
 //
-// Both AI panels used to render on the Overview landing as always-on
-// content. That worked when the page was a long dashboard scroll, but
-// in workspace mode it bloated the Overview and made it less of a
-// landing. Moved here so the user reaches for AI insights when they
-// want them.
-//
-// The two panels stack vertically with a clear hierarchy:
-//   1. AI Summary — what the repo is, in 150-200 words.
+// AI prose layer that sits on top of the deterministic signals already
+// surfaced on the Overview. The Overview's "Health at a glance" strip
+// answers "what" — this page answers "why, in plain English". Two
+// panels:
+//   1. AI Briefing — what the repo is, in 150-200 words.
 //   2. Health Check — the three-column verdict grounded in 17 signals.
+//
+// v0.60 trim: the page header used to repeat what the panel headers
+// already say. Dropped the 4-line intro paragraph in favor of a single
+// muted-line provenance hint, since alpha users were hitting the page
+// from anchored Overview-tile clicks and didn't need re-introduction.
 //
 // If ANTHROPIC_API_KEY isn't set, both panels render their own empty
 // state explaining that AI features are off.
@@ -35,28 +37,13 @@ export default async function InsightsRoute({
   return (
     <main className="px-8 py-8 flex flex-col gap-6">
       <div id="screenshot-target" className="flex flex-col gap-6 max-w-4xl">
-        <header className="flex flex-col gap-2">
+        <header className="flex items-baseline justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <Sparkles size={15} style={{ color: TOK.accent }} />
+            <Sparkles size={14} style={{ color: TOK.accent }} />
             <span className={STYLE.eyebrow} style={{ color: TOK.textMuted }}>
-              Insights
+              Insights · AI commentary on deterministic signals
             </span>
           </div>
-          <h1
-            className="text-2xl font-semibold tracking-tight"
-            style={{ letterSpacing: "-0.01em" }}
-          >
-            AI summary &amp; health verdict
-          </h1>
-          <p
-            className="text-sm leading-relaxed"
-            style={{ color: TOK.textSecondary }}
-          >
-            Generated from the latest snapshot. Every claim is grounded in
-            a deterministic signal computed server-side — see the Health
-            section&apos;s &quot;evidence&quot; tags for the underlying
-            data.
-          </p>
         </header>
 
         <AiSummaryPanel sessionId={session.id} snapshot={current} />

@@ -19,6 +19,23 @@ import type {
 } from "@/lib/intelligence/healthSummary";
 import { STYLE, TOK } from "@/lib/theme";
 
+/** Map a tile's status to the relevant Health-check column anchor on
+ *  /insights. critical + warning tiles want the "needs work" column;
+ *  healthy tiles want the "what works" column. solo + unknown don't
+ *  link anywhere — there's nothing to drill into. */
+function anchorForStatus(status: DimensionStatus): string | null {
+  switch (status) {
+    case "critical":
+    case "warning":
+      return "health-needs-work";
+    case "healthy":
+      return "health-working";
+    case "solo":
+    case "unknown":
+      return null;
+  }
+}
+
 interface StatusStyle {
   /** Foreground color of the icon + status label. */
   fg: string;
@@ -103,7 +120,7 @@ export function HealthSummary({ summaries, sessionId }: Props) {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {summaries.map((s) => (
-          <HealthTile key={s.id} summary={s} insightsHref={insightsHref} />
+          <HealthTile key={s.id} summary={s} insightsBase={insightsHref} />
         ))}
       </div>
     </section>
@@ -140,18 +157,23 @@ function fallbackDetail(summary: DimensionSummary): string {
 
 function HealthTile({
   summary,
-  insightsHref,
+  insightsBase,
 }: {
   summary: DimensionSummary;
-  insightsHref: string;
+  /** Base /session/{id}/insights path — the tile appends the relevant
+   *  column anchor for its status so the link scrolls into the right
+   *  column on the verdict page. */
+  insightsBase: string;
 }) {
   const style = STATUS_STYLES[summary.status];
   const { Icon } = style;
 
   // Unknown / solo tiles are non-actionable, so render as plain divs.
-  // Other statuses link to /insights so users can dig into the evidence.
-  const isInteractive =
-    summary.status !== "unknown" && summary.status !== "solo";
+  // Other statuses link to /insights with an anchor so users land in
+  // the column whose copy applies to this tile's status.
+  const anchor = anchorForStatus(summary.status);
+  const isInteractive = anchor !== null;
+  const href = anchor ? `${insightsBase}#${anchor}` : insightsBase;
 
   const detailText = summary.detail ?? fallbackDetail(summary);
 
@@ -200,7 +222,7 @@ function HealthTile({
 
   if (isInteractive) {
     return (
-      <Link href={insightsHref} className={className} style={inlineStyle}>
+      <Link href={href} className={className} style={inlineStyle}>
         {Body}
       </Link>
     );

@@ -103,18 +103,10 @@ export function AiSummaryPanel({ sessionId, snapshot }: Props) {
       </div>
 
       {!summary && !pending && (
-        <div
-          className="rounded-xl p-5 text-sm"
-          style={{
-            background: TOK.surface,
-            border: `1px solid ${TOK.border}`,
-            color: TOK.textSecondary,
-          }}
-        >
-          Claude reads this snapshot and writes a short profile — what the
-          project is, how it&apos;s built, and what&apos;s happening lately.
-          Cached on the snapshot, so it&apos;s only generated once per refresh.
-        </div>
+        <p className="text-xs" style={{ color: TOK.textMuted }}>
+          Claude writes a 150-word profile — what the project is, how it&apos;s
+          built, and what&apos;s happening lately. Cached per snapshot.
+        </p>
       )}
 
       {summary && (

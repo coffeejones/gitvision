@@ -40,3 +40,34 @@ body {
   );
   background-size: 24px 24px;
 }
+
+/* Anchor-flash: a continuous, very subtle amber pulse on a deep-linked
+   panel after fragment-based navigation. Driven by JS (HealthPanel
+   adds .anchor-flash-active when window.location.hash matches an
+   anchor on mount + hashchange; the class persists until the
+   component unmounts so the pulse acts as a "you are here" marker
+   while the user is on the page).
+
+   Why JS, not :target — Next.js App Router's client-side navigation
+   doesn't always trigger :target re-evaluation when <Link> changes
+   the URL fragment, so a CSS-only solution is unreliable.
+
+   Tuned to be near-ambient: 0.18 alpha ring + 0.08 alpha glow, a
+   gentle 2.8s cycle. The cue is felt more than seen — eye rests on
+   the column, the breathing motion confirms "this is the one". */
+.anchor-flash-active {
+  animation: anchor-pulse 2.8s ease-in-out infinite;
+}
+@keyframes anchor-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(245, 158, 11, 0),
+      0 0 0 0 rgba(245, 158, 11, 0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1.5px rgba(245, 158, 11, 0.18),
+      0 0 14px rgba(245, 158, 11, 0.08);
+  }
+}

@@ -4,11 +4,86 @@
 // Evidence is visible by default (no more hidden <details>) — each column
 // shows the narrative prose on top and a signal bullet list below it.
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCw, Stethoscope } from "lucide-react";
 import type { AnalysisSnapshot, HealthSignal } from "@/lib/types";
 import { TOK } from "@/lib/theme";
+
+/** The three anchor IDs the HealthSummary tiles deep-link to. Kept
+ *  exhaustive (not extended) so a typo in a tile's anchor never lights
+ *  up the wrong column — only members of this list flash. */
+const ANCHOR_IDS = [
+  "health-working",
+  "health-needs-work",
+  "health-questions",
+] as const;
+
+/** Watch window.location.hash for an anchor match on mount + on
+ *  hashchange. When the hash points at one of our columns, add the
+ *  .anchor-flash-active class — the CSS keyframe pulses a faint amber
+ *  ring continuously while the class is present. The class persists
+ *  for the lifetime of the page (no auto-removal) so the pulse acts
+ *  as a "you are here" marker until the user navigates away.
+ *
+ *  When the user clicks a different HealthSummary tile (hash change
+ *  to a different anchor), we move the class off the previous column
+ *  and onto the new one. Cleanup removes it on unmount.
+ *
+ *  Timing note: Next.js App Router's <Link> sets the URL hash
+ *  asynchronously after the new route's components mount, so reading
+ *  window.location.hash synchronously on first effect-run misses it.
+ *  We poll a few rAF ticks to catch the hash once it lands. After
+ *  that the hashchange listener handles in-page navigations. */
+function useAnchorFlash() {
+  useEffect(() => {
+    let cancelled = false;
+    let activeEl: HTMLElement | null = null;
+
+    function applyFlash(hash: string) {
+      if (!ANCHOR_IDS.includes(hash as (typeof ANCHOR_IDS)[number])) return;
+      const el = document.getElementById(hash);
+      if (!el || el === activeEl) return;
+      // Move the pulse class from the previously-active column (if
+      // any) to the new target so only one column pulses at a time.
+      if (activeEl) activeEl.classList.remove("anchor-flash-active");
+      el.classList.add("anchor-flash-active");
+      activeEl = el;
+    }
+
+    function flashFromCurrentHash() {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (hash) applyFlash(hash);
+    }
+
+    // Initial mount: poll up to ~10 frames for the hash to land. Stops
+    // as soon as we see a non-empty hash, or after the budget is spent.
+    let attempts = 0;
+    function pollForHash() {
+      if (cancelled) return;
+      const hash = window.location.hash.replace(/^#/, "");
+      if (hash) {
+        applyFlash(hash);
+        return;
+      }
+      if (attempts++ < 10) {
+        requestAnimationFrame(pollForHash);
+      }
+    }
+    requestAnimationFrame(pollForHash);
+
+    // Subsequent in-page hash changes (clicking another tile while on
+    // /insights) — the browser fires hashchange synchronously here.
+    window.addEventListener("hashchange", flashFromCurrentHash);
+    return () => {
+      cancelled = true;
+      // Stop the pulse so it doesn't linger if the column happens to
+      // stay in DOM after this component unmounts.
+      if (activeEl) activeEl.classList.remove("anchor-flash-active");
+      window.removeEventListener("hashchange", flashFromCurrentHash);
+    };
+  }, []);
+}
 
 interface Props {
   sessionId: string;
@@ -20,6 +95,9 @@ export function HealthPanel({ sessionId, snapshot }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const analysis = snapshot.healthAnalysis;
+  // Pulse the deep-linked column on hash navigation. Lives at panel
+  // level (not per-column) so we only register one effect.
+  useAnchorFlash();
 
   function generate() {
     startTransition(async () => {
@@ -99,35 +177,31 @@ export function HealthPanel({ sessionId, snapshot }: Props) {
       </div>
 
       {!analysis && !pending && (
-        <div
-          className="rounded-xl p-5 text-sm"
-          style={{
-            background: TOK.surface,
-            border: `1px solid ${TOK.border}`,
-            color: TOK.textSecondary,
-          }}
-        >
-          Computes concrete signals — bus factor, PR backlog, test coverage,
-          module coupling, freshness — and asks Claude to translate them into
-          a plain-English verdict you can act on.
-        </div>
+        <p className="text-xs" style={{ color: TOK.textMuted }}>
+          Claude reads the 17 signals already computed for the Overview strip
+          and writes a verdict you can act on — what works, where to dig
+          deeper, and what needs human judgment.
+        </p>
       )}
 
       {analysis && (
         <div className="grid md:grid-cols-3 gap-3">
           <HealthColumn
+            anchorId="health-working"
             label="What works"
             accent={TOK.accent}
             narrative={analysis.narrative.working}
             signals={analysis.signals.working}
           />
           <HealthColumn
+            anchorId="health-needs-work"
             label="Where to dig deeper"
             accent={TOK.amber}
             narrative={analysis.narrative.needsWork}
             signals={analysis.signals.needsWork}
           />
           <HealthColumn
+            anchorId="health-questions"
             label="Open questions"
             accent={TOK.textSecondary}
             narrative={analysis.narrative.questions}
@@ -153,11 +227,17 @@ export function HealthPanel({ sessionId, snapshot }: Props) {
 }
 
 function HealthColumn({
+  anchorId,
   label,
   accent,
   narrative,
   signals,
 }: {
+  /** Fragment id (e.g. "health-working") so deep-links from the
+   *  Overview's HealthSummary tiles can scroll to this column. The
+   *  scroll-margin-top keeps the anchor below the sticky workspace
+   *  toolbar when it lands. */
+  anchorId: string;
   label: string;
   accent: string;
   narrative: string;
@@ -165,10 +245,12 @@ function HealthColumn({
 }) {
   return (
     <div
+      id={anchorId}
       className="rounded-xl p-4 flex flex-col gap-3"
       style={{
         background: TOK.surface,
         border: `1px solid ${TOK.border}`,
+        scrollMarginTop: "5rem",
       }}
     >
       <div className="flex items-center gap-2">
