@@ -41,6 +41,7 @@ import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 import {
   ArrowRight,
+  Boxes,
   Code as CodeIcon,
   ExternalLink,
   FileCode,
@@ -345,6 +346,21 @@ export default async function OverviewPage({
               }
               description="Blast radius · untested hotspots · structural duplicates"
               accent={duplicateGroups.length > 0 || !!(coverage && coverage.totals.testFiles > 0)}
+            />
+            <QuickLookCard
+              href={`${base}/architecture`}
+              icon={<Boxes size={15} />}
+              label="Architecture"
+              stat={
+                codeGraph?.classes && codeGraph.classes.length > 0
+                  ? `${codeGraph.classes.length.toLocaleString()} class${
+                      codeGraph.classes.length === 1 ? "" : "es"
+                    } extracted`
+                  : codeGraph
+                    ? "No classes detected"
+                    : "Refresh to populate"
+              }
+              description="Class diagrams · Mermaid export · architectural intelligence"
             />
             <QuickLookCard
               href={`${base}/packages`}

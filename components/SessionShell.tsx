@@ -24,6 +24,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   AlertCircle,
+  Boxes,
   Code as CodeIcon,
   FileCode,
   GitPullRequest,
@@ -91,6 +92,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
   const hasCodeGraph = !!snapshot.codeGraph;
   const depCount = snapshot.fileGraph?.nodes.length ?? 0;
   const codeFunctionCount = snapshot.codeGraph?.functions.length ?? 0;
+  const classCount = snapshot.codeGraph?.classes?.length ?? 0;
   const prCount = snapshot.pullRequests?.length ?? 0;
   const healths =
     snapshot.dependencyHealths ??
@@ -127,6 +129,17 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       href: `${base}/code`,
       icon: <CodeIcon size={14} />,
       count: hasCodeGraph ? codeFunctionCount : undefined,
+      hint: hasCodeGraph ? undefined : "refresh",
+    },
+    {
+      // v0.70: Architecture tab — first beboer is class diagrams.
+      // Future deeper-intelligence themes (hidden coupling,
+      // knowledge ranking, pattern detection) land here too.
+      label: "Architecture",
+      href: `${base}/architecture`,
+      icon: <Boxes size={14} />,
+      count:
+        hasCodeGraph && classCount > 0 ? classCount : undefined,
       hint: hasCodeGraph ? undefined : "refresh",
     },
     {

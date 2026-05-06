@@ -14,6 +14,7 @@ function pf(over: Partial<ParsedFile> & { rel: string }): ParsedFile {
     calls: over.calls ?? [],
     fileComplexity: over.fileComplexity ?? 1,
     parseError: over.parseError ?? false,
+    ...(over.classes !== undefined ? { classes: over.classes } : {}),
   };
 }
 
@@ -636,5 +637,110 @@ describe("buildCodeGraph", () => {
     });
     expect(g.truncated).toBe("MAX_FILES capped");
     expect(g.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  // ---------------- Class aggregation (v0.70) ----------------
+
+  it("aggregates per-file ParsedClass entries into cg.classes", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "src/user.ts",
+          classes: [
+            {
+              name: "User",
+              startRow: 0,
+              endRow: 10,
+              fields: [
+                {
+                  name: "id",
+                  type: "string",
+                  visibility: "public",
+                  isStatic: false,
+                },
+              ],
+              methodNames: [],
+            },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.classes).toHaveLength(1);
+    expect(g.classes![0]).toMatchObject({
+      name: "User",
+      filePath: "src/user.ts",
+      fields: [{ name: "id", type: "string" }],
+    });
+  });
+
+  it("disambiguates duplicate class names across files via filename suffix", () => {
+    // Multiple Props interfaces (canonical React/TS pattern). Mermaid
+    // would silently merge them into one entity if names weren't
+    // disambiguated, producing FALSE diagrams. This test exists
+    // specifically to prevent regression of the v0.70 polish.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "components/HeadlineFinding.tsx",
+          classes: [
+            {
+              name: "Props",
+              startRow: 0,
+              endRow: 5,
+              fields: [],
+              methodNames: [],
+            },
+          ],
+        }),
+        pf({
+          rel: "components/AiSummaryPanel.tsx",
+          classes: [
+            {
+              name: "Props",
+              startRow: 0,
+              endRow: 5,
+              fields: [],
+              methodNames: [],
+            },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    const names = g.classes!.map((c) => c.name).sort();
+    expect(names).toEqual([
+      "Props_AiSummaryPanel",
+      "Props_HeadlineFinding",
+    ]);
+  });
+
+  it("leaves single-occurrence names unchanged", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "lib/types.ts",
+          classes: [
+            {
+              name: "AnalysisSnapshot",
+              startRow: 0,
+              endRow: 5,
+              fields: [],
+              methodNames: [],
+            },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.classes![0].name).toBe("AnalysisSnapshot");
+  });
+
+  it("returns undefined for cg.classes when no class extraction happened", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [pf({ rel: "src/foo.ts" })],
+      pluginByFile: new Map(),
+    });
+    expect(g.classes).toBeUndefined();
   });
 });

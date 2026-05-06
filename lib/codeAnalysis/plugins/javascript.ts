@@ -15,9 +15,12 @@ import path from "node:path";
 import { Parser } from "web-tree-sitter";
 import type { Language, Node as TsNode } from "web-tree-sitter";
 import type {
+  ClassMemberVisibility,
   CodeAnalysisPlugin,
   FileIndex,
   ParsedCall,
+  ParsedClass,
+  ParsedField,
   ParsedFile,
   ParsedFunction,
   ParsedImport,
@@ -395,6 +398,10 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   const imports: ParsedImport[] = [];
   const functions: ParsedFunction[] = [];
   const calls: ParsedCall[] = [];
+  /** v0.70: full ParsedClass entries for the Architecture tab.
+   *  Built up alongside the existing classStack as the walker
+   *  enters each class_declaration / interface_declaration. */
+  const parsedClasses: ParsedClass[] = [];
   let totalDecisionPoints = 0;
 
   const seenImportSpecs = new Set<string>();
@@ -467,6 +474,143 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
       const info = extractParamNameAndType(p);
       if (info && info.isParamProperty && info.type) {
         out.set(info.name, info.type);
+      }
+    }
+    return out;
+  }
+
+  /** v0.70: full field metadata for the Architecture tab. Like
+   *  collectClassFields() but keeps every field (typed or not),
+   *  records visibility / static / readonly, and follows the JS
+   *  underscore-prefix convention as a private-by-convention
+   *  signal when no explicit modifier is present. */
+  function collectFullClassFields(classBody: TsNode): ParsedField[] {
+    const out: ParsedField[] = [];
+    for (const member of classBody.namedChildren) {
+      if (
+        member.type !== "public_field_definition" &&
+        member.type !== "field_definition"
+      ) {
+        continue;
+      }
+      const propNode =
+        member.childForFieldName("property") ??
+        member.childForFieldName("name");
+      if (propNode?.type !== "property_identifier") continue;
+      const name = propNode.text;
+
+      const typeNode = member.childForFieldName("type");
+      const type = typeNode
+        ? extractTypeFromAnnotation(typeNode) ?? undefined
+        : undefined;
+
+      // Modifier detection — TS fields can carry accessibility +
+      // static + readonly keywords as direct child nodes. JS has no
+      // explicit modifiers; underscore prefix is the closest
+      // convention so we use that as a fallback.
+      let visibility: ClassMemberVisibility = name.startsWith("_")
+        ? "private"
+        : "public";
+      let isStatic = false;
+      let isReadonly = false;
+      for (const child of member.children) {
+        if (!child) continue;
+        if (child.type === "accessibility_modifier") {
+          const txt = child.text;
+          if (txt === "private") visibility = "private";
+          else if (txt === "protected") visibility = "protected";
+          else if (txt === "public") visibility = "public";
+        } else if (child.type === "static") {
+          isStatic = true;
+        } else if (child.type === "readonly") {
+          isReadonly = true;
+        }
+      }
+
+      out.push({ name, type, visibility, isStatic, isReadonly });
+    }
+    return out;
+  }
+
+  /** Collect constructor parameter properties as full ParsedField
+   *  entries — TS lets you write `constructor(public name: string)`
+   *  and that implicitly declares + assigns a field. We emit them
+   *  alongside the regular field declarations. */
+  function collectConstructorParamFields(
+    constructorNode: TsNode
+  ): ParsedField[] {
+    const out: ParsedField[] = [];
+    const params = constructorNode.childForFieldName("parameters");
+    if (!params) return out;
+    for (const p of params.namedChildren) {
+      const info = extractParamNameAndType(p);
+      if (!info || !info.isParamProperty) continue;
+      // The accessibility_modifier sits as a direct child of the
+      // parameter node alongside the identifier.
+      let visibility: ClassMemberVisibility = "public";
+      let isReadonly = false;
+      for (const child of p.children) {
+        if (!child) continue;
+        if (child.type === "accessibility_modifier") {
+          const txt = child.text;
+          if (txt === "private") visibility = "private";
+          else if (txt === "protected") visibility = "protected";
+          else if (txt === "public") visibility = "public";
+        } else if (child.type === "readonly") {
+          isReadonly = true;
+        }
+      }
+      out.push({
+        name: info.name,
+        type: info.type ?? undefined,
+        visibility,
+        isStatic: false,
+        isReadonly,
+      });
+    }
+    return out;
+  }
+
+  /** Extract the parent class name from a class_heritage node when
+   *  the class declares `extends Foo`. Returns undefined when no
+   *  extends clause is present. */
+  function extractParentClass(node: TsNode): string | undefined {
+    const heritage = node.childForFieldName("class_heritage")
+      ?? node.namedChildren.find((c): c is TsNode =>
+        !!c && c.type === "class_heritage"
+      );
+    if (!heritage) return undefined;
+    for (const child of heritage.namedChildren) {
+      if (child.type === "extends_clause") {
+        // First identifier child is the parent class name.
+        for (const grand of child.namedChildren) {
+          if (grand.type === "identifier") return grand.text;
+          if (grand.type === "member_expression") return grand.text;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /** Extract names listed in the `implements` clause (TS only).
+   *  Empty array when none present. */
+  function extractImplements(node: TsNode): string[] {
+    const heritage = node.childForFieldName("class_heritage")
+      ?? node.namedChildren.find((c): c is TsNode =>
+        !!c && c.type === "class_heritage"
+      );
+    if (!heritage) return [];
+    const out: string[] = [];
+    for (const child of heritage.namedChildren) {
+      if (child.type === "implements_clause") {
+        for (const grand of child.namedChildren) {
+          if (grand.type === "identifier") out.push(grand.text);
+          else if (grand.type === "type_identifier") out.push(grand.text);
+          else if (grand.type === "generic_type") {
+            const inner = grand.childForFieldName("name");
+            if (inner) out.push(inner.text);
+          }
+        }
       }
     }
     return out;
@@ -706,6 +850,98 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           for (const child of bodyNode.namedChildren) visit(child);
         }
         classStack.pop();
+
+        // v0.70: also emit a richer ParsedClass for the
+        // Architecture-tab Mermaid generator. Skips anonymous
+        // classes (no useful diagram) — they're rare and the
+        // diagram doesn't have a name to label them with anyway.
+        if (className !== "<anonymous>" && bodyNode) {
+          const fullFields = collectFullClassFields(bodyNode);
+          // Constructor parameter properties — collected as full
+          // ParsedField entries (visibility / readonly preserved).
+          for (const member of bodyNode.namedChildren) {
+            if (member.type !== "method_definition") continue;
+            const memberName =
+              member.childForFieldName("name")?.text ?? "";
+            if (memberName === "constructor") {
+              for (const f of collectConstructorParamFields(member)) {
+                fullFields.push(f);
+              }
+            }
+          }
+          // Walk the body for method definitions so we can list
+          // their names. Full FunctionDef cross-reference happens
+          // during cg aggregation (matching containerType + name).
+          const methodNames: string[] = [];
+          for (const member of bodyNode.namedChildren) {
+            if (member.type !== "method_definition") continue;
+            const m = member.childForFieldName("name");
+            if (m && m.text) methodNames.push(m.text);
+          }
+          parsedClasses.push({
+            name: className,
+            startRow: node.startPosition.row,
+            endRow: node.endPosition.row,
+            fields: fullFields,
+            methodNames,
+            parentClass: extractParentClass(node),
+            implements: extractImplements(node),
+            isAbstract: node.type === "abstract_class_declaration",
+            isInterface: false,
+          });
+        }
+        return;
+      }
+
+      case "interface_declaration": {
+        // TypeScript-only. Interfaces have no implementation, so we
+        // capture them purely for the Architecture-tab diagram —
+        // they're skipped by the type-aware-resolution paths above.
+        const nameNode = node.childForFieldName("name");
+        const interfaceName = nameNode?.text ?? "<anonymous>";
+        if (interfaceName === "<anonymous>") {
+          for (const child of node.namedChildren) visit(child);
+          return;
+        }
+        const bodyNode = node.childForFieldName("body");
+        const ifaceFields: ParsedField[] = [];
+        const ifaceMethods: string[] = [];
+        if (bodyNode) {
+          for (const member of bodyNode.namedChildren) {
+            if (member.type === "property_signature") {
+              const propNode = member.childForFieldName("name");
+              if (propNode?.type === "property_identifier") {
+                const typeNode = member.childForFieldName("type");
+                const type = typeNode
+                  ? extractTypeFromAnnotation(typeNode) ?? undefined
+                  : undefined;
+                ifaceFields.push({
+                  name: propNode.text,
+                  type,
+                  visibility: "public",
+                  isStatic: false,
+                });
+              }
+            } else if (member.type === "method_signature") {
+              const m = member.childForFieldName("name");
+              if (m && m.text) ifaceMethods.push(m.text);
+            }
+          }
+        }
+        // Interfaces extend other interfaces, not classes — capture
+        // the same way for visualisation purposes.
+        parsedClasses.push({
+          name: interfaceName,
+          startRow: node.startPosition.row,
+          endRow: node.endPosition.row,
+          fields: ifaceFields,
+          methodNames: ifaceMethods,
+          parentClass: extractParentClass(node),
+          implements: [],
+          isInterface: true,
+          isAbstract: false,
+        });
+        for (const child of node.namedChildren) visit(child);
         return;
       }
 
@@ -865,6 +1101,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     calls,
     fileComplexity: 1 + totalDecisionPoints,
     parseError: false,
+    classes: parsedClasses,
   };
 }
 

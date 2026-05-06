@@ -116,7 +116,71 @@ export interface ParsedFile {
   /** Total decision points across the whole file + 1. */
   fileComplexity: number;
   parseError: boolean;
+  /** Class / interface / struct definitions found in this file
+   *  (v0.70+). Used by the Architecture tab to render class
+   *  diagrams. Optional so plugins can adopt incrementally — JS/TS
+   *  ships first; other languages emit empty arrays until they wire
+   *  up class extraction in their parseDirect / query handlers. */
+  classes?: ParsedClass[];
 }
+
+/** Per-file class definition emitted by language plugins.
+ *  Mirrors ClassDef on the cross-file CodeGraph but lives one
+ *  level closer to the parser — methods are referenced by name +
+ *  startRow only, the full FunctionDef cross-reference happens
+ *  during codeGraph aggregation. */
+export interface ParsedClass {
+  name: string;
+  startRow: number;
+  endRow: number;
+  fields: ParsedField[];
+  /** Names of methods declared on this class. The orchestrator
+   *  resolves these to full FunctionDef entries by matching
+   *  containerType + name during cg aggregation. */
+  methodNames: string[];
+  /** Direct parent class name (single-inheritance languages) or
+   *  the first listed when the language allows multiple. */
+  parentClass?: string;
+  /** Names of interfaces / protocols / mixins declared via
+   *  `implements`, `:`, `<:`, etc. depending on language. Empty
+   *  array for languages without an explicit interface concept. */
+  implements?: string[];
+  /** True when the source declared this as `interface` / `protocol`
+   *  / `trait` rather than `class`. Drives the Mermaid stereotype
+   *  in the diagram renderer (`<<interface>>`). */
+  isInterface?: boolean;
+  /** True when the class itself is declared abstract (Java
+   *  `abstract class`, TypeScript `abstract class`). */
+  isAbstract?: boolean;
+}
+
+/** A single field / property declaration on a class. Optional
+ *  fields stay undefined when the source language doesn't carry
+ *  the information (Python without PEP 526 hints has no type;
+ *  JavaScript has no real visibility). */
+export interface ParsedField {
+  name: string;
+  /** Source-spelled type ("string", "User[]", "Map<K,V>"). The
+   *  diagram renderer prints it verbatim — we don't try to
+   *  normalise across languages. Undefined for dynamic-language
+   *  fields without annotations. */
+  type?: string;
+  visibility: ClassMemberVisibility;
+  isStatic: boolean;
+  /** True for `readonly` / `final` / `const` fields. Surfaced as
+   *  a stereotype in the Mermaid output. */
+  isReadonly?: boolean;
+}
+
+/** Member visibility, normalised across languages. Languages
+ *  without explicit modifiers (JS, Ruby) map case / underscore
+ *  conventions onto these values: `_foo` → "private", `foo` →
+ *  "public", etc. */
+export type ClassMemberVisibility =
+  | "public"
+  | "private"
+  | "protected"
+  | "internal";
 
 // ------------------- Plugin contract -------------------
 
@@ -226,6 +290,29 @@ export interface PluginStats {
   imports: number;
 }
 
+/** A class / interface / struct definition aggregated to the
+ *  CodeGraph level. Mirrors ParsedClass from the parser layer but
+ *  resolves method names to full FunctionDef entries so downstream
+ *  consumers (Architecture-tab Mermaid generator, future pattern-
+ *  detection rules) get rich method signatures without re-walking
+ *  cg.functions. v0.70+. */
+export interface ClassDef {
+  name: string;
+  filePath: string;
+  startRow: number;
+  endRow: number;
+  fields: ParsedField[];
+  /** Methods that belong to this class (resolved by matching
+   *  containerType + name during aggregation). Always references
+   *  the same FunctionDef instances as cg.functions, so blast-
+   *  radius / complexity data is consistent. */
+  methods: FunctionDef[];
+  parentClass?: string;
+  implements?: string[];
+  isInterface?: boolean;
+  isAbstract?: boolean;
+}
+
 /** The full output of a code-analysis pass. Designed to live optionally on
  *  AnalysisSnapshot.codeGraph (Phase 4); old snapshots without this field
  *  continue to render normally. */
@@ -241,6 +328,11 @@ export interface CodeGraph {
   filesByExt: Record<string, number>;
   /** Per-plugin breakdown for stats and "fallback in use" indicators. */
   byPlugin: Record<string, PluginStats>;
+  /** Class / interface definitions across all files (v0.70+).
+   *  Optional so legacy snapshots without class extraction render
+   *  unchanged; the Architecture tab shows an empty-state when
+   *  this field is missing or empty. */
+  classes?: ClassDef[];
   /** Truncation reason if any cap was hit. */
   truncated?: string;
   generatedAt: string;

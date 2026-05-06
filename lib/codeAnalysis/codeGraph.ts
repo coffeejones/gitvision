@@ -11,9 +11,11 @@
 
 import type {
   CallEdge,
+  ClassDef,
   CodeGraph,
   FunctionDef,
   ImportEdge,
+  ParsedClass,
   ParsedFile,
   PluginStats,
 } from "./types";
@@ -136,6 +138,67 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
     byPlugin[pluginName] = stats;
   }
 
+  // 5. Aggregate ParsedClass entries from each file into the
+  //    cross-file ClassDef list. Method names get resolved against
+  //    the global functions array so consumers (Architecture-tab
+  //    Mermaid generator) can read FunctionDef-level metadata
+  //    (complexity, blast-radius targets) without re-walking
+  //    cg.functions. v0.70+.
+  //
+  //    Disambiguation pass: many React/TS codebases declare the
+  //    same name (Props, State, Config, Options) in dozens of
+  //    files. Mermaid's classDiagram syntax silently merges
+  //    same-named entities, producing FALSE diagrams (fields
+  //    from N components show up under one Props box). To prevent
+  //    that, we count occurrences of each name across all files
+  //    and append a filename-derived suffix to every duplicate.
+  //    Single-occurrence names (WorkspaceSummary, AnalysisSnapshot)
+  //    keep their original name.
+  const rawClasses: { pc: ParsedClass; filePath: string }[] = [];
+  const nameCounts = new Map<string, number>();
+  for (const f of parsedFiles) {
+    if (!f.classes) continue;
+    for (const pc of f.classes) {
+      rawClasses.push({ pc, filePath: f.rel });
+      nameCounts.set(pc.name, (nameCounts.get(pc.name) ?? 0) + 1);
+    }
+  }
+
+  const classes: ClassDef[] = [];
+  for (const { pc, filePath } of rawClasses) {
+    // If this name appears more than once across the codebase,
+    // suffix with the file basename (no extension) so each entity
+    // is uniquely addressable. Same-name within the same file
+    // can't happen (one declaration per name in any sane source).
+    const uniqueName =
+      (nameCounts.get(pc.name) ?? 0) > 1
+        ? `${pc.name}_${basenameNoExt(filePath)}`
+        : pc.name;
+    // Match methods by (containerType=originalName) + name in the
+    // same file. We use the ORIGINAL name (pc.name), not the
+    // disambiguated one — FunctionDef.containerType was set during
+    // parsing and doesn't know about the suffix.
+    const methods: FunctionDef[] = [];
+    for (const fn of functions) {
+      if (fn.filePath !== filePath) continue;
+      if (fn.containerType !== pc.name) continue;
+      if (!pc.methodNames.includes(fn.name)) continue;
+      methods.push(fn);
+    }
+    classes.push({
+      name: uniqueName,
+      filePath,
+      startRow: pc.startRow,
+      endRow: pc.endRow,
+      fields: pc.fields,
+      methods,
+      parentClass: pc.parentClass,
+      implements: pc.implements,
+      isInterface: pc.isInterface,
+      isAbstract: pc.isAbstract,
+    });
+  }
+
   return {
     functions,
     calls,
@@ -143,9 +206,23 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
     fileComplexity,
     filesByExt,
     byPlugin,
+    classes: classes.length > 0 ? classes : undefined,
     truncated,
     generatedAt: new Date().toISOString(),
   };
+}
+
+/** Strip directory + extension from a posix-style file path so we
+ *  get a stable suffix for class-name disambiguation. Handles the
+ *  common cases (`components/HeadlineFinding.tsx` →
+ *  "HeadlineFinding") plus dot-prefixed files (.eslintrc.json) and
+ *  multi-dot names (foo.test.ts → "foo.test"). */
+function basenameNoExt(filePath: string): string {
+  const slashIdx = filePath.lastIndexOf("/");
+  const base = slashIdx >= 0 ? filePath.slice(slashIdx + 1) : filePath;
+  const dotIdx = base.lastIndexOf(".");
+  if (dotIdx <= 0) return base; // no extension OR dot-prefixed file
+  return base.slice(0, dotIdx);
 }
 
 /** Pick the best target for a call given the candidate function definitions
