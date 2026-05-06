@@ -58,6 +58,7 @@ import { computeTestCoverage } from "@/lib/codeAnalysis/testCoverage";
 import { rankFunctionsByBlast } from "@/lib/codeAnalysis/blastRanking";
 import { pickHeadline } from "@/lib/intelligence/headline";
 import {
+  computeHealthTrend,
   diffHealthSummaries,
   summarizeHealth,
 } from "@/lib/intelligence/healthSummary";
@@ -163,6 +164,15 @@ export default async function OverviewPage({
     ? diffHealthSummaries(previous, current)
     : undefined;
 
+  // v0.68: trend across last N snapshots for inline sparklines on
+  // each HealthSummary tile. Only computed when the session has
+  // 3+ snapshots — under that, the delta arrows already cover the
+  // current-vs-previous case more clearly.
+  const healthTrend =
+    session.snapshots.length >= 3
+      ? computeHealthTrend(session.snapshots)
+      : undefined;
+
   // v0.67: per-function / per-file structural diff. Computed only
   // when there's a previous snapshot AND there's actual content to
   // show — small refreshes that touched no code don't need a panel.
@@ -263,14 +273,15 @@ export default async function OverviewPage({
          *  in lib/intelligence/headline.ts. */}
         <HeadlineFinding headline={headline} sessionId={session.id} />
 
-        {/* Health at a glance (v0.59 + v0.62 deltas) — six traffic-light
-         *  tiles, with optional change indicators per tile when there's
-         *  a previous snapshot to diff against. Hides itself when
-         *  every dimension is "unknown" (brand-new snapshot pre-refresh). */}
+        {/* Health at a glance (v0.59 + v0.62 deltas + v0.68 trend) —
+         *  six traffic-light tiles. Optional delta arrows when there's
+         *  a previous snapshot. Optional inline sparkline when session
+         *  has 3+ snapshots (power-user direction-of-travel signal). */}
         <HealthSummary
           summaries={healthSummaries}
           sessionId={session.id}
           deltas={healthDeltas}
+          trend={healthTrend}
         />
 
         {/* Possible secrets (v0.61) — regex-pass findings. Hides itself

@@ -286,6 +286,58 @@ export function diffHealthSummaries(
   });
 }
 
+// ---------------- Multi-snapshot trend (v0.68 / C3) ----------------
+
+/** Default number of snapshots to include in a trend series. Chosen
+ *  to fit a small inline sparkline (~5 dots) without overwhelming the
+ *  tile. Older snapshots get dropped from the head; if a session has
+ *  fewer than this, we just return what's there. */
+export const DEFAULT_TREND_WINDOW = 5;
+
+/** Per-dimension trend data: the chronological-order series of
+ *  statuses for a single dimension across recent snapshots. The
+ *  array is oldest-first so renderers can map index → x-position
+ *  directly. Length is bounded by the window size (default 5). */
+export type DimensionTrend = Map<DimensionId, DimensionStatus[]>;
+
+/** Compute a per-dimension trend across a sequence of snapshots.
+ *  Returns a Map keyed by DimensionId, value = array of statuses in
+ *  chronological order (oldest first). Designed for inline sparkline
+ *  rendering on the Overview's HealthSummary tiles when a session
+ *  has 3+ snapshots — fewer than that, the trend isn't really a
+ *  trend, it's just a current-vs-previous comparison (we already
+ *  have diffHealthSummaries for that case).
+ *
+ *  Window: takes the last N snapshots (default 5). Older history
+ *  is summarized by the structural-diff panel; a sparkline is for
+ *  the recent direction-of-travel. */
+export function computeHealthTrend(
+  snapshots: AnalysisSnapshot[],
+  window: number = DEFAULT_TREND_WINDOW
+): DimensionTrend {
+  const slice = snapshots.slice(-window);
+  const summariesPerSnapshot = slice.map((s) => summarizeHealth(s));
+
+  const trend: DimensionTrend = new Map();
+  // Use the first summary's dimension list as canonical ordering —
+  // summarizeHealth always returns the same six dimensions in the
+  // same order, so any snapshot's projection works.
+  if (summariesPerSnapshot.length === 0) return trend;
+  for (const dim of summariesPerSnapshot[0]) {
+    const series: DimensionStatus[] = summariesPerSnapshot.map(
+      (snapshotSummaries) => {
+        const match = snapshotSummaries.find((d) => d.id === dim.id);
+        // summarizeHealth always returns all 6 dimensions, but be
+        // defensive — a future schema change can't quietly break
+        // sparkline rendering.
+        return match?.status ?? "unknown";
+      }
+    );
+    trend.set(dim.id, series);
+  }
+  return trend;
+}
+
 /** Pure function: snapshot → 6 dimension summaries in fixed order. The
  *  fixed order matters for visual stability across snapshots — tiles
  *  shouldn't shuffle when severity changes. */

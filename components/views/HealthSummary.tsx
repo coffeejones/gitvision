@@ -23,8 +23,10 @@ import {
 } from "lucide-react";
 import type {
   DimensionDelta,
+  DimensionId,
   DimensionStatus,
   DimensionSummary,
+  DimensionTrend,
 } from "@/lib/intelligence/healthSummary";
 import { STYLE, TOK } from "@/lib/theme";
 
@@ -98,9 +100,21 @@ interface Props {
    *  TrendingUp/TrendingDown icon next to the status label. Pass
    *  undefined when there's no previous snapshot. */
   deltas?: DimensionDelta[];
+  /** Optional per-dimension trend (last N statuses, oldest-first)
+   *  from v0.68 / C3. When present, tiles render a tiny inline
+   *  sparkline so power-users see direction-of-travel at a glance.
+   *  Pass undefined when the session has fewer than 3 snapshots —
+   *  the structural-diff panel + delta arrows already cover the
+   *  current-vs-previous case. */
+  trend?: DimensionTrend;
 }
 
-export function HealthSummary({ summaries, sessionId, deltas }: Props) {
+export function HealthSummary({
+  summaries,
+  sessionId,
+  deltas,
+  trend,
+}: Props) {
   // Hide entirely if every dimension is unknown. Means we have no data to
   // talk about — quick-look-cards already say "refresh to populate".
   if (summaries.every((d) => d.status === "unknown")) return null;
@@ -140,6 +154,7 @@ export function HealthSummary({ summaries, sessionId, deltas }: Props) {
             summary={s}
             insightsBase={insightsHref}
             delta={deltaById.get(s.id)}
+            trendSeries={trend?.get(s.id)}
           />
         ))}
       </div>
@@ -179,6 +194,7 @@ function HealthTile({
   summary,
   insightsBase,
   delta,
+  trendSeries,
 }: {
   summary: DimensionSummary;
   /** Base /session/{id}/insights path — the tile appends the relevant
@@ -189,6 +205,10 @@ function HealthTile({
    *  TrendingUp (green) or TrendingDown (rose) icon next to the
    *  status label when the dimension actually changed. */
   delta?: DimensionDelta;
+  /** Optional last-N-snapshots status sequence (oldest-first). When
+   *  provided AND length >= 3, renders an inline sparkline at the
+   *  bottom of the tile so power-users see direction-of-travel. */
+  trendSeries?: DimensionStatus[];
 }) {
   const style = STATUS_STYLES[summary.status];
   const { Icon } = style;
@@ -226,6 +246,11 @@ function HealthTile({
     );
   })();
 
+  // Sparkline only renders when we have a meaningful trend (3+ data
+  // points). 1-2 data points = no real direction, that signal is
+  // already covered by the delta arrow.
+  const showSparkline = trendSeries && trendSeries.length >= 3;
+
   const Body = (
     <>
       <div className="flex items-center gap-1.5">
@@ -251,6 +276,9 @@ function HealthTile({
       >
         {detailText}
       </div>
+      {showSparkline && trendSeries && (
+        <TrendSparkline series={trendSeries} dimensionId={summary.id} />
+      )}
     </>
   );
 
@@ -280,6 +308,59 @@ function HealthTile({
   return (
     <div className={className} style={inlineStyle}>
       {Body}
+    </div>
+  );
+}
+
+/** Inline sparkline rendering a status sequence (oldest-first) as a
+ *  horizontal row of dots, color-coded by status. Compact enough to
+ *  sit inside a HealthSummary tile without competing with the
+ *  primary content; tooltip explains the data behind the dots.
+ *
+ *  Visual choice: dots > line chart because status is a discrete
+ *  enum (5 values), not a continuous metric. A line implies
+ *  interpolation between healthy ↔ critical that doesn't exist. */
+function TrendSparkline({
+  series,
+  dimensionId,
+}: {
+  series: DimensionStatus[];
+  dimensionId: DimensionId;
+}) {
+  const colorOf = (s: DimensionStatus): string => {
+    switch (s) {
+      case "critical":
+        return TOK.rose;
+      case "warning":
+        return TOK.amber;
+      case "healthy":
+        return TOK.accent;
+      case "solo":
+        return TOK.textSecondary;
+      case "unknown":
+        return TOK.textMuted;
+    }
+  };
+  const tooltip = `Trend across last ${series.length} snapshots: ${series.join(" → ")}`;
+  return (
+    <div
+      className="flex items-center gap-1 pt-1.5"
+      title={tooltip}
+      aria-label={`${dimensionId} trend: ${series.join(", ")}`}
+    >
+      {series.map((status, i) => (
+        <span
+          key={i}
+          className="rounded-full inline-block"
+          style={{
+            background: colorOf(status),
+            // Last dot slightly larger so the eye lands on "now"
+            width: i === series.length - 1 ? 6 : 4,
+            height: i === series.length - 1 ? 6 : 4,
+            opacity: i === series.length - 1 ? 1 : 0.55,
+          }}
+        />
+      ))}
     </div>
   );
 }
