@@ -74,7 +74,11 @@ export function SecretFindingsPanel({ result }: Props) {
   if (result.findings.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-3">
+    <section
+      id="secrets"
+      className="flex flex-col gap-3"
+      style={{ scrollMarginTop: "5rem" }}
+    >
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className={STYLE.eyebrow} style={{ color: TOK.textMuted }}>

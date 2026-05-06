@@ -157,7 +157,7 @@ describe("pickHeadline · secret-leak override", () => {
     expect(headline.severity).toBe("critical");
     expect(headline.primary).toContain("AWS Access Key");
     expect(headline.detail).toContain("AKIAQ4...7890");
-    expect(headline.ctaLink).toBe("?focus=secrets");
+    expect(headline.ctaLink).toBe("#secrets");
   });
 
   it("trumps every other rule (incl. critical-duplicates)", () => {

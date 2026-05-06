@@ -86,8 +86,15 @@ interface Props {
 export function HeadlineFinding({ headline, sessionId }: Props) {
   const style = pickSeverityStyle(headline);
   const { Icon } = style;
+  // Fragment-only ctaLinks (like "#secrets") stay on the current page
+  // and scroll to a panel anchor; everything else builds a nested
+  // tab URL. Without this branch, "#secrets" would resolve to
+  // "/session/{id}/#secrets" which is fine technically but skips the
+  // smart-scroll behavior of same-page hash navigation in App Router.
   const href = headline.ctaLink
-    ? `/session/${sessionId}/${headline.ctaLink}`
+    ? headline.ctaLink.startsWith("#")
+      ? headline.ctaLink
+      : `/session/${sessionId}/${headline.ctaLink}`
     : null;
 
   // The whole card becomes a hover-highlighted Link when there's a CTA.

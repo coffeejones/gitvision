@@ -125,7 +125,10 @@ export function pickHeadline(snap: AnalysisSnapshot): Headline {
         severity: "critical",
         primary: `${seriousFindings.length} possible ${word} detected — top match: ${top.patternLabel}`,
         detail: `${top.filePath}:${top.line} (${top.preview}). Rotate the credential and purge it from git history. Low-confidence test fixtures already filtered out.`,
-        ctaLink: "?focus=secrets",
+        // Fragment anchor — SecretFindingsPanel renders an id="secrets"
+        // wrapper on the Overview so this scrolls into view. We don't
+        // route to a separate page; the panel lives below the headline.
+        ctaLink: "#secrets",
         ctaLabel: "View possible secrets",
       };
     }

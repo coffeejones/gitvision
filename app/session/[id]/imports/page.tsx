@@ -20,19 +20,26 @@ export default async function ImportsPage({
   return (
     <main className="px-8 py-8 flex flex-col gap-4">
       <div id="screenshot-target" className="flex flex-col gap-4">
-        {current.fileGraph ? (
+        {current.fileGraph && current.fileGraph.nodes.length > 0 ? (
           <DependencyCanvas graph={current.fileGraph} />
         ) : (
           <div
-            className="rounded-xl border border-dashed p-10 text-center text-sm"
+            className="rounded-xl border border-dashed p-10 text-center text-sm flex flex-col items-center gap-2"
             style={{
               borderColor: TOK.border,
               color: TOK.textMuted,
             }}
           >
-            This snapshot was created before the dependency graph feature
-            landed. Click <strong>Refresh</strong> in the topbar to build
-            one.
+            <div style={{ color: TOK.textSecondary }}>
+              No file-to-file imports detected for this snapshot.
+            </div>
+            <div className="text-[11px] max-w-xl">
+              GitVision builds the import graph for JS/TS, Python, Go, Java,
+              C#, PHP, and Ruby. Tiny repos, single-file projects, or
+              snapshots created before the import-graph feature shipped will
+              land here. Click <strong>Refresh</strong> in the topbar to
+              regenerate.
+            </div>
           </div>
         )}
         <p className="text-xs" style={{ color: TOK.textMuted }}>
