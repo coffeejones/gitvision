@@ -1,16 +1,27 @@
-// Session cache for the GitVision MCP server (v0.64 / C1.1).
+// Session cache for the GitVision MCP server (v0.64 / C1.1, on-disk
+// layer added in v0.65 / C1.2).
 //
-// AI agents call repeatedly: analyze_repo → blast_radius → find_duplicates
-// → blast_radius (different fn) → ... all on the same repo. We cache the
-// AnalysisSnapshot in-memory keyed by a stable sessionId (a 12-char hash
-// of the repo URL) so subsequent tool calls don't re-download + re-parse.
+// AI agents call repeatedly: analyze_repo → blast_radius →
+// find_duplicates → blast_radius (different fn) → ... all on the
+// same repo. We cache the AnalysisSnapshot keyed by a stable
+// sessionId (12-char SHA-1 of the repo URL) so subsequent tool
+// calls don't re-download + re-parse.
 //
-// C1.1 ships in-memory only — TTL 10 min, capped at 8 entries. C1.2 will
-// add an on-disk layer at ~/.gitvision/cache/{sessionId}.json so the
-// cache survives process restarts (Claude Code stops + starts the MCP
-// server frequently during dev sessions).
+// Two-layer cache:
+//   1. In-memory Map (hot path). 10-min TTL, 8-entry FIFO.
+//   2. On-disk JSON at ~/.gitvision/cache/{sessionId}.json (warm
+//      path). 24-hour TTL — survives MCP server restarts that
+//      Claude Code does multiple times per dev session.
+//
+// Reads check in-memory first; on miss, fall back to disk. Writes
+// fan out to both. On-disk eviction is lazy (read-time TTL check;
+// expired files are deleted as a side effect). Disk failures never
+// crash the lookup — we log and degrade to in-memory-only.
 
 import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
 import type { AnalysisSnapshot } from "../lib/types";
 
 interface CacheEntry {
@@ -19,8 +30,11 @@ interface CacheEntry {
   expiresAt: number;
 }
 
-const TTL_MS = 10 * 60 * 1000; // 10 minutes
-const MAX_ENTRIES = 8;
+const MEMORY_TTL_MS = 10 * 60 * 1000; // 10 min — refresh-window for active agent flows
+const DISK_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours — survives restarts
+const MAX_MEMORY_ENTRIES = 8;
+
+const CACHE_DIR = path.join(homedir(), ".gitvision", "cache");
 
 /** sessionId from repoUrl: stable, opaque, doesn't leak the URL into
  *  the wire format. 12 chars of SHA-1 in hex is plenty unique for the
@@ -29,38 +43,137 @@ export function sessionIdFor(repoUrl: string): string {
   return createHash("sha1").update(repoUrl).digest("hex").slice(0, 12);
 }
 
-const cache = new Map<string, CacheEntry>();
+const memoryCache = new Map<string, CacheEntry>();
 
-/** Get a cached snapshot. Returns undefined when missing OR expired
- *  (the expired entry is evicted as a side-effect). */
-export function getCached(sessionId: string): AnalysisSnapshot | undefined {
-  const entry = cache.get(sessionId);
+// ---------------- Memory layer ----------------
+
+function getFromMemory(sessionId: string): AnalysisSnapshot | undefined {
+  const entry = memoryCache.get(sessionId);
   if (!entry) return undefined;
   if (Date.now() > entry.expiresAt) {
-    cache.delete(sessionId);
+    memoryCache.delete(sessionId);
     return undefined;
   }
   return entry.snapshot;
 }
 
-/** Store a snapshot under the given sessionId. Evicts the oldest entry
- *  when we hit MAX_ENTRIES — simple FIFO since AI agents tend to work
- *  on one or two repos at a time. */
-export function setCached(sessionId: string, snapshot: AnalysisSnapshot): void {
-  if (cache.size >= MAX_ENTRIES) {
-    const oldestKey = cache.keys().next().value;
-    if (oldestKey) cache.delete(oldestKey);
+function setInMemory(sessionId: string, snapshot: AnalysisSnapshot): void {
+  if (memoryCache.size >= MAX_MEMORY_ENTRIES) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (oldestKey) memoryCache.delete(oldestKey);
   }
-  cache.set(sessionId, { snapshot, expiresAt: Date.now() + TTL_MS });
+  memoryCache.set(sessionId, {
+    snapshot,
+    expiresAt: Date.now() + MEMORY_TTL_MS,
+  });
+}
+
+// ---------------- Disk layer ----------------
+
+interface DiskEntry {
+  snapshot: AnalysisSnapshot;
+  cachedAt: string; // ISO timestamp
+}
+
+function diskPathFor(sessionId: string): string {
+  return path.join(CACHE_DIR, `${sessionId}.json`);
+}
+
+async function ensureCacheDir(): Promise<void> {
+  await fs.mkdir(CACHE_DIR, { recursive: true });
+}
+
+async function getFromDisk(
+  sessionId: string
+): Promise<AnalysisSnapshot | undefined> {
+  const filePath = diskPathFor(sessionId);
+  let raw: string;
+  try {
+    raw = await fs.readFile(filePath, "utf-8");
+  } catch {
+    return undefined; // missing file = cache miss (normal)
+  }
+  let entry: DiskEntry;
+  try {
+    entry = JSON.parse(raw);
+  } catch (err) {
+    console.error(
+      `gitvision-mcp: corrupt cache file ${filePath}, evicting:`,
+      err instanceof Error ? err.message : err
+    );
+    await fs.unlink(filePath).catch(() => {});
+    return undefined;
+  }
+  const cachedAtMs = new Date(entry.cachedAt).getTime();
+  if (Date.now() - cachedAtMs > DISK_TTL_MS) {
+    // Expired — delete and miss
+    await fs.unlink(filePath).catch(() => {});
+    return undefined;
+  }
+  return entry.snapshot;
+}
+
+async function setOnDisk(
+  sessionId: string,
+  snapshot: AnalysisSnapshot
+): Promise<void> {
+  try {
+    await ensureCacheDir();
+    const entry: DiskEntry = {
+      snapshot,
+      cachedAt: new Date().toISOString(),
+    };
+    await fs.writeFile(
+      diskPathFor(sessionId),
+      JSON.stringify(entry),
+      "utf-8"
+    );
+  } catch (err) {
+    // Disk failures degrade to memory-only — never block the tool call.
+    console.error(
+      `gitvision-mcp: failed to write disk cache for ${sessionId}:`,
+      err instanceof Error ? err.message : err
+    );
+  }
+}
+
+// ---------------- Public API ----------------
+
+/** Get a cached snapshot. Checks memory first, then disk. On a disk
+ *  hit, hydrate the memory layer so subsequent calls in the same
+ *  process are O(1). */
+export async function getCached(
+  sessionId: string
+): Promise<AnalysisSnapshot | undefined> {
+  const memHit = getFromMemory(sessionId);
+  if (memHit) return memHit;
+
+  const diskHit = await getFromDisk(sessionId);
+  if (diskHit) {
+    // Promote to memory so future calls in this process skip the disk.
+    setInMemory(sessionId, diskHit);
+    return diskHit;
+  }
+  return undefined;
+}
+
+/** Store a snapshot in both layers. Disk write is fire-and-forget
+ *  if it fails — the tool call has already returned by then. */
+export async function setCached(
+  sessionId: string,
+  snapshot: AnalysisSnapshot
+): Promise<void> {
+  setInMemory(sessionId, snapshot);
+  await setOnDisk(sessionId, snapshot);
 }
 
 /** Convenience: combined "did we already analyze this URL recently?"
- *  lookup. Returns the snapshot if present, undefined if we need to
- *  download + parse fresh. */
-export function lookup(repoUrl: string): {
+ *  lookup. Returns the sessionId either way; snapshot is undefined
+ *  on miss. */
+export async function lookup(repoUrl: string): Promise<{
   sessionId: string;
   snapshot: AnalysisSnapshot | undefined;
-} {
+}> {
   const sessionId = sessionIdFor(repoUrl);
-  return { sessionId, snapshot: getCached(sessionId) };
+  return { sessionId, snapshot: await getCached(sessionId) };
 }

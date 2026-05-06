@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// GitVision MCP server (v0.64 / C1.1).
+// GitVision MCP server (v0.64 / C1.1, expanded v0.65 / C1.2).
 //
 // Exposes the GitVision analysis pipeline as Model Context Protocol
 // tools so AI coding agents (Claude Code, Cursor, Cline, etc.) can
@@ -11,14 +11,20 @@
 //   $ npm install -g gitvision-mcp
 //   $ claude mcp add gitvision npx gitvision-mcp
 //
-// The server runs as a child process of the MCP client. State is
-// in-memory only in C1.1 — sessions live for 10 minutes after the
-// last analyze_repo call. C1.2 will add an on-disk cache layer at
-// ~/.gitvision/cache so sessions survive restarts.
+// The server runs as a child process of the MCP client. Sessions are
+// cached in-memory (10-min TTL, 8 entries) AND on-disk at
+// ~/.gitvision/cache/ (24h TTL) so they survive the frequent restarts
+// MCP clients perform during dev sessions.
 //
-// C1.1 ships two tools (analyze_repo + blast_radius). C1.2 adds three
-// more (find_duplicates, untested_hotspots, signals). Each tool is
-// implemented in mcp/tools/<name>.ts; this file is just the wiring.
+// Five tools as of C1.2:
+//   analyze_repo        Entry point — every other tool needs sessionId
+//   blast_radius        File or function-level reach
+//   find_duplicates     Structurally identical functions (refactor signal)
+//   untested_hotspots   Production fns with no test caller
+//   signals             Full 17-signal health verdict + dimension rollup
+//
+// Each tool is implemented in mcp/tools/<name>.ts; this file is just
+// the wiring.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -30,8 +36,20 @@ import {
   blastRadiusInputSchema,
   handleBlastRadius,
 } from "./tools/blastRadius.js";
+import {
+  findDuplicatesInputSchema,
+  handleFindDuplicates,
+} from "./tools/findDuplicates.js";
+import {
+  untestedHotspotsInputSchema,
+  handleUntestedHotspots,
+} from "./tools/untestedHotspots.js";
+import {
+  signalsInputSchema,
+  handleSignals,
+} from "./tools/signals.js";
 
-const SERVER_VERSION = "0.64.0";
+const SERVER_VERSION = "0.65.0";
 
 const server = new McpServer({
   name: "gitvision",
@@ -56,6 +74,36 @@ server.registerTool(
     inputSchema: blastRadiusInputSchema,
   },
   handleBlastRadius
+);
+
+server.registerTool(
+  "find_duplicates",
+  {
+    description:
+      "Find structurally identical functions across the codebase via FNV-1a AST hashes. Surfaces refactor candidates: when the same function body appears in multiple files (modulo identifier renaming), there's usually a missing helper. Skip-trivial defaults filter out one-line getters and similar noise.",
+    inputSchema: findDuplicatesInputSchema,
+  },
+  handleFindDuplicates
+);
+
+server.registerTool(
+  "untested_hotspots",
+  {
+    description:
+      "List production functions with no direct test caller, ranked by complexity. Computed via call-graph walk from test files into prod files — direct calls only, no transitive coverage. Returns the hotspot list plus repo-wide coverage totals so an agent can reason about both individual cases and overall test debt in one call.",
+    inputSchema: untestedHotspotsInputSchema,
+  },
+  handleUntestedHotspots
+);
+
+server.registerTool(
+  "signals",
+  {
+    description:
+      "Full 17-signal health verdict — what works, what needs work, what's worth a human eye. Returns both raw signals (with severity, evidence, IDs) and a 6-dimension rollup (Activity, Team, Code, PR flow, Dependencies, Hygiene) so agents can quote specific findings or summarize at a high level. Pure rule-based, no AI involved.",
+    inputSchema: signalsInputSchema,
+  },
+  handleSignals
 );
 
 async function main() {

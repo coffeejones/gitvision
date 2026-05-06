@@ -55,10 +55,10 @@ const InputSchema = z.object(blastRadiusInputSchema);
 type Input = z.infer<typeof InputSchema>;
 
 export async function handleBlastRadius(input: Input) {
-  const snapshot = getCached(input.sessionId);
+  const snapshot = await getCached(input.sessionId);
   if (!snapshot) {
     return errorResult(
-      `Session '${input.sessionId}' not found or expired (10-min TTL). Call analyze_repo again with the same repoUrl to refresh.`
+      `Session '${input.sessionId}' not found or expired. Call analyze_repo again with the same repoUrl to refresh.`
     );
   }
   if (!snapshot.codeGraph) {

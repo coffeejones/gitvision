@@ -57,7 +57,7 @@ export async function handleAnalyzeRepo(input: Input) {
     );
   }
 
-  setCached(sessionId, snapshot);
+  await setCached(sessionId, snapshot);
 
   // Build a compact summary — agents want signal density, not the full
   // ~MB AnalysisSnapshot dumped into their context window. Pull the
