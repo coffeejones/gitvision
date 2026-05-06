@@ -54,7 +54,10 @@ import { findDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
 import { computeTestCoverage } from "@/lib/codeAnalysis/testCoverage";
 import { rankFunctionsByBlast } from "@/lib/codeAnalysis/blastRanking";
 import { pickHeadline } from "@/lib/intelligence/headline";
-import { summarizeHealth } from "@/lib/intelligence/healthSummary";
+import {
+  diffHealthSummaries,
+  summarizeHealth,
+} from "@/lib/intelligence/healthSummary";
 import { STYLE, TOK } from "@/lib/theme";
 import { StatGrid } from "@/components/views/StatGrid";
 import { SinceLastVisit } from "@/components/views/SinceLastVisit";
@@ -144,6 +147,14 @@ export default async function OverviewPage({
   // signal layer — no new compute. Six dimensions, one tile each.
   const healthSummaries = summarizeHealth(current);
 
+  // v0.62: per-dimension diff vs. previous snapshot. Drives the
+  // tiny TrendingUp/Down indicators on each tile so refresh-visitors
+  // see "Code went from healthy → critical since last visit" at a
+  // glance. Skipped on first-snapshot sessions.
+  const healthDeltas = previous
+    ? diffHealthSummaries(previous, current)
+    : undefined;
+
   const base = `/session/${session.id}`;
 
   return (
@@ -227,10 +238,15 @@ export default async function OverviewPage({
          *  in lib/intelligence/headline.ts. */}
         <HeadlineFinding headline={headline} sessionId={session.id} />
 
-        {/* Health at a glance (v0.59) — six traffic-light tiles. Hides
-         *  itself when every dimension is "unknown" (e.g. a brand-new
-         *  snapshot before the first refresh). */}
-        <HealthSummary summaries={healthSummaries} sessionId={session.id} />
+        {/* Health at a glance (v0.59 + v0.62 deltas) — six traffic-light
+         *  tiles, with optional change indicators per tile when there's
+         *  a previous snapshot to diff against. Hides itself when
+         *  every dimension is "unknown" (brand-new snapshot pre-refresh). */}
+        <HealthSummary
+          summaries={healthSummaries}
+          sessionId={session.id}
+          deltas={healthDeltas}
+        />
 
         {/* Possible secrets (v0.61) — regex-pass findings. Hides itself
          *  when the snapshot has no findings (cleanest case) or no

@@ -212,6 +212,80 @@ function pickStatus(
   return { status: "unknown", statusLabel: STATUS_WORDS.unknown };
 }
 
+// ---------------- Cross-snapshot diff (v0.62 / B5) ----------------
+
+/** Direction of a per-dimension status change between two snapshots.
+ *  unchanged = same status, OR a status switch that doesn't cross
+ *  the "ok" boundary (e.g. healthy ↔ solo are both fine). */
+export type DimensionChange = "improved" | "regressed" | "unchanged";
+
+export interface DimensionDelta {
+  id: DimensionId;
+  fromStatus: DimensionStatus;
+  toStatus: DimensionStatus;
+  change: DimensionChange;
+}
+
+/** Severity rank for change-classification. healthy and solo share
+ *  rank 0 because both are "ok" — a transition between them isn't a
+ *  real improvement or regression, just a labeling change. unknown
+ *  sits at 1 (data gap, not a problem). warning + critical climb.
+ *
+ *  improved: rank goes DOWN (toward healthy)
+ *  regressed: rank goes UP (toward critical)
+ *  unchanged: same rank (or healthy ↔ solo) */
+const STATUS_RANK: Record<DimensionStatus, number> = {
+  healthy: 0,
+  solo: 0,
+  unknown: 1,
+  warning: 2,
+  critical: 3,
+};
+
+function classifyChange(
+  from: DimensionStatus,
+  to: DimensionStatus
+): DimensionChange {
+  const fromRank = STATUS_RANK[from];
+  const toRank = STATUS_RANK[to];
+  if (toRank < fromRank) return "improved";
+  if (toRank > fromRank) return "regressed";
+  return "unchanged";
+}
+
+/** Compare two snapshots dimension-by-dimension. Returns one delta
+ *  per dimension in the canonical order, so the caller can match
+ *  outputs to summarizeHealth() positionally. Useful for surfacing
+ *  "X changed since last visit" without having to call both
+ *  summarizeHealth functions individually. */
+export function diffHealthSummaries(
+  prev: AnalysisSnapshot,
+  curr: AnalysisSnapshot
+): DimensionDelta[] {
+  const prevSummaries = summarizeHealth(prev);
+  const currSummaries = summarizeHealth(curr);
+  return prevSummaries.map((p) => {
+    const c = currSummaries.find((cs) => cs.id === p.id);
+    if (!c) {
+      // Shouldn't happen — both calls produce the same fixed-order
+      // dimension list. Defensive fallback so a future signal-list
+      // change can't crash the diff.
+      return {
+        id: p.id,
+        fromStatus: p.status,
+        toStatus: p.status,
+        change: "unchanged",
+      };
+    }
+    return {
+      id: p.id,
+      fromStatus: p.status,
+      toStatus: c.status,
+      change: classifyChange(p.status, c.status),
+    };
+  });
+}
+
 /** Pure function: snapshot → 6 dimension summaries in fixed order. The
  *  fixed order matters for visual stability across snapshots — tiles
  *  shouldn't shuffle when severity changes. */

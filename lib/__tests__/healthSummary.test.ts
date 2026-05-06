@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  diffHealthSummaries,
   summarizeHealth,
   type DimensionId,
   type DimensionStatus,
@@ -451,5 +452,163 @@ describe("summarizeHealth · precedence", () => {
       })
     );
     expectStatus(summaries, "team", "critical");
+  });
+});
+
+// ---------------- Cross-snapshot diff (v0.62 / B5) ----------------
+
+describe("diffHealthSummaries · status transitions", () => {
+  /** Helper: build a snapshot whose deps dimension lands at the
+   *  given status by toggling vulnerable / outdated / fresh shapes.
+   *  Other dimensions stay at unknown unless overridden. */
+  function depSnapForStatus(
+    status: "critical" | "warning" | "healthy" | "unknown"
+  ): AnalysisSnapshot {
+    if (status === "critical") {
+      return snap({
+        dependencyHealths: [
+          {
+            ecosystem: "npm",
+            total: 10,
+            outdated: [],
+            vulnerable: [
+              { name: "lodash", current: "4.17.0", cves: ["CVE-1"] },
+            ],
+            deprecated: [],
+            analyzedAt: "2026-05-06T00:00:00Z",
+          },
+        ],
+      });
+    }
+    if (status === "warning") {
+      return snap({
+        dependencyHealths: [
+          {
+            ecosystem: "npm",
+            total: 30,
+            outdated: Array.from({ length: 4 }, (_, i) => ({
+              name: `p${i}`,
+              current: "1.0.0",
+              latest: "2.0.0",
+              ageMonths: 14,
+              lastPublished: "2025-01-01",
+            })),
+            vulnerable: [],
+            deprecated: [],
+            analyzedAt: "2026-05-06T00:00:00Z",
+          },
+        ],
+      });
+    }
+    if (status === "healthy") {
+      return snap({
+        dependencyHealths: [
+          {
+            ecosystem: "npm",
+            total: 20,
+            outdated: [],
+            vulnerable: [],
+            deprecated: [],
+            analyzedAt: "2026-05-06T00:00:00Z",
+          },
+        ],
+      });
+    }
+    return snap();
+  }
+
+  it("flags 'regressed' when status worsens (healthy → critical)", () => {
+    const deltas = diffHealthSummaries(
+      depSnapForStatus("healthy"),
+      depSnapForStatus("critical")
+    );
+    const deps = deltas.find((d) => d.id === "deps")!;
+    expect(deps.change).toBe("regressed");
+    expect(deps.fromStatus).toBe("healthy");
+    expect(deps.toStatus).toBe("critical");
+  });
+
+  it("flags 'improved' when status gets better (critical → healthy)", () => {
+    const deltas = diffHealthSummaries(
+      depSnapForStatus("critical"),
+      depSnapForStatus("healthy")
+    );
+    const deps = deltas.find((d) => d.id === "deps")!;
+    expect(deps.change).toBe("improved");
+    expect(deps.fromStatus).toBe("critical");
+    expect(deps.toStatus).toBe("healthy");
+  });
+
+  it("flags 'improved' when going from warning → healthy", () => {
+    const deltas = diffHealthSummaries(
+      depSnapForStatus("warning"),
+      depSnapForStatus("healthy")
+    );
+    const deps = deltas.find((d) => d.id === "deps")!;
+    expect(deps.change).toBe("improved");
+  });
+
+  it("flags 'regressed' when going from warning → critical", () => {
+    const deltas = diffHealthSummaries(
+      depSnapForStatus("warning"),
+      depSnapForStatus("critical")
+    );
+    const deps = deltas.find((d) => d.id === "deps")!;
+    expect(deps.change).toBe("regressed");
+  });
+
+  it("flags 'unchanged' when status is identical", () => {
+    const deltas = diffHealthSummaries(
+      depSnapForStatus("warning"),
+      depSnapForStatus("warning")
+    );
+    const deps = deltas.find((d) => d.id === "deps")!;
+    expect(deps.change).toBe("unchanged");
+  });
+
+  it("treats unknown → healthy as 'improved' (we have data now)", () => {
+    const deltas = diffHealthSummaries(
+      depSnapForStatus("unknown"),
+      depSnapForStatus("healthy")
+    );
+    const deps = deltas.find((d) => d.id === "deps")!;
+    expect(deps.change).toBe("improved");
+  });
+
+  it("returns one delta per dimension, in the canonical order", () => {
+    const deltas = diffHealthSummaries(snap(), snap());
+    expect(deltas).toHaveLength(6);
+    expect(deltas.map((d) => d.id)).toEqual([
+      "activity",
+      "team",
+      "code",
+      "pr-flow",
+      "deps",
+      "hygiene",
+    ]);
+  });
+
+  it("does not flag healthy ↔ solo as a real change (both are 'ok')", () => {
+    const recent = new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString();
+    // prev: solo project (only solo-project signal, status=solo)
+    const prev = snap({
+      hotspots: [hotspot("src/foo.ts", 10, ["jonas"])],
+      recentCommits: Array.from({ length: 6 }, () =>
+        commit(recent, "jonas")
+      ),
+    });
+    // curr: many contributors (status=healthy)
+    const curr = snap({
+      contributors: Array.from({ length: 25 }, (_, i) => ({
+        login: `dev${i}`,
+        avatarUrl: "",
+        htmlUrl: "",
+        contributions: 100 - i,
+      })),
+    });
+    const deltas = diffHealthSummaries(prev, curr);
+    const team = deltas.find((d) => d.id === "team")!;
+    // healthy and solo both rank 0 — transition reads as unchanged.
+    expect(team.change).toBe("unchanged");
   });
 });

@@ -12,8 +12,17 @@
 // tile drills into the page where the signals (and their evidence) live.
 
 import Link from "next/link";
-import { ArrowRight, AlertCircle, Check, Minus, User } from "lucide-react";
+import {
+  ArrowRight,
+  AlertCircle,
+  Check,
+  Minus,
+  TrendingDown,
+  TrendingUp,
+  User,
+} from "lucide-react";
 import type {
+  DimensionDelta,
   DimensionStatus,
   DimensionSummary,
 } from "@/lib/intelligence/healthSummary";
@@ -84,14 +93,20 @@ interface Props {
   summaries: DimensionSummary[];
   /** Session id — used to build the /session/{id}/insights link. */
   sessionId: string;
+  /** Optional per-dimension diff vs. the previous snapshot (v0.62/B5).
+   *  When present, tiles whose status actually changed render a small
+   *  TrendingUp/TrendingDown icon next to the status label. Pass
+   *  undefined when there's no previous snapshot. */
+  deltas?: DimensionDelta[];
 }
 
-export function HealthSummary({ summaries, sessionId }: Props) {
+export function HealthSummary({ summaries, sessionId, deltas }: Props) {
   // Hide entirely if every dimension is unknown. Means we have no data to
   // talk about — quick-look-cards already say "refresh to populate".
   if (summaries.every((d) => d.status === "unknown")) return null;
 
   const insightsHref = `/session/${sessionId}/insights`;
+  const deltaById = new Map(deltas?.map((d) => [d.id, d]));
 
   return (
     <section className="flex flex-col gap-3">
@@ -120,7 +135,12 @@ export function HealthSummary({ summaries, sessionId }: Props) {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {summaries.map((s) => (
-          <HealthTile key={s.id} summary={s} insightsBase={insightsHref} />
+          <HealthTile
+            key={s.id}
+            summary={s}
+            insightsBase={insightsHref}
+            delta={deltaById.get(s.id)}
+          />
         ))}
       </div>
     </section>
@@ -158,12 +178,17 @@ function fallbackDetail(summary: DimensionSummary): string {
 function HealthTile({
   summary,
   insightsBase,
+  delta,
 }: {
   summary: DimensionSummary;
   /** Base /session/{id}/insights path — the tile appends the relevant
    *  column anchor for its status so the link scrolls into the right
    *  column on the verdict page. */
   insightsBase: string;
+  /** Optional change indicator vs. previous snapshot. Renders a tiny
+   *  TrendingUp (green) or TrendingDown (rose) icon next to the
+   *  status label when the dimension actually changed. */
+  delta?: DimensionDelta;
 }) {
   const style = STATUS_STYLES[summary.status];
   const { Icon } = style;
@@ -177,6 +202,30 @@ function HealthTile({
 
   const detailText = summary.detail ?? fallbackDetail(summary);
 
+  // Change indicator — tiny TrendingUp/Down icon when the dimension's
+  // status changed since the previous snapshot. Color-codes the
+  // direction (improvements green, regressions rose) and the tooltip
+  // spells out the from/to so the icon isn't ambiguous.
+  const changeIcon = (() => {
+    if (!delta || delta.change === "unchanged") return null;
+    const isImproved = delta.change === "improved";
+    const ChangeIcon = isImproved ? TrendingUp : TrendingDown;
+    const color = isImproved ? TOK.accent : TOK.rose;
+    const label = isImproved
+      ? `Improved from ${delta.fromStatus}`
+      : `Regressed from ${delta.fromStatus}`;
+    return (
+      <span
+        className="ml-auto inline-flex items-center"
+        style={{ color }}
+        title={label}
+        aria-label={label}
+      >
+        <ChangeIcon size={12} />
+      </span>
+    );
+  })();
+
   const Body = (
     <>
       <div className="flex items-center gap-1.5">
@@ -187,6 +236,7 @@ function HealthTile({
         >
           {summary.statusLabel}
         </span>
+        {changeIcon}
       </div>
       <div
         className="text-[15px] font-semibold leading-tight"
