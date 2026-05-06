@@ -172,11 +172,11 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
           style={{ borderBottom: `1px solid ${TOK.border}` }}
         >
           <Link
-            href="/workspace"
+            href="/"
             className="text-xs inline-flex items-center gap-1.5 transition hover:underline"
             style={{ color: TOK.textMuted }}
           >
-            ← Workspace
+            ← All sessions
           </Link>
           <button
             onClick={() => setPaletteOpen(true)}

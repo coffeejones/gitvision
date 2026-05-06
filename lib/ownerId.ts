@@ -13,6 +13,31 @@
 
 const STORAGE_KEY = "gv:owner-id";
 
+/** Cookie name used to mirror the owner-id from localStorage so server
+ *  components can read it during SSR. Lets app/page.tsx pick the
+ *  workspace vs marketing layout server-side and avoid the post-
+ *  hydration flash that happens when the decision lives in client
+ *  state only. v0.69+. */
+export const OWNER_ID_COOKIE = "gv_owner_id";
+
+/** Mirror an owner-id into a cookie alongside localStorage. Cookies are
+ *  the only client-state mechanism the Next.js server can read during
+ *  page rendering. We use SameSite=Lax + 1-year max-age so the cookie
+ *  survives across browser sessions. No HttpOnly flag because the
+ *  client also reads it (the cookie is purely a server-side hint, not
+ *  a security boundary). */
+function mirrorOwnerIdToCookie(ownerId: string): void {
+  if (typeof document === "undefined") return;
+  try {
+    const oneYearSec = 60 * 60 * 24 * 365;
+    document.cookie =
+      `${OWNER_ID_COOKIE}=${encodeURIComponent(ownerId)}; ` +
+      `path=/; max-age=${oneYearSec}; SameSite=Lax`;
+  } catch {
+    /* document.cookie can throw in extremely-restricted contexts */
+  }
+}
+
 /** Generate a v4-style UUID without depending on the Web Crypto API
  *  presence (older browsers, test environments). Pattern matches RFC 4122
  *  v4 — random bits with the version + variant nibbles in their fixed
@@ -45,16 +70,24 @@ function generateUuid(): string {
 }
 
 /** Read the stored owner-id, or generate + persist a fresh one if none
- *  exists. Returns null on the server (where localStorage isn't available)
- *  — server-rendered code shouldn't depend on owner-id; the landing page
- *  filters client-side after hydration. */
+ *  exists. Also mirrors the value into a cookie so server components
+ *  can read it during SSR (used by the home route to pick the
+ *  workspace vs marketing layout without a post-hydration flash).
+ *  Returns null on the server (where localStorage isn't available). */
 export function getOrCreateOwnerId(): string | null {
   if (typeof window === "undefined") return null;
   try {
     const existing = window.localStorage.getItem(STORAGE_KEY);
-    if (existing && existing.trim().length > 0) return existing;
+    if (existing && existing.trim().length > 0) {
+      // Re-mirror on every read so legacy users (pre-v0.69, no cookie
+      // yet) populate the cookie on first home-page visit. After that,
+      // SSR has the value and the flash goes away.
+      mirrorOwnerIdToCookie(existing);
+      return existing;
+    }
     const fresh = generateUuid();
     window.localStorage.setItem(STORAGE_KEY, fresh);
+    mirrorOwnerIdToCookie(fresh);
     return fresh;
   } catch {
     // localStorage can throw in private-browsing modes / quota exceeded.

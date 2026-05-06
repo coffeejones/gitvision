@@ -1,17 +1,30 @@
-// Landing page — Linear-lighter direction.
+// Home route — adaptive between marketing landing and power-user
+// workspace dashboard (v0.69 / C3 polish).
 //
-// Section order chosen for the dual-audience problem: this URL serves
-// BOTH first-time visitors (HN/Reddit traffic — need the marketing
-// pitch) and returning users (need their sessions fast). v0.49 puts
-// the sessions list above the "What you'll see" feature grid so
-// returning users don't scroll past 6 marketing cards to find their
-// own work; first-time visitors see an empty-state nudge and read on.
+// Two distinct experiences live behind the same URL:
+//
+//   - First-time visitor (no owned sessions in localStorage) →
+//     MarketingHome: hero + form + demos + feature grid + footer.
+//     The HN/Reddit cold-traffic surface.
+//   - Returning power-user (1+ owned sessions) → WorkspaceHome:
+//     inline analyze-input + ranked dashboard cards. The
+//     "your code dashboard" experience that used to live at
+//     /workspace until v0.68; merging it here removes the routing
+//     friction (Workspace → Analyze new repo bounced to landing
+//     before v0.69).
+//
+// AdaptiveHome (client) does the localStorage check + render
+// switch. Server-side we always compute both data sets — the
+// marketing static content and the workspace summaries — so the
+// switch is instant and either path renders without an additional
+// fetch.
 
 import { listSessions } from "@/lib/storage";
-import { DEMO_OWNER_ID } from "@/lib/ownerId";
-import { STYLE, TOK } from "@/lib/theme";
+import { DEMO_OWNER_ID, filterSessionsByOwner } from "@/lib/ownerId";
+import { getOwnerIdFromCookies } from "@/lib/ownerIdServer";
+import { getWorkspaceSummaries } from "@/lib/intelligence/workspaceSummary";
 import { type DemoRepo } from "@/components/RepoInputForm";
-import { LandingPanel } from "@/components/LandingPanel";
+import { AdaptiveHome } from "@/components/AdaptiveHome";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +40,12 @@ const DEMO_REPOS: DemoRepo[] = [
   { repo: "spring-projects/spring-petclinic", lang: "Java" },
 ];
 
+/** Cap on workspace summaries computed server-side. Each summary
+ *  reads + parses one session JSON, so this bounds TTFB on power-
+ *  users with many sessions. Above the cap, older sessions still
+ *  exist on disk but won't appear in the workspace cards. */
+const WORKSPACE_SUMMARY_CAP = 30;
+
 export default async function Home() {
   const sessions = await listSessions();
 
@@ -35,10 +54,6 @@ export default async function Home() {
   // direct navigation instead of triggering a fresh 20-second
   // analysis. Falls back to the prior pre-fill behaviour when a
   // demo button has no pre-analyzed counterpart on disk.
-  //
-  // Multiple demos for the same repo: take the most-recently
-  // updated. updatedAt is an ISO8601 string, lexicographically
-  // sortable, so a simple .reduce() picks the right one.
   const demoSessions: Record<string, string> = {};
   for (const s of sessions) {
     if (s.ownerId !== DEMO_OWNER_ID) continue;
@@ -46,8 +61,6 @@ export default async function Home() {
     if (!existing) {
       demoSessions[s.repoFullName] = s.id;
     } else {
-      // Prefer the more recently updated one. Look up the older
-      // session's updatedAt; if the new one is newer, replace.
       const olderUpdatedAt =
         sessions.find((x) => x.id === existing)?.updatedAt ?? "";
       if (s.updatedAt > olderUpdatedAt) {
@@ -56,153 +69,36 @@ export default async function Home() {
     }
   }
 
+  // Workspace summaries — projected for the most-recent N sessions.
+  // AdaptiveHome filters this client-side via ownerId before deciding
+  // whether to render WorkspaceHome.
+  const summaryIds = sessions
+    .slice(0, WORKSPACE_SUMMARY_CAP)
+    .map((s) => s.id);
+  const workspaceSummaries = await getWorkspaceSummaries(summaryIds);
+
+  // v0.69: read ownerId from cookie (mirrored from localStorage by
+  // getOrCreateOwnerId on the client) so we can pre-decide the
+  // initial layout server-side. Without this the server always
+  // renders marketing — power-users then get a visible flash on
+  // hydration when the swap to WorkspaceHome happens. With the
+  // cookie present, server picks the right layout up front and
+  // hydration is silent.
+  const ownerIdFromCookie = await getOwnerIdFromCookies();
+  const initialOwnedSessionsExist = ownerIdFromCookie
+    ? filterSessionsByOwner(sessions, ownerIdFromCookie).length > 0
+    : false;
+  const initialLayout: "marketing" | "workspace" =
+    initialOwnedSessionsExist ? "workspace" : "marketing";
+
   return (
-    <main className="max-w-5xl w-full mx-auto px-8 pt-16 pb-20 flex flex-col gap-16">
-      {/* Hero — text only. Form + Try-a-demo + Your-sessions live in
-       *  LandingPanel below so the URL field, demo picker, and saved
-       *  sessions share one client component (lifted value state). */}
-      <section className="flex flex-col gap-7">
-        <div className="flex items-center gap-2">
-          <span
-            className="h-1.5 w-1.5 rounded-full"
-            style={{ background: TOK.accent }}
-          />
-          <span
-            className="text-xs uppercase tracking-[0.18em] font-medium"
-            style={{ color: TOK.textSecondary }}
-          >
-            Alpha · code analysis across 7 languages
-          </span>
-        </div>
-
-        <h1
-          className="text-5xl sm:text-6xl font-semibold tracking-tight leading-[1.05]"
-          style={{ letterSpacing: "-0.03em" }}
-        >
-          Map any GitHub repo.{" "}
-          <span style={{ color: TOK.accent }}>
-            See blast radius, structural duplicates, and untested code.
-          </span>
-        </h1>
-
-        <p
-          className="text-lg max-w-2xl leading-relaxed"
-          style={{ color: TOK.textSecondary }}
-        >
-          Paste a URL. Click any file or function — see exactly what
-          breaks if you change it. AST-based analysis across 7 languages,
-          in under 20 seconds. Every insight links to its source.
-        </p>
-
-        <LandingPanel
-          demoRepos={DEMO_REPOS}
-          demoSessions={demoSessions}
-          initialSessions={sessions}
-        />
-      </section>
-
-      {/* What you'll find — feature-specific cards highlighting the
-       *  three concrete signals users get on a session page. v0.49
-       *  trimmed from 6 to 3; v0.56 swapped "AI health verdict" for
-       *  "Untested hotspots" after three independent commenters across
-       *  r/vibecoding, r/coolgithubprojects, and r/devtools all said the
-       *  same thing: "health verdict" reads as abstract / marketing,
-       *  concrete signals (untested hotspots, blast radius, structural
-       *  duplicates) read as actionable. The AI narrative still exists
-       *  on the Insights page — just not promoted as the hero. The
-       *  signals do the work; the AI translates. */}
-      <section className="flex flex-col gap-6">
-        <div className="flex items-baseline justify-between">
-          <h2 className={STYLE.sectionTitle}>What you&apos;ll find</h2>
-          <div className="text-xs" style={{ color: TOK.textMuted }}>
-            things GitHub Insights doesn&apos;t show
-          </div>
-        </div>
-
-        <div
-          className="grid grid-cols-1 md:grid-cols-3 gap-px overflow-hidden rounded-xl"
-          style={{ background: TOK.border }}
-        >
-          {[
-            {
-              t: "Blast radius",
-              d: "Click any file or function. See what breaks if you change it — three hops deep across the call graph.",
-            },
-            {
-              t: "Near-duplicates",
-              d: "Structural AST hashing finds 36 copies of one ARM rewrite pattern in golang/go src/cmd. Across 7 languages.",
-            },
-            {
-              t: "Untested hotspots",
-              d: "Most-complex production functions with zero test caller. Computed by walking the call graph from test files into production code.",
-            },
-          ].map((s) => (
-            <div
-              key={s.t}
-              className="p-6 flex flex-col gap-2"
-              style={{ background: TOK.bg }}
-            >
-              <h3
-                className="text-base font-semibold"
-                style={{ color: TOK.textPrimary }}
-              >
-                {s.t}
-              </h3>
-              <p
-                className="text-sm leading-relaxed"
-                style={{ color: TOK.textSecondary }}
-              >
-                {s.d}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="text-xs" style={{ color: TOK.textMuted }}>
-          Tree-sitter AST across JS/TS, Python, Go, Java, C#, PHP, Ruby.
-          Kotlin via regex fallback (imports only). Big monorepos? Paste
-          a deep-link to a subdirectory to scope the analysis.
-        </div>
-      </section>
-
-      {/* Footer. Feedback link is opt-in via env: set
-       *  NEXT_PUBLIC_FEEDBACK_URL to a Tally / Cal.com / Typeform URL
-       *  to surface a dedicated "Feedback" link. Otherwise we point
-       *  at GitHub Issues, which is always-available. */}
-      <footer
-        className="pt-8 text-xs flex items-center justify-between border-t flex-wrap gap-3"
-        style={{ borderColor: TOK.border, color: TOK.textMuted }}
-      >
-        <span>GitVision · made by coffeejones</span>
-        <div className="flex items-center gap-3 flex-wrap">
-          <a
-            href="https://github.com/coffeejones/gitvision"
-            target="_blank"
-            rel="noopener"
-            className="transition hover:underline"
-          >
-            GitHub
-          </a>
-          <span style={{ color: TOK.border }}>·</span>
-          <a
-            href={
-              process.env.NEXT_PUBLIC_FEEDBACK_URL ??
-              "https://github.com/coffeejones/gitvision/issues"
-            }
-            target="_blank"
-            rel="noopener"
-            className="transition hover:underline"
-          >
-            Feedback
-          </a>
-          <span style={{ color: TOK.border }}>·</span>
-          <a href="/legal" className="transition hover:underline">
-            Privacy &amp; terms
-          </a>
-          <span style={{ color: TOK.border }}>·</span>
-          <span>PolyForm Noncommercial</span>
-        </div>
-      </footer>
-    </main>
+    <AdaptiveHome
+      demoRepos={DEMO_REPOS}
+      demoSessions={demoSessions}
+      initialSessions={sessions}
+      workspaceSummaries={workspaceSummaries}
+      totalOnDisk={sessions.length}
+      initialLayout={initialLayout}
+    />
   );
 }

@@ -211,26 +211,15 @@ export function LandingPanel({
               Your sessions
             </span>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-[11px]" style={{ color: TOK.textMuted }}>
-              {visibleSessions.length === 0
-                ? "Saved analyses appear here"
-                : `${visibleSessions.length} saved${
-                    hiddenCount > 0
-                      ? ` · ${hiddenCount} from other browsers hidden`
-                      : ""
-                  }`}
-            </span>
-            {visibleSessions.length > 1 && (
-              <Link
-                href="/workspace"
-                className="text-[11px] inline-flex items-center gap-1 transition hover:underline"
-                style={{ color: TOK.accent }}
-              >
-                Open workspace →
-              </Link>
-            )}
-          </div>
+          <span className="text-[11px]" style={{ color: TOK.textMuted }}>
+            {visibleSessions.length === 0
+              ? "Saved analyses appear here"
+              : `${visibleSessions.length} saved${
+                  hiddenCount > 0
+                    ? ` · ${hiddenCount} from other browsers hidden`
+                    : ""
+                }`}
+          </span>
         </div>
 
         {visibleSessions.length === 0 ? (

@@ -1,4 +1,5 @@
-// Per-session rich summary for the workspace dashboard (v0.68 / C3).
+// Per-session rich summary for the workspace dashboard (v0.68 / C3,
+// split v0.69 to keep server-only code out of the browser bundle).
 //
 // Bridges raw Session JSON files on disk to the workspace UI. Each
 // summary carries enough information for a one-row card: identity
@@ -9,45 +10,23 @@
 //
 // Pure server-side composition over existing intelligence layers —
 // summarizeHealth + pickHeadline + extractHealthSignals. No new
-// computation, just packaging.
+// computation, just packaging. Calls into lib/storage which uses
+// node:fs, so this module is server-only; client code that just
+// wants the WorkspaceSummary type or the sort helper should import
+// from workspaceTypes.ts instead.
 
 import { extractHealthSignals } from "../signals";
-import { pickHeadline, type Headline } from "./headline";
-import {
-  summarizeHealth,
-  type DimensionStatus,
-  type DimensionSummary,
-} from "./healthSummary";
+import { pickHeadline } from "./headline";
+import { summarizeHealth } from "./healthSummary";
 import { getSession } from "../storage";
+import type { WorkspaceSummary } from "./workspaceTypes";
 
-export interface WorkspaceSummary {
-  /** Session id — clicking the workspace card navigates to /session/{id}. */
-  id: string;
-  /** User-editable display name. Falls back to repo full name on
-   *  legacy sessions without a custom name. */
-  name: string;
-  /** owner/repo slug of the analyzed repo. */
-  repoFullName: string;
-  /** ISO timestamp of the latest session activity (refresh, name
-   *  edit, etc.). Drives "X hours ago" display + sort order. */
-  updatedAt: string;
-  /** How many snapshots this session has. ≥3 enables trend rendering;
-   *  =1 means it's never been refreshed (most alpha-launch sessions
-   *  fall here). */
-  snapshotCount: number;
-  /** Six-dimension health summary computed from the latest snapshot.
-   *  Fixed canonical order (Activity, Team, Code, PR flow, Deps,
-   *  Hygiene). Workspace cards render these as a mini-strip. */
-  dimensions: DimensionSummary[];
-  /** Top finding picked by the headline waterfall. Workspace cards
-   *  surface its severity + primary text so the user sees "what
-   *  matters here" without opening the session. */
-  headline: Headline;
-  /** Count of high-severity needsWork signals across all dimensions
-   *  on the latest snapshot. Drives sort order ("most-critical
-   *  first") and the prioritization chip on each card. */
-  criticalCount: number;
-}
+// Re-export the types + sort helper so server code can import
+// everything from the same module.
+export {
+  sortWorkspaceByPriority,
+  type WorkspaceSummary,
+} from "./workspaceTypes";
 
 /** Read one session from disk and project it to a WorkspaceSummary.
  *  Returns null when the session doesn't exist or the latest snapshot
@@ -92,30 +71,4 @@ export async function getWorkspaceSummaries(
     )
   );
   return results.filter((s): s is WorkspaceSummary => s !== null);
-}
-
-/** Sort summaries by "most-needs-attention first": critical signals
- *  desc, then warning-tier dimensions, then by updatedAt desc as a
- *  stable tiebreaker. The result is "what should I look at first"
- *  ordering, not "what changed most recently" — that's the
- *  difference between a workspace dashboard and a sessions list. */
-export function sortWorkspaceByPriority(
-  summaries: WorkspaceSummary[]
-): WorkspaceSummary[] {
-  return [...summaries].sort((a, b) => {
-    if (b.criticalCount !== a.criticalCount) {
-      return b.criticalCount - a.criticalCount;
-    }
-    const aWarn = countStatus(a.dimensions, "warning");
-    const bWarn = countStatus(b.dimensions, "warning");
-    if (bWarn !== aWarn) return bWarn - aWarn;
-    return b.updatedAt.localeCompare(a.updatedAt);
-  });
-}
-
-function countStatus(
-  dimensions: DimensionSummary[],
-  status: DimensionStatus
-): number {
-  return dimensions.filter((d) => d.status === status).length;
 }

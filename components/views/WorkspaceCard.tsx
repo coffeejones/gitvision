@@ -24,7 +24,7 @@ import {
   ShieldAlert,
   User,
 } from "lucide-react";
-import type { WorkspaceSummary } from "@/lib/intelligence/workspaceSummary";
+import type { WorkspaceSummary } from "@/lib/intelligence/workspaceTypes";
 import type {
   DimensionStatus,
   DimensionSummary,
