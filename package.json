@@ -14,6 +14,8 @@
     "test:run": "vitest run",
     "analyze": "tsx lib/codeAnalysis/cli.ts",
     "mcp:build": "tsc -p mcp/tsconfig.json",
+    "mcp:test": "vitest run mcp/__tests__",
+    "mcp:validate": "npm run mcp:build && npm run mcp:test",
     "mcp": "npm run mcp:build && node mcp/dist/mcp/server.js"
   },
   "dependencies": {

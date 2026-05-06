@@ -4,7 +4,10 @@ import path from "node:path";
 export default defineConfig({
   test: {
     // Only run our unit tests; don't touch Next.js' .next or node_modules.
-    include: ["lib/__tests__/**/*.test.ts"],
+    include: [
+      "lib/__tests__/**/*.test.ts",
+      "mcp/__tests__/**/*.test.ts",
+    ],
     environment: "node",
   },
   resolve: {

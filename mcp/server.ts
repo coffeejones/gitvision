@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// GitVision MCP server (v0.64 / C1.1, expanded v0.65 / C1.2).
+// GitVision MCP server entry point (v0.64 / C1.1, expanded v0.65 / C1.2,
+// refactored v0.66 / C1.3 to share a buildServer() with tests).
 //
 // Exposes the GitVision analysis pipeline as Model Context Protocol
 // tools so AI coding agents (Claude Code, Cursor, Cline, etc.) can
@@ -24,89 +25,15 @@
 //   signals             Full 17-signal health verdict + dimension rollup
 //
 // Each tool is implemented in mcp/tools/<name>.ts; this file is just
-// the wiring.
+// the wiring. buildServer() lives in buildServer.ts so the test suite
+// can construct an identically-configured server attached to an
+// in-memory transport.
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  analyzeRepoInputSchema,
-  handleAnalyzeRepo,
-} from "./tools/analyzeRepo.js";
-import {
-  blastRadiusInputSchema,
-  handleBlastRadius,
-} from "./tools/blastRadius.js";
-import {
-  findDuplicatesInputSchema,
-  handleFindDuplicates,
-} from "./tools/findDuplicates.js";
-import {
-  untestedHotspotsInputSchema,
-  handleUntestedHotspots,
-} from "./tools/untestedHotspots.js";
-import {
-  signalsInputSchema,
-  handleSignals,
-} from "./tools/signals.js";
-
-const SERVER_VERSION = "0.65.0";
-
-const server = new McpServer({
-  name: "gitvision",
-  version: SERVER_VERSION,
-});
-
-server.registerTool(
-  "analyze_repo",
-  {
-    description:
-      "Download a GitHub repo, run AST + git-history analysis, return a session id and a compact summary. Always call this first — every other GitVision tool needs the session id. Cached for 10 minutes per repo URL so subsequent calls on the same URL are free.",
-    inputSchema: analyzeRepoInputSchema,
-  },
-  handleAnalyzeRepo
-);
-
-server.registerTool(
-  "blast_radius",
-  {
-    description:
-      "Compute what breaks if you change a file or function. Pass `file` for file-level reach (imports + call edges, capped at 3 hops). Add `fn` (and optionally `container`) for function-level reach (callers + callees). Function-level requires JS/TS, Python, Go, or Java source.",
-    inputSchema: blastRadiusInputSchema,
-  },
-  handleBlastRadius
-);
-
-server.registerTool(
-  "find_duplicates",
-  {
-    description:
-      "Find structurally identical functions across the codebase via FNV-1a AST hashes. Surfaces refactor candidates: when the same function body appears in multiple files (modulo identifier renaming), there's usually a missing helper. Skip-trivial defaults filter out one-line getters and similar noise.",
-    inputSchema: findDuplicatesInputSchema,
-  },
-  handleFindDuplicates
-);
-
-server.registerTool(
-  "untested_hotspots",
-  {
-    description:
-      "List production functions with no direct test caller, ranked by complexity. Computed via call-graph walk from test files into prod files — direct calls only, no transitive coverage. Returns the hotspot list plus repo-wide coverage totals so an agent can reason about both individual cases and overall test debt in one call.",
-    inputSchema: untestedHotspotsInputSchema,
-  },
-  handleUntestedHotspots
-);
-
-server.registerTool(
-  "signals",
-  {
-    description:
-      "Full 17-signal health verdict — what works, what needs work, what's worth a human eye. Returns both raw signals (with severity, evidence, IDs) and a 6-dimension rollup (Activity, Team, Code, PR flow, Dependencies, Hygiene) so agents can quote specific findings or summarize at a high level. Pure rule-based, no AI involved.",
-    inputSchema: signalsInputSchema,
-  },
-  handleSignals
-);
+import { buildServer } from "./buildServer.js";
 
 async function main() {
+  const server = buildServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // No console.log here — stdio transport reserves stdout for MCP
