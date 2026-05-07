@@ -22,10 +22,12 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as htmlToImage from "html-to-image";
+import Link from "next/link";
 import {
   Camera,
   ChevronDown,
   Gift,
+  HelpCircle,
   MoreHorizontal,
   RefreshCw,
   Share2,
@@ -303,6 +305,38 @@ export function SessionToolbar({
                   border: `1px solid ${TOK.borderStrong}`,
                 }}
               >
+                <Link
+                  href="/help"
+                  target="_blank"
+                  rel="noopener"
+                  onClick={() => setOverflowOpen(false)}
+                  className="flex items-start gap-2.5 px-3 py-2 text-xs transition cursor-pointer"
+                  style={{ color: TOK.textSecondary }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = TOK.surface;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  <HelpCircle
+                    size={14}
+                    style={{ color: TOK.textMuted, marginTop: 1 }}
+                  />
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span style={{ color: TOK.textPrimary }}>Help</span>
+                    <span
+                      className="text-[11px]"
+                      style={{ color: TOK.textMuted }}
+                    >
+                      What the panels and signals mean
+                    </span>
+                  </div>
+                </Link>
+                <div
+                  className="my-1 mx-2 h-px"
+                  style={{ background: TOK.border }}
+                />
                 <MenuItem
                   icon={<Trash2 size={14} />}
                   label="Delete session"

@@ -17,6 +17,7 @@ import Link from "next/link";
 import { ArrowRight, Zap } from "lucide-react";
 import type { RankedBlastFunction } from "@/lib/codeAnalysis/blastRanking";
 import { STYLE, TOK } from "@/lib/theme";
+import { HelpHint } from "@/components/HelpHint";
 
 interface Props {
   ranked: RankedBlastFunction[];
@@ -33,8 +34,15 @@ export function BlastRadiusPanel({ ranked, sessionId }: Props) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline gap-2">
-        <span className={STYLE.eyebrow} style={{ color: TOK.textMuted }}>
+        <span
+          className={`${STYLE.eyebrow} inline-flex items-center gap-1.5`}
+          style={{ color: TOK.textMuted }}
+        >
           Touch with care
+          <HelpHint
+            anchor="blast-radius"
+            label="How blast radius (callers + callees) is computed"
+          />
         </span>
         <span className="text-xs" style={{ color: TOK.textMuted }}>
           · functions whose changes ripple the furthest

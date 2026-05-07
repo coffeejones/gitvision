@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
 import { TOK } from "@/lib/theme";
 import { DependencyCanvas } from "@/components/views/DependencyCanvas";
+import { HelpHint } from "@/components/HelpHint";
 
 export const dynamic = "force-dynamic";
 
@@ -42,10 +43,17 @@ export default async function ImportsPage({
             </div>
           </div>
         )}
-        <p className="text-xs" style={{ color: TOK.textMuted }}>
+        <p
+          className="text-xs inline-flex items-center gap-1.5"
+          style={{ color: TOK.textMuted }}
+        >
           File-to-file imports, extends/implements, and framework-specific
           edges (e.g. Spring MVC controller → template). Layered top-down:
           entry points at top, leaves at bottom.
+          <HelpHint
+            anchor="imports"
+            label="File-level dependency canvas, layers, edge kinds"
+          />
         </p>
       </div>
     </main>

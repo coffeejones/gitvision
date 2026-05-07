@@ -29,6 +29,7 @@ import type {
 import { STYLE, TOK } from "@/lib/theme";
 import { ArchitectureScope } from "./ArchitectureScope";
 import { ClassCanvas } from "./ClassCanvas";
+import { HelpHint } from "@/components/HelpHint";
 
 interface Props {
   diagram: ClassDiagramResult | null;
@@ -71,8 +72,15 @@ export function ArchitecturePanel({
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className={STYLE.eyebrow} style={{ color: TOK.textMuted }}>
+          <span
+            className={`${STYLE.eyebrow} inline-flex items-center gap-1.5`}
+            style={{ color: TOK.textMuted }}
+          >
             Class diagram
+            <HelpHint
+              anchor="architecture"
+              label="Class canvas, edge types, and filters"
+            />
           </span>
           {diagram && (
             <span className="text-xs" style={{ color: TOK.textMuted }}>

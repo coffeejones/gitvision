@@ -39,6 +39,7 @@ import {
 import type { AnalysisSnapshot, CodeGraph } from "@/lib/types";
 import { STYLE, TOK } from "@/lib/theme";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { HelpHint } from "@/components/HelpHint";
 import { SearchInput } from "@/components/SearchInput";
 import {
   computeBlastRadius,
@@ -559,10 +560,14 @@ function SelectedFileHeader({
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <Target size={15} style={{ color: TOK.accent }} />
           <span
-            className="text-xs uppercase tracking-wider"
+            className="text-xs uppercase tracking-wider inline-flex items-center gap-1.5"
             style={{ color: TOK.textMuted }}
           >
             Blast radius for
+            <HelpHint
+              anchor="blast-radius"
+              label="Callers, callees, hops, and chip overload markers"
+            />
           </span>
         </div>
         {complexity !== null && (
@@ -1182,8 +1187,15 @@ function UntestedHotspotsPanel({
             <ChevronRight size={14} style={{ color: TOK.textMuted }} />
           )}
           <ShieldOff size={15} style={{ color: TOK.amber }} />
-          <span className={STYLE.eyebrow} style={{ color: TOK.textPrimary }}>
+          <span
+            className={`${STYLE.eyebrow} inline-flex items-center gap-1.5`}
+            style={{ color: TOK.textPrimary }}
+          >
             Untested hotspots
+            <HelpHint
+              anchor="untested-duplicates"
+              label="How untested coverage is detected and ranked"
+            />
           </span>
           <span style={{ color: TOK.textMuted }}>·</span>
           <span className="text-xs truncate" style={{ color: TOK.textSecondary }}>
@@ -1354,8 +1366,15 @@ function NearDuplicatesPanel({
             <ChevronRight size={14} style={{ color: TOK.textMuted }} />
           )}
           <Copy size={15} style={{ color: TOK.accent }} />
-          <span className={STYLE.eyebrow} style={{ color: TOK.textPrimary }}>
+          <span
+            className={`${STYLE.eyebrow} inline-flex items-center gap-1.5`}
+            style={{ color: TOK.textPrimary }}
+          >
             Near-duplicate functions
+            <HelpHint
+              anchor="untested-duplicates"
+              label="How AST-based duplicate groups are detected"
+            />
           </span>
           <span style={{ color: TOK.textMuted }}>·</span>
           <span className="text-xs truncate" style={{ color: TOK.textSecondary }}>

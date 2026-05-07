@@ -24,6 +24,7 @@ import type {
 } from "@/lib/types";
 import { TOK } from "@/lib/theme";
 import { SearchInput } from "@/components/SearchInput";
+import { HelpHint } from "@/components/HelpHint";
 
 // ------------------- Link builders -------------------
 
@@ -129,10 +130,14 @@ export function PackagesPanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
       >
         <div className="flex items-center gap-2">
           <span
-            className="text-[11px] uppercase tracking-[0.18em] font-medium"
+            className="text-[11px] uppercase tracking-[0.18em] font-medium inline-flex items-center gap-1.5"
             style={{ color: TOK.textMuted }}
           >
             Across
+            <HelpHint
+              anchor="dep-health"
+              label="What outdated, deprecated, vulnerable, and abandoned mean"
+            />
           </span>
           <span
             className="text-sm font-semibold tabular-nums"

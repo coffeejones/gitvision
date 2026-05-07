@@ -25,6 +25,7 @@ import type {
   StructuralFnRef,
 } from "@/lib/intelligence/structuralDiff";
 import { STYLE, TOK } from "@/lib/theme";
+import { HelpHint } from "@/components/HelpHint";
 
 interface Props {
   diff: StructuralDiff;
@@ -34,8 +35,15 @@ export function StructuralDiffPanel({ diff }: Props) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline gap-2 flex-wrap">
-        <span className={STYLE.eyebrow} style={{ color: TOK.textMuted }}>
+        <span
+          className={`${STYLE.eyebrow} inline-flex items-center gap-1.5`}
+          style={{ color: TOK.textMuted }}
+        >
           Structural changes
+          <HelpHint
+            anchor="sessions-snapshots"
+            label="What snapshots are and how the diff is computed"
+          />
         </span>
         <span className="text-xs" style={{ color: TOK.textMuted }}>
           · functions, dup-groups, coverage, complexity since previous snapshot

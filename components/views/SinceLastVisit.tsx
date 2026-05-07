@@ -24,6 +24,7 @@ import {
 import type { SnapshotDiff, Headline } from "@/lib/diff";
 import { pickHeadline } from "@/lib/diff";
 import { STYLE, TOK } from "@/lib/theme";
+import { HelpHint } from "@/components/HelpHint";
 
 function formatRel(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -489,8 +490,15 @@ export function SinceLastVisit({ diff, repoFullName }: Props) {
           >
             <RefreshCw size={11} />
           </span>
-          <span className={STYLE.eyebrow} style={{ color: TOK.textMuted }}>
+          <span
+            className={`${STYLE.eyebrow} inline-flex items-center gap-1.5`}
+            style={{ color: TOK.textMuted }}
+          >
             Since your last visit
+            <HelpHint
+              anchor="sessions-snapshots"
+              label="How sessions, snapshots, and refresh diffs work"
+            />
           </span>
         </div>
         <span
