@@ -33,6 +33,11 @@ export interface RankedBlastFunction {
   filePath: string;
   name: string;
   containerType?: string;
+  /** Source line where the function declaration starts. Used by the
+   *  UI to disambiguate overloaded methods (Java's `login(String)`
+   *  vs `login(String, String)` share path + container + name and
+   *  would otherwise collide on React keys). v0.72.1+. */
+  startRow: number;
   /** Cyclomatic complexity — useful as a secondary signal: a complex
    *  hub function is worse than a simple one. Surfaced in UI for context. */
   complexity: number;
@@ -113,10 +118,17 @@ export function rankFunctionsByBlast(
   }
 
   // Map "fileSEPnameSEPcontainer" -> FunctionDef so we can recover
-  // display fields (complexity, container) once a winner emerges.
+  // display fields (complexity, container, startRow) once a winner
+  // emerges.
   const fnIndex = new Map<
     string,
-    { filePath: string; name: string; containerType?: string; complexity: number }
+    {
+      filePath: string;
+      name: string;
+      containerType?: string;
+      complexity: number;
+      startRow: number;
+    }
   >();
   for (const fn of cg.functions) {
     if (classify(fn.filePath)) continue; // never rank test fns themselves
@@ -131,6 +143,7 @@ export function rankFunctionsByBlast(
         name: fn.name,
         containerType: fn.containerType,
         complexity: fn.complexity,
+        startRow: fn.startRow,
       });
     }
   }
@@ -200,6 +213,7 @@ export function rankFunctionsByBlast(
       filePath: cand.fnInfo!.filePath,
       name: cand.fnInfo!.name,
       containerType: cand.fnInfo!.containerType,
+      startRow: cand.fnInfo!.startRow,
       complexity: cand.fnInfo!.complexity,
       directIncoming: cand.direct,
       incomingCount: inc.count,

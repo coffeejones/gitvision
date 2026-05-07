@@ -478,6 +478,46 @@ function CoverageChip({ cg }: { cg: CodeGraph }) {
 
 // ------------------- Selected-file header + picker -------------------
 
+interface FnChipSummary {
+  name: string;
+  complexity: number;
+  startRow: number;
+  containerType?: string;
+}
+
+interface FnChipGroup {
+  /** All overloads (or single function) sharing the same containerType +
+   *  name. Always at least one entry; length > 1 means an overload. */
+  entries: FnChipSummary[];
+  /** Highest complexity across the group — drives the chip's number
+   *  badge and the sort order. */
+  maxComplexity: number;
+}
+
+/** v0.72.1: collapse Java/C# method overloads into a single chip per
+ *  (containerType, name) tuple. The blast-radius computation in
+ *  lib/codeAnalysis/blastRadius.ts can't distinguish overloads (CallEdge
+ *  carries name + container, no signature), so rendering them as
+ *  separate clickable chips is misleading — both clicks would zoom to
+ *  the same aggregated radius. One chip per group + a `×N` overload
+ *  marker matches the data reality and keeps the UI honest. */
+function collapseOverloads(fns: FnChipSummary[]): FnChipGroup[] {
+  const groups = new Map<string, FnChipGroup>();
+  for (const fn of fns) {
+    const key = `${fn.containerType ?? ""}@${fn.name}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = { entries: [], maxComplexity: 0 };
+      groups.set(key, g);
+    }
+    g.entries.push(fn);
+    if (fn.complexity > g.maxComplexity) g.maxComplexity = fn.complexity;
+  }
+  // Preserve max-complexity-desc ordering so the .slice(0, 6) downstream
+  // keeps surfacing the heaviest hot-spots first.
+  return [...groups.values()].sort((a, b) => b.maxComplexity - a.maxComplexity);
+}
+
 function SelectedFileHeader({
   selected,
   complexity,
@@ -551,50 +591,91 @@ function SelectedFileHeader({
       )}
 
       {/* Top functions in the selected file. Clickable: zooms blast radius
-       *  in to function-level for the picked one. v0.28: each (name,
-       *  containerType) tuple is its own chip — overloads stay distinct.
-       *  The active chip is matched on the same tuple so e.g.
-       *  Blueprint.__init__ highlights without lighting up
-       *  BlueprintSetupState.__init__. */}
+       *  in to function-level for the picked one.
+       *
+       *  v0.72.1: overloads (Java's `login(String)` vs
+       *  `login(String, String)` — same containerType + name, different
+       *  signatures) are COLLAPSED into a single chip. The underlying
+       *  CallEdge data doesn't carry signatures, so blast radius for
+       *  one overload is identical to blast radius for the other —
+       *  rendering them as separate clickable chips would be
+       *  misleading (clicks would all zoom to the same aggregated
+       *  radius, but users couldn't tell which "version" they were
+       *  seeing). Showing one chip with a `×N` marker matches the
+       *  data reality and the tooltip lists each overload's line for
+       *  transparency. */}
       {functions.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {functions.slice(0, 6).map((fn) => {
-            const active =
-              activeFunction !== null &&
-              activeFunction.name === fn.name &&
-              activeFunction.containerType === fn.containerType;
-            return (
-              <button
-                key={`${fn.containerType ?? ""}@${fn.name}@${fn.startRow}`}
-                onClick={() => onSelectFunction(fn.name, fn.containerType)}
-                className="text-[11px] px-1.5 py-0.5 rounded font-mono transition cursor-pointer"
-                style={{
-                  background: active ? TOK.accentSoft : TOK.surfaceElevated,
-                  color: active ? TOK.textPrimary : TOK.textSecondary,
-                  border: `1px solid ${active ? TOK.accent : TOK.border}`,
-                }}
-                title={`Line ${fn.startRow + 1} · complexity ${fn.complexity}${
-                  active ? "" : " — click to focus"
-                }`}
-                onMouseEnter={(e) => {
-                  if (!active) e.currentTarget.style.borderColor = TOK.borderStrong;
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) e.currentTarget.style.borderColor = TOK.border;
-                }}
-              >
-                {fn.containerType && (
-                  <span style={{ color: TOK.textMuted }}>
-                    {fn.containerType}.
+          {collapseOverloads(functions)
+            .slice(0, 6)
+            .map((group) => {
+              const head = group.entries[0];
+              const overloadCount = group.entries.length;
+              const active =
+                activeFunction !== null &&
+                activeFunction.name === head.name &&
+                activeFunction.containerType === head.containerType;
+              // Java + C# name constructors after the class itself, so a
+              // constructor for `Foo` shows up as containerType="Foo",
+              // name="Foo" — which renders as "Foo.Foo", easily mistaken
+              // for "the class itself" by readers. Detect this and render
+              // the natural `new Foo` form instead.
+              const isConstructor =
+                !!head.containerType && head.containerType === head.name;
+              const titleLines = [
+                ...group.entries.map(
+                  (fn) => `Line ${fn.startRow + 1} · complexity ${fn.complexity}`
+                ),
+                active ? "" : "Click to focus",
+              ].filter(Boolean);
+              return (
+                <button
+                  key={`${head.containerType ?? ""}@${head.name}`}
+                  onClick={() => onSelectFunction(head.name, head.containerType)}
+                  className="text-[11px] px-1.5 py-0.5 rounded font-mono transition cursor-pointer"
+                  style={{
+                    background: active ? TOK.accentSoft : TOK.surfaceElevated,
+                    color: active ? TOK.textPrimary : TOK.textSecondary,
+                    border: `1px solid ${active ? TOK.accent : TOK.border}`,
+                  }}
+                  title={titleLines.join("\n")}
+                  onMouseEnter={(e) => {
+                    if (!active)
+                      e.currentTarget.style.borderColor = TOK.borderStrong;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active) e.currentTarget.style.borderColor = TOK.border;
+                  }}
+                >
+                  {isConstructor ? (
+                    <>
+                      <span style={{ color: TOK.textMuted }}>new </span>
+                      {head.name}
+                    </>
+                  ) : (
+                    <>
+                      {head.containerType && (
+                        <span style={{ color: TOK.textMuted }}>
+                          {head.containerType}.
+                        </span>
+                      )}
+                      {head.name}
+                    </>
+                  )}{" "}
+                  <span style={{ color: active ? TOK.accent : TOK.textMuted }}>
+                    {group.maxComplexity}
                   </span>
-                )}
-                {fn.name}{" "}
-                <span style={{ color: active ? TOK.accent : TOK.textMuted }}>
-                  {fn.complexity}
-                </span>
-              </button>
-            );
-          })}
+                  {overloadCount > 1 && (
+                    <span
+                      style={{ color: TOK.textMuted, marginLeft: 4 }}
+                      title={`${overloadCount} overloads`}
+                    >
+                      ×{overloadCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
         </div>
       )}
 
@@ -1135,7 +1216,12 @@ function UntestedHotspotsPanel({
       {isExpanded && (
       <ul className="flex flex-col gap-0.5">
         {items.map((h) => (
-          <li key={`${h.filePath}:${h.containerType ?? ""}:${h.name}`}>
+          // startRow disambiguates overloaded methods (Java's
+          // `login(String)` vs `login(String, String)` share name +
+          // container + path but differ on line number).
+          <li
+            key={`${h.filePath}:${h.containerType ?? ""}:${h.name}:${h.startRow}`}
+          >
             <button
               onClick={() => onPick(h.filePath, h.name, h.containerType)}
               className="w-full flex items-center gap-3 py-1.5 px-2 rounded text-left transition"

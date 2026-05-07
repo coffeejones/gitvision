@@ -49,8 +49,11 @@ export function BlastRadiusPanel({ ranked, sessionId }: Props) {
         }}
       >
         {ranked.map((fn, i) => (
+          // startRow disambiguates overloaded methods (Java's
+          // `login(String)` vs `login(String, String)` share path +
+          // container + name but differ on line number).
           <BlastRow
-            key={`${fn.filePath}::${fn.containerType ?? ""}::${fn.name}`}
+            key={`${fn.filePath}::${fn.containerType ?? ""}::${fn.name}::${fn.startRow}`}
             fn={fn}
             sessionId={sessionId}
             isFirst={i === 0}

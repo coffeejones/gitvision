@@ -35,6 +35,11 @@ export interface UntestedHotspot {
   name: string;
   containerType?: string;
   complexity: number;
+  /** Source line where the function declaration starts. Used by the
+   *  UI to disambiguate overloaded methods (Java's `login(String)`
+   *  vs `login(String, String)` share path + container + name and
+   *  would otherwise collide on React keys). v0.72.1+. */
+  startRow: number;
 }
 
 export interface TestCoverage {
@@ -247,6 +252,7 @@ export function computeTestCoverage(
       name: fn.name,
       containerType: fn.containerType,
       complexity: fn.complexity,
+      startRow: fn.startRow,
     });
   }
   untestedHotspots.sort((a, b) => b.complexity - a.complexity);
