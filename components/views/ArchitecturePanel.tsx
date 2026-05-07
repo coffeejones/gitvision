@@ -1,24 +1,26 @@
 "use client";
 
-// Architecture tab — class-diagram surface (v0.70 / Phase 1).
+// Architecture tab — class diagram surface (v0.72).
 //
-// Three states, one component:
-//   - No codeGraph at all → degraded empty state matching the Code
-//     tab's pattern (skip reason if present, else "Refresh"
-//     prompt for legacy snapshots)
+// Stacked layout:
+//   1. Interactive ReactFlow canvas (primary — the browsing UX)
+//   2. "Show Mermaid source" toggle revealing the source block +
+//      "Copy as Mermaid" CTA (secondary — the shareability path)
+//
+// Three render states above the stack:
+//   - No codeGraph at all → degraded empty state (skip reason if
+//     present, else "Refresh" prompt for legacy snapshots)
 //   - codeGraph exists but no classes detected → friendly
-//     "no classes" state (common for utility-heavy repos with
-//     functional code only)
-//   - Classes detected → eyebrow + Mermaid source block + Copy
-//     button + scope hint
+//     "no classes" state (common for utility-heavy repos)
+//   - Classes detected → eyebrow row + scope dropdown + the stack
 //
-// Intentionally leaves live Mermaid rendering for Phase 3 — the
-// "Copy as Mermaid" CTA is the killer feature for distribution
-// (paste into README, blog post, or mermaid.live), and we ship
-// that now without dragging in the ~500KB mermaid.js bundle.
+// The Mermaid source path stayed because it's still the best
+// shareability format (paste into README, blog post, or
+// mermaid.live), but the in-app browsing happens on the
+// interactive canvas — that's where the new UX lives.
 
 import { useState } from "react";
-import { Boxes, Check, Copy } from "lucide-react";
+import { Boxes, Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import type { CodeGraph } from "@/lib/types";
 import type {
   ClassDiagramResult,
@@ -26,6 +28,7 @@ import type {
 } from "@/lib/intelligence/classDiagram";
 import { STYLE, TOK } from "@/lib/theme";
 import { ArchitectureScope } from "./ArchitectureScope";
+import { ClassCanvas } from "./ClassCanvas";
 
 interface Props {
   diagram: ClassDiagramResult | null;
@@ -58,6 +61,12 @@ export function ArchitecturePanel({
     return <EmptyClasses totalAvailable={0} />;
   }
 
+  // Build canvas-scope from the currently-applied folder. Empty
+  // string = "all"; same convention as the URL search param.
+  const canvasScope = currentScope
+    ? ({ kind: "folder", folder: currentScope } as const)
+    : ({ kind: "all" } as const);
+
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
@@ -71,8 +80,7 @@ export function ArchitecturePanel({
               {diagram.classCount === 1 ? "" : "es"}
               {currentScope === "" &&
                 diagram.totalAvailable > diagram.classCount &&
-                ` of ${diagram.totalAvailable}`}{" "}
-              · Mermaid source
+                ` of ${diagram.totalAvailable}`}
             </span>
           )}
         </div>
@@ -84,30 +92,27 @@ export function ArchitecturePanel({
               currentScope={currentScope}
             />
           )}
-          {diagram && diagram.classCount > 0 && (
-            <CopyButton source={diagram.source} />
-          )}
         </div>
       </div>
 
       {diagram && diagram.classCount > 0 ? (
         <>
-          <pre
-            className="rounded-xl p-4 text-[12px] leading-relaxed font-mono overflow-x-auto"
-            style={{
-              background: TOK.surface,
-              border: `1px solid ${TOK.border}`,
-              color: TOK.textPrimary,
-            }}
-          >
-            {diagram.source}
-          </pre>
+          {/* Primary: interactive canvas. Drag/zoom/pan, click a
+           *  class to highlight neighbours, hover for the file
+           *  path tooltip. */}
+          <ClassCanvas codeGraph={codeGraph} scope={canvasScope} />
 
           {diagram.truncated && (
             <p className="text-[11px]" style={{ color: TOK.textMuted }}>
               {diagram.truncated}
             </p>
           )}
+
+          {/* Secondary: collapsible Mermaid source for distribution.
+           *  Hidden by default — it's not the browsing surface, just
+           *  a "give me the text I can paste into mermaid.live or
+           *  README" affordance. */}
+          <MermaidSourceDisclosure source={diagram.source} />
         </>
       ) : (
         // Scope filter matched zero classes — but classes exist
@@ -123,6 +128,40 @@ export function ArchitecturePanel({
         </div>
       )}
     </section>
+  );
+}
+
+/** v0.72: collapsible disclosure for the Mermaid source block. The
+ *  source is no longer the primary surface (the interactive canvas
+ *  is), but it's still useful as a shareability/export affordance. */
+function MermaidSourceDisclosure({ source }: { source: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="text-xs inline-flex items-center gap-1 px-2 py-1 -ml-2 rounded-md transition cursor-pointer"
+          style={{ color: TOK.textSecondary }}
+        >
+          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          {open ? "Hide" : "Show"} Mermaid source
+        </button>
+        {open && <CopyButton source={source} />}
+      </div>
+      {open && (
+        <pre
+          className="rounded-xl p-4 text-[12px] leading-relaxed font-mono overflow-x-auto"
+          style={{
+            background: TOK.surface,
+            border: `1px solid ${TOK.border}`,
+            color: TOK.textPrimary,
+          }}
+        >
+          {source}
+        </pre>
+      )}
+    </div>
   );
 }
 

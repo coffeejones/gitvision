@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.0",
+    "@dagrejs/dagre": "^3.0.0",
     "@iarna/toml": "^2.2.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/d3-sankey": "^0.12.5",
