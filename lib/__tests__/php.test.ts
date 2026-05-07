@@ -523,3 +523,161 @@ describe("phpPlugin — type-aware tracking (Phase 5)", () => {
     expect(helper?.containerType).toBeUndefined();
   });
 });
+
+describe("phpPlugin — ParsedClass extraction (v0.71)", () => {
+  beforeAll(async () => {
+    await phpPlugin.load();
+  });
+
+  it("emits a ParsedClass for a basic class with fields + methods", () => {
+    const content =
+      "<?php\n" +
+      "namespace App;\n" +
+      "class Widget {\n" +
+      "  public int $count;\n" +
+      "  private string $name;\n" +
+      "  public function __construct() {}\n" +
+      "  public function render(): int { return 1; }\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Widget.php", ext: "php", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(phpPlugin, file, ix);
+    expect(parsed.classes).toBeDefined();
+    expect(parsed.classes!.length).toBe(1);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("Widget");
+    expect(cls.isInterface).toBe(false);
+    expect(cls.isAbstract).toBe(false);
+    expect(cls.fields.map((f) => f.name).sort()).toEqual(["count", "name"]);
+    expect(cls.methodNames.sort()).toEqual(["__construct", "render"]);
+  });
+
+  it("captures property visibility from visibility_modifier child", () => {
+    // PHP wraps the keyword in a `visibility_modifier` named node with
+    // an anonymous inner keyword child — distinct from Java/C#.
+    const content =
+      "<?php\n" +
+      "class V {\n" +
+      "  public int $pub;\n" +
+      "  private int $priv;\n" +
+      "  protected int $prot;\n" +
+      "}\n";
+    const file: SourceFile = { rel: "V.php", ext: "php", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(phpPlugin, file, ix);
+    const fields = parsed.classes![0].fields;
+    const byName = new Map(fields.map((f) => [f.name, f]));
+    expect(byName.get("pub")?.visibility).toBe("public");
+    expect(byName.get("priv")?.visibility).toBe("private");
+    expect(byName.get("prot")?.visibility).toBe("protected");
+  });
+
+  it("flags static + readonly properties", () => {
+    const content =
+      "<?php\n" +
+      "class V {\n" +
+      "  public static int $total;\n" +
+      "  public readonly int $limit;\n" +
+      "  public int $mutable;\n" +
+      "}\n";
+    const file: SourceFile = { rel: "V.php", ext: "php", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(phpPlugin, file, ix);
+    const byName = new Map(
+      parsed.classes![0].fields.map((f) => [f.name, f])
+    );
+    expect(byName.get("total")?.isStatic).toBe(true);
+    expect(byName.get("limit")?.isReadonly).toBe(true);
+    expect(byName.get("mutable")?.isStatic).toBe(false);
+    expect(byName.get("mutable")?.isReadonly).toBe(false);
+  });
+
+  it("includes constructor-promoted properties (PHP 8)", () => {
+    // PHP 8 lets constructors declare implicit properties via parameter
+    // promotion: `public Logger $logger` in __construct creates a property.
+    const content =
+      "<?php\n" +
+      "class Service {\n" +
+      "  public function __construct(\n" +
+      "    public Logger $logger,\n" +
+      "    private readonly Cache $cache\n" +
+      "  ) {}\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Service.php", ext: "php", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(phpPlugin, file, ix);
+    const fields = parsed.classes![0].fields;
+    const byName = new Map(fields.map((f) => [f.name, f]));
+    expect(byName.get("logger")?.visibility).toBe("public");
+    expect(byName.get("logger")?.type).toBe("Logger");
+    expect(byName.get("cache")?.visibility).toBe("private");
+    expect(byName.get("cache")?.isReadonly).toBe(true);
+  });
+
+  it("captures parentClass + implements", () => {
+    const content =
+      "<?php\n" +
+      "namespace App;\n" +
+      "class Service extends BaseService implements IDisposable, IRunnable {\n" +
+      "  public function run(): void {}\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Service.php", ext: "php", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(phpPlugin, file, ix);
+    const cls = parsed.classes![0];
+    expect(cls.parentClass).toBe("BaseService");
+    expect(cls.implements).toEqual(["IDisposable", "IRunnable"]);
+  });
+
+  it("flags abstract classes via abstract_modifier", () => {
+    const content =
+      "<?php\n" +
+      "abstract class Shape {\n" +
+      "  abstract public function area(): float;\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Shape.php", ext: "php", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(phpPlugin, file, ix);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("Shape");
+    expect(cls.isAbstract).toBe(true);
+  });
+
+  it("flags interfaces with isInterface=true", () => {
+    const content =
+      "<?php\n" +
+      "interface IRepository {\n" +
+      "  public function save(): void;\n" +
+      "  public function delete(int $id): void;\n" +
+      "}\n";
+    const file: SourceFile = { rel: "IRepository.php", ext: "php", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(phpPlugin, file, ix);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("IRepository");
+    expect(cls.isInterface).toBe(true);
+    expect(cls.methodNames.sort()).toEqual(["delete", "save"]);
+  });
+
+  it("emits ParsedClass for enum_declaration but skips traits (v0.71)", () => {
+    // v0.71: PHP 8.1+ enums get a dedicated entry. Traits remain
+    // skipped — their composition shape doesn't fit a class diagram.
+    const content =
+      "<?php\n" +
+      "trait Loggable { public function log(): void {} }\n" +
+      "enum Status { case Active; case Inactive; case Pending; }\n" +
+      "class Real { public int $x; }\n";
+    const file: SourceFile = { rel: "Mixed.php", ext: "php", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(phpPlugin, file, ix);
+    const byName = new Map(parsed.classes!.map((c) => [c.name, c]));
+    expect([...byName.keys()].sort()).toEqual(["Real", "Status"]);
+    expect(byName.get("Status")?.isEnum).toBe(true);
+    expect(byName.get("Status")?.enumValues).toEqual([
+      "Active",
+      "Inactive",
+      "Pending",
+    ]);
+    expect(byName.get("Real")?.isEnum).toBeFalsy();
+  });
+});

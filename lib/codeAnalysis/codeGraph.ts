@@ -196,6 +196,8 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
       implements: pc.implements,
       isInterface: pc.isInterface,
       isAbstract: pc.isAbstract,
+      isEnum: pc.isEnum,
+      enumValues: pc.enumValues,
     });
   }
 

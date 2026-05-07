@@ -450,3 +450,181 @@ describe("javaPlugin — type-aware tracking (v0.15)", () => {
     expect(widgetNew?.calleeType).toBe("Widget");
   });
 });
+
+// ---------------- v0.71: Class extraction (Architecture tab) ----------------
+
+describe("javaPlugin — class extraction for Architecture tab", () => {
+  beforeAll(async () => {
+    await javaPlugin.load();
+  });
+
+  it("emits a ParsedClass for a basic class with fields + methods", () => {
+    const content =
+      "package com.example;\n" +
+      "public class User {\n" +
+      "  public String name;\n" +
+      "  private int age;\n" +
+      "  public Token login(String password) { return null; }\n" +
+      "  public void logout() {}\n" +
+      "}\n";
+    const file: SourceFile = { rel: "User.java", ext: "java", content };
+    const parsed = parseFile(javaPlugin, file, makeIndex([file]));
+    expect(parsed.classes).toHaveLength(1);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("User");
+    expect(cls.isInterface).toBe(false);
+    expect(cls.isAbstract).toBe(false);
+    expect(cls.fields.map((f) => f.name).sort()).toEqual(["age", "name"]);
+    expect(cls.methodNames.sort()).toEqual(["login", "logout"]);
+  });
+
+  it("captures field visibility from the modifiers child", () => {
+    const content =
+      "package com.example;\n" +
+      "public class X {\n" +
+      "  public String pub;\n" +
+      "  private int priv;\n" +
+      "  protected double prot;\n" +
+      "  String pkg;\n" + // package-private (no modifier) → "internal"
+      "}\n";
+    const file: SourceFile = { rel: "X.java", ext: "java", content };
+    const parsed = parseFile(javaPlugin, file, makeIndex([file]));
+    const fields = parsed.classes![0].fields;
+    const byName = Object.fromEntries(fields.map((f) => [f.name, f.visibility]));
+    expect(byName.pub).toBe("public");
+    expect(byName.priv).toBe("private");
+    expect(byName.prot).toBe("protected");
+    expect(byName.pkg).toBe("internal");
+  });
+
+  it("flags static + final fields", () => {
+    const content =
+      "package com.example;\n" +
+      "public class X {\n" +
+      "  public static final String VERSION = \"1.0\";\n" +
+      "  public final int id = 0;\n" +
+      "  public String mutable;\n" +
+      "}\n";
+    const file: SourceFile = { rel: "X.java", ext: "java", content };
+    const parsed = parseFile(javaPlugin, file, makeIndex([file]));
+    const fields = parsed.classes![0].fields;
+    const version = fields.find((f) => f.name === "VERSION")!;
+    expect(version.isStatic).toBe(true);
+    expect(version.isReadonly).toBe(true);
+    const id = fields.find((f) => f.name === "id")!;
+    expect(id.isStatic).toBe(false);
+    expect(id.isReadonly).toBe(true);
+    const mutable = fields.find((f) => f.name === "mutable")!;
+    expect(mutable.isStatic).toBe(false);
+    expect(mutable.isReadonly).toBe(false);
+  });
+
+  it("captures extends + implements relationships", () => {
+    const content =
+      "package com.example;\n" +
+      "public class Dog extends Animal implements Trainable, Serializable {\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Dog.java", ext: "java", content };
+    const parsed = parseFile(javaPlugin, file, makeIndex([file]));
+    const cls = parsed.classes![0];
+    expect(cls.parentClass).toBe("Animal");
+    expect(cls.implements).toEqual(["Trainable", "Serializable"]);
+  });
+
+  it("flags abstract classes via the abstract modifier", () => {
+    const content =
+      "package com.example;\n" +
+      "public abstract class Shape {\n" +
+      "  public abstract double area();\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Shape.java", ext: "java", content };
+    const parsed = parseFile(javaPlugin, file, makeIndex([file]));
+    expect(parsed.classes![0].isAbstract).toBe(true);
+  });
+
+  it("flags interfaces with isInterface=true", () => {
+    const content =
+      "package com.example;\n" +
+      "public interface Comparable<T> {\n" +
+      "  int compareTo(T other);\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Comparable.java", ext: "java", content };
+    const parsed = parseFile(javaPlugin, file, makeIndex([file]));
+    expect(parsed.classes![0].isInterface).toBe(true);
+    expect(parsed.classes![0].name).toBe("Comparable");
+    expect(parsed.classes![0].methodNames).toContain("compareTo");
+  });
+
+  it("emits a ParsedClass for enum_declaration with isEnum + enumValues (v0.71)", () => {
+    // v0.71: enums get a dedicated entry in the diagram so users can
+    // see Status / Privacy / FormatType etc. as visual members of
+    // their domain model. Records remain skipped (different shape).
+    const content =
+      "package com.example;\n" +
+      "public enum Color { RED, GREEN, BLUE }\n";
+    const file: SourceFile = { rel: "Color.java", ext: "java", content };
+    const parsed = parseFile(javaPlugin, file, makeIndex([file]));
+    expect(parsed.classes).toHaveLength(1);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("Color");
+    expect(cls.isEnum).toBe(true);
+    expect(cls.isInterface).toBeFalsy();
+    expect(cls.fields).toEqual([]);
+    expect(cls.enumValues).toEqual(["RED", "GREEN", "BLUE"]);
+  });
+
+  it("does NOT emit ParsedClass for record_declaration (still skipped)", () => {
+    const content =
+      "package com.example;\n" +
+      "public record Point(int x, int y) {}\n";
+    const file: SourceFile = { rel: "Point.java", ext: "java", content };
+    const parsed = parseFile(javaPlugin, file, makeIndex([file]));
+    expect(parsed.classes).toEqual([]);
+  });
+
+  it("preserves generic parameterization in field types (v0.71)", () => {
+    // Pre-fix, `List<Card>` was stripped to `List` on field display, losing
+    // the most semantically important info (and breaking the arrow-target
+    // resolution in classDiagram, which now peels `<X>` to find Card).
+    const content =
+      "package com.example;\n" +
+      "import java.util.List;\n" +
+      "import java.util.Map;\n" +
+      "public class Holder {\n" +
+      "  private List<Card> cards;\n" +
+      "  private Map<String, Card> byName;\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Holder.java", ext: "java", content };
+    const parsed = parseFile(javaPlugin, file, makeIndex([file]));
+    const fields = parsed.classes![0].fields;
+    const byName = new Map(fields.map((f) => [f.name, f]));
+    expect(byName.get("cards")?.type).toBe("List<Card>");
+    expect(byName.get("byName")?.type).toBe("Map<String, Card>");
+  });
+
+  it("captures primitive field types (int, long, double, boolean) — v0.71", () => {
+    // Pre-fix, primitives returned null from extractTypeName so the
+    // Architecture tab rendered `id` and `weight` with no type, looking
+    // empty for stat-heavy classes (Card / User / etc.). Post-fix the
+    // literal keyword surfaces in the field list.
+    const content =
+      "package com.example;\n" +
+      "public class Card {\n" +
+      "  private int id;\n" +
+      "  private long timestamp;\n" +
+      "  private double weight;\n" +
+      "  private boolean active;\n" +
+      "  private String name;\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Card.java", ext: "java", content };
+    const parsed = parseFile(javaPlugin, file, makeIndex([file]));
+    const fields = parsed.classes![0].fields;
+    const byName = new Map(fields.map((f) => [f.name, f]));
+    expect(byName.get("id")?.type).toBe("int");
+    expect(byName.get("timestamp")?.type).toBe("long");
+    expect(byName.get("weight")?.type).toBe("double");
+    expect(byName.get("active")?.type).toBe("boolean");
+    // Reference type still works as before
+    expect(byName.get("name")?.type).toBe("String");
+  });
+});

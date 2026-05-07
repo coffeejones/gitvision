@@ -511,3 +511,157 @@ describe("csharpPlugin — type-aware tracking (Phase 5)", () => {
     expect(validateCall?.calleeType).toBe("ValidateEmail");
   });
 });
+
+describe("csharpPlugin — ParsedClass extraction (v0.71)", () => {
+  beforeAll(async () => {
+    await csharpPlugin.load();
+  });
+
+  it("emits a ParsedClass for a basic class with fields, properties, and methods", () => {
+    const content =
+      "namespace App;\n" +
+      "public class Widget\n" +
+      "{\n" +
+      "  private int count;\n" +
+      "  public string Name { get; set; }\n" +
+      "  public Widget() {}\n" +
+      "  public int Render() { return 1; }\n" +
+      "  private void Update() {}\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Widget.cs", ext: "cs", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(csharpPlugin, file, ix);
+    expect(parsed.classes).toBeDefined();
+    expect(parsed.classes!.length).toBe(1);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("Widget");
+    expect(cls.isInterface).toBe(false);
+    expect(cls.isAbstract).toBe(false);
+    expect(cls.fields.map((f) => f.name).sort()).toEqual(["Name", "count"]);
+    expect(cls.methodNames.sort()).toEqual(["Render", "Update", "Widget"]);
+  });
+
+  it("captures field/property visibility (public/private/protected/internal)", () => {
+    // C#'s default visibility is `private` for class members — opposite of
+    // Java's `internal` (package-private). Verify each explicit modifier.
+    const content =
+      "namespace App;\n" +
+      "public class V\n" +
+      "{\n" +
+      "  public int Pub;\n" +
+      "  private int Priv;\n" +
+      "  protected int Prot;\n" +
+      "  internal int Intern;\n" +
+      "  int Default;\n" + // no modifier → private (C# default)
+      "}\n";
+    const file: SourceFile = { rel: "V.cs", ext: "cs", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(csharpPlugin, file, ix);
+    const fields = parsed.classes![0].fields;
+    const byName = new Map(fields.map((f) => [f.name, f]));
+    expect(byName.get("Pub")?.visibility).toBe("public");
+    expect(byName.get("Priv")?.visibility).toBe("private");
+    expect(byName.get("Prot")?.visibility).toBe("protected");
+    expect(byName.get("Intern")?.visibility).toBe("internal");
+    expect(byName.get("Default")?.visibility).toBe("private");
+  });
+
+  it("flags static + readonly + const fields", () => {
+    // C#-specific: `const` is treated as readonly in our model since both
+    // are immutable from a diagram-consumer perspective.
+    const content =
+      "namespace App;\n" +
+      "public class V\n" +
+      "{\n" +
+      "  public static int Total;\n" +
+      "  public readonly int Limit = 10;\n" +
+      "  public const string Tag = \"x\";\n" +
+      "  public int Mutable;\n" +
+      "}\n";
+    const file: SourceFile = { rel: "V.cs", ext: "cs", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(csharpPlugin, file, ix);
+    const byName = new Map(
+      parsed.classes![0].fields.map((f) => [f.name, f])
+    );
+    expect(byName.get("Total")?.isStatic).toBe(true);
+    expect(byName.get("Limit")?.isReadonly).toBe(true);
+    expect(byName.get("Tag")?.isReadonly).toBe(true);
+    expect(byName.get("Mutable")?.isStatic).toBe(false);
+    expect(byName.get("Mutable")?.isReadonly).toBe(false);
+  });
+
+  it("captures parentClass + implements from base_list (`: Base, IFace1, IFace2`)", () => {
+    // C# uses one combined `:` syntax for inheritance + interfaces. We pick
+    // the first base as parentClass and the rest as implements (consumers
+    // can refine via interface metadata if needed).
+    const content =
+      "namespace App;\n" +
+      "public class Service : BaseService, IDisposable, IRunnable\n" +
+      "{\n" +
+      "  public void Run() {}\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Service.cs", ext: "cs", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(csharpPlugin, file, ix);
+    const cls = parsed.classes![0];
+    expect(cls.parentClass).toBe("BaseService");
+    expect(cls.implements).toEqual(["IDisposable", "IRunnable"]);
+  });
+
+  it("flags abstract classes via the abstract modifier", () => {
+    const content =
+      "namespace App;\n" +
+      "public abstract class Shape\n" +
+      "{\n" +
+      "  public abstract double Area();\n" +
+      "}\n";
+    const file: SourceFile = { rel: "Shape.cs", ext: "cs", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(csharpPlugin, file, ix);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("Shape");
+    expect(cls.isAbstract).toBe(true);
+  });
+
+  it("flags interfaces with isInterface=true", () => {
+    const content =
+      "namespace App;\n" +
+      "public interface IRepository\n" +
+      "{\n" +
+      "  void Save();\n" +
+      "  void Delete(int id);\n" +
+      "}\n";
+    const file: SourceFile = { rel: "IRepository.cs", ext: "cs", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(csharpPlugin, file, ix);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("IRepository");
+    expect(cls.isInterface).toBe(true);
+    expect(cls.methodNames.sort()).toEqual(["Delete", "Save"]);
+  });
+
+  it("emits ParsedClass for enum_declaration but skips struct + record (v0.71)", () => {
+    // v0.71: enums are now first-class in the diagram (with
+    // <<enumeration>> stereotype + value list). Structs and records
+    // remain skipped — their shapes don't fit a class diagram cleanly.
+    const content =
+      "namespace App;\n" +
+      "public struct Point { public int X; public int Y; }\n" +
+      "public record User(string Name, int Age);\n" +
+      "public enum Status { Active, Inactive, Pending }\n" +
+      "public class Real { public int X; }\n";
+    const file: SourceFile = { rel: "Mixed.cs", ext: "cs", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(csharpPlugin, file, ix);
+    const byName = new Map(parsed.classes!.map((c) => [c.name, c]));
+    expect([...byName.keys()].sort()).toEqual(["Real", "Status"]);
+    expect(byName.get("Status")?.isEnum).toBe(true);
+    expect(byName.get("Status")?.enumValues).toEqual([
+      "Active",
+      "Inactive",
+      "Pending",
+    ]);
+    expect(byName.get("Real")?.isEnum).toBeFalsy();
+  });
+});

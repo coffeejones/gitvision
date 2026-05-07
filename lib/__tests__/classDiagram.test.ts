@@ -122,10 +122,12 @@ describe("generateClassDiagram · class block", () => {
     expect(source).toContain("+age number");
   });
 
-  it("does NOT render methods (v0.70 polish — empty parens are misleading)", () => {
-    // Methods get hidden in v0.70 because we have method names but
-    // not param/return signatures. Re-introduced when we extract
-    // those in a future phase. See classDiagram.ts renderClassBlock.
+  it("renders methods as +name() with default public visibility (v0.71)", () => {
+    // v0.71: re-enabled method rendering after the v0.70 hold. Param/
+    // return signatures are still missing — we render bare `+name()` —
+    // because that gives readers an idea of the class surface without
+    // pretending we know more than we do. Visibility defaults to `+`
+    // since FunctionDef doesn't carry per-method modifier info yet.
     const cg = emptyGraph();
     cg.classes = [
       cls("User", {
@@ -136,17 +138,38 @@ describe("generateClassDiagram · class block", () => {
       }),
     ];
     const { source } = generateClassDiagram(cg);
-    expect(source).not.toContain("+login()");
-    expect(source).not.toContain("+complicatedFunction()");
+    expect(source).toContain("+login()");
+    expect(source).toContain("+complicatedFunction()");
   });
 
-  it("renders a file-path note below each class", () => {
+  it("does not render methods on enums (values list is the surface)", () => {
+    // Enum entries have a values list instead of fields/methods —
+    // adding `+name()` underneath would be visual noise.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Status", {
+        isEnum: true,
+        enumValues: ["Active", "Inactive"],
+        methods: [method("describe", "src/foo.ts", "Status")],
+      }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).toContain("Active");
+    expect(source).not.toContain("+describe()");
+  });
+
+  it("does NOT render file-path notes (v0.71 — visual noise outweighed value)", () => {
+    // Pre-v0.71 we appended `note for X "<full-path>"` under each class.
+    // For 27-class diagrams the notes outweighed the class names and
+    // fragmented the layout. File-path navigation lives in the Code
+    // tab; the future ReactFlow canvas will surface it on hover/click.
     const cg = emptyGraph();
     cg.classes = [
       cls("User", { filePath: "src/auth/user.ts" }),
     ];
     const { source } = generateClassDiagram(cg);
-    expect(source).toContain('note for User "src/auth/user.ts"');
+    expect(source).not.toContain("note for User");
+    expect(source).not.toContain("src/auth/user.ts");
   });
 
   it("uses correct visibility prefixes", () => {
@@ -179,7 +202,12 @@ describe("generateClassDiagram · class block", () => {
     expect(source).toContain("+$VERSION string");
   });
 
-  it("marks readonly fields with * prefix", () => {
+  it("does NOT mark readonly fields with any glyph (Mermaid has no native syntax)", () => {
+    // v0.71: removed the `*` readonly prefix. Mermaid only treats `*` as
+    // an abstract-method tag, never on fields, so it rendered as if the
+    // glyph were part of the field name. Java's `private final X` and
+    // TS's `readonly X` both still parse and capture isReadonly — we
+    // just don't surface it visually until we adopt a stereotype line.
     const cg = emptyGraph();
     cg.classes = [
       cls("X", {
@@ -187,7 +215,8 @@ describe("generateClassDiagram · class block", () => {
       }),
     ];
     const { source } = generateClassDiagram(cg);
-    expect(source).toContain("+*id string");
+    expect(source).toContain("+id string");
+    expect(source).not.toContain("+*id");
   });
 
   it("omits the type when undefined", () => {
@@ -216,6 +245,24 @@ describe("generateClassDiagram · stereotypes", () => {
     cg.classes = [cls("Animal", { isAbstract: true })];
     const { source } = generateClassDiagram(cg);
     expect(source).toContain("<<abstract>>");
+  });
+
+  it("tags enums with <<enumeration>> and lists their values (v0.71)", () => {
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Status", {
+        isEnum: true,
+        enumValues: ["Active", "Inactive", "Pending"],
+      }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).toContain("<<enumeration>>");
+    expect(source).toContain("Active");
+    expect(source).toContain("Inactive");
+    expect(source).toContain("Pending");
+    // Value entries don't get a visibility prefix — they're constants.
+    expect(source).not.toContain("+Active");
+    expect(source).not.toContain("-Active");
   });
 
   it("interface stereotype takes precedence over abstract", () => {
@@ -270,6 +317,243 @@ describe("generateClassDiagram · inheritance", () => {
     cg.classes = [cls("Dog", { parentClass: "Animal" })];
     const result = generateClassDiagram(cg);
     expect(result.truncated).toMatch(/outside the current scope/);
+  });
+});
+
+// ---------------- Namespace grouping (v0.71) ----------------
+
+describe("generateClassDiagram · namespace grouping", () => {
+  it("wraps classes in namespace blocks when there are multiple folders", () => {
+    // Mermaid's classDiagram lays a flat graph horizontally — wrapping
+    // by folder gives the renderer clusters to arrange, producing a
+    // grid-like layout instead of one wide band.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("LoginController", { filePath: "src/controller/LoginController.ts" }),
+      cls("LogInService", { filePath: "src/service/LogInService.ts" }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).toContain("namespace controller {");
+    expect(source).toContain("namespace service {");
+    // Classes appear inside their respective namespace block
+    const controllerIdx = source.indexOf("namespace controller {");
+    const loginCtrlIdx = source.indexOf("class LoginController");
+    const closeIdx = source.indexOf("}", controllerIdx);
+    expect(loginCtrlIdx).toBeGreaterThan(controllerIdx);
+    expect(loginCtrlIdx).toBeLessThan(closeIdx);
+  });
+
+  it("does NOT emit any file-path notes inside namespace mode (v0.71)", () => {
+    // Pre-v0.71 namespaces hoisted notes after the closing braces.
+    // v0.71 dropped notes entirely — the assertion is now the absence
+    // of any `note for` line at all.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("A", { filePath: "src/a/A.ts" }),
+      cls("B", { filePath: "src/b/B.ts" }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).not.toContain("note for");
+  });
+
+  it("falls back to flat layout when all classes are in one folder", () => {
+    // Single-folder repos don't benefit from namespace wrapping —
+    // the output stays flat (one fewer level of nesting in source).
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("A", { filePath: "src/foo/A.ts" }),
+      cls("B", { filePath: "src/foo/B.ts" }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).not.toContain("namespace");
+  });
+
+  it("uses full folder path when leaf names collide", () => {
+    // Two distinct "service" folders (main + test) need different
+    // namespace identifiers. Falls back to the full path so the two
+    // groups don't collapse.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Real", { filePath: "src/main/service/Real.ts" }),
+      cls("RealTest", { filePath: "src/test/service/RealTest.ts" }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    // At least one of the two namespaces should reflect the full path
+    // (sanitized — slashes become underscores).
+    expect(source).toMatch(/namespace src_main_service|namespace src_test_service/);
+  });
+
+  it("emits namespaces in alphabetical folder order (deterministic source)", () => {
+    // Insertion-order-based output produces noisy git diffs when the
+    // file index changes. Sort by folder so re-running yields the
+    // same source.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Z", { filePath: "src/zzz/Z.ts" }),
+      cls("A", { filePath: "src/aaa/A.ts" }),
+      cls("M", { filePath: "src/mmm/M.ts" }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    const aaaIdx = source.indexOf("namespace aaa");
+    const mmmIdx = source.indexOf("namespace mmm");
+    const zzzIdx = source.indexOf("namespace zzz");
+    expect(aaaIdx).toBeGreaterThan(0);
+    expect(aaaIdx).toBeLessThan(mmmIdx);
+    expect(mmmIdx).toBeLessThan(zzzIdx);
+  });
+});
+
+// ---------------- Field-based association arrows (v0.71) ----------------
+
+describe("generateClassDiagram · field-based associations", () => {
+  it("emits Owner --> FieldType : fieldName when target is rendered", () => {
+    // Spring DI's textbook pattern: a controller with a service field
+    // gets an explicit dependency arrow to that service.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("LoginController", {
+        fields: [field("logInService", "LogInService", "private")],
+      }),
+      cls("LogInService"),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).toContain("LoginController --> LogInService : logInService");
+  });
+
+  it("does NOT emit an arrow when the field type isn't a rendered class", () => {
+    // Stdlib types (List, Map, String) shouldn't pull orphan boxes
+    // into the diagram. Skip when the target isn't already rendered.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Card", {
+        fields: [
+          field("cardTypes", "List", "private"),
+          field("name", "String", "private"),
+        ],
+      }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).not.toContain("--> List");
+    expect(source).not.toContain("--> String");
+  });
+
+  it("skips self-references (Foo with a Foo field)", () => {
+    // Trees / linked lists have self-typed fields. Drawing a self-arrow
+    // adds visual noise without revealing anything not already obvious
+    // from the field list.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Node", { fields: [field("next", "Node", "public")] }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).not.toContain("Node --> Node");
+  });
+
+  it("dedupes when one class has multiple fields of the same type", () => {
+    // ValidationService having `vp: ValidatePassword` and `vp2: ValidatePassword`
+    // gets ONE arrow, not two parallel ones (Mermaid would clip the labels).
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Service", {
+        fields: [
+          field("primary", "Validator", "private"),
+          field("backup", "Validator", "private"),
+        ],
+      }),
+      cls("Validator"),
+    ];
+    const { source } = generateClassDiagram(cg);
+    const arrowLines = source
+      .split("\n")
+      .filter((l) => l.includes("Service --> Validator"));
+    expect(arrowLines.length).toBe(1);
+  });
+
+  it("skips arrows when target lies outside the active scope", () => {
+    // Service in folder A has a field of type Helper in folder B. With
+    // a folder=A scope, only Service renders — Helper isn't in scope,
+    // so no arrow (we don't want orphan boxes leaking external types
+    // into the filtered view).
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Service", {
+        filePath: "src/a/Service.ts",
+        fields: [field("helper", "Helper", "private")],
+      }),
+      cls("Helper", { filePath: "src/b/Helper.ts" }),
+    ];
+    const { source } = generateClassDiagram(cg, {
+      scope: { kind: "folder", folder: "src/a" },
+    });
+    expect(source).not.toContain("--> Helper");
+  });
+
+  it("peels generic wrappers (List<Card>, Map<K,V>) to find arrow target", () => {
+    // The killer missing edge in TheDeckForge feedback: `private List<Card>
+    // cards` in Collection should draw an arrow to Card. Direct match on
+    // "List<Card>" obviously fails (List<Card> isn't a class), but
+    // resolveArrowTarget peels off the generic to find the inner element.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Collection", {
+        fields: [field("cards", "List<Card>", "private")],
+      }),
+      cls("Card"),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).toContain("Collection --> Card : cards");
+  });
+
+  it("peels Go slice / pointer / map wrappers to find arrow target", () => {
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Service", {
+        fields: [
+          field("decks", "[]Deck", "public"),
+          field("client", "*Client", "private"),
+          field("byName", "map[string]User", "private"),
+        ],
+      }),
+      cls("Deck"),
+      cls("Client"),
+      cls("User"),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).toContain("Service --> Deck : decks");
+    expect(source).toContain("Service --> Client : client");
+    // Map: peel to value type (User), ignore key type (string).
+    expect(source).toContain("Service --> User : byName");
+  });
+
+  it("peels nullable suffix (Foo?) to find arrow target", () => {
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Service", {
+        fields: [field("validator", "Validator?", "private")],
+      }),
+      cls("Validator"),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).toContain("Service --> Validator : validator");
+  });
+
+  it("emits arrows for inheritance AND field associations on the same class", () => {
+    // A repository class can both implement an interface AND depend on
+    // an injected service. Both edges should render.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("UserRepository", {
+        implements: ["IUserRepository"],
+        fields: [field("jdbcTemplate", "JdbcTemplate", "private")],
+      }),
+      cls("IUserRepository", { isInterface: true }),
+      cls("JdbcTemplate"),
+    ];
+    const { source } = generateClassDiagram(cg);
+    expect(source).toContain("IUserRepository <|.. UserRepository");
+    expect(source).toContain(
+      "UserRepository --> JdbcTemplate : jdbcTemplate"
+    );
   });
 });
 

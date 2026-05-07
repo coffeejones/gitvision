@@ -29,9 +29,12 @@ import path from "node:path";
 import { Parser } from "web-tree-sitter";
 import type { Language, Node as TsNode } from "web-tree-sitter";
 import type {
+  ClassMemberVisibility,
   CodeAnalysisPlugin,
   FileIndex,
   ParsedCall,
+  ParsedClass,
+  ParsedField,
   ParsedFile,
   ParsedFunction,
   ParsedImport,
@@ -245,6 +248,167 @@ function collectMemberTypes(classBody: TsNode): Map<string, string> {
   return out;
 }
 
+/** v0.71: full field metadata for the Architecture-tab Mermaid
+ *  generator. C# modifiers — `public`/`private`/`protected`/
+ *  `internal`/`static`/`readonly`/`const` — are wrapped in NAMED
+ *  `modifier` nodes (each with an anonymous keyword child). Walk
+ *  the field_declaration's namedChildren for `modifier` nodes,
+ *  then read the inner keyword via .child(0).type. Different from
+ *  Java where modifiers are anonymous-direct-children of a
+ *  `modifiers` wrapper. */
+function collectModifiersFromNode(
+  node: TsNode
+): { visibility: ClassMemberVisibility; isStatic: boolean; isReadonly: boolean; isAbstract: boolean } {
+  let visibility: ClassMemberVisibility = "private"; // C# default for class members
+  let isStatic = false;
+  let isReadonly = false;
+  let isAbstract = false;
+  for (const c of node.namedChildren) {
+    if (c.type !== "modifier") continue;
+    // The keyword is the first (typically only) child of the modifier wrapper
+    const kw = c.child(0);
+    if (!kw) continue;
+    const t = kw.type;
+    if (t === "public") visibility = "public";
+    else if (t === "private") visibility = "private";
+    else if (t === "protected") visibility = "protected";
+    else if (t === "internal") visibility = "internal";
+    else if (t === "static") isStatic = true;
+    else if (t === "readonly" || t === "const") isReadonly = true;
+    else if (t === "abstract") isAbstract = true;
+  }
+  return { visibility, isStatic, isReadonly, isAbstract };
+}
+
+/** v0.71: type extraction for FIELD DISPLAY purposes (Architecture
+ *  tab). Same rationale as the Java helper — type-tracking wants the
+ *  base name, but the diagram preserves "List<Card>" so the consumer
+ *  can pull element types for composition arrows. C# spelling note:
+ *  generic types are `generic_name` (Java's grammar calls them
+ *  `generic_type`), and the inner shape is identifier + type_argument_list. */
+function extractFieldType(node: TsNode): string | undefined {
+  const base = extractTypeName(node);
+  if (!base) return undefined;
+  if (node.type === "nullable_type") {
+    // Recurse on the inner type, append `?` for the diagram so users
+    // see `Validator?` rather than just `Validator`.
+    const inner = node.namedChildren[0];
+    const innerName = inner ? extractFieldType(inner) : undefined;
+    return innerName ? `${innerName}?` : base;
+  }
+  if (node.type !== "generic_name") return base;
+  const args: string[] = [];
+  for (const child of node.namedChildren) {
+    if (child.type !== "type_argument_list") continue;
+    for (const arg of child.namedChildren) {
+      const inner = extractFieldType(arg);
+      if (inner) args.push(inner);
+    }
+  }
+  if (args.length === 0) return base;
+  return `${base}<${args.join(", ")}>`;
+}
+
+function collectFullClassFields(classBody: TsNode): ParsedField[] {
+  const out: ParsedField[] = [];
+
+  for (const child of classBody.namedChildren) {
+    if (child.type !== "field_declaration" && child.type !== "property_declaration") {
+      continue;
+    }
+
+    const { visibility, isStatic, isReadonly } = collectModifiersFromNode(child);
+
+    if (child.type === "field_declaration") {
+      const vd = child.namedChildren.find((c) => c.type === "variable_declaration");
+      if (!vd) continue;
+      const typeNode = vd.childForFieldName("type");
+      const type = typeNode ? extractFieldType(typeNode) : undefined;
+      for (const sub of vd.namedChildren) {
+        if (sub.type !== "variable_declarator") continue;
+        const nameNode = sub.namedChildren[0];
+        if (nameNode?.type === "identifier") {
+          out.push({
+            name: nameNode.text,
+            type,
+            visibility,
+            isStatic,
+            isReadonly,
+          });
+        }
+      }
+    } else if (child.type === "property_declaration") {
+      const typeNode = child.childForFieldName("type");
+      const nameNode = child.childForFieldName("name");
+      if (!nameNode) continue;
+      const type = typeNode ? extractFieldType(typeNode) : undefined;
+      out.push({
+        name: nameNode.text,
+        type,
+        visibility,
+        isStatic,
+        isReadonly,
+      });
+    }
+  }
+  return out;
+}
+
+/** Extract the parent class / first listed base type from a C#
+ *  class_declaration's base_list. C# uses `: BaseClass, IFace1,
+ *  IFace2` syntax — the first entry MAY be a class or an interface;
+ *  we follow the convention that the first non-interface-named
+ *  entry is the parent. We don't have interface metadata at parse
+ *  time, so we treat all base_list entries as "parents + interfaces"
+ *  and let the cross-snapshot consumer decide. v1: pick the first
+ *  as parentClass, the rest as implements. */
+function extractCsharpBases(classNode: TsNode): {
+  parentClass?: string;
+  implements: string[];
+} {
+  const baseList = classNode.namedChildren.find(
+    (c): c is TsNode => !!c && c.type === "base_list"
+  );
+  if (!baseList) return { implements: [] };
+  const bases: string[] = [];
+  for (const child of baseList.namedChildren) {
+    if (child.type === "identifier") bases.push(child.text);
+    else if (child.type === "qualified_name") bases.push(child.text);
+    else if (child.type === "generic_name") {
+      const inner = child.childForFieldName("name");
+      if (inner) bases.push(inner.text);
+      else bases.push(child.text.split("<")[0]);
+    }
+  }
+  if (bases.length === 0) return { implements: [] };
+  return { parentClass: bases[0], implements: bases.slice(1) };
+}
+
+/** True when the class declares the `abstract` modifier. C# wraps each
+ *  class-level modifier in a named `modifier` node — same shape as the
+ *  field/property modifier handling above. */
+function isAbstractCsharpClass(classNode: TsNode): boolean {
+  return collectModifiersFromNode(classNode).isAbstract;
+}
+
+/** v0.71: walk a C# enum_declaration's enum_member_declaration_list
+ *  for the constant names (`Active`, `Inactive`, `Pending`). C#
+ *  exposes the body as `enum_member_declaration_list`, not under a
+ *  `body` field name — so we find it via type lookup. */
+function collectCsharpEnumValues(enumNode: TsNode): string[] {
+  const list = enumNode.namedChildren.find(
+    (c) => c.type === "enum_member_declaration_list"
+  );
+  if (!list) return [];
+  const out: string[] = [];
+  for (const child of list.namedChildren) {
+    if (child.type !== "enum_member_declaration") continue;
+    const idNode = child.namedChildren.find((c) => c.type === "identifier");
+    if (idNode?.text) out.push(idNode.text);
+  }
+  return out;
+}
+
 /** Walk a method's parameter_list, return name→type map. */
 function collectParamTypes(methodNode: TsNode): Map<string, string> {
   const out = new Map<string, string>();
@@ -299,6 +463,13 @@ function parseCSharpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
   const imports: ParsedImport[] = [];
   const functions: ParsedFunction[] = [];
   const calls: ParsedCall[] = [];
+  /** v0.71: full ParsedClass entries for the Architecture-tab Mermaid
+   *  generator. Captured alongside the existing classStack entries
+   *  (which only carry name + member types for type-aware call
+   *  resolution). Only class_declaration + interface_declaration types
+   *  emit entries — structs/records/enums get a separate visualisation
+   *  in a later phase. */
+  const parsedClasses: ParsedClass[] = [];
   let totalDecisionPoints = 0;
 
   const seenImportSpecs = new Set<string>();
@@ -432,6 +603,24 @@ function parseCSharpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
           ? collectMemberTypes(bodyNode)
           : new Map<string, string>();
         classStack.push({ name: className, fields });
+
+        // Collect method names from the body BEFORE we recurse — needed
+        // to populate ParsedClass.methodNames so the codeGraph aggregator
+        // can match them to FunctionDef entries by (containerType, name).
+        const methodNames: string[] = [];
+        if (bodyNode) {
+          for (const member of bodyNode.namedChildren) {
+            if (
+              member.type !== "method_declaration" &&
+              member.type !== "constructor_declaration"
+            ) {
+              continue;
+            }
+            const m = member.childForFieldName("name");
+            if (m && m.text) methodNames.push(m.text);
+          }
+        }
+
         if (bodyNode) {
           for (const child of bodyNode.namedChildren) visit(child);
         }
@@ -439,6 +628,44 @@ function parseCSharpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
         // `public record Foo(int Bar);` — we don't extract those parameters
         // as fields in v1. The class scope still pushes/pops correctly.
         classStack.pop();
+
+        // v0.71: emit ParsedClass for the Architecture tab. Anonymous
+        // classes are skipped. struct/record diagrams remain a later
+        // phase. Enums get a dedicated branch since their body is an
+        // enum_member_declaration_list (not a `body` field) and they
+        // carry value names instead of fields.
+        if (
+          className !== "<anon>" &&
+          (node.type === "class_declaration" ||
+            node.type === "interface_declaration") &&
+          bodyNode
+        ) {
+          const bases = extractCsharpBases(node);
+          parsedClasses.push({
+            name: className,
+            startRow: node.startPosition.row,
+            endRow: node.endPosition.row,
+            fields: collectFullClassFields(bodyNode),
+            methodNames,
+            parentClass: bases.parentClass,
+            implements: bases.implements,
+            isInterface: node.type === "interface_declaration",
+            isAbstract: isAbstractCsharpClass(node),
+          });
+        } else if (
+          className !== "<anon>" &&
+          node.type === "enum_declaration"
+        ) {
+          parsedClasses.push({
+            name: className,
+            startRow: node.startPosition.row,
+            endRow: node.endPosition.row,
+            fields: [],
+            methodNames: [],
+            isEnum: true,
+            enumValues: collectCsharpEnumValues(node),
+          });
+        }
         return;
       }
 
@@ -629,6 +856,7 @@ function parseCSharpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
     calls,
     fileComplexity: 1 + totalDecisionPoints,
     parseError: false,
+    classes: parsedClasses,
   };
 }
 

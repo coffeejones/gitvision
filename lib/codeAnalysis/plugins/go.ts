@@ -27,9 +27,12 @@ import path from "node:path";
 import { Parser } from "web-tree-sitter";
 import type { Language, Node as TsNode } from "web-tree-sitter";
 import type {
+  ClassMemberVisibility,
   CodeAnalysisPlugin,
   FileIndex,
   ParsedCall,
+  ParsedClass,
+  ParsedField,
   ParsedFile,
   ParsedFunction,
   ParsedImport,
@@ -176,6 +179,213 @@ function collectStructFields(structType: TsNode): Map<string, string> {
   return out;
 }
 
+// ------------------- ParsedClass extraction (v0.71) -------------------
+//
+// Go's notion of "class" is split across two AST shapes:
+//
+//   1. Struct types (`type X struct {...}`) — the field-bearing entity. Methods
+//      are declared OUTSIDE the struct body via receiver syntax (`func (x *X)
+//      M()`), so we have to do a second pass over method_declaration nodes and
+//      attach method names by matching receiver types.
+//
+//   2. Interface types (`type Y interface {...}`) — the method-signature
+//      bearing entity. method_elem children carry the signatures.
+//
+// Visibility in Go is convention-driven: capital first letter = exported
+// (public), lowercase = unexported (private). We map that 1:1 to our
+// ClassMemberVisibility model. There's no abstract/static/readonly concept —
+// those flags are always false.
+//
+// What we don't capture in v1:
+//   - Embedded structs / interface composition (would require more work to
+//     decide whether to surface as parentClass or as fields)
+//   - Interface satisfaction (Go is duck-typed; `implements` stays empty)
+
+/** Map a Go identifier to public/private using the language's exported-name
+ *  convention. */
+function goVisibilityFromName(name: string): ClassMemberVisibility {
+  if (!name) return "private";
+  const first = name.charCodeAt(0);
+  // Capital A-Z (and underscore) treated as exported. Lowercase = unexported.
+  if (first >= 65 && first <= 90) return "public";
+  return "private";
+}
+
+interface GoClassDraft {
+  name: string;
+  startRow: number;
+  endRow: number;
+  fields: ParsedField[];
+  methodNames: string[];
+  isInterface: boolean;
+}
+
+/** Walk the file once collecting struct + interface ParsedClass drafts.
+ *  Method names are filled in by a second pass over method_declaration. */
+function collectGoClassDrafts(root: TsNode): Map<string, GoClassDraft> {
+  const out = new Map<string, GoClassDraft>();
+
+  function visit(node: TsNode) {
+    if (node.type === "type_declaration") {
+      for (const spec of node.namedChildren) {
+        if (spec.type !== "type_spec") continue;
+        const nameNode = spec.childForFieldName("name");
+        const typeNode = spec.childForFieldName("type");
+        if (!nameNode || !typeNode) continue;
+        const className = nameNode.text;
+
+        if (typeNode.type === "struct_type") {
+          out.set(className, {
+            name: className,
+            startRow: spec.startPosition.row,
+            endRow: spec.endPosition.row,
+            fields: collectGoStructFields(typeNode),
+            methodNames: [],
+            isInterface: false,
+          });
+        } else if (typeNode.type === "interface_type") {
+          const methodNames: string[] = [];
+          for (const member of typeNode.namedChildren) {
+            if (member.type !== "method_elem") continue;
+            // First named child of method_elem is the field_identifier
+            // (method name). Embedded interfaces have type_identifier
+            // shape and are skipped in v1.
+            for (const c of member.namedChildren) {
+              if (c.type === "field_identifier") {
+                methodNames.push(c.text);
+                break;
+              }
+            }
+          }
+          out.set(className, {
+            name: className,
+            startRow: spec.startPosition.row,
+            endRow: spec.endPosition.row,
+            fields: [],
+            methodNames,
+            isInterface: true,
+          });
+        }
+      }
+    }
+    for (const child of node.namedChildren) visit(child);
+  }
+
+  visit(root);
+  return out;
+}
+
+/** v0.71: type extraction for FIELD DISPLAY purposes. extractTypeName
+ *  returns null for slices, maps, and other composite types (call-
+ *  resolution can't do anything useful with `[]Foo.method()` so the
+ *  bare-base extractor stays conservative). For diagram display we
+ *  preserve container info: `cards []Card` shows as `[]Card`, and the
+ *  classDiagram generator can pull `Card` out as the arrow target. */
+function extractFieldType(node: TsNode): string | undefined {
+  switch (node.type) {
+    case "slice_type": {
+      // `[]Foo` — single child is the element type.
+      for (const child of node.namedChildren) {
+        const inner = extractFieldType(child);
+        if (inner) return `[]${inner}`;
+      }
+      return undefined;
+    }
+    case "map_type": {
+      // `map[K]V` — first named child is key, second is value.
+      const key = node.namedChildren[0]
+        ? extractFieldType(node.namedChildren[0]) ?? "?"
+        : "?";
+      const val = node.namedChildren[1]
+        ? extractFieldType(node.namedChildren[1]) ?? "?"
+        : "?";
+      return `map[${key}]${val}`;
+    }
+    case "pointer_type": {
+      for (const child of node.namedChildren) {
+        const inner = extractFieldType(child);
+        if (inner) return `*${inner}`;
+      }
+      return undefined;
+    }
+    case "generic_type": {
+      // Go 1.18+ generics: `Foo[T1, T2]`
+      let base: string | undefined;
+      const args: string[] = [];
+      for (const child of node.namedChildren) {
+        if (
+          child.type === "type_identifier" ||
+          child.type === "qualified_type"
+        ) {
+          base = extractTypeName(child) ?? undefined;
+        } else if (child.type === "type_arguments") {
+          for (const arg of child.namedChildren) {
+            const inner = extractFieldType(arg);
+            if (inner) args.push(inner);
+          }
+        }
+      }
+      if (!base) return undefined;
+      return args.length > 0 ? `${base}[${args.join(", ")}]` : base;
+    }
+    default:
+      return extractTypeName(node) ?? undefined;
+  }
+}
+
+/** Field extraction for the rich ParsedClass shape. Mirrors collectStructFields
+ *  (which returns a name→type Map for the type-tracking pass) but emits
+ *  ParsedField with Go-convention visibility. */
+function collectGoStructFields(structType: TsNode): ParsedField[] {
+  const out: ParsedField[] = [];
+  for (const child of structType.namedChildren) {
+    if (child.type !== "field_declaration_list") continue;
+    for (const fd of child.namedChildren) {
+      if (fd.type !== "field_declaration") continue;
+      const typeNode = fd.childForFieldName("type");
+      const type = typeNode ? extractFieldType(typeNode) : undefined;
+      // field_declaration may carry multiple field_identifier children for
+      // `a, b SomeType` syntax — emit one ParsedField per identifier.
+      for (const sub of fd.namedChildren) {
+        if (sub.type !== "field_identifier") continue;
+        const name = sub.text;
+        out.push({
+          name,
+          type,
+          visibility: goVisibilityFromName(name),
+          isStatic: false,
+          isReadonly: false,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/** Walk all method_declaration nodes and attach method names to the matching
+ *  struct draft via receiver type. Only attaches to known structs — methods
+ *  on external types or unrecognized names are ignored. */
+function attachGoMethodsToClasses(
+  root: TsNode,
+  drafts: Map<string, GoClassDraft>
+): void {
+  function visit(node: TsNode) {
+    if (node.type === "method_declaration") {
+      const nameNode = node.childForFieldName("name");
+      const receiverNode = node.childForFieldName("receiver");
+      if (nameNode && receiverNode) {
+        const rcv = extractReceiver(receiverNode);
+        if (rcv.type) {
+          const draft = drafts.get(rcv.type);
+          if (draft) draft.methodNames.push(nameNode.text);
+        }
+      }
+    }
+    for (const child of node.namedChildren) visit(child);
+  }
+  visit(root);
+}
+
 // ------------------- Param + receiver extraction -------------------
 
 interface ReceiverInfo {
@@ -248,10 +458,15 @@ function parseGoDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     return errorParsedFile(file);
   }
 
-  // Pass 1: build the struct table for this file.
+  // Pass 1: build the struct table for this file (used for type-aware call
+  // resolution in pass 3). Also collect ParsedClass drafts for the
+  // Architecture tab.
   const structs = collectStructs(tree.rootNode);
+  const classDrafts = collectGoClassDrafts(tree.rootNode);
+  // Pass 2: attach method names to struct drafts via receiver matching.
+  attachGoMethodsToClasses(tree.rootNode, classDrafts);
 
-  // Pass 2: walk for imports, functions, calls, decision points.
+  // Pass 3: walk for imports, functions, calls, decision points.
   const imports: ParsedImport[] = [];
   const functions: ParsedFunction[] = [];
   const calls: ParsedCall[] = [];
@@ -534,6 +749,24 @@ function parseGoDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   tree.delete();
   parser.delete();
 
+  // v0.71: assemble final ParsedClass[] from drafts. Most Go-specific bits
+  // (no inheritance, duck-typed interfaces, no abstract concept) collapse to
+  // empty arrays / falsy flags here.
+  const parsedClasses: ParsedClass[] = [];
+  for (const draft of classDrafts.values()) {
+    parsedClasses.push({
+      name: draft.name,
+      startRow: draft.startRow,
+      endRow: draft.endRow,
+      fields: draft.fields,
+      methodNames: draft.methodNames,
+      parentClass: undefined,
+      implements: [],
+      isInterface: draft.isInterface,
+      isAbstract: false,
+    });
+  }
+
   return {
     rel: file.rel,
     imports,
@@ -541,6 +774,7 @@ function parseGoDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     calls,
     fileComplexity: 1 + totalDecisionPoints,
     parseError: false,
+    classes: parsedClasses,
   };
 }
 

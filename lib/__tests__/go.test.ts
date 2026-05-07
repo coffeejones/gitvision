@@ -465,3 +465,152 @@ describe("goPlugin — type-aware tracking (v0.16)", () => {
     expect(sendCalls).toEqual(["ClientA", "ClientB"]);
   });
 });
+
+describe("goPlugin — ParsedClass extraction (v0.71)", () => {
+  beforeAll(async () => {
+    await goPlugin.load();
+  });
+
+  it("emits a ParsedClass for a struct with fields + receiver methods", () => {
+    const content =
+      "package widgets\n" +
+      "type Widget struct {\n" +
+      "  count  int\n" +
+      "  Name   string\n" +
+      "}\n" +
+      "func (w *Widget) Render() int { return 1 }\n" +
+      "func (w Widget) hidden() {}\n";
+    const file: SourceFile = { rel: "widget.go", ext: "go", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(goPlugin, file, ix);
+    expect(parsed.classes).toBeDefined();
+    expect(parsed.classes!.length).toBe(1);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("Widget");
+    expect(cls.isInterface).toBe(false);
+    expect(cls.isAbstract).toBe(false);
+    expect(cls.fields.map((f) => f.name).sort()).toEqual(["Name", "count"]);
+    expect(cls.methodNames.sort()).toEqual(["Render", "hidden"]);
+  });
+
+  it("derives field visibility from name's first character (Go convention)", () => {
+    // Go has no explicit visibility modifiers — exported = capital first
+    // letter, unexported = lowercase. We map that 1:1 to public/private.
+    const content =
+      "package widgets\n" +
+      "type V struct {\n" +
+      "  Pub    int\n" +
+      "  priv   int\n" +
+      "  Logger *Logger\n" +
+      "  cache  *Cache\n" +
+      "}\n";
+    const file: SourceFile = { rel: "v.go", ext: "go", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(goPlugin, file, ix);
+    const fields = parsed.classes![0].fields;
+    const byName = new Map(fields.map((f) => [f.name, f]));
+    expect(byName.get("Pub")?.visibility).toBe("public");
+    expect(byName.get("priv")?.visibility).toBe("private");
+    expect(byName.get("Logger")?.visibility).toBe("public");
+    expect(byName.get("cache")?.visibility).toBe("private");
+  });
+
+  it("captures field types preserving pointer/slice/map wrappers (v0.71)", () => {
+    // v0.71: extractFieldType keeps `*`, `[]`, `map[K]` wrappers so the
+    // diagram surfaces "this is a pointer" / "this is a slice" info.
+    // The arrow-resolver in classDiagram peels these back when picking
+    // an arrow target.
+    const content =
+      "package widgets\n" +
+      "type Service struct {\n" +
+      "  client  *http.Client\n" +
+      "  inner   Inner\n" +
+      "  decks   []Deck\n" +
+      "  byName  map[string]User\n" +
+      "}\n";
+    const file: SourceFile = { rel: "service.go", ext: "go", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(goPlugin, file, ix);
+    const byName = new Map(
+      parsed.classes![0].fields.map((f) => [f.name, f])
+    );
+    expect(byName.get("client")?.type).toBe("*Client");
+    expect(byName.get("inner")?.type).toBe("Inner");
+    expect(byName.get("decks")?.type).toBe("[]Deck");
+    expect(byName.get("byName")?.type).toBe("map[string]User");
+  });
+
+  it("attaches methods to the correct struct via receiver type", () => {
+    // Receiver type matching is the only way to discover methods in Go —
+    // they're declared OUTSIDE the struct. Pointer + value receivers both
+    // count.
+    const content =
+      "package widgets\n" +
+      "type Alpha struct { x int }\n" +
+      "type Beta struct { y int }\n" +
+      "func (a *Alpha) AlphaMethod() {}\n" +
+      "func (a Alpha) AnotherAlpha() {}\n" +
+      "func (b *Beta) BetaMethod() {}\n";
+    const file: SourceFile = { rel: "ab.go", ext: "go", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(goPlugin, file, ix);
+    const byName = new Map(parsed.classes!.map((c) => [c.name, c]));
+    expect(byName.get("Alpha")?.methodNames.sort()).toEqual([
+      "AlphaMethod",
+      "AnotherAlpha",
+    ]);
+    expect(byName.get("Beta")?.methodNames).toEqual(["BetaMethod"]);
+  });
+
+  it("emits ParsedClass for interfaces with isInterface=true", () => {
+    const content =
+      "package widgets\n" +
+      "type Reader interface {\n" +
+      "  Read(p []byte) (n int, err error)\n" +
+      "  Close() error\n" +
+      "}\n";
+    const file: SourceFile = { rel: "reader.go", ext: "go", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(goPlugin, file, ix);
+    expect(parsed.classes!.length).toBe(1);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("Reader");
+    expect(cls.isInterface).toBe(true);
+    expect(cls.fields).toEqual([]);
+    expect(cls.methodNames.sort()).toEqual(["Close", "Read"]);
+  });
+
+  it("leaves parentClass undefined and implements empty (Go has no inheritance)", () => {
+    // Go uses composition (struct embedding) instead of inheritance, and
+    // interfaces are duck-typed. Both edges stay empty in our diagram model
+    // — we won't hallucinate a class hierarchy that doesn't exist.
+    const content =
+      "package widgets\n" +
+      "type Embedded struct { Logger }\n" +
+      "type Logger struct { tag string }\n";
+    const file: SourceFile = { rel: "e.go", ext: "go", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(goPlugin, file, ix);
+    for (const cls of parsed.classes!) {
+      expect(cls.parentClass).toBeUndefined();
+      expect(cls.implements).toEqual([]);
+      expect(cls.isAbstract).toBe(false);
+    }
+  });
+
+  it("does NOT emit ParsedClass entries for type aliases of non-struct/interface types", () => {
+    // `type Status int` and `type Handler func(...)` are not struct/interface
+    // declarations and shouldn't show up in the class diagram. They're real
+    // Go shapes but not relevant to the entity-relationship view we render.
+    const content =
+      "package widgets\n" +
+      "type Status int\n" +
+      "type Handler func(req string) error\n" +
+      "type Real struct { x int }\n";
+    const file: SourceFile = { rel: "mixed.go", ext: "go", content };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(goPlugin, file, ix);
+    expect(parsed.classes!.length).toBe(1);
+    expect(parsed.classes![0].name).toBe("Real");
+  });
+});

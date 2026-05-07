@@ -444,4 +444,28 @@ describe("structuralDiffHasContent", () => {
     const diff = structuralDiff(mkCovSnap(2), mkCovSnap(8));
     expect(structuralDiffHasContent(diff)).toBe(true);
   });
+
+  it("returns false when coverage is unchanged across snapshots (v0.71)", () => {
+    // diffCoverage returns a non-null CoverageDelta whenever both
+    // sides have test infrastructure — even when the percentages are
+    // identical. Pre-fix, that made the panel render against
+    // unchanged repos (delta=0, all other fields zero) with an
+    // empty SummaryStrip and no per-list rows. The gate must look
+    // at delta !== 0, not the wrapper.
+    function mkCovSnap(): AnalysisSnapshot {
+      const cg = emptyGraph();
+      cg.functions = [
+        fn("__tests__/t.test.ts", "testFn", 2),
+        fn("src/p.ts", "prodFn", 2),
+      ];
+      cg.calls = [call("__tests__/t.test.ts", "testFn", "src/p.ts", "prodFn")];
+      return snap({ codeGraph: cg });
+    }
+    const diff = structuralDiff(mkCovSnap(), mkCovSnap());
+    // CoverageDelta IS populated (both snapshots have tests)…
+    expect(diff.coverageDelta).not.toBeNull();
+    expect(diff.coverageDelta?.delta).toBe(0);
+    // …but the panel should hide because nothing actually changed.
+    expect(structuralDiffHasContent(diff)).toBe(false);
+  });
 });

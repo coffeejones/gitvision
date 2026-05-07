@@ -37,9 +37,12 @@ import path from "node:path";
 import { Parser } from "web-tree-sitter";
 import type { Language, Node as TsNode } from "web-tree-sitter";
 import type {
+  ClassMemberVisibility,
   CodeAnalysisPlugin,
   FileIndex,
   ParsedCall,
+  ParsedClass,
+  ParsedField,
   ParsedFile,
   ParsedFunction,
   ParsedImport,
@@ -312,6 +315,183 @@ function inferInitializerType(initNode: TsNode | null): string | null {
   return null;
 }
 
+/** v0.71: type extraction for FIELD DISPLAY purposes. PHP doesn't
+ *  have generic syntax in the type system, so the only "richer" form
+ *  we can preserve is `?Foo` (optional_type — recursed for `Foo?`
+ *  display). Other shapes (union/intersection) fall through to the
+ *  bare base from extractTypeName. */
+function extractFieldType(node: TsNode): string | undefined {
+  if (node.type === "optional_type") {
+    for (const child of node.namedChildren) {
+      const inner = extractFieldType(child);
+      if (inner) return `${inner}?`;
+    }
+  }
+  return extractTypeName(node) ?? undefined;
+}
+
+/** v0.71: rich field metadata for the Architecture-tab Mermaid
+ *  generator. PHP wraps each modifier in a NAMED node (one of
+ *  `visibility_modifier`, `static_modifier`, `readonly_modifier`,
+ *  `abstract_modifier`, `final_modifier`), each with an anonymous
+ *  keyword child. Different from Java (anonymous-direct under a
+ *  `modifiers` wrapper) and C# (named `modifier` wrapper with
+ *  anonymous keyword). */
+function collectFullClassFields(classBody: TsNode): ParsedField[] {
+  const out: ParsedField[] = [];
+
+  for (const child of classBody.namedChildren) {
+    if (child.type !== "property_declaration") continue;
+
+    // PHP requires explicit visibility for properties in modern code,
+    // but `var $foo` (legacy) defaults to public — that's our fallback.
+    let visibility: ClassMemberVisibility = "public";
+    let isStatic = false;
+    let isReadonly = false;
+    let typeNode: TsNode | null = null;
+
+    for (const sub of child.namedChildren) {
+      if (sub.type === "visibility_modifier") {
+        const kw = sub.child(0);
+        if (kw) {
+          if (kw.type === "public") visibility = "public";
+          else if (kw.type === "private") visibility = "private";
+          else if (kw.type === "protected") visibility = "protected";
+        }
+      } else if (sub.type === "static_modifier") {
+        isStatic = true;
+      } else if (sub.type === "readonly_modifier") {
+        isReadonly = true;
+      } else if (
+        sub.type === "named_type" ||
+        sub.type === "primitive_type" ||
+        sub.type === "optional_type" ||
+        sub.type === "union_type" ||
+        sub.type === "intersection_type"
+      ) {
+        typeNode = sub;
+      }
+    }
+
+    const type = typeNode ? extractFieldType(typeNode) : undefined;
+
+    // property_declaration may have multiple property_element children:
+    // `private Foo $a, $b, $c;` — each gets the same modifier set + type.
+    for (const sub of child.namedChildren) {
+      if (sub.type !== "property_element") continue;
+      for (const inner of sub.namedChildren) {
+        if (inner.type === "variable_name") {
+          const name = bareVariableName(inner);
+          if (name) {
+            out.push({ name, type, visibility, isStatic, isReadonly });
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // PHP 8 constructor parameter promotion creates implicit properties.
+  // Pull them in so a class like `class C { __construct(public Foo $x) }`
+  // exposes `x` in the diagram.
+  for (const child of classBody.namedChildren) {
+    if (child.type !== "method_declaration") continue;
+    const nameNode = child.childForFieldName("name");
+    if (nameNode?.text !== "__construct") continue;
+    const params = child.childForFieldName("parameters");
+    if (!params) continue;
+    for (const p of params.namedChildren) {
+      if (p.type !== "property_promotion_parameter") continue;
+      // Same modifier shape as property_declaration but typically only
+      // a visibility_modifier and optional readonly_modifier.
+      let visibility: ClassMemberVisibility = "public";
+      let isReadonly = false;
+      for (const sub of p.namedChildren) {
+        if (sub.type === "visibility_modifier") {
+          const kw = sub.child(0);
+          if (kw) {
+            if (kw.type === "public") visibility = "public";
+            else if (kw.type === "private") visibility = "private";
+            else if (kw.type === "protected") visibility = "protected";
+          }
+        } else if (sub.type === "readonly_modifier") {
+          isReadonly = true;
+        }
+      }
+      const typeNode = p.childForFieldName("type");
+      const nameNode = p.childForFieldName("name");
+      if (!nameNode) continue;
+      const name = bareVariableName(nameNode);
+      if (!name) continue;
+      const type = typeNode ? extractFieldType(typeNode) : undefined;
+      out.push({ name, type, visibility, isStatic: false, isReadonly });
+    }
+  }
+
+  return out;
+}
+
+/** Extract parent class name from a `extends Foo` base_clause. PHP only
+ *  supports single inheritance, so at most one parent. */
+function extractPhpParent(classNode: TsNode): string | undefined {
+  for (const child of classNode.namedChildren) {
+    if (child.type !== "base_clause") continue;
+    for (const c of child.namedChildren) {
+      if (c.type === "name") return c.text;
+      if (c.type === "qualified_name") {
+        const parts = c.text.split("\\");
+        return parts[parts.length - 1] ?? undefined;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** Extract names listed in `implements IFoo, IBar` clause. */
+function extractPhpImplements(classNode: TsNode): string[] {
+  const out: string[] = [];
+  for (const child of classNode.namedChildren) {
+    if (child.type !== "class_interface_clause") continue;
+    for (const c of child.namedChildren) {
+      if (c.type === "name") out.push(c.text);
+      else if (c.type === "qualified_name") {
+        const parts = c.text.split("\\");
+        const last = parts[parts.length - 1];
+        if (last) out.push(last);
+      }
+    }
+  }
+  return out;
+}
+
+/** True when class declares `abstract` (PHP exposes this as a named
+ *  `abstract_modifier` child). */
+function isAbstractPhpClass(classNode: TsNode): boolean {
+  for (const child of classNode.namedChildren) {
+    if (child.type === "abstract_modifier") return true;
+  }
+  return false;
+}
+
+/** v0.71: walk a PHP 8.1+ enum_declaration's enum_declaration_list
+ *  for the case names. Each `case Active;` is an enum_case child
+ *  whose `name` field holds the literal value name. */
+function collectPhpEnumValues(enumNode: TsNode): string[] {
+  const list = enumNode.namedChildren.find(
+    (c) => c.type === "enum_declaration_list"
+  );
+  if (!list) return [];
+  const out: string[] = [];
+  for (const child of list.namedChildren) {
+    if (child.type !== "enum_case") continue;
+    const nameNode =
+      child.childForFieldName("name") ??
+      child.namedChildren.find((c) => c.type === "name");
+    if (nameNode?.text) out.push(nameNode.text);
+  }
+  return out;
+}
+
 // ------------------- parseDirect: AST walk with type tracking -------------------
 
 interface MethodScope {
@@ -340,6 +520,10 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
   const imports: ParsedImport[] = [];
   const functions: ParsedFunction[] = [];
   const calls: ParsedCall[] = [];
+  /** v0.71: full ParsedClass entries for the Architecture-tab Mermaid
+   *  generator. Only emitted for class_declaration + interface_declaration
+   *  — traits and enums get separate visualisations later. */
+  const parsedClasses: ParsedClass[] = [];
   let totalDecisionPoints = 0;
 
   const seenImportSpecs = new Set<string>();
@@ -458,7 +642,13 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
       case "enum_declaration": {
         const nameNode = node.childForFieldName("name");
         const className = nameNode?.text ?? "<anon>";
-        const bodyNode = node.childForFieldName("body");
+        // PHP grammar: class_declaration's body is `declaration_list`,
+        // not exposed via a `body` field name — it's just the last
+        // declaration_list named child.
+        const bodyNode =
+          node.childForFieldName("body") ??
+          node.namedChildren.find((c) => c.type === "declaration_list") ??
+          null;
         const fields = bodyNode
           ? collectMemberTypes(bodyNode)
           : new Map<string, string>();
@@ -491,10 +681,57 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
           }
         }
 
+        // Collect method names from the body BEFORE recursing — needed
+        // to populate ParsedClass.methodNames.
+        const methodNames: string[] = [];
+        if (bodyNode) {
+          for (const member of bodyNode.namedChildren) {
+            if (member.type !== "method_declaration") continue;
+            const m = member.childForFieldName("name");
+            if (m && m.text) methodNames.push(m.text);
+          }
+        }
+
         if (bodyNode) {
           for (const child of bodyNode.namedChildren) visit(child);
         }
         classStack.pop();
+
+        // v0.71: emit ParsedClass for the Architecture tab. Anonymous
+        // classes are skipped. Traits remain unsupported (their
+        // composition shape doesn't fit a class diagram cleanly).
+        // Enums get their own branch with isEnum + enumValues.
+        if (
+          className !== "<anon>" &&
+          (node.type === "class_declaration" ||
+            node.type === "interface_declaration") &&
+          bodyNode
+        ) {
+          parsedClasses.push({
+            name: className,
+            startRow: node.startPosition.row,
+            endRow: node.endPosition.row,
+            fields: collectFullClassFields(bodyNode),
+            methodNames,
+            parentClass: extractPhpParent(node),
+            implements: extractPhpImplements(node),
+            isInterface: node.type === "interface_declaration",
+            isAbstract: isAbstractPhpClass(node),
+          });
+        } else if (
+          className !== "<anon>" &&
+          node.type === "enum_declaration"
+        ) {
+          parsedClasses.push({
+            name: className,
+            startRow: node.startPosition.row,
+            endRow: node.endPosition.row,
+            fields: [],
+            methodNames: [],
+            isEnum: true,
+            enumValues: collectPhpEnumValues(node),
+          });
+        }
         return;
       }
 
@@ -670,6 +907,7 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
     calls,
     fileComplexity: 1 + totalDecisionPoints,
     parseError: false,
+    classes: parsedClasses,
   };
 }
 

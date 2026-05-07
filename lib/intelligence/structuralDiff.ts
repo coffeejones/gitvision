@@ -266,14 +266,20 @@ function diffFileComplexity(
 
 /** Quick "is anything noteworthy?" check so callers can decide whether
  *  to render a panel at all. Returns true when at least one structural
- *  change exists. */
+ *  change exists.
+ *
+ *  v0.71: coverageDelta is non-null whenever both snapshots have tests,
+ *  even when the percentage is identical. We must check delta !== 0,
+ *  not the wrapper, otherwise a refresh against an unchanged repo
+ *  rendered a panel with an empty SummaryStrip and no per-list content
+ *  — looked broken on the Overview. */
 export function structuralDiffHasContent(diff: StructuralDiff): boolean {
   return (
     diff.totalAdded > 0 ||
     diff.totalRemoved > 0 ||
     diff.duplicateGroupsAdded > 0 ||
     diff.duplicateGroupsDissolved > 0 ||
-    diff.coverageDelta !== null ||
+    (diff.coverageDelta !== null && diff.coverageDelta.delta !== 0) ||
     diff.complexityWorsened.length > 0 ||
     diff.complexityImproved.length > 0
   );

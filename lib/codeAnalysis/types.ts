@@ -152,6 +152,16 @@ export interface ParsedClass {
   /** True when the class itself is declared abstract (Java
    *  `abstract class`, TypeScript `abstract class`). */
   isAbstract?: boolean;
+  /** True when this entry represents an enum declaration (Java enum,
+   *  C# enum, PHP 8.1+ enum). The diagram renderer surfaces these
+   *  with the Mermaid `<<enumeration>>` stereotype and lists their
+   *  values via {@link enumValues}. v0.71+. */
+  isEnum?: boolean;
+  /** When isEnum is true, the literal constant names declared inside
+   *  the enum body (`RED`, `GREEN`, `BLUE` for `enum Color`). Order
+   *  preserved from source. Empty when the enum body is empty or the
+   *  language doesn't carry value names. */
+  enumValues?: string[];
 }
 
 /** A single field / property declaration on a class. Optional
@@ -311,6 +321,9 @@ export interface ClassDef {
   implements?: string[];
   isInterface?: boolean;
   isAbstract?: boolean;
+  /** v0.71: enum support. Mirror of the same fields on ParsedClass. */
+  isEnum?: boolean;
+  enumValues?: string[];
 }
 
 /** The full output of a code-analysis pass. Designed to live optionally on

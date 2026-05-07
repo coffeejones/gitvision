@@ -25,9 +25,12 @@ import path from "node:path";
 import { Parser } from "web-tree-sitter";
 import type { Language, Node as TsNode } from "web-tree-sitter";
 import type {
+  ClassMemberVisibility,
   CodeAnalysisPlugin,
   FileIndex,
   ParsedCall,
+  ParsedClass,
+  ParsedField,
   ParsedFile,
   ParsedFunction,
   ParsedImport,
@@ -137,12 +140,28 @@ const QUERIES: PluginQueries = {
 // ------------------- Type extraction -------------------
 
 /** Extract a type name (just the bare class name) from a Java type AST node.
- *  Returns null for primitives, arrays, and types we can't statically resolve.
- *  We deliberately strip generics ("List<String>" → "List") because our type
- *  index is keyed by class name, not parameterized type. */
+ *  Returns null for arrays and types we can't statically resolve.
+ *
+ *  v0.71: primitives (`int`, `long`, `double`, `boolean`, ...) and `void`
+ *  now return their literal text. They don't resolve to anything in our
+ *  FunctionDef index (so call-resolution still skips them gracefully — no
+ *  candidate matches "int.foo()"), but they DO surface as field types in
+ *  the Architecture tab so a `private int id;` reads as "id : int" instead
+ *  of an empty entry. The type-tracking pass calls extractTypeName for
+ *  field/param types — primitives there are harmless because lookupVariableType
+ *  is a Map: callers ask for a class with the name "int", get nothing back,
+ *  fall through. */
 function extractTypeName(node: TsNode): string | null {
   switch (node.type) {
     case "type_identifier":
+      return node.text;
+    case "integral_type":
+    case "floating_point_type":
+    case "boolean_type":
+    case "void_type":
+      // The keyword (`int`, `double`, `boolean`, `void`) is the node's
+      // text — tree-sitter-java exposes these as dedicated leaf types
+      // rather than under a generic "primitive" umbrella.
       return node.text;
     case "generic_type": {
       // generic_type's first named child is the base type (type_identifier
@@ -164,8 +183,8 @@ function extractTypeName(node: TsNode): string | null {
       const parts = node.text.split(".");
       return parts[parts.length - 1] ?? null;
     }
-    // Arrays + primitives + void → null (no methods we can resolve to in our
-    // FunctionDef index)
+    // Arrays → null (would need element-type tracking for method resolution
+    // to be useful). Other shapes also drop through.
     default:
       return null;
   }
@@ -189,6 +208,152 @@ function collectFieldTypes(classBody: TsNode): Map<string, string> {
     }
   }
   return out;
+}
+
+/** v0.71: type extraction for FIELD DISPLAY purposes (Architecture
+ *  tab). Different from extractTypeName because:
+ *    - extractTypeName returns the BARE base ("List" for List<Card>)
+ *      because the type-tracking pass keys class lookups by base name.
+ *    - extractFieldType returns the parameterized form ("List<Card>")
+ *      so the diagram preserves "this is a List of Cards" — and the
+ *      classDiagram generator can pull out the element type to draw
+ *      composition arrows from Card to its container.
+ *  Calling both on the same node is intentional — they serve different
+ *  consumers. */
+function extractFieldType(node: TsNode): string | undefined {
+  const base = extractTypeName(node);
+  if (!base) return undefined;
+  if (node.type !== "generic_type") return base;
+  // generic_type has a `type_arguments` child holding the inner types.
+  // Walk it for each named child and recursively extract a display name.
+  const args: string[] = [];
+  for (const child of node.namedChildren) {
+    if (child.type !== "type_arguments") continue;
+    for (const arg of child.namedChildren) {
+      const inner = extractFieldType(arg);
+      if (inner) args.push(inner);
+    }
+  }
+  if (args.length === 0) return base;
+  return `${base}<${args.join(", ")}>`;
+}
+
+/** v0.71: rich field metadata for the Architecture-tab Mermaid
+ *  generator. Same shape as the JS version — visibility / static /
+ *  final keywords pulled from the modifiers child. Java has explicit
+ *  modifiers so we can be precise about everything. */
+function collectFullClassFields(classBody: TsNode): ParsedField[] {
+  const out: ParsedField[] = [];
+  for (const child of classBody.namedChildren) {
+    if (child.type !== "field_declaration") continue;
+
+    // Modifier detection. Java field_declaration has an optional
+    // `modifiers` child holding `public`/`private`/`protected`/
+    // `static`/`final` etc as separate keyword nodes. Note: those
+    // keyword nodes are ANONYMOUS in tree-sitter-java's grammar
+    // (named=false), so we must walk `children` not `namedChildren`.
+    let visibility: ClassMemberVisibility = "internal"; // package-private
+    let isStatic = false;
+    let isReadonly = false;
+    const modifiersNode = child.namedChildren.find(
+      (c): c is TsNode => !!c && c.type === "modifiers"
+    );
+    if (modifiersNode) {
+      for (let i = 0; i < modifiersNode.childCount; i++) {
+        const m = modifiersNode.child(i);
+        if (!m) continue;
+        const t = m.type;
+        if (t === "public") visibility = "public";
+        else if (t === "private") visibility = "private";
+        else if (t === "protected") visibility = "protected";
+        else if (t === "static") isStatic = true;
+        else if (t === "final") isReadonly = true;
+      }
+    }
+
+    const typeNode = child.childForFieldName("type");
+    const type = typeNode ? extractFieldType(typeNode) : undefined;
+
+    for (const sub of child.namedChildren) {
+      if (sub.type !== "variable_declarator") continue;
+      const nameNode = sub.childForFieldName("name");
+      const name = nameNode?.text;
+      if (!name) continue;
+      out.push({ name, type, visibility, isStatic, isReadonly });
+    }
+  }
+  return out;
+}
+
+/** Extract the parent class name from a class_declaration's
+ *  superclass clause (`extends Foo`). Returns undefined when the
+ *  class doesn't extend anything (or extends Object implicitly). */
+function extractJavaParent(classNode: TsNode): string | undefined {
+  // Tree-sitter-java exposes the extends clause as a `superclass`
+  // child. Inside it, the first type_identifier is the parent.
+  const superclass = classNode.childForFieldName("superclass");
+  if (!superclass) return undefined;
+  for (const child of superclass.namedChildren) {
+    if (child.type === "type_identifier") return child.text;
+    if (child.type === "generic_type") {
+      const inner = child.childForFieldName("name");
+      if (inner) return inner.text;
+    }
+  }
+  return undefined;
+}
+
+/** Extract the names listed in a class's `implements` clause.
+ *  Empty array when the class implements nothing. */
+function extractJavaImplements(classNode: TsNode): string[] {
+  const interfaces = classNode.childForFieldName("interfaces");
+  if (!interfaces) return [];
+  const out: string[] = [];
+  // The interfaces field wraps a `super_interfaces` node which
+  // contains a `type_list` of identifiers.
+  function walkForIdents(n: TsNode) {
+    if (n.type === "type_identifier") {
+      out.push(n.text);
+      return;
+    }
+    if (n.type === "generic_type") {
+      const inner = n.childForFieldName("name");
+      if (inner) out.push(inner.text);
+      return;
+    }
+    for (const child of n.namedChildren) walkForIdents(child);
+  }
+  walkForIdents(interfaces);
+  return out;
+}
+
+/** v0.71: walk an enum_declaration's enum_body for the constant
+ *  names. Each enum_constant child holds a single identifier with
+ *  the value's literal name (`RED`, `GREEN`, `BLUE`). Order is
+ *  preserved from source. */
+function collectJavaEnumValues(enumBody: TsNode): string[] {
+  const out: string[] = [];
+  for (const child of enumBody.namedChildren) {
+    if (child.type !== "enum_constant") continue;
+    const idNode = child.namedChildren.find((c) => c.type === "identifier");
+    if (idNode?.text) out.push(idNode.text);
+  }
+  return out;
+}
+
+/** True when the class declares the `abstract` modifier. The
+ *  modifier keyword is anonymous in tree-sitter-java, so we walk
+ *  `children` not `namedChildren`. */
+function isAbstractClass(classNode: TsNode): boolean {
+  const modifiersNode = classNode.namedChildren.find(
+    (c): c is TsNode => !!c && c.type === "modifiers"
+  );
+  if (!modifiersNode) return false;
+  for (let i = 0; i < modifiersNode.childCount; i++) {
+    const m = modifiersNode.child(i);
+    if (m && m.type === "abstract") return true;
+  }
+  return false;
 }
 
 /** Walk a method's formal_parameters, return name→type map. */
@@ -238,6 +403,11 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
   const imports: ParsedImport[] = [];
   const functions: ParsedFunction[] = [];
   const calls: ParsedCall[] = [];
+  /** v0.71: full ParsedClass entries for the Architecture-tab
+   *  Mermaid generator. Captured alongside the existing classStack
+   *  entries (which only carry name + field types for type-aware
+   *  call resolution). */
+  const parsedClasses: ParsedClass[] = [];
   let totalDecisionPoints = 0;
 
   const seenImportSpecs = new Set<string>();
@@ -350,11 +520,70 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
           ? collectFieldTypes(bodyNode)
           : new Map<string, string>();
         classStack.push({ name: className, fields });
+
+        // Collect method names from the body BEFORE we recurse —
+        // we need to know them to populate ParsedClass.methodNames
+        // and the codeGraph aggregator can match them to FunctionDef
+        // entries by (containerType, name).
+        const methodNames: string[] = [];
+        if (bodyNode) {
+          for (const member of bodyNode.namedChildren) {
+            if (
+              member.type !== "method_declaration" &&
+              member.type !== "constructor_declaration"
+            ) {
+              continue;
+            }
+            const m = member.childForFieldName("name");
+            if (m && m.text) methodNames.push(m.text);
+          }
+        }
+
         // Walk body so nested methods/classes get visited
         if (bodyNode) {
           for (const child of bodyNode.namedChildren) visit(child);
         }
         classStack.pop();
+
+        // v0.71: emit ParsedClass for the Architecture tab. Anonymous
+        // classes are skipped (no useful diagram entity). Records
+        // continue to be skipped (their primary-constructor parameter
+        // syntax doesn't fit our field model). Enums get a dedicated
+        // path below — they have their own AST shape (enum_constant
+        // children) and a distinct stereotype in the diagram.
+        if (
+          className !== "<anon>" &&
+          (node.type === "class_declaration" ||
+            node.type === "interface_declaration") &&
+          bodyNode
+        ) {
+          parsedClasses.push({
+            name: className,
+            startRow: node.startPosition.row,
+            endRow: node.endPosition.row,
+            fields: collectFullClassFields(bodyNode),
+            methodNames,
+            parentClass: extractJavaParent(node),
+            implements: extractJavaImplements(node),
+            isInterface: node.type === "interface_declaration",
+            isAbstract: isAbstractClass(node),
+          });
+        } else if (
+          className !== "<anon>" &&
+          node.type === "enum_declaration" &&
+          bodyNode
+        ) {
+          parsedClasses.push({
+            name: className,
+            startRow: node.startPosition.row,
+            endRow: node.endPosition.row,
+            fields: [],
+            methodNames,
+            implements: extractJavaImplements(node),
+            isEnum: true,
+            enumValues: collectJavaEnumValues(bodyNode),
+          });
+        }
         return;
       }
 
@@ -476,6 +705,7 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
     calls,
     fileComplexity: 1 + totalDecisionPoints,
     parseError: false,
+    classes: parsedClasses,
   };
 }
 
