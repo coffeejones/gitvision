@@ -405,3 +405,141 @@ describe("pythonPlugin — type-aware tracking (v0.18)", () => {
     expect(validateCall?.calleeType).toBe("ValidatePassword");
   });
 });
+
+// ---------------- v0.77: Class extraction (Architecture tab) ----------------
+
+describe("pythonPlugin — class extraction for Architecture tab", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+
+  it("emits a ParsedClass for a basic class with PEP-526 fields + methods", () => {
+    const content =
+      "class User:\n" +
+      "    name: str\n" +
+      "    age: int\n" +
+      "    def __init__(self, name: str):\n" +
+      "        self.name = name\n" +
+      "    def login(self, password: str):\n" +
+      "        pass\n";
+    const file: SourceFile = { rel: "user.py", ext: "py", content };
+    const parsed = parseFile(pythonPlugin, file, makeIndex([file]));
+    expect(parsed.classes).toHaveLength(1);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("User");
+    expect(cls.isInterface).toBe(false);
+    expect(cls.isAbstract).toBe(false);
+    expect(cls.fields.map((f) => f.name).sort()).toEqual(["age", "name"]);
+    expect(cls.methodNames.sort()).toEqual(["__init__", "login"]);
+  });
+
+  it("derives field visibility from PEP-8 naming convention", () => {
+    // Python has no explicit access modifiers — convention is the
+    // only signal: __X = private, _X = protected, X = public.
+    // Dunder names (__init__, __X__) are NOT private — they're
+    // language hooks and should read as public.
+    const content =
+      "class V:\n" +
+      "    pub: int\n" +
+      "    _prot: int\n" +
+      "    __priv: int\n";
+    const file: SourceFile = { rel: "v.py", ext: "py", content };
+    const parsed = parseFile(pythonPlugin, file, makeIndex([file]));
+    const fields = parsed.classes![0].fields;
+    const byName = new Map(fields.map((f) => [f.name, f]));
+    expect(byName.get("pub")?.visibility).toBe("public");
+    expect(byName.get("_prot")?.visibility).toBe("protected");
+    expect(byName.get("__priv")?.visibility).toBe("private");
+  });
+
+  it("captures parentClass from positional inheritance argument", () => {
+    const content =
+      "class Animal:\n" +
+      "    pass\n" +
+      "class Dog(Animal):\n" +
+      "    def speak(self):\n" +
+      "        return 'woof'\n";
+    const file: SourceFile = { rel: "animal.py", ext: "py", content };
+    const parsed = parseFile(pythonPlugin, file, makeIndex([file]));
+    const byName = new Map(parsed.classes!.map((c) => [c.name, c]));
+    expect(byName.get("Dog")?.parentClass).toBe("Animal");
+    expect(byName.get("Animal")?.parentClass).toBeUndefined();
+  });
+
+  it("flags ABC / ABCMeta / Protocol parents as isAbstract (not as the parent class)", () => {
+    // ABC is a stylistic marker that the class is abstract — treating
+    // it as a structural parent in the diagram would clutter the
+    // hierarchy. Route it through isAbstract instead.
+    const content =
+      "from abc import ABC\n" +
+      "class Shape(ABC):\n" +
+      "    pass\n" +
+      "class Drawable(ABC, Logger):\n" +
+      "    pass\n";
+    const file: SourceFile = { rel: "shapes.py", ext: "py", content };
+    const parsed = parseFile(pythonPlugin, file, makeIndex([file]));
+    const byName = new Map(parsed.classes!.map((c) => [c.name, c]));
+    expect(byName.get("Shape")?.isAbstract).toBe(true);
+    expect(byName.get("Shape")?.parentClass).toBeUndefined();
+    // When ABC is mixed with a real parent, ABC is still filtered and
+    // the real parent surfaces.
+    expect(byName.get("Drawable")?.isAbstract).toBe(true);
+    expect(byName.get("Drawable")?.parentClass).toBe("Logger");
+  });
+
+  it("captures methods wrapped in decorators (@property, @abstractmethod)", () => {
+    // Decorated methods in Python come through as `decorated_definition`
+    // wrapping a `function_definition`. We unwrap so they show up in
+    // methodNames just like undecorated methods.
+    const content =
+      "from abc import ABC, abstractmethod\n" +
+      "class Service(ABC):\n" +
+      "    @abstractmethod\n" +
+      "    def run(self):\n" +
+      "        pass\n" +
+      "    @property\n" +
+      "    def name(self) -> str:\n" +
+      "        return 'svc'\n" +
+      "    def helper(self):\n" +
+      "        pass\n";
+    const file: SourceFile = { rel: "service.py", ext: "py", content };
+    const parsed = parseFile(pythonPlugin, file, makeIndex([file]));
+    expect(parsed.classes![0].methodNames.sort()).toEqual([
+      "helper",
+      "name",
+      "run",
+    ]);
+  });
+
+  it("isInterface stays false (Python has no native interface concept)", () => {
+    // Even classes that look "interface-y" via Protocol or ABC stay
+    // classes from our model's perspective. We don't pretend Python
+    // has interfaces — they're a Java/C# concept the language doesn't
+    // expose.
+    const content =
+      "from typing import Protocol\n" +
+      "class Drawable(Protocol):\n" +
+      "    def draw(self) -> None: ...\n";
+    const file: SourceFile = { rel: "drawable.py", ext: "py", content };
+    const parsed = parseFile(pythonPlugin, file, makeIndex([file]));
+    expect(parsed.classes![0].isInterface).toBe(false);
+    // But Protocol IS treated as abstract — same routing as ABC
+    expect(parsed.classes![0].isAbstract).toBe(true);
+  });
+
+  it("captures bare class-level constants (no PEP-526 annotation)", () => {
+    // CLASS_CONST = 42 inside a class body should still surface as a
+    // field even without an explicit type annotation.
+    const content =
+      "class Config:\n" +
+      "    VERSION = '1.0'\n" +
+      "    timeout: int = 30\n";
+    const file: SourceFile = { rel: "config.py", ext: "py", content };
+    const parsed = parseFile(pythonPlugin, file, makeIndex([file]));
+    const fields = parsed.classes![0].fields;
+    const byName = new Map(fields.map((f) => [f.name, f]));
+    expect(byName.has("VERSION")).toBe(true);
+    expect(byName.get("VERSION")?.type).toBeUndefined();
+    expect(byName.get("timeout")?.type).toBe("int");
+  });
+});

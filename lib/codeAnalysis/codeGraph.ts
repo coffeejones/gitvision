@@ -164,16 +164,39 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
     }
   }
 
+  // Two-pass disambiguation. Pass 1 appends `_basenameNoExt` for any
+  // name appearing more than once (the v0.70 rule). Pass 2 catches the
+  // residual collision: when two duplicates share BOTH original name
+  // AND basename (e.g. `tests/test_views.py` and `examples/x/test_views.py`
+  // both define `class Index`), pass-1 produces `Index_test_views` for
+  // BOTH — same React key, ReactFlow rejects the duplicate edge,
+  // diagram shows only one entity. Surfaced on Flask in v0.77 once
+  // Python class extraction shipped. Pass 2 appends a stable numeric
+  // suffix (`_2`, `_3`, …) to residual collisions, in source-traversal
+  // order so re-runs produce identical names.
+  const initialNames = rawClasses.map(({ pc, filePath }) =>
+    (nameCounts.get(pc.name) ?? 0) > 1
+      ? `${pc.name}_${basenameNoExt(filePath)}`
+      : pc.name
+  );
+  const initialCounts = new Map<string, number>();
+  for (const n of initialNames) {
+    initialCounts.set(n, (initialCounts.get(n) ?? 0) + 1);
+  }
+  const usedSuffix = new Map<string, number>();
+  const finalNames = initialNames.map((n) => {
+    if ((initialCounts.get(n) ?? 0) <= 1) return n;
+    const next = (usedSuffix.get(n) ?? 0) + 1;
+    usedSuffix.set(n, next);
+    // The first occurrence keeps the bare disambiguated name to
+    // stay backwards-compatible with v0.70's "Props_HeadlineFinding"
+    // shape; subsequent collisions get _2, _3, ...
+    return next === 1 ? n : `${n}_${next}`;
+  });
+
   const classes: ClassDef[] = [];
-  for (const { pc, filePath } of rawClasses) {
-    // If this name appears more than once across the codebase,
-    // suffix with the file basename (no extension) so each entity
-    // is uniquely addressable. Same-name within the same file
-    // can't happen (one declaration per name in any sane source).
-    const uniqueName =
-      (nameCounts.get(pc.name) ?? 0) > 1
-        ? `${pc.name}_${basenameNoExt(filePath)}`
-        : pc.name;
+  rawClasses.forEach(({ pc, filePath }, i) => {
+    const uniqueName = finalNames[i];
     // Match methods by (containerType=originalName) + name in the
     // same file. We use the ORIGINAL name (pc.name), not the
     // disambiguated one — FunctionDef.containerType was set during
@@ -199,7 +222,7 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
       isEnum: pc.isEnum,
       enumValues: pc.enumValues,
     });
-  }
+  });
 
   return {
     functions,

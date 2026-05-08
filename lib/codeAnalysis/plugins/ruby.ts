@@ -48,6 +48,8 @@ import type {
   CodeAnalysisPlugin,
   FileIndex,
   ParsedCall,
+  ParsedClass,
+  ParsedField,
   ParsedFile,
   ParsedFunction,
   ParsedImport,
@@ -207,6 +209,111 @@ function extractConstantName(node: TsNode): string | null {
   return null;
 }
 
+/** v0.77: pull symbol names out of a Ruby `attr_accessor :foo, :bar`
+ *  argument_list. Each `:name` is a `simple_symbol` node whose text
+ *  starts with `:` — strip it. Returns names in source order. */
+function extractAttrSymbolNames(callNode: TsNode): string[] {
+  const args = callNode.namedChildren.find((c) => c.type === "argument_list");
+  if (!args) return [];
+  const out: string[] = [];
+  for (const arg of args.namedChildren) {
+    if (arg.type === "simple_symbol") {
+      // Symbol text is `:foo` — drop the leading colon.
+      const raw = arg.text;
+      const name = raw.startsWith(":") ? raw.slice(1) : raw;
+      if (name) out.push(name);
+    }
+  }
+  return out;
+}
+
+/** v0.77: rich field metadata for the Architecture-tab Mermaid +
+ *  ReactFlow class canvas. Ruby has no explicit field declarations
+ *  the way Java/C# do — the closest analog is the `attr_accessor` /
+ *  `attr_reader` / `attr_writer` macro family, which both creates
+ *  the storage AND exposes it through generated getter/setter
+ *  methods. We surface those as fields plus class-level constants
+ *  (`CLASS_CONST = "v1"` style assignments).
+ *
+ *  Skipped intentionally:
+ *   - Bare instance variables (`@foo = bar` inside `initialize`).
+ *     Ruby instance vars are private by language; users rarely
+ *     read them via the diagram and they pollute the field list
+ *     because every method that touches `@x` would create one.
+ *     The attr_* macros are the deliberate "this is the public
+ *     surface" signal. */
+function collectFullRubyFields(classBody: TsNode): ParsedField[] {
+  const out: ParsedField[] = [];
+  for (const stmt of classBody.namedChildren) {
+    if (stmt.type === "call") {
+      const callee = stmt.childForFieldName("method") ??
+        // tree-sitter-ruby exposes `attr_accessor :foo` as a call
+        // whose method is the bare identifier (no receiver). Fall
+        // back to scanning the named children.
+        stmt.namedChildren.find((c) => c.type === "identifier");
+      const name = callee?.text;
+      if (
+        name === "attr_accessor" ||
+        name === "attr_reader" ||
+        name === "attr_writer"
+      ) {
+        const isReadonly = name === "attr_reader";
+        for (const sym of extractAttrSymbolNames(stmt)) {
+          out.push({
+            name: sym,
+            // Ruby is dynamically typed; no declarations to read.
+            type: undefined,
+            // attr_* generates public getter/setter pairs — these
+            // ARE the public surface. Always public.
+            visibility: "public",
+            isStatic: false,
+            isReadonly,
+          });
+        }
+      }
+    } else if (stmt.type === "assignment") {
+      // Class-level constant: `CLASS_CONST = "v1"`. Constants in
+      // Ruby are convention: identifier starts with a capital
+      // letter. Tree-sitter parses these as `constant` nodes on the
+      // left of the assignment.
+      const left = stmt.namedChildren[0];
+      if (left?.type === "constant" && left.text) {
+        out.push({
+          name: left.text,
+          type: undefined,
+          visibility: "public",
+          // Class-level constants behave like static + readonly
+          // members in OOP languages — tag them so the diagram
+          // can render the `$` static glyph.
+          isStatic: true,
+          isReadonly: true,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/** v0.77: extract the parent class from a Ruby `class X < Parent`
+ *  declaration. Returns undefined when the class has no superclass
+ *  (which means it implicitly inherits from `Object`, but rendering
+ *  Object as a parent would clutter every diagram). */
+function extractRubyParent(classNode: TsNode): string | undefined {
+  for (const child of classNode.namedChildren) {
+    if (child.type !== "superclass") continue;
+    for (const sub of child.namedChildren) {
+      if (sub.type === "constant") return sub.text;
+      if (sub.type === "scope_resolution") {
+        // `Foo::Bar` — last segment is the class name.
+        const parts = sub.text.split("::");
+        const last = parts[parts.length - 1];
+        if (last) return last;
+      }
+    }
+  }
+  return undefined;
+}
+
 /** Try to infer the class type of an `x = SomeClass.new` assignment.
  *  Returns the class name or null. Mirror of JS/Python's similar logic. */
 function inferAssignmentType(rhs: TsNode): string | null {
@@ -253,6 +360,11 @@ function parseRubyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   const imports: ParsedImport[] = [];
   const functions: ParsedFunction[] = [];
   const calls: ParsedCall[] = [];
+  /** v0.77: full ParsedClass entries for the Architecture-tab Mermaid
+   *  + ReactFlow class canvas. Only emitted for `class` nodes —
+   *  Ruby `module` declarations are a separate concept (mixins), not
+   *  comparable to OO classes, and stay out of the diagram for v1. */
+  const parsedClasses: ParsedClass[] = [];
   let totalDecisionPoints = 0;
 
   const seenImportSpecs = new Set<string>();
@@ -442,10 +554,52 @@ function parseRubyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           instanceVars: new Map(),
         });
         const bodyNode = node.childForFieldName("body");
+
+        // v0.77: collect method names BEFORE recursing so the
+        // ParsedClass we emit at the end of this case has the
+        // method list ready. `method` and `singleton_method` (the
+        // `def self.foo` form) both count.
+        const methodNames: string[] = [];
+        if (bodyNode) {
+          for (const member of bodyNode.namedChildren) {
+            if (member.type !== "method" && member.type !== "singleton_method") {
+              continue;
+            }
+            const m = member.childForFieldName("name");
+            if (m && m.text) methodNames.push(m.text);
+          }
+        }
+
         if (bodyNode) {
           for (const child of bodyNode.namedChildren) visit(child);
         }
         classStack.pop();
+
+        // v0.77: emit ParsedClass for the Architecture tab. Skip
+        // anonymous shapes. Empty classes (`class Foo < Bar; end`
+        // with no body statements at all) are common in Rails-style
+        // codebases — those emit too, with empty fields/method
+        // arrays, so the diagram can still show the inheritance
+        // edge from the class to its parent.
+        //
+        // Ruby has no native interface concept (modules are mixins,
+        // not interfaces in the OO sense), so isInterface stays
+        // false and implements stays empty. No abstract concept
+        // either — `raise NotImplementedError` is convention but
+        // not detectable from AST shape.
+        if (className !== "<anon>") {
+          parsedClasses.push({
+            name: className,
+            startRow: node.startPosition.row,
+            endRow: node.endPosition.row,
+            fields: bodyNode ? collectFullRubyFields(bodyNode) : [],
+            methodNames,
+            parentClass: extractRubyParent(node),
+            implements: [],
+            isInterface: false,
+            isAbstract: false,
+          });
+        }
         return;
       }
 
@@ -562,6 +716,7 @@ function parseRubyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     calls,
     fileComplexity: 1 + totalDecisionPoints,
     parseError: false,
+    classes: parsedClasses,
   };
 }
 

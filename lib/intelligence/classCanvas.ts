@@ -127,7 +127,25 @@ export function buildClassCanvas(
   const totalAvailable = allClasses.length;
   const maxClasses = opts.maxClasses ?? DEFAULT_MAX_CLASSES;
   const scoped = filterByScope(allClasses, opts.scope ?? { kind: "all" });
-  const trimmed = scoped.slice(0, maxClasses);
+  const capped = scoped.slice(0, maxClasses);
+
+  // Defensive name-dedup. The aggregator's pass-2 (codeGraph.ts) already
+  // ensures unique class names for snapshots built v0.77+. But snapshots
+  // saved BEFORE v0.77 may still contain colliding `Foo_basename` names
+  // (two `tests/test_views.py` files in different directories both
+  // produced `Index_test_views`). Without this dedup, ReactFlow gets
+  // duplicate node + edge IDs and silently drops some entities while
+  // logging a React-key warning. Rename collisions in-place so legacy
+  // snapshots render cleanly until the user clicks Refresh.
+  const seenName = new Map<string, number>();
+  const trimmed = capped.map((cls) => {
+    const count = (seenName.get(cls.name) ?? 0) + 1;
+    seenName.set(cls.name, count);
+    if (count === 1) return cls;
+    // Mirrors the aggregator's pass-2 numbering scheme so legacy
+    // snapshots get the same shape they would after a Refresh.
+    return { ...cls, name: `${cls.name}_${count}` };
+  });
 
   if (trimmed.length === 0) {
     return { nodes: [], edges: [], classCount: 0, totalAvailable };
@@ -211,7 +229,13 @@ export function buildClassCanvas(
         label: cls.name,
         filePath: cls.filePath,
         fields: cls.fields,
-        methodNames: cls.methods.map((m) => m.name),
+        // v0.77: dedupe method names. Multiple function_definitions
+        // can share a name in the same class (Python @overload typing
+        // stubs, @property+@setter pairs, Java overloads). Showing
+        // each one as a separate `+foo()` row makes the canvas look
+        // buggy. cls.methods stays intact for blast-radius / complexity
+        // consumers; we just collapse for display.
+        methodNames: dedupeStrings(cls.methods.map((m) => m.name)),
         isInterface: cls.isInterface ?? false,
         isAbstract: cls.isAbstract ?? false,
         isEnum: cls.isEnum ?? false,
@@ -341,6 +365,21 @@ function resolveArrowTarget(
     return resolveArrowTarget(mapMatch[2].trim(), rendered);
   }
   return undefined;
+}
+
+/** v0.77: dedupe a string array preserving first-occurrence order.
+ *  Used for method-name collapse in ClassNodeData.methodNames so the
+ *  canvas doesn't render `+permanent()` twice when a Python class
+ *  has both `@property` and `@x.setter` definitions of `permanent`. */
+function dedupeStrings(input: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of input) {
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
 }
 
 function splitTopLevel(s: string): string[] {

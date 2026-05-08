@@ -297,6 +297,66 @@ describe("buildClassCanvas · maxClasses cap", () => {
   });
 });
 
+describe("buildClassCanvas · v0.77: method-name dedupe", () => {
+  it("dedupes duplicate method names in node data (one row per logical method)", () => {
+    // Same Python @overload / @property+@setter pattern as the Mermaid
+    // dedupe test — ReactFlow node data must collapse too so the
+    // canvas doesn't render `+permanent()` twice.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("SessionMixin", {
+        methods: [
+          method("permanent", "src/sessions.py", "SessionMixin"),
+          method("permanent", "src/sessions.py", "SessionMixin"),
+          method("modified", "src/sessions.py", "SessionMixin"),
+        ],
+      }),
+    ];
+    const { nodes } = buildClassCanvas(cg);
+    expect(nodes[0].data.methodNames).toEqual(["permanent", "modified"]);
+  });
+});
+
+describe("buildClassCanvas · defensive name dedup (legacy snapshots)", () => {
+  it("renames duplicate class names so node + edge IDs stay unique", () => {
+    // Surfaced on Flask in v0.77: aggregator pass-1 produced
+    // `Index_test_views` for multiple `Index` classes living in
+    // different directories' `test_views.py` files. Aggregator pass-2
+    // (codeGraph.ts) fixes new snapshots, but snapshots stored on
+    // disk before the fix still contain the collision. Canvas
+    // defensively renames at render time so ReactFlow doesn't drop
+    // duplicates with a console warning.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Index_test_views", {
+        filePath: "tests/test_views.py",
+        parentClass: "MethodView",
+      }),
+      cls("Index_test_views", {
+        filePath: "examples/tutorial/test_views.py",
+        parentClass: "MethodView",
+      }),
+      cls("Index_test_views", {
+        filePath: "examples/blog/test_views.py",
+        parentClass: "MethodView",
+      }),
+      cls("MethodView"),
+    ];
+    const { nodes, edges } = buildClassCanvas(cg);
+    // All node IDs unique
+    const nodeIds = nodes.map((n) => n.id);
+    expect(new Set(nodeIds).size).toBe(nodeIds.length);
+    // First occurrence keeps the bare name (legacy snapshots render
+    // identically to before the bug surfaced).
+    expect(nodeIds).toContain("Index_test_views");
+    expect(nodeIds).toContain("Index_test_views_2");
+    expect(nodeIds).toContain("Index_test_views_3");
+    // All edge IDs unique
+    const edgeIds = edges.map((e) => e.id);
+    expect(new Set(edgeIds).size).toBe(edgeIds.length);
+  });
+});
+
 describe("layoutDagre · re-layout for filtered sets", () => {
   it("returns positions for every node in the input set", () => {
     const positions = layoutDagre(

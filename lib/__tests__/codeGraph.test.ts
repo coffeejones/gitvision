@@ -715,6 +715,63 @@ describe("buildCodeGraph", () => {
     ]);
   });
 
+  it("appends a numeric suffix when basename-disambiguation still collides (v0.77)", () => {
+    // Surfaced on Flask: `tests/test_views.py` and `examples/tutorial/test_views.py`
+    // both define `class Index(MethodView)`. Pass-1 disambiguation produces
+    // `Index_test_views` for BOTH, which collides as a React key in the
+    // class canvas (ReactFlow drops the duplicate edge silently). Pass-2
+    // appends `_2`, `_3`, … so each class is uniquely keyable.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "tests/test_views.py",
+          classes: [
+            {
+              name: "Index",
+              startRow: 0,
+              endRow: 5,
+              fields: [],
+              methodNames: [],
+            },
+          ],
+        }),
+        pf({
+          rel: "examples/tutorial/test_views.py",
+          classes: [
+            {
+              name: "Index",
+              startRow: 0,
+              endRow: 5,
+              fields: [],
+              methodNames: [],
+            },
+          ],
+        }),
+        pf({
+          rel: "examples/blog/test_views.py",
+          classes: [
+            {
+              name: "Index",
+              startRow: 0,
+              endRow: 5,
+              fields: [],
+              methodNames: [],
+            },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    const names = g.classes!.map((c) => c.name);
+    // All three names must be unique. First occurrence keeps the
+    // bare basename-disambiguated form to stay backwards-compatible
+    // with v0.70's existing test fixtures.
+    expect(new Set(names).size).toBe(3);
+    expect(names[0]).toBe("Index_test_views");
+    expect(names[1]).toBe("Index_test_views_2");
+    expect(names[2]).toBe("Index_test_views_3");
+  });
+
   it("leaves single-occurrence names unchanged", () => {
     const g = buildCodeGraph({
       parsedFiles: [

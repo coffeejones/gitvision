@@ -478,3 +478,144 @@ describe("rubyPlugin — type-aware tracking (Phase 5, dynamic-language flavor)"
     expect(fn?.containerType).toBeUndefined();
   });
 });
+
+// ---------------- v0.77: Class extraction (Architecture tab) ----------------
+
+describe("rubyPlugin — class extraction for Architecture tab", () => {
+  beforeAll(async () => {
+    await rubyPlugin.load();
+  });
+
+  it("emits a ParsedClass for a basic class with methods", () => {
+    const content =
+      "class User\n" +
+      "  def initialize(name)\n" +
+      "    @name = name\n" +
+      "  end\n" +
+      "  def login(password)\n" +
+      "  end\n" +
+      "end\n";
+    const file: SourceFile = { rel: "user.rb", ext: "rb", content };
+    const parsed = parseFile(rubyPlugin, file, makeIndex([file]));
+    expect(parsed.classes).toHaveLength(1);
+    const cls = parsed.classes![0];
+    expect(cls.name).toBe("User");
+    expect(cls.isInterface).toBe(false);
+    expect(cls.isAbstract).toBe(false);
+    expect(cls.methodNames.sort()).toEqual(["initialize", "login"]);
+  });
+
+  it("captures attr_accessor / attr_reader / attr_writer as fields", () => {
+    // Ruby's idiomatic field declaration. attr_accessor creates
+    // public getter+setter pairs; attr_reader creates a readonly
+    // getter only. We surface them as ParsedFields with appropriate
+    // isReadonly flags.
+    const content =
+      "class V\n" +
+      "  attr_accessor :name, :age\n" +
+      "  attr_reader :id\n" +
+      "  attr_writer :secret\n" +
+      "end\n";
+    const file: SourceFile = { rel: "v.rb", ext: "rb", content };
+    const parsed = parseFile(rubyPlugin, file, makeIndex([file]));
+    const fields = parsed.classes![0].fields;
+    const byName = new Map(fields.map((f) => [f.name, f]));
+    expect(byName.get("name")?.visibility).toBe("public");
+    expect(byName.get("name")?.isReadonly).toBe(false);
+    expect(byName.get("age")?.isReadonly).toBe(false);
+    expect(byName.get("id")?.isReadonly).toBe(true);
+    expect(byName.get("secret")?.isReadonly).toBe(false);
+  });
+
+  it("captures class-level constants as static + readonly fields", () => {
+    // Constants in Ruby (capitalized = constant convention) are
+    // class-level state, conceptually static + readonly.
+    const content =
+      "class Config\n" +
+      "  VERSION = '1.0'\n" +
+      "  TIMEOUT = 30\n" +
+      "end\n";
+    const file: SourceFile = { rel: "config.rb", ext: "rb", content };
+    const parsed = parseFile(rubyPlugin, file, makeIndex([file]));
+    const fields = parsed.classes![0].fields;
+    const byName = new Map(fields.map((f) => [f.name, f]));
+    expect(byName.get("VERSION")?.isStatic).toBe(true);
+    expect(byName.get("VERSION")?.isReadonly).toBe(true);
+    expect(byName.get("VERSION")?.visibility).toBe("public");
+    expect(byName.get("TIMEOUT")?.isStatic).toBe(true);
+  });
+
+  it("captures parentClass from `class Foo < Bar` superclass", () => {
+    const content =
+      "class Animal\n" +
+      "end\n" +
+      "class Dog < Animal\n" +
+      "  def speak\n" +
+      "    'woof'\n" +
+      "  end\n" +
+      "end\n";
+    const file: SourceFile = { rel: "animals.rb", ext: "rb", content };
+    const parsed = parseFile(rubyPlugin, file, makeIndex([file]));
+    const byName = new Map(parsed.classes!.map((c) => [c.name, c]));
+    expect(byName.get("Dog")?.parentClass).toBe("Animal");
+    expect(byName.get("Animal")?.parentClass).toBeUndefined();
+  });
+
+  it("handles `class Foo < Module::Bar` scoped parent", () => {
+    // Ruby allows nested-namespace parents. Take the last segment.
+    const content =
+      "class Job < ActiveRecord::Base\n" +
+      "end\n";
+    const file: SourceFile = { rel: "job.rb", ext: "rb", content };
+    const parsed = parseFile(rubyPlugin, file, makeIndex([file]));
+    expect(parsed.classes![0].parentClass).toBe("Base");
+  });
+
+  it("captures singleton_method (def self.foo) in methodNames", () => {
+    // Ruby's class methods use `def self.method_name` syntax — the
+    // tree-sitter node type is singleton_method. Both regular and
+    // singleton methods land in methodNames.
+    const content =
+      "class User\n" +
+      "  def self.find(id)\n" +
+      "  end\n" +
+      "  def name\n" +
+      "    @name\n" +
+      "  end\n" +
+      "end\n";
+    const file: SourceFile = { rel: "user.rb", ext: "rb", content };
+    const parsed = parseFile(rubyPlugin, file, makeIndex([file]));
+    expect(parsed.classes![0].methodNames.sort()).toEqual(["find", "name"]);
+  });
+
+  it("does NOT emit ParsedClass for `module` declarations", () => {
+    // Modules in Ruby are mixins, not classes. They have a different
+    // semantic role and stay out of the class diagram for v1.
+    const content =
+      "module Loggable\n" +
+      "  def log(msg)\n" +
+      "  end\n" +
+      "end\n" +
+      "class Service\n" +
+      "  include Loggable\n" +
+      "end\n";
+    const file: SourceFile = { rel: "mixed.rb", ext: "rb", content };
+    const parsed = parseFile(rubyPlugin, file, makeIndex([file]));
+    expect(parsed.classes!.map((c) => c.name)).toEqual(["Service"]);
+  });
+
+  it("isInterface stays false (Ruby has no interface concept)", () => {
+    // Ruby uses duck typing + module mixins; there's no `interface`
+    // keyword. Even classes that look interface-y are still classes.
+    const content =
+      "class Drawable\n" +
+      "  def draw\n" +
+      "    raise NotImplementedError\n" +
+      "  end\n" +
+      "end\n";
+    const file: SourceFile = { rel: "drawable.rb", ext: "rb", content };
+    const parsed = parseFile(rubyPlugin, file, makeIndex([file]));
+    expect(parsed.classes![0].isInterface).toBe(false);
+    expect(parsed.classes![0].isAbstract).toBe(false);
+  });
+});

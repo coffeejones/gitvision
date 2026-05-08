@@ -15,9 +15,12 @@ import path from "node:path";
 import { Parser } from "web-tree-sitter";
 import type { Language, Node as TsNode } from "web-tree-sitter";
 import type {
+  ClassMemberVisibility,
   CodeAnalysisPlugin,
   FileIndex,
   ParsedCall,
+  ParsedClass,
+  ParsedField,
   ParsedFile,
   ParsedFunction,
   ParsedImport,
@@ -186,6 +189,28 @@ function resolvePythonImport(
  *  collection type, but List itself rarely has same-named ambiguity, so
  *  we'd actually return List). Returns null for shapes we can't resolve
  *  (Union[A, B], Callable[..., R], string-quoted forward references). */
+/** v0.77: map a Python identifier to a visibility level using the
+ *  language's PEP-8 naming convention. Python has no explicit access
+ *  modifiers — convention is the only signal:
+ *    `__name`  → "private" (name-mangled by the interpreter)
+ *    `_name`   → "protected" (single underscore = "I'm internal, don't touch")
+ *    `name`    → "public"
+ *
+ *  Edge case: dunder methods like `__init__`, `__str__`, `__repr__`
+ *  start with `__` but are NOT private — they're the language's
+ *  protocol hooks. We detect the dunder pattern (leading AND trailing
+ *  double underscore) and treat them as public. */
+function pythonVisibilityFromName(
+  name: string
+): ClassMemberVisibility {
+  if (!name) return "public";
+  const isDunder = name.startsWith("__") && name.endsWith("__") && name.length > 4;
+  if (isDunder) return "public";
+  if (name.startsWith("__")) return "private";
+  if (name.startsWith("_")) return "protected";
+  return "public";
+}
+
 function extractPyTypeName(node: TsNode): string | null {
   switch (node.type) {
     case "identifier":
@@ -274,6 +299,11 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   const imports: ParsedImport[] = [];
   const functions: ParsedFunction[] = [];
   const calls: ParsedCall[] = [];
+  /** v0.77: full ParsedClass entries for the Architecture-tab Mermaid
+   *  + ReactFlow class canvas. Only emitted for class_definition
+   *  nodes; module-level functions and free-standing assignments
+   *  don't produce class entries. */
+  const parsedClasses: ParsedClass[] = [];
   let totalDecisionPoints = 0;
 
   const seenImportSpecs = new Set<string>();
@@ -304,6 +334,109 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     totalDecisionPoints++;
     const m = currentMethod();
     if (m) m.decisionPoints++;
+  }
+
+  /** v0.77: rich field metadata for the Architecture-tab Mermaid +
+   *  ReactFlow class canvas. Walks PEP-526-annotated class attributes
+   *  AND bare class-level assignments (the `CLASS_CONST = 42` pattern,
+   *  which lacks a type annotation but should still surface in the
+   *  diagram as a field).
+   *
+   *  Visibility from PEP-8 naming convention; see
+   *  pythonVisibilityFromName for the mapping. isStatic and isReadonly
+   *  stay false — Python has neither concept at the language level
+   *  (classmethods exist but are rare on data attributes; readonly
+   *  needs decorators or property-setter machinery to enforce). */
+  function collectFullPythonFields(classBody: TsNode): ParsedField[] {
+    const out: ParsedField[] = [];
+    function visitStmt(stmt: TsNode) {
+      // Class bodies appear as a `block` containing
+      // `expression_statement` children, each wrapping an assignment.
+      if (
+        stmt.type === "expression_statement" &&
+        stmt.namedChildren.length === 1 &&
+        stmt.namedChildren[0]
+      ) {
+        const inner = stmt.namedChildren[0];
+        if (inner.type === "assignment") {
+          const left = inner.childForFieldName("left");
+          const typeNode = inner.childForFieldName("type");
+          if (left?.type === "identifier") {
+            const name = left.text;
+            const type = typeNode
+              ? extractPyTypeName(typeNode) ?? undefined
+              : undefined;
+            out.push({
+              name,
+              type,
+              visibility: pythonVisibilityFromName(name),
+              isStatic: false,
+              isReadonly: false,
+            });
+          }
+        }
+      } else if (stmt.type === "assignment") {
+        const left = stmt.childForFieldName("left");
+        const typeNode = stmt.childForFieldName("type");
+        if (left?.type === "identifier") {
+          const name = left.text;
+          const type = typeNode
+            ? extractPyTypeName(typeNode) ?? undefined
+            : undefined;
+          out.push({
+            name,
+            type,
+            visibility: pythonVisibilityFromName(name),
+            isStatic: false,
+            isReadonly: false,
+          });
+        }
+      }
+    }
+    for (const child of classBody.namedChildren) {
+      if (child.type === "block") {
+        for (const stmt of child.namedChildren) visitStmt(stmt);
+      } else {
+        visitStmt(child);
+      }
+    }
+    return out;
+  }
+
+  /** v0.77: extract the parent class and (skipped) implements list.
+   *  Python single-class-with-multiple-bases is the common case;
+   *  multi-inheritance MRO chains are rare in real codebases and
+   *  hard to render meaningfully on a class diagram. We pick the
+   *  FIRST argument as parentClass. ABC / ABCMeta are filtered out
+   *  of the parent slot — they're stylistic markers (the class is
+   *  "abstract"), not a typical class-hierarchy parent — and routed
+   *  through isAbstract instead. */
+  function extractPythonParents(
+    classNode: TsNode
+  ): { parentClass?: string; isAbstract: boolean } {
+    const args = classNode.namedChildren.find(
+      (c) => c.type === "argument_list"
+    );
+    if (!args) return { isAbstract: false };
+    const names: string[] = [];
+    for (const arg of args.namedChildren) {
+      if (arg.type === "identifier") names.push(arg.text);
+      else if (arg.type === "attribute") {
+        // `abc.ABC` form — take the rightmost segment
+        const last = arg.text.split(".").pop();
+        if (last) names.push(last);
+      }
+    }
+    const isAbstract = names.some(
+      (n) => n === "ABC" || n === "ABCMeta" || n === "Protocol"
+    );
+    const realParents = names.filter(
+      (n) => n !== "ABC" && n !== "ABCMeta" && n !== "Protocol"
+    );
+    return {
+      parentClass: realParents[0],
+      isAbstract,
+    };
   }
 
   /** Walk a class body for `name: Type` annotated attributes (PEP 526),
@@ -575,11 +708,56 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           }
         }
 
+        // v0.77: collect method names BEFORE recursing — needed to
+        // populate ParsedClass.methodNames so the codeGraph aggregator
+        // can match them to FunctionDef entries by (containerType,
+        // name). Methods may be either `function_definition` or
+        // `decorated_definition` wrapping one (e.g. @property,
+        // @abstractmethod, @staticmethod).
+        const methodNames: string[] = [];
+        if (bodyNode) {
+          for (const member of bodyNode.namedChildren) {
+            let fnNode: TsNode | null = null;
+            if (member.type === "function_definition") fnNode = member;
+            else if (member.type === "decorated_definition") {
+              fnNode =
+                member.namedChildren.find(
+                  (c) => c.type === "function_definition"
+                ) ?? null;
+            }
+            if (fnNode) {
+              const m = fnNode.childForFieldName("name");
+              if (m && m.text) methodNames.push(m.text);
+            }
+          }
+        }
+
         classStack.push({ name: className, fields });
         if (bodyNode) {
           for (const child of bodyNode.namedChildren) visit(child);
         }
         classStack.pop();
+
+        // v0.77: emit ParsedClass for the Architecture tab. Skip
+        // anonymous shapes. Python doesn't have a separate `interface`
+        // construct (Protocol classes from typing exist but are
+        // marker types — we treat them as abstract). isInterface
+        // stays false; isAbstract reflects ABC / ABCMeta / Protocol
+        // parents.
+        if (className !== "<anon>" && bodyNode) {
+          const { parentClass, isAbstract } = extractPythonParents(node);
+          parsedClasses.push({
+            name: className,
+            startRow: node.startPosition.row,
+            endRow: node.endPosition.row,
+            fields: collectFullPythonFields(bodyNode),
+            methodNames,
+            parentClass,
+            implements: [],
+            isInterface: false,
+            isAbstract,
+          });
+        }
         return;
       }
 
@@ -687,6 +865,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     calls,
     fileComplexity: 1 + totalDecisionPoints,
     parseError: false,
+    classes: parsedClasses,
   };
 }
 

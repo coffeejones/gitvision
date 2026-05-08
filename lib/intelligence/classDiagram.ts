@@ -355,7 +355,7 @@ function renderClassInsideNamespace(cls: ClassDef): string[] {
     for (const f of cls.fields) {
       lines.push(`  ${renderField(f)}`);
     }
-    for (const m of cls.methods) {
+    for (const m of dedupeMethods(cls.methods)) {
       lines.push(`  ${renderMethod(m)}`);
     }
   }
@@ -387,7 +387,7 @@ function renderClassBlock(cls: ClassDef): string[] {
     for (const field of cls.fields) {
       lines.push(`    ${renderField(field)}`);
     }
-    for (const m of cls.methods) {
+    for (const m of dedupeMethods(cls.methods)) {
       lines.push(`    ${renderMethod(m)}`);
     }
   }
@@ -415,6 +415,29 @@ function renderClassBlock(cls: ClassDef): string[] {
  *  `login(password: String): Token` would mislead more than it helps. */
 function renderMethod(m: FunctionDef): string {
   return `+${m.name}()`;
+}
+
+/** v0.77: dedupe method names while preserving source-order of the
+ *  first occurrence. Several language patterns produce multiple
+ *  function_definition nodes that share a name within the same class:
+ *    - Python `@overload` typing-stub variants
+ *    - Python `@property` + `@x.setter` paired definitions
+ *    - Java / C# method overloads (collapsed in the chip strip via
+ *      collapseOverloads but historically duplicated in the
+ *      class-diagram output)
+ *  Showing them as separate `+foo()` lines makes the diagram look
+ *  buggy ("why is `permanent()` listed twice?"). One line per logical
+ *  method is the cleaner read; the FunctionDef array stays intact for
+ *  consumers that need the full list (blast radius, complexity, etc.). */
+function dedupeMethods(methods: FunctionDef[]): FunctionDef[] {
+  const seen = new Set<string>();
+  const out: FunctionDef[] = [];
+  for (const m of methods) {
+    if (seen.has(m.name)) continue;
+    seen.add(m.name);
+    out.push(m);
+  }
+  return out;
 }
 
 function renderField(field: ParsedField): string {
@@ -446,14 +469,18 @@ function visToMermaid(v: ClassMemberVisibility): string {
   }
 }
 
-/** Mermaid identifiers can't contain ., <, >, /, or other special
- *  chars. Class names usually don't, but generic types might appear
- *  in the parser's output (e.g. `Map<K,V>`), and namespace
- *  identifiers built from folder paths contain slashes when the
- *  collision-fallback kicks in. Strip them defensively so the
- *  diagram still parses. */
+/** Mermaid identifiers can't contain ., <, >, /, :, or other special
+ *  chars. Class names usually don't, but a few real-world shapes do:
+ *    - Generic types: `Map<K,V>`
+ *    - Namespace identifiers from folder paths (slashes) when the
+ *      collision-fallback kicks in
+ *    - Ruby's open-class reopening of scoped names like
+ *      `class RSpec::Core::Configuration` — the `::` survives the
+ *      tree-sitter `name` field and would otherwise leak into the
+ *      Mermaid identifier (where `:` has its own grammar role).
+ *  Strip all of them defensively so the diagram still parses. */
 function sanitizeIdentifier(name: string): string {
-  return name.replace(/[<>,./ \t]/g, "_");
+  return name.replace(/[<>,.:/ \t]/g, "_");
 }
 
 /** Mermaid uses < and > as part of its syntax (stereotypes,

@@ -667,6 +667,70 @@ describe("generateClassDiagram · result shape", () => {
   });
 });
 
+// ---------------- v0.77: identifier sanitisation + method dedupe ----------------
+
+describe("generateClassDiagram · v0.77 polish", () => {
+  it("sanitises `:` in class identifiers (Ruby open-class scoped names)", () => {
+    // Surfaced on rspec-core: `class RSpec::Core::Configuration` (Ruby
+    // reopening pattern) leaks the `::` through tree-sitter's `name`
+    // field. `:` has its own grammar role in Mermaid, so unsanitised
+    // identifiers can fail to render.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("RSpec::Core::Configuration", { filePath: "lib/configuration.rb" }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    // Colons replaced with underscores in the identifier
+    expect(source).toContain("RSpec__Core__Configuration");
+    expect(source).not.toContain("class RSpec::Core::Configuration");
+  });
+
+  it("dedupes method names in the rendered class body (one line per logical method)", () => {
+    // Surfaced on Flask: `@overload` typing-stubs and `@property`+
+    // `@x.setter` pairs produce multiple function_definitions sharing
+    // a name within the same class. Showing each as a separate
+    // `+foo()` row makes the diagram look buggy.
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("SessionMixin", {
+        methods: [
+          method("permanent", "src/sessions.py", "SessionMixin"),
+          method("permanent", "src/sessions.py", "SessionMixin"),
+          method("modified", "src/sessions.py", "SessionMixin"),
+        ],
+      }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    // permanent() should appear EXACTLY once, modified() also once
+    const permanentMatches = source.match(/\+permanent\(\)/g) ?? [];
+    expect(permanentMatches.length).toBe(1);
+    const modifiedMatches = source.match(/\+modified\(\)/g) ?? [];
+    expect(modifiedMatches.length).toBe(1);
+  });
+
+  it("preserves first-occurrence order when deduping methods", () => {
+    const cg = emptyGraph();
+    cg.classes = [
+      cls("Service", {
+        methods: [
+          method("zeta", "src/s.py", "Service"),
+          method("alpha", "src/s.py", "Service"),
+          method("zeta", "src/s.py", "Service"), // duplicate, drop
+          method("middle", "src/s.py", "Service"),
+        ],
+      }),
+    ];
+    const { source } = generateClassDiagram(cg);
+    // Order: zeta, alpha, middle (zeta wins first slot)
+    const zetaIdx = source.indexOf("+zeta()");
+    const alphaIdx = source.indexOf("+alpha()");
+    const middleIdx = source.indexOf("+middle()");
+    expect(zetaIdx).toBeGreaterThan(0);
+    expect(alphaIdx).toBeGreaterThan(zetaIdx);
+    expect(middleIdx).toBeGreaterThan(alphaIdx);
+  });
+});
+
 // ---------------- computeScopeOptions ----------------
 
 describe("computeScopeOptions", () => {
