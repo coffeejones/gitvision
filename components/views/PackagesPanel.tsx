@@ -25,6 +25,7 @@ import type {
 import { TOK } from "@/lib/theme";
 import { SearchInput } from "@/components/SearchInput";
 import { HelpHint } from "@/components/HelpHint";
+import { EmptyPanel } from "@/components/EmptyPanel";
 
 // ------------------- Link builders -------------------
 
@@ -83,38 +84,21 @@ export function PackagesPanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
 
   if (healths.length === 0) {
     return (
-      <div
-        className="rounded-xl border border-dashed p-10 text-center text-sm flex flex-col gap-2"
-        style={{
-          borderColor: TOK.border,
-          color: TOK.textMuted,
-        }}
-      >
-        <PackageX size={20} className="mx-auto" style={{ color: TOK.textMuted }} />
-        <div style={{ color: TOK.textSecondary }}>
-          No package manifests in this repo.
-        </div>
-        <div className="text-[11px]">
-          Try a JavaScript, Rust, or Python project to see vulnerable /
-          outdated / deprecated dependencies surfaced here. GitVision reads{" "}
-          <code className="font-mono" style={{ color: TOK.textSecondary }}>
-            package.json
-          </code>
-          ,{" "}
-          <code className="font-mono" style={{ color: TOK.textSecondary }}>
-            Cargo.toml
-          </code>
-          ,{" "}
-          <code className="font-mono" style={{ color: TOK.textSecondary }}>
-            pyproject.toml
-          </code>
-          , and{" "}
-          <code className="font-mono" style={{ color: TOK.textSecondary }}>
-            requirements*.txt
-          </code>
-          .
-        </div>
-      </div>
+      <EmptyPanel
+        icon={<PackageX size={22} />}
+        title="No package manifests detected in this repo"
+        body={
+          <>
+            GitVision reads{" "}
+            <code className="font-mono">package.json</code>,{" "}
+            <code className="font-mono">Cargo.toml</code>,{" "}
+            <code className="font-mono">pyproject.toml</code>, and{" "}
+            <code className="font-mono">requirements*.txt</code>. Try a
+            JavaScript, Rust, or Python project to see vulnerable /
+            outdated / deprecated dependencies surfaced here.
+          </>
+        }
+      />
     );
   }
 

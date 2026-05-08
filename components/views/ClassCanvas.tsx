@@ -45,7 +45,7 @@ import {
   EdgeLabelRenderer,
   getSmoothStepPath,
 } from "@xyflow/react";
-import { Search, X } from "lucide-react";
+import { Boxes, Search, X } from "lucide-react";
 import type { CodeGraph } from "@/lib/types";
 import type { ParsedField } from "@/lib/codeAnalysis/types";
 import {
@@ -55,6 +55,7 @@ import {
   type ClassNodeData,
 } from "@/lib/intelligence/classCanvas";
 import { TOK } from "@/lib/theme";
+import { EmptyPanel } from "@/components/EmptyPanel";
 
 interface Props {
   codeGraph: CodeGraph;
@@ -273,13 +274,18 @@ function ClassCanvasInner({ codeGraph, scope }: Props) {
   }, [visibleIds, reactFlow]);
 
   if (rawNodes.length === 0) {
+    // Defensive fallback. ArchitecturePanel normally handles the
+    // "no classes" state itself before mounting this component, so
+    // this branch is rarely reached — but the guard keeps the canvas
+    // safe to drop into other surfaces (e.g. embedded views) without
+    // assuming a parent has pre-filtered.
     return (
-      <div
-        className="rounded-xl border border-dashed p-8 text-center text-sm"
-        style={{ borderColor: TOK.border, color: TOK.textMuted }}
-      >
-        No classes to render.
-      </div>
+      <EmptyPanel
+        size="sm"
+        icon={<Boxes size={20} />}
+        title="No classes to render"
+        body="The active scope filtered down to zero classes. Try a wider scope or refresh the snapshot."
+      />
     );
   }
 

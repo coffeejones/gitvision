@@ -26,8 +26,10 @@ interface Props {
   /** Lucide icon (or any ReactNode) shown above the title. */
   icon?: ReactNode;
   /** One-line headline. Keep under ~60 characters so it doesn't wrap
-   *  awkwardly on narrow viewports. */
-  title: string;
+   *  awkwardly on narrow viewports. ReactNode (not just string) so
+   *  callers can interpolate `<code>` snippets, scoped names, or
+   *  other inline emphasis without a full prose rewrite. */
+  title: ReactNode;
   /** Optional paragraph explaining what this panel would show given
    *  the right inputs. 1-3 sentences. */
   body?: ReactNode;

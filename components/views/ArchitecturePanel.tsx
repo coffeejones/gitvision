@@ -30,6 +30,7 @@ import { STYLE, TOK } from "@/lib/theme";
 import { ArchitectureScope } from "./ArchitectureScope";
 import { ClassCanvas } from "./ClassCanvas";
 import { HelpHint } from "@/components/HelpHint";
+import { EmptyPanel } from "@/components/EmptyPanel";
 
 interface Props {
   diagram: ClassDiagramResult | null;
@@ -127,13 +128,16 @@ export function ArchitecturePanel({
         // somewhere in the repo. Surface as a soft empty-state
         // INSIDE the panel so the dropdown stays accessible for
         // the user to switch back to "All".
-        <div
-          className="rounded-xl border border-dashed p-8 text-center text-sm"
-          style={{ borderColor: TOK.border, color: TOK.textMuted }}
-        >
-          No classes in <code className="font-mono">{currentScope}</code>.
-          Pick a different scope from the dropdown above.
-        </div>
+        <EmptyPanel
+          size="sm"
+          title={
+            <>
+              No classes in{" "}
+              <code className="font-mono">{currentScope}</code>
+            </>
+          }
+          body="Pick a different scope from the dropdown above to see classes from another folder."
+        />
       )}
     </section>
   );
@@ -212,58 +216,54 @@ function CopyButton({ source }: { source: string }) {
 }
 
 function EmptyCodeGraph({ reason }: { reason?: string }) {
-  const isSkipped = !!reason;
+  if (reason) {
+    return (
+      <EmptyPanel
+        icon={<Boxes size={22} />}
+        title="Class extraction was skipped for this snapshot"
+        body={reason}
+      />
+    );
+  }
   return (
-    <div
-      className="rounded-xl border border-dashed p-10 text-center text-sm flex flex-col items-center gap-3"
-      style={{ borderColor: TOK.border, color: TOK.textMuted }}
-    >
-      <Boxes size={20} style={{ color: TOK.textSecondary }} />
-      {isSkipped ? (
+    <EmptyPanel
+      icon={<Boxes size={22} />}
+      title="This snapshot pre-dates the class-extraction pipeline"
+      body={
         <>
-          <p style={{ color: TOK.textSecondary }}>
-            Class extraction was skipped for this snapshot.
-          </p>
-          <p className="max-w-2xl">{reason}</p>
+          Click <strong style={{ color: TOK.textPrimary }}>Refresh</strong>{" "}
+          in the topbar to populate it. v0.70+ snapshots include class
+          data for JavaScript, TypeScript, Java, C#, PHP, and Go.
         </>
-      ) : (
-        <>
-          <p style={{ color: TOK.textSecondary }}>
-            This snapshot was created before the class-extraction
-            pipeline shipped.
-          </p>
-          <p>
-            Click{" "}
-            <strong style={{ color: TOK.textPrimary }}>Refresh</strong>{" "}
-            in the topbar to populate it. v0.70+ snapshots ship with
-            JavaScript / TypeScript class data; other languages
-            follow in upcoming versions.
-          </p>
-        </>
-      )}
-    </div>
+      }
+      hint="Python and Ruby class extraction lands in v0.77."
+    />
   );
 }
 
 function EmptyClasses({ totalAvailable }: { totalAvailable: number }) {
+  // totalAvailable === 0 → repo has no classes anywhere.
+  // > 0 → some classes exist but none match the active scope (this
+  // path is unreachable in the current ArchitecturePanel because the
+  // scope-filter mismatch surfaces inside the section instead, but
+  // keeping the branch here makes the helper safe to reuse).
   return (
-    <div
-      className="rounded-xl border border-dashed p-10 text-center text-sm flex flex-col items-center gap-2"
-      style={{ borderColor: TOK.border, color: TOK.textMuted }}
-    >
-      <Boxes size={20} style={{ color: TOK.textSecondary }} />
-      <p style={{ color: TOK.textSecondary }}>
-        {totalAvailable === 0
-          ? "No classes detected in this repo's JS/TS sources."
-          : "No classes match the current scope."}
-      </p>
-      <p className="text-[11px] max-w-xl">
-        Many modern JS/TS codebases lean functional and have few or
-        no classes. Class extraction for Python, Go, Java, C#, PHP,
-        and Ruby is rolling out in the next phase — those repos
-        will surface more here.
-      </p>
-    </div>
+    <EmptyPanel
+      icon={<Boxes size={22} />}
+      title={
+        totalAvailable === 0
+          ? "No classes detected in this repo"
+          : "No classes match the current scope"
+      }
+      body={
+        <>
+          Many codebases — especially TypeScript / Python / Go projects
+          that lean functional — have few or no class declarations.
+          That&apos;s expected, not an error.
+        </>
+      }
+      hint="Python and Ruby class extraction lands in v0.77; other languages already extract."
+    />
   );
 }
 

@@ -32,8 +32,9 @@ import {
   type Edge,
   type NodeProps,
 } from "@xyflow/react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Network } from "lucide-react";
 import { TOK } from "@/lib/theme";
+import { EmptyPanel } from "@/components/EmptyPanel";
 import type {
   FileGraph,
   FileGraphEdge,
@@ -424,20 +425,26 @@ function DependencyCanvasInner({ graph }: Props) {
   );
 
   if (graph.nodes.length === 0) {
+    if (graph.truncated) {
+      return (
+        <EmptyPanel
+          icon={<AlertTriangle size={22} />}
+          title="Dependency graph unavailable"
+          body={graph.truncated}
+        />
+      );
+    }
     return (
-      <div
-        className="rounded-xl p-8 text-center"
-        style={{
-          background: "rgba(255,255,255,0.02)",
-          border: "1px solid rgba(255,255,255,0.04)",
-        }}
-      >
-        <p className="text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
-          {graph.truncated
-            ? `Dependency graph unavailable: ${graph.truncated}`
-            : "No dependency data in this snapshot. Refresh to rebuild."}
-        </p>
-      </div>
+      <EmptyPanel
+        icon={<Network size={22} />}
+        title="No dependency data in this snapshot"
+        hint={
+          <>
+            Click <strong style={{ color: TOK.textPrimary }}>Refresh</strong>{" "}
+            in the topbar to rebuild the import graph.
+          </>
+        }
+      />
     );
   }
 
