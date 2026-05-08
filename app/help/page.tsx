@@ -422,19 +422,36 @@ export default function HelpPage() {
       </Section>
 
       <footer
-        className="pt-8 text-xs border-t"
+        className="pt-8 text-xs border-t flex flex-col gap-2"
         style={{ borderColor: TOK.border, color: TOK.textMuted }}
       >
-        Found something unclear? Open an issue on{" "}
-        <a
-          href="https://github.com/coffeejones/gitvision/issues"
-          target="_blank"
-          rel="noopener"
-          className="underline underline-offset-2"
-        >
-          GitHub
-        </a>{" "}
-        — these are the kinds of doc gaps we want to know about.
+        <p>
+          Found something unclear? Open an issue on{" "}
+          <a
+            href="https://github.com/coffeejones/gitvision/issues"
+            target="_blank"
+            rel="noopener"
+            className="underline underline-offset-2"
+          >
+            GitHub
+          </a>{" "}
+          — these are the kinds of doc gaps we want to know about.
+        </p>
+        {process.env.NEXT_PUBLIC_DISCORD_INVITE_URL && (
+          <p>
+            Want to chat? Join the{" "}
+            <a
+              href={process.env.NEXT_PUBLIC_DISCORD_INVITE_URL}
+              target="_blank"
+              rel="noopener"
+              className="underline underline-offset-2"
+            >
+              GitVision Discord
+            </a>{" "}
+            — community-sized, low-traffic, mostly questions and feature
+            ideas.
+          </p>
+        )}
       </footer>
     </main>
   );

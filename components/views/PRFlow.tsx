@@ -5,8 +5,10 @@
 
 import { useMemo, useState } from "react";
 import { sankey, sankeyLinkHorizontal } from "d3-sankey";
+import { GitPullRequest } from "lucide-react";
 import type { PullRequestSummary } from "@/lib/types";
 import { TOK } from "@/lib/theme";
+import { EmptyPanel } from "@/components/EmptyPanel";
 
 interface Props {
   prs: PullRequestSummary[];
@@ -146,17 +148,23 @@ export function PRFlow({ prs }: Props) {
 
   if (prs.length === 0) {
     return (
-      <div
-        className="rounded-xl border border-dashed p-8 text-center text-sm"
-        style={{
-          borderColor: TOK.border,
-          color: TOK.textMuted,
-        }}
-      >
-        No PR data in this snapshot — the repo may have no PRs yet, or the
-        analysis hasn&apos;t fetched them. Click <strong>Refresh</strong> if
-        you expect PRs.
-      </div>
+      <EmptyPanel
+        icon={<GitPullRequest size={22} />}
+        title="No PRs in this snapshot"
+        body={
+          <>
+            The repo may not have any pull requests yet, or this snapshot
+            was taken before they were fetched. Brand-new repos and
+            personal projects often have zero — that&apos;s fine, this
+            panel will populate once a PR exists.
+          </>
+        }
+        hint={
+          <>
+            Click <strong>Refresh</strong> in the topbar to re-fetch PR data.
+          </>
+        }
+      />
     );
   }
 

@@ -1,10 +1,12 @@
 // /session/[id]/imports — Imports tab as its own route (v0.42).
 
 import { notFound } from "next/navigation";
+import { Network } from "lucide-react";
 import { getSession } from "@/lib/storage";
 import { TOK } from "@/lib/theme";
 import { DependencyCanvas } from "@/components/views/DependencyCanvas";
 import { HelpHint } from "@/components/HelpHint";
+import { EmptyPanel } from "@/components/EmptyPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -24,24 +26,23 @@ export default async function ImportsPage({
         {current.fileGraph && current.fileGraph.nodes.length > 0 ? (
           <DependencyCanvas graph={current.fileGraph} />
         ) : (
-          <div
-            className="rounded-xl border border-dashed p-10 text-center text-sm flex flex-col items-center gap-2"
-            style={{
-              borderColor: TOK.border,
-              color: TOK.textMuted,
-            }}
-          >
-            <div style={{ color: TOK.textSecondary }}>
-              No file-to-file imports detected for this snapshot.
-            </div>
-            <div className="text-[11px] max-w-xl">
-              GitVision builds the import graph for JS/TS, Python, Go, Java,
-              C#, PHP, and Ruby. Tiny repos, single-file projects, or
-              snapshots created before the import-graph feature shipped will
-              land here. Click <strong>Refresh</strong> in the topbar to
-              regenerate.
-            </div>
-          </div>
+          <EmptyPanel
+            icon={<Network size={22} />}
+            title="No file-to-file imports detected"
+            body={
+              <>
+                GitVision builds the import graph for JS/TS, Python, Go,
+                Java, C#, PHP, and Ruby. Tiny repos, single-file projects,
+                or snapshots created before the import-graph feature
+                shipped will land here.
+              </>
+            }
+            hint={
+              <>
+                Click <strong>Refresh</strong> in the topbar to regenerate.
+              </>
+            }
+          />
         )}
         <p
           className="text-xs inline-flex items-center gap-1.5"

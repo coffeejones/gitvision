@@ -148,6 +148,24 @@ export function MarketingHome({
           >
             GitHub
           </a>
+          {/* Discord — only renders when invite URL is configured.
+           *  Graceful: deploy ships the wiring, set
+           *  NEXT_PUBLIC_DISCORD_INVITE_URL when the community server
+           *  is ready. Until then this row stays clean instead of
+           *  shipping a broken / placeholder link. */}
+          {process.env.NEXT_PUBLIC_DISCORD_INVITE_URL && (
+            <>
+              <span style={{ color: TOK.border }}>·</span>
+              <a
+                href={process.env.NEXT_PUBLIC_DISCORD_INVITE_URL}
+                target="_blank"
+                rel="noopener"
+                className="transition hover:underline"
+              >
+                Discord
+              </a>
+            </>
+          )}
           <span style={{ color: TOK.border }}>·</span>
           <FeedbackLink className="transition hover:underline cursor-pointer">
             Feedback
