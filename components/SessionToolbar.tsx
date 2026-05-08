@@ -28,6 +28,7 @@ import {
   ChevronDown,
   Gift,
   HelpCircle,
+  MessageSquarePlus,
   MoreHorizontal,
   RefreshCw,
   Share2,
@@ -40,6 +41,7 @@ import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { TOK } from "@/lib/theme";
 import { ShareCardModal } from "./ShareCardModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
+import { FeedbackModal } from "./FeedbackModal";
 
 interface Props {
   sessionId: string;
@@ -77,6 +79,7 @@ export function SessionToolbar({
   const [message, setMessage] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [wrappedOpen, setWrappedOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
@@ -333,6 +336,36 @@ export function SessionToolbar({
                     </span>
                   </div>
                 </Link>
+                <button
+                  onClick={() => {
+                    setOverflowOpen(false);
+                    setFeedbackOpen(true);
+                  }}
+                  className="w-full flex items-start gap-2.5 px-3 py-2 text-xs transition cursor-pointer text-left"
+                  style={{ color: TOK.textSecondary }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = TOK.surface;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  <MessageSquarePlus
+                    size={14}
+                    style={{ color: TOK.textMuted, marginTop: 1 }}
+                  />
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span style={{ color: TOK.textPrimary }}>
+                      Send feedback
+                    </span>
+                    <span
+                      className="text-[11px]"
+                      style={{ color: TOK.textMuted }}
+                    >
+                      Bug, feature idea, or general note
+                    </span>
+                  </div>
+                </button>
                 <div
                   className="my-1 mx-2 h-px"
                   style={{ background: TOK.border }}
@@ -372,6 +405,11 @@ export function SessionToolbar({
         snapshot={snapshot}
         open={wrappedOpen}
         onClose={() => setWrappedOpen(false)}
+      />
+      <FeedbackModal
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        sessionId={sessionId}
       />
     </div>
   );

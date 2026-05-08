@@ -13,6 +13,7 @@ import Link from "next/link";
 import { STYLE, TOK } from "@/lib/theme";
 import { type DemoRepo } from "@/components/RepoInputForm";
 import { LandingPanel } from "@/components/LandingPanel";
+import { FeedbackLink } from "@/components/FeedbackLink";
 import type { SessionSummary } from "@/lib/types";
 
 interface Props {
@@ -143,17 +144,9 @@ export function MarketingHome({
             GitHub
           </a>
           <span style={{ color: TOK.border }}>·</span>
-          <a
-            href={
-              process.env.NEXT_PUBLIC_FEEDBACK_URL ??
-              "https://github.com/coffeejones/gitvision/issues"
-            }
-            target="_blank"
-            rel="noopener"
-            className="transition hover:underline"
-          >
+          <FeedbackLink className="transition hover:underline cursor-pointer">
             Feedback
-          </a>
+          </FeedbackLink>
           <span style={{ color: TOK.border }}>·</span>
           <Link href="/legal" className="transition hover:underline">
             Privacy &amp; terms
