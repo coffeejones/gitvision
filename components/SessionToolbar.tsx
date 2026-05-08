@@ -42,6 +42,7 @@ import { TOK } from "@/lib/theme";
 import { ShareCardModal } from "./ShareCardModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
 import { FeedbackModal } from "./FeedbackModal";
+import { Logo } from "./Logo";
 
 interface Props {
   sessionId: string;
@@ -183,6 +184,11 @@ export function SessionToolbar({
     >
       <div className="px-5 h-12 flex items-center gap-3">
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          {/* Logo doubles as a home link — clickable from any session
+           *  page back to the landing / workspace. The accent ring
+           *  echoes the in-app accent for visual continuity. */}
+          <Logo size={18} href="/" />
+          <span style={{ color: TOK.border }}>·</span>
           <span
             className="font-mono text-sm truncate"
             style={{ color: TOK.textPrimary }}

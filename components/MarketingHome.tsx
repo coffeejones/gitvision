@@ -14,6 +14,7 @@ import { STYLE, TOK } from "@/lib/theme";
 import { type DemoRepo } from "@/components/RepoInputForm";
 import { LandingPanel } from "@/components/LandingPanel";
 import { FeedbackLink } from "@/components/FeedbackLink";
+import { Logo } from "@/components/Logo";
 import type { SessionSummary } from "@/lib/types";
 
 interface Props {
@@ -33,6 +34,10 @@ export function MarketingHome({
        *  LandingPanel below so the URL field, demo picker, and saved
        *  sessions share one client component (lifted value state). */}
       <section className="flex flex-col gap-7">
+        {/* Brand mark — small, pre-hero anchor. Matches the topbar
+         *  treatment so users have a consistent "where am I" cue
+         *  across the marketing → session transition. */}
+        <Logo size={22} wordmark />
         <div className="flex items-center gap-2">
           <span
             className="h-1.5 w-1.5 rounded-full"
