@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 // deploys where the URL changes per branch.
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://gitvision.app"
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://gitvision.net"
   ),
   title: "GitVision — map any GitHub repo",
   description:

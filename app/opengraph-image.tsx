@@ -127,7 +127,7 @@ export default function OpenGraphImage() {
             letterSpacing: "0.02em",
           }}
         >
-          gitvision.app
+          gitvision.net
         </div>
       </div>
     ),

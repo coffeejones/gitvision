@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" width="700" height="160">
+  <title>GitVision wordmark — logo + text lockup</title>
+  <!-- Concentric rings + centre dot, identical to logo.svg -->
+  <circle cx="32" cy="32" r="26" stroke="#10b981" stroke-width="3" fill="none" opacity="0.25"/>
+  <circle cx="32" cy="32" r="17" stroke="#10b981" stroke-width="3" fill="none" opacity="0.55"/>
+  <circle cx="32" cy="32" r="9" stroke="#10b981" stroke-width="3" fill="none" opacity="0.85"/>
+  <circle cx="32" cy="32" r="4" fill="#10b981"/>
+  <!-- Wordmark — system-ui sans, similar weight + tracking to in-app
+       use. Renders identical text on Mac (SF Pro), iOS (SF Pro), Win
+       (Segoe UI), Linux (Cantarell / Roboto) — close enough that the
+       brand is consistent without bundling a font file. -->
+  <text x="84" y="42" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="32" font-weight="600" letter-spacing="-0.6" fill="#E8E8EE">GitVision</text>
+</svg>

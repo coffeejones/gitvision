@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512">
+  <title>GitVision logo — concentric blast radius</title>
+  <!-- Outer ring — most-faded ripple -->
+  <circle cx="32" cy="32" r="26" stroke="#10b981" stroke-width="3" fill="none" opacity="0.25"/>
+  <!-- Middle ring -->
+  <circle cx="32" cy="32" r="17" stroke="#10b981" stroke-width="3" fill="none" opacity="0.55"/>
+  <!-- Inner ring -->
+  <circle cx="32" cy="32" r="9" stroke="#10b981" stroke-width="3" fill="none" opacity="0.85"/>
+  <!-- Centre dot — the "epicentre" -->
+  <circle cx="32" cy="32" r="4" fill="#10b981"/>
+</svg>
