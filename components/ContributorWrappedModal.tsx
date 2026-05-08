@@ -420,7 +420,7 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
           position: "relative",
         }}
       >
-        <span>gitvision.app</span>
+        <span>gitvision.net</span>
         <span>#GitVisionWrapped</span>
       </div>
     </div>

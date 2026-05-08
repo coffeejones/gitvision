@@ -530,7 +530,7 @@ export function ShareCard({ snapshot, variant }: Props) {
             day: "numeric",
           })}
         </span>
-        <span>gitvision.app · paste a repo URL, get a constellation</span>
+        <span>gitvision.net · paste a repo URL, get a constellation</span>
       </div>
     </div>
   );

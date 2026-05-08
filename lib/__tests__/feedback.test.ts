@@ -146,12 +146,12 @@ describe("submitFeedback", () => {
       type: "feature",
       description: "would love a keyboard shortcut for refresh",
       email: "test@example.com",
-      pageUrl: "https://gitvision.app/session/abc123",
+      pageUrl: "https://gitvision.net/session/abc123",
       sessionId: "abc123",
     });
     const entry = await readEntry(result.id);
     expect(entry.email).toBe("test@example.com");
-    expect(entry.pageUrl).toBe("https://gitvision.app/session/abc123");
+    expect(entry.pageUrl).toBe("https://gitvision.net/session/abc123");
     expect(entry.sessionId).toBe("abc123");
   });
 

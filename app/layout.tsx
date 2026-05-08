@@ -51,7 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   // Analytics is opt-in via env: set NEXT_PUBLIC_PLAUSIBLE_DOMAIN to the
-  // domain you've configured in your Plausible dashboard (e.g. gitvision.app
+  // domain you've configured in your Plausible dashboard (e.g. gitvision.net
   // or a self-hosted equivalent). Unset → no analytics, no script tag, no
   // tracking. Keeps the local-dev experience analytics-free without code
   // changes.
