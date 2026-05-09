@@ -286,7 +286,23 @@ function pickCallTarget(
   // 1. Strict type-aware match.
   if (calleeType) {
     const typed = candidates.find((c) => c.containerType === calleeType);
-    return typed ?? null;
+    if (typed) return typed;
+    // Fall through ONLY to top-level (no containerType) candidates,
+    // and only when there's no explicit receiver. Rationale:
+    //   - A method on an UNRELATED class is a false positive (the
+    //     rspec/JpaRepository case — strict matching is intentional).
+    //   - A top-level function with no container is a legitimate target
+    //     for a bare-name call inside a method (Go's `Add(...)` calling
+    //     a package-level helper from a `(c *Calculator) Process` method).
+    //     The Go plugin sets calleeType=<receiver> for any bare identifier
+    //     inside a method as a hint, but Go allows bare calls to package
+    //     functions too — this fallthrough captures that case without
+    //     loosening the strict-receiver rule for method-vs-method matches.
+    if (!hasReceiver) {
+      const topLevel = candidates.filter((c) => c.containerType === undefined);
+      if (topLevel.length === 1) return topLevel[0];
+    }
+    return null;
   }
 
   // Common proximity helpers (used by both 2 and 3+ branches below).
