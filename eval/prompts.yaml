@@ -1,0 +1,135 @@
+# Eval target repos — one per AST-supported language. Mix of sizes so a
+# single run surfaces both cross-language AND cross-scale signal.
+#
+# Function counts are approximate — they shift as upstream repos evolve.
+# What matters is the relative magnitude (small, medium, large), not the
+# exact number.
+target_repos:
+  - id: ts_zod
+    language: ts
+    url: https://github.com/colinhacks/zod
+    subdir: null
+    size_class: small        # ~1k functions
+
+  - id: py_flask
+    language: python
+    url: https://github.com/pallets/flask
+    subdir: null
+    size_class: medium       # ~5k functions
+
+  - id: go_compiler
+    language: go
+    url: https://github.com/golang/go
+    subdir: src/cmd
+    size_class: large        # ~22k functions
+
+  - id: java_petclinic
+    language: java
+    url: https://github.com/spring-projects/spring-petclinic
+    subdir: null
+    size_class: small        # ~200 functions; framework-style
+
+  - id: rb_rspec
+    language: ruby
+    url: https://github.com/rspec/rspec-core
+    subdir: null
+    size_class: medium       # ~3k functions
+
+  - id: cs_serilog
+    language: csharp
+    url: https://github.com/serilog/serilog
+    subdir: null
+    size_class: medium       # ~2k functions
+
+# Prompts — kept deliberately narrow. Each one targets a specific
+# roadmap question we can act on.
+prompts:
+  # P1 — Cross-language recall on a universal task. Same prompt works on
+  # any language; per-language deltas reveal plugin-quality bias.
+  # Roadmap signal: "Plugin X has 40% lower recall than the others — it
+  # needs work."
+  #
+  # Truth-shape note: originally used `signals` (bucket: needsWork) but
+  # signal-IDs don't overlap with Claude's natural answer style ("function
+  # X has complexity 22"). Switched to `untested_hotspots` because it
+  # returns the same {filePath, name, complexity} shape Claude produces
+  # — same data the rule-based signal pipeline derives from.
+  # Caveat: repos where untested_hotspots returns [] (e.g. ts_zod's test
+  # layout doesn't match our heuristic) will score as `untestable`.
+  - id: P1_top_complexity
+    description: "Universal task — name top complex functions. Tests cross-language plugin parity."
+    target_repos: [ts_zod, py_flask, go_compiler, java_petclinic, rb_rspec, cs_serilog]
+    prompt: |
+      List the top 5 most cyclomatically complex functions in this repo.
+      For each: file path, function/method name, complexity score, and
+      one sentence on what it does.
+    ground_truth:
+      tool: untested_hotspots
+      args:
+        limit: 10
+    primary_metric: recall
+
+  # P2 — Test-coverage gap recall. Tests untested_hotspots tool quality.
+  # Roadmap signal: "Tool over-reports — 40% of items don't actually
+  # exist" or "Tool's heuristic for 'untested' is wrong on language X".
+  - id: P2_untested_hotspots
+    description: "Untested high-complexity functions. Tests untested_hotspots accuracy across languages."
+    target_repos: [py_flask, go_compiler, java_petclinic, rb_rspec, cs_serilog]
+    # Note: zod is intentionally skipped — its test layout doesn't fit our
+    # heuristic and we already know it returns no hotspots.
+    prompt: |
+      List the top 5 production functions in this repo that have NO
+      direct test coverage and are also high-complexity. For each: file
+      path, function name, complexity, and one sentence on why it's risky
+      to leave untested.
+    ground_truth:
+      tool: untested_hotspots
+      args:
+        limit: 5
+    primary_metric: recall
+
+  # P3 — Architecture synthesis. Tests whether tool data converts into
+  # readable prose, or whether Claude just dumps JSON.
+  # Roadmap signal: "T6-style data-dump symptom" — `analyze_repo` and
+  # `signals` may need compact-mode flags so synthesis becomes possible.
+  - id: P3_architecture_overview
+    description: "High-level architecture synthesis. Tests if MCP context produces grounded prose vs raw data dump."
+    target_repos: [ts_zod, py_flask, java_petclinic]
+    # Smaller framework-style repos where "what's the architecture?" has
+    # a meaningful answer. Skipping go_compiler (too sprawling for this
+    # prompt shape — would need a different question).
+    prompt: |
+      Give me a 4-paragraph architecture overview of this repo:
+        1. What the codebase does (one paragraph).
+        2. The 3 most central classes/modules and how they relate.
+        3. The 3 hottest files by churn or complexity.
+        4. Anything unusual or noteworthy about the structure.
+      Cite specific file paths and class names. Keep paragraphs short.
+    ground_truth:
+      tool: analyze_repo
+      args: {}
+    primary_metric: judge_synthesis  # human review — no auto-score
+
+  # P4 — Composite reasoning. Tests if Claude can chain MCP signals into
+  # a prioritized action list (the "review my repo" use case).
+  # Roadmap signal: "Composite reasoning works on Go but breaks on TS"
+  # OR "Claude over-uses one tool" (e.g. always analyze_repo, never
+  # blast_radius).
+  - id: P4_refactor_priority
+    description: "If you had one week to reduce risk, where would you focus? Tests synthesis + tool selection."
+    target_repos: [py_flask, go_compiler]
+    # Two repos: medium Python + large Go. Big enough that the answer
+    # isn't trivial but small enough that ground truth is checkable.
+    prompt: |
+      I have one week to reduce risk in this codebase before a release.
+      Where should I focus refactoring effort? Give me a prioritized
+      list of 5–8 specific functions or files, with:
+        - File path and function name
+        - Why each is high-risk (cite complexity, missing test coverage,
+          duplicates, or blast radius — pick what applies)
+        - Estimated impact if fixed
+      Don't be vague. Name actual files and functions.
+    ground_truth:
+      tool: composite
+      args: {}
+    primary_metric: recall_and_tool_diversity
