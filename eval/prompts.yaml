@@ -148,7 +148,7 @@ prompts:
     template_kind: hotspot_pr
     prompt_template: |
       Reviewer simulation. Someone has opened a PR that modifies the
-      function `{fn_name}` in `{fn_file}` (cyclomatic complexity
+      function `{fn_qualname}` in `{fn_file}` (cyclomatic complexity
       {fn_complexity}, no direct test coverage).
 
       Name 3-5 specific concerns a reviewer should raise. For each:
@@ -175,7 +175,7 @@ prompts:
     target_repos: [py_flask, go_compiler, java_petclinic, rb_rspec, cs_serilog]
     template_kind: hotspot_blast
     prompt_template: |
-      Function `{fn_name}` in `{fn_file}` (cyclomatic complexity
+      Function `{fn_qualname}` in `{fn_file}` (cyclomatic complexity
       {fn_complexity}) is being refactored. List the specific callers
       (incoming dependencies) and downstream code (outgoing) that
       would be affected by this change.

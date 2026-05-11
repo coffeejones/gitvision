@@ -131,6 +131,25 @@ COMPOSITE_TOOLS = ["signals", "untested_hotspots", "find_duplicates"]
 # seed available) get marked _skipped and produce untestable cells.
 # ---------------------------------------------------------------------------
 
+def _seed_format_kwargs(seed: dict[str, Any]) -> dict[str, Any]:
+    """Build the format() kwargs we pass into prompt templates. fn_qualname
+    is the most useful field — it's the "Class.method" form when there's
+    a container (Java/Ruby/C#/Python class methods) or just the bare name
+    for module-level functions (Go/JS top-level). Without this Claude
+    can't pass `container` to blast_radius and lands on the wrong
+    overload — that's the Ruby P6 regression bug."""
+    name = seed.get("name", "?")
+    container = seed.get("containerType", "") or ""
+    qualname = f"{container}.{name}" if container else name
+    return {
+        "fn_name": name,
+        "fn_file": seed.get("filePath", "?"),
+        "fn_complexity": seed.get("complexity", "?"),
+        "fn_container": container,
+        "fn_qualname": qualname,
+    }
+
+
 async def _handle_hotspot_blast(
     session: ClientSession, prompt: Prompt, session_id: str
 ) -> dict[str, Any]:
@@ -151,11 +170,7 @@ async def _handle_hotspot_blast(
         br_args["container"] = seed["containerType"]
     br = await call_tool(session, "blast_radius", br_args)
     br_data = json.loads(br["text"]) if br["text"] else {}
-    rendered = prompt.prompt_template.format(
-        fn_name=seed.get("name", "?"),
-        fn_file=seed.get("filePath", "?"),
-        fn_complexity=seed.get("complexity", "?"),
-    )
+    rendered = prompt.prompt_template.format(**_seed_format_kwargs(seed))
     return {"_seed": seed, "_rendered_prompt": rendered, **br_data}
 
 
@@ -191,11 +206,7 @@ async def _handle_hotspot_pr(
     for g in fd_data.get("groups") or []:
         if any(m.get("filePath") == seed.get("filePath") for m in g.get("members") or []):
             relevant_dupes.append(g)
-    rendered = prompt.prompt_template.format(
-        fn_name=seed.get("name", "?"),
-        fn_file=seed.get("filePath", "?"),
-        fn_complexity=seed.get("complexity", "?"),
-    )
+    rendered = prompt.prompt_template.format(**_seed_format_kwargs(seed))
     return {
         "_seed": seed,
         "_rendered_prompt": rendered,
