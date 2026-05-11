@@ -212,3 +212,32 @@ prompts:
     ground_truth:
       tool: templated
     primary_metric: recall
+
+  # P8 — Diff-aware PR review. End-to-end test of the new analyze_diff
+  # MCP tool. Eval captures: analyze_repo at base ref, analyze_repo at
+  # head ref, analyze_diff between them → truth set of ChangedFunction[].
+  # Claude with MCP can call the same three tools to do the same work.
+  # First validation runs on a single repo (py_flask) to verify the
+  # workflow before scaling out; if quality is good, add more entries to
+  # ref_pairs and target_repos in a future commit.
+  # Roadmap signal: "Claude struggles to chain three tool calls" OR
+  # "analyze_diff output is too thin to drive a review".
+  - id: P8_diff_review
+    description: "Diff-aware PR review — validates analyze_diff workflow end-to-end."
+    target_repos: [py_flask]
+    template_kind: diff_pair
+    ref_pairs:
+      py_flask:
+        base: "3.0.0"
+        head: "main"
+    prompt_template: |
+      A PR was opened upgrading `{repo_name}` from ref `{ref_base}` to
+      `{ref_head}`. Review the function-level changes and name the
+      top 3-5 specific concerns a reviewer should raise.
+
+      Be concrete — name actual function names, file paths, and
+      complexity deltas where relevant. If many functions changed,
+      pick the highest-impact ones rather than enumerating everything.
+    ground_truth:
+      tool: templated
+    primary_metric: recall

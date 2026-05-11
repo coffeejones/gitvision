@@ -79,6 +79,18 @@ class Prompt:
     prompt: str = ""
     prompt_template: str = ""
     template_kind: str = ""
+    # For template_kind="diff_pair": per-repo {base, head} git refs. The
+    # capture handler runs analyze_repo at each ref and analyze_diff
+    # against the resulting session pair. Shape:
+    #   ref_pairs: { "repo_id": { "base": "v3.0.0", "head": "main" } }
+    ref_pairs: dict[str, dict[str, str]] = field(default_factory=dict)
+    # Cap the number of items used for recall scoring. Set on prompts
+    # whose underlying tool can produce huge truth sets (diff_pair can
+    # easily return 300+ changes in a real PR). Without it, even a
+    # perfect narrative answer scores <5% recall — see the run analysis
+    # in eval/strategy/. 0 = no cap (use everything). Default in
+    # _handle_diff_pair is 10 when unset.
+    truth_top_n: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +163,7 @@ def _seed_format_kwargs(seed: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _handle_hotspot_blast(
-    session: ClientSession, prompt: Prompt, session_id: str
+    session: ClientSession, prompt: Prompt, session_id: str, repo: TargetRepo
 ) -> dict[str, Any]:
     """P6: pick the top untested hotspot, capture its blast_radius as truth."""
     uh_args: dict[str, Any] = {"sessionId": session_id, **prompt.ground_truth.get("selector_args", {})}
@@ -175,7 +187,7 @@ async def _handle_hotspot_blast(
 
 
 async def _handle_hotspot_pr(
-    session: ClientSession, prompt: Prompt, session_id: str
+    session: ClientSession, prompt: Prompt, session_id: str, repo: TargetRepo
 ) -> dict[str, Any]:
     """P5: simulate PR review on top hotspot. Synthesizes
     untested_hotspots + blast_radius + find_duplicates relevant to the
@@ -217,7 +229,7 @@ async def _handle_hotspot_pr(
 
 
 async def _handle_duplicate_intent(
-    session: ClientSession, prompt: Prompt, session_id: str
+    session: ClientSession, prompt: Prompt, session_id: str, repo: TargetRepo
 ) -> dict[str, Any]:
     """P7: pick a duplicate group, use first member as 'intent', other
     members as truth. Tests Claude's ability to find existing utilities
@@ -246,10 +258,104 @@ async def _handle_duplicate_intent(
     }
 
 
+def _change_priority(c: dict[str, Any]) -> float:
+    """Heuristic 'how impactful is this change?' score for sorting top-N.
+    Modified functions ranked by complexity-delta magnitude; added/removed
+    by the surviving complexity value. Unchanged ranked last."""
+    status = c.get("status")
+    if status == "modified":
+        return abs(c.get("complexityDelta") or 0)
+    if status == "added":
+        return float(c.get("complexityAfter") or 0)
+    if status == "removed":
+        return float(c.get("complexityBefore") or 0)
+    return 0.0  # unchanged
+
+
+async def _handle_diff_pair(
+    session: ClientSession, prompt: Prompt, session_id: str, repo: TargetRepo
+) -> dict[str, Any]:
+    """P8 (diff_pair): analyze_repo twice at different refs, then
+    analyze_diff for the truth set. Tests the full diff-aware workflow
+    end-to-end. session_id (the default-branch session captured at the
+    start of capture_ground_truth) is ignored here — we always make our
+    own analyze_repo calls so base/head are explicit.
+
+    Truth curation: by default we expose only the top-N changes by
+    impact (complexity delta for modified, complexity value for
+    added/removed) as the scoring-relevant `changes` field. The full
+    list is preserved under `_full_changes` for human inspection but
+    not scored — large PRs would otherwise create 300+ truth items
+    against which any narrative top-5 answer scores < 5% recall. Set
+    `truth_top_n` on the prompt config to override (default 10)."""
+    refs = prompt.ref_pairs.get(repo.id)
+    if not refs or not refs.get("base") or not refs.get("head"):
+        return {
+            "_skipped": True,
+            "_reason": f"no ref_pairs entry for {repo.id} in prompt.ref_pairs",
+        }
+    base_ref = refs["base"]
+    head_ref = refs["head"]
+
+    base_args: dict[str, Any] = {"repoUrl": repo.url, "ref": base_ref}
+    if repo.subdir:
+        base_args["subdir"] = repo.subdir
+    print(f"      analyze_repo {repo.url} (ref={base_ref})")
+    base_result = await call_tool(session, "analyze_repo", base_args)
+    base_payload = json.loads(base_result["text"]) if base_result["text"] else {}
+    base_session_id = base_payload.get("sessionId")
+    if not base_session_id:
+        return {"_skipped": True, "_reason": f"analyze_repo at ref={base_ref} returned no sessionId"}
+
+    head_args: dict[str, Any] = {"repoUrl": repo.url, "ref": head_ref}
+    if repo.subdir:
+        head_args["subdir"] = repo.subdir
+    print(f"      analyze_repo {repo.url} (ref={head_ref})")
+    head_result = await call_tool(session, "analyze_repo", head_args)
+    head_payload = json.loads(head_result["text"]) if head_result["text"] else {}
+    head_session_id = head_payload.get("sessionId")
+    if not head_session_id:
+        return {"_skipped": True, "_reason": f"analyze_repo at ref={head_ref} returned no sessionId"}
+
+    print(f"      analyze_diff (base={base_ref} vs head={head_ref})")
+    diff_result = await call_tool(
+        session,
+        "analyze_diff",
+        {"baseSessionId": base_session_id, "headSessionId": head_session_id},
+    )
+    diff_payload = json.loads(diff_result["text"]) if diff_result["text"] else {}
+
+    rendered = prompt.prompt_template.format(
+        ref_base=base_ref,
+        ref_head=head_ref,
+        repo_name=repo.id,
+    )
+
+    # Curate top-N changes for scoring. Sort by impact heuristic, take
+    # top N (default 10), and stash the rest under _full_changes (won't
+    # be scored — metadata convention).
+    top_n = prompt.truth_top_n or 10
+    all_changes = list(diff_payload.get("changes") or [])
+    all_changes.sort(key=_change_priority, reverse=True)
+    curated = all_changes[:top_n]
+    overflow = all_changes[top_n:]
+
+    return {
+        "_seed": {"base_ref": base_ref, "head_ref": head_ref, "repo": repo.id},
+        "_rendered_prompt": rendered,
+        "_base_session_id": base_session_id,
+        "_head_session_id": head_session_id,
+        "_full_changes": overflow,
+        "summary": diff_payload.get("summary"),
+        "changes": curated,
+    }
+
+
 TEMPLATE_HANDLERS = {
     "hotspot_blast": _handle_hotspot_blast,
     "hotspot_pr": _handle_hotspot_pr,
     "duplicate_intent": _handle_duplicate_intent,
+    "diff_pair": _handle_diff_pair,
 }
 
 
@@ -291,7 +397,7 @@ async def capture_ground_truth(
                     f"Unknown template_kind '{prompt.template_kind}' for {prompt.id}"
                 )
             print(f"    [{prompt.template_kind}] {prompt.id}")
-            payload = await handler(session, prompt, session_id)
+            payload = await handler(session, prompt, session_id, repo)
             truths[prompt.id] = payload
             (repo_dir / f"{prompt.id}.json").write_text(json.dumps(payload, indent=2))
         elif tool == "analyze_repo":
@@ -435,15 +541,20 @@ def _collect_recursive(
     `file`, or `name`. Used by templated-prompt truths where the shape
     is irregular (union of multiple tool outputs).
 
-    `skip_keys` lets P7 exclude the seed function (Claude is supposed
-    to discover the *other* members of the duplicate group, not the
-    seed it's already shown)."""
+    Convention: keys starting with `_` are metadata (e.g. `_seed`,
+    `_rendered_prompt`, `_full_diff`) and are skipped during truth
+    collection. This lets handlers stash raw/uncurated data alongside
+    the scoring-relevant data without polluting the recall numerator.
+
+    `skip_keys` is the explicit-skip escape hatch (e.g. P7 uses it to
+    exclude the seed function from truth — Claude is supposed to
+    discover the *other* members of the duplicate group)."""
     if isinstance(obj, dict):
         for k, v in obj.items():
             if k in skip_keys:
                 continue
-            if k == "_rendered_prompt":
-                continue
+            if isinstance(k, str) and k.startswith("_"):
+                continue  # metadata convention — see docstring
             if k in ("filePath", "file") and isinstance(v, str):
                 files.add(v)
             elif k == "name" and isinstance(v, str):
