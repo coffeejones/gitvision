@@ -49,11 +49,12 @@ describe("computeBlastRadius", () => {
       { from: "lib.ts", to: "util.ts", kind: "import" },
     ];
     const b = computeBlastRadius(cg, "util.ts");
-    // Incoming chain: lib.ts (hop 1) ← comp.ts (hop 2) ← page.ts (hop 3)
+    // Incoming chain: lib.ts (hop 1) ← comp.ts (hop 2) ← page.ts (hop 3).
+    // All top-level files → same "" module → crossModule false everywhere.
     expect(b.incoming).toEqual([
-      { filePath: "lib.ts", hop: 1 },
-      { filePath: "comp.ts", hop: 2 },
-      { filePath: "page.ts", hop: 3 },
+      { filePath: "lib.ts", hop: 1, crossModule: false },
+      { filePath: "comp.ts", hop: 2, crossModule: false },
+      { filePath: "page.ts", hop: 3, crossModule: false },
     ]);
     expect(b.byHop.incoming).toEqual({ 1: 1, 2: 1, 3: 1 });
   });
@@ -125,7 +126,7 @@ describe("computeBlastRadius", () => {
       },
     ];
     const b = computeBlastRadius(cg, "target.ts");
-    expect(b.incoming).toEqual([{ filePath: "a.ts", hop: 1 }]);
+    expect(b.incoming).toEqual([{ filePath: "a.ts", hop: 1, crossModule: false }]);
   });
 
   it("ignores self-edges defensively", () => {
@@ -177,9 +178,9 @@ describe("computeBlastRadius", () => {
     ];
     const b = computeBlastRadius(cg, "target.ts");
     expect(b.incoming).toEqual([
-      { filePath: "a.ts", hop: 1 },
-      { filePath: "z.ts", hop: 1 },
-      { filePath: "m.ts", hop: 2 },
+      { filePath: "a.ts", hop: 1, crossModule: false },
+      { filePath: "z.ts", hop: 1, crossModule: false },
+      { filePath: "m.ts", hop: 2, crossModule: false },
     ]);
   });
 });
@@ -206,7 +207,7 @@ describe("computeFunctionBlastRadius", () => {
     ];
     const b = computeFunctionBlastRadius(cg, "target.ts", "doStuff");
     expect(b.incoming).toEqual([
-      { filePath: "caller.ts", name: "main", hop: 1 },
+      { filePath: "caller.ts", name: "main", hop: 1, crossModule: false },
     ]);
     expect(b.outgoing).toEqual([]);
   });
@@ -224,7 +225,7 @@ describe("computeFunctionBlastRadius", () => {
     ];
     const b = computeFunctionBlastRadius(cg, "main.ts", "run");
     expect(b.outgoing).toEqual([
-      { filePath: "lib.ts", name: "helper", hop: 1 },
+      { filePath: "lib.ts", name: "helper", hop: 1, crossModule: false },
     ]);
     expect(b.incoming).toEqual([]);
   });
@@ -257,9 +258,9 @@ describe("computeFunctionBlastRadius", () => {
     ];
     const b = computeFunctionBlastRadius(cg, "repo.ts", "find");
     expect(b.incoming).toEqual([
-      { filePath: "service.ts", name: "lookup", hop: 1 },
-      { filePath: "controller.ts", name: "dispatch", hop: 2 },
-      { filePath: "page.ts", name: "handle", hop: 3 },
+      { filePath: "service.ts", name: "lookup", hop: 1, crossModule: false },
+      { filePath: "controller.ts", name: "dispatch", hop: 2, crossModule: false },
+      { filePath: "page.ts", name: "handle", hop: 3, crossModule: false },
     ]);
     expect(b.byHop.incoming).toEqual({ 1: 1, 2: 1, 3: 1 });
   });
@@ -316,7 +317,7 @@ describe("computeFunctionBlastRadius", () => {
     ];
     const b = computeFunctionBlastRadius(cg, "json.ts", "parse");
     expect(b.incoming).toEqual([
-      { filePath: "json.ts", name: "main", hop: 1 },
+      { filePath: "json.ts", name: "main", hop: 1, crossModule: false },
     ]);
   });
 
@@ -341,7 +342,7 @@ describe("computeFunctionBlastRadius", () => {
     ];
     const b = computeFunctionBlastRadius(cg, "a.ts", "x");
     expect(b.outgoing).toEqual([
-      { filePath: "a.ts", name: "y", hop: 1 },
+      { filePath: "a.ts", name: "y", hop: 1, crossModule: false },
     ]);
   });
 
@@ -447,6 +448,7 @@ describe("computeFunctionBlastRadius", () => {
         name: "make_blueprint",
         containerType: undefined,
         hop: 1,
+        crossModule: false,
       },
     ]);
 
@@ -460,6 +462,7 @@ describe("computeFunctionBlastRadius", () => {
         name: "setup",
         containerType: undefined,
         hop: 1,
+        crossModule: false,
       },
     ]);
   });
@@ -524,6 +527,7 @@ describe("computeFunctionBlastRadius", () => {
         name: "main",
         containerType: "App",
         hop: 1,
+        crossModule: false,
       },
     ]);
   });
@@ -557,7 +561,279 @@ describe("computeFunctionBlastRadius", () => {
         name: "helper",
         containerType: "Helper",
         hop: 1,
+        crossModule: false,
       },
     ]);
+  });
+});
+
+// ---------------- modulePathOf + crossModule flag (v0.79) ----------------
+
+import { modulePathOf } from "../codeAnalysis/blastRadius";
+
+describe("modulePathOf", () => {
+  it("returns the directory portion of a forward-slash path", () => {
+    expect(modulePathOf("src/main/java/petclinic/owner/Owner.java")).toBe(
+      "src/main/java/petclinic/owner"
+    );
+    expect(modulePathOf("lib/rspec/core/option_parser.rb")).toBe(
+      "lib/rspec/core"
+    );
+    expect(modulePathOf("a/b.ts")).toBe("a");
+  });
+
+  it("returns empty string for top-level files with no directory", () => {
+    expect(modulePathOf("README.md")).toBe("");
+    expect(modulePathOf("package.json")).toBe("");
+  });
+
+  it("returns empty string for an empty input (defensive)", () => {
+    expect(modulePathOf("")).toBe("");
+  });
+
+  it("preserves a leading slash if one is present", () => {
+    // Repo paths in our pipeline are repo-relative without a leading
+    // slash, but defensive coverage doesn't hurt.
+    expect(modulePathOf("/abs/path/to/file.ts")).toBe("/abs/path/to");
+  });
+
+  it("treats a trailing slash as the directory itself", () => {
+    // Edge case — a path that ends in a slash shouldn't appear in real
+    // data, but make sure the behavior is well-defined.
+    expect(modulePathOf("src/dir/")).toBe("src/dir");
+  });
+});
+
+describe("computeBlastRadius cross-module flag", () => {
+  it("flags callers in different directories as cross-module", () => {
+    const cg = emptyCodeGraph();
+    cg.imports = [
+      // Same-module caller: same directory as target
+      { from: "petclinic/owner/PetController.java", to: "petclinic/owner/Owner.java", kind: "import" },
+      // Cross-module caller: different directory
+      { from: "petclinic/audit/AuditLogger.java", to: "petclinic/owner/Owner.java", kind: "import" },
+    ];
+    const b = computeBlastRadius(cg, "petclinic/owner/Owner.java");
+    const byPath = Object.fromEntries(
+      b.incoming.map((e) => [e.filePath, e.crossModule])
+    );
+    expect(byPath["petclinic/owner/PetController.java"]).toBe(false);
+    expect(byPath["petclinic/audit/AuditLogger.java"]).toBe(true);
+  });
+
+  it("computes crossModuleCounts aggregate correctly", () => {
+    const cg = emptyCodeGraph();
+    cg.imports = [
+      // 2 same-module + 3 cross-module = 5 incoming, 3 cross-module
+      { from: "owner/a.ts", to: "owner/target.ts", kind: "import" },
+      { from: "owner/b.ts", to: "owner/target.ts", kind: "import" },
+      { from: "audit/c.ts", to: "owner/target.ts", kind: "import" },
+      { from: "service/d.ts", to: "owner/target.ts", kind: "import" },
+      { from: "service/e.ts", to: "owner/target.ts", kind: "import" },
+    ];
+    const b = computeBlastRadius(cg, "owner/target.ts");
+    expect(b.incoming).toHaveLength(5);
+    expect(b.crossModuleCounts.incoming).toBe(3);
+    expect(b.crossModuleCounts.outgoing).toBe(0);
+  });
+
+  it("treats nested subdirectories as cross-module (strict same-dir rule)", () => {
+    // Java-style: petclinic/owner/ vs petclinic/owner/sub/ are different
+    // packages semantically and different directories on disk.
+    const cg = emptyCodeGraph();
+    cg.imports = [
+      { from: "petclinic/owner/sub/SubOwner.java", to: "petclinic/owner/Owner.java", kind: "import" },
+    ];
+    const b = computeBlastRadius(cg, "petclinic/owner/Owner.java");
+    expect(b.incoming[0].crossModule).toBe(true);
+  });
+
+  it("handles top-level targets (empty-string module)", () => {
+    // Target at repo root → its module is "". Other top-level files
+    // should be same-module (both ""), but anything in a subdirectory
+    // is cross-module.
+    const cg = emptyCodeGraph();
+    cg.imports = [
+      { from: "README.md", to: "package.json", kind: "import" },
+      { from: "src/index.ts", to: "package.json", kind: "import" },
+    ];
+    const b = computeBlastRadius(cg, "package.json");
+    const byPath = Object.fromEntries(
+      b.incoming.map((e) => [e.filePath, e.crossModule])
+    );
+    expect(byPath["README.md"]).toBe(false);
+    expect(byPath["src/index.ts"]).toBe(true);
+  });
+
+  it("works on the outgoing direction too", () => {
+    const cg = emptyCodeGraph();
+    cg.imports = [
+      { from: "owner/target.ts", to: "owner/sameDir.ts", kind: "import" },
+      { from: "owner/target.ts", to: "service/external.ts", kind: "import" },
+    ];
+    const b = computeBlastRadius(cg, "owner/target.ts");
+    const byPath = Object.fromEntries(
+      b.outgoing.map((e) => [e.filePath, e.crossModule])
+    );
+    expect(byPath["owner/sameDir.ts"]).toBe(false);
+    expect(byPath["service/external.ts"]).toBe(true);
+    expect(b.crossModuleCounts.outgoing).toBe(1);
+  });
+});
+
+describe("computeFunctionBlastRadius cross-module flag", () => {
+  it("flags function callers based on their filePath's module, not the function name", () => {
+    const cg = emptyCodeGraph();
+    cg.calls = [
+      // Same-module: PetController calls Owner.addPet — both in owner/
+      {
+        fromFile: "petclinic/owner/PetController.java",
+        fromFunction: "processCreationForm",
+        calleeName: "addPet",
+        toFile: "petclinic/owner/Owner.java",
+        toFunction: "addPet",
+      },
+      // Cross-module: AuditLogger calls Owner.addPet — across packages
+      {
+        fromFile: "petclinic/audit/AuditLogger.java",
+        fromFunction: "logCreation",
+        calleeName: "addPet",
+        toFile: "petclinic/owner/Owner.java",
+        toFunction: "addPet",
+      },
+    ];
+    const b = computeFunctionBlastRadius(
+      cg,
+      "petclinic/owner/Owner.java",
+      "addPet"
+    );
+    const byFile = Object.fromEntries(
+      b.incoming.map((e) => [e.filePath, e.crossModule])
+    );
+    expect(byFile["petclinic/owner/PetController.java"]).toBe(false);
+    expect(byFile["petclinic/audit/AuditLogger.java"]).toBe(true);
+    expect(b.crossModuleCounts.incoming).toBe(1);
+  });
+
+  it("aggregates crossModuleCounts on both directions", () => {
+    const cg = emptyCodeGraph();
+    cg.calls = [
+      // 1 incoming: cross-module
+      {
+        fromFile: "audit/AuditLogger.java",
+        fromFunction: "log",
+        calleeName: "addPet",
+        toFile: "owner/Owner.java",
+        toFunction: "addPet",
+      },
+      // 2 outgoing: 1 same-module, 1 cross-module
+      {
+        fromFile: "owner/Owner.java",
+        fromFunction: "addPet",
+        calleeName: "getName",
+        toFile: "owner/Pet.java",
+        toFunction: "getName",
+      },
+      {
+        fromFile: "owner/Owner.java",
+        fromFunction: "addPet",
+        calleeName: "persist",
+        toFile: "persistence/Repo.java",
+        toFunction: "persist",
+      },
+    ];
+    const b = computeFunctionBlastRadius(cg, "owner/Owner.java", "addPet");
+    expect(b.crossModuleCounts.incoming).toBe(1);
+    expect(b.crossModuleCounts.outgoing).toBe(1);
+  });
+
+  it("handles same-file callers (always same-module)", () => {
+    // A function calling another function in the same file is by
+    // definition same-module — same directory.
+    const cg = emptyCodeGraph();
+    cg.calls = [
+      {
+        fromFile: "owner/Owner.java",
+        fromFunction: "validate",
+        calleeName: "addPet",
+        toFile: "owner/Owner.java",
+        toFunction: "addPet",
+      },
+    ];
+    const b = computeFunctionBlastRadius(cg, "owner/Owner.java", "addPet");
+    expect(b.incoming[0].crossModule).toBe(false);
+  });
+});
+
+describe("cross-module integration (real-world path shapes)", () => {
+  it("RSpec-style: lib/rspec/core/ same module, lib/rspec/core/bisect/ different", () => {
+    // Mirrors the actual P6 rb_rspec eval scenario.
+    const cg = emptyCodeGraph();
+    cg.calls = [
+      // Same module: option_parser.rb's `parse` calls `parser` in same file
+      {
+        fromFile: "lib/rspec/core/option_parser.rb",
+        fromFunction: "parse",
+        calleeName: "parser",
+        toFile: "lib/rspec/core/option_parser.rb",
+        toFunction: "parser",
+      },
+      // Same module sibling: configuration_options.rb in same lib/rspec/core/
+      {
+        fromFile: "lib/rspec/core/configuration_options.rb",
+        fromFunction: "command_line_options",
+        calleeName: "parser",
+        toFile: "lib/rspec/core/option_parser.rb",
+        toFunction: "parser",
+      },
+      // Cross-module: bisect subdir is a separate directory
+      {
+        fromFile: "lib/rspec/core/bisect/shell_command.rb",
+        fromFunction: "parsed_original_cli_options",
+        calleeName: "parser",
+        toFile: "lib/rspec/core/option_parser.rb",
+        toFunction: "parser",
+      },
+    ];
+    const b = computeFunctionBlastRadius(
+      cg,
+      "lib/rspec/core/option_parser.rb",
+      "parser"
+    );
+    const byFile = Object.fromEntries(
+      b.incoming.map((e) => [e.filePath, e.crossModule])
+    );
+    expect(byFile["lib/rspec/core/option_parser.rb"]).toBe(false);
+    expect(byFile["lib/rspec/core/configuration_options.rb"]).toBe(false);
+    expect(byFile["lib/rspec/core/bisect/shell_command.rb"]).toBe(true);
+    expect(b.crossModuleCounts.incoming).toBe(1);
+  });
+
+  it("Go-compiler-style: deeply nested package paths", () => {
+    // Mirrors src/cmd/compile/internal/ssa/ vs src/cmd/internal/obj/arm64/
+    const cg = emptyCodeGraph();
+    cg.imports = [
+      // Same SSA package
+      {
+        from: "src/cmd/compile/internal/ssa/rewriteARM.go",
+        to: "src/cmd/compile/internal/ssa/rewriteARM64.go",
+        kind: "import",
+      },
+      // Cross-package: obj/arm64 lives elsewhere
+      {
+        from: "src/cmd/internal/obj/arm64/asm7.go",
+        to: "src/cmd/compile/internal/ssa/rewriteARM64.go",
+        kind: "import",
+      },
+    ];
+    const b = computeBlastRadius(
+      cg,
+      "src/cmd/compile/internal/ssa/rewriteARM64.go"
+    );
+    const byPath = Object.fromEntries(
+      b.incoming.map((e) => [e.filePath, e.crossModule])
+    );
+    expect(byPath["src/cmd/compile/internal/ssa/rewriteARM.go"]).toBe(false);
+    expect(byPath["src/cmd/internal/obj/arm64/asm7.go"]).toBe(true);
   });
 });

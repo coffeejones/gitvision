@@ -27,6 +27,13 @@ export interface BlastRadiusEntry {
   filePath: string;
   /** 1 = direct, 2 = transitive via 1 intermediate, etc. Always >= 1. */
   hop: number;
+  /** True when this entry lives in a different directory than the target.
+   *  Same-directory is our cross-language module heuristic — enforced by
+   *  Go (1 package per dir) and idiomatic for Java/C#/Ruby/PHP/Python/
+   *  JS/TS. Cross-module callers are higher-blast-radius signals: a
+   *  change rippling beyond its own module is more surprising than one
+   *  staying inside the package the dev was already editing. */
+  crossModule: boolean;
 }
 
 export interface BlastRadius {
@@ -38,6 +45,10 @@ export interface BlastRadius {
     incoming: Record<number, number>;
     outgoing: Record<number, number>;
   };
+  /** Subset of incoming/outgoing counts that are in a different module
+   *  than the target. Use to highlight "N callers from outside this
+   *  package" — a sharper risk signal than raw caller count. */
+  crossModuleCounts: { incoming: number; outgoing: number };
   /** Set when the BFS hit the per-direction node cap, indicating the listed
    *  set is incomplete. */
   truncated?: string;
@@ -54,6 +65,9 @@ export interface FunctionBlastEntry {
    *  module-scope functions or for legacy data without container info. */
   containerType?: string;
   hop: number;
+  /** True when this function's filePath is in a different directory than
+   *  the target function's filePath. See BlastRadiusEntry.crossModule. */
+  crossModule: boolean;
 }
 
 export interface FunctionBlastRadius {
@@ -64,7 +78,28 @@ export interface FunctionBlastRadius {
     incoming: Record<number, number>;
     outgoing: Record<number, number>;
   };
+  crossModuleCounts: { incoming: number; outgoing: number };
   truncated?: string;
+}
+
+/** Return the directory portion of a repo-relative path — our same-directory
+ *  module heuristic. We use forward slashes throughout the pipeline so a
+ *  simple lastIndexOf split is safe. Top-level files (no slash) get an
+ *  empty-string "module" so they only collide with other top-level files.
+ *
+ *  Why same-dir works across 8 languages:
+ *    - Go: enforced (one package per directory)
+ *    - Java/C#/Ruby/PHP: convention strongly followed
+ *    - Python: enforced by package structure (__init__.py at each level)
+ *    - JS/TS: directory boundaries match package/module organization
+ *
+ *  Imperfect on edge cases (Java sub-package vs parent-package both inside
+ *  same `petclinic/owner/` would read as same module even though semantically
+ *  one nests inside the other), but the failure mode is "missed a flag" not
+ *  "false positive" — acceptable. */
+export function modulePathOf(filePath: string): string {
+  const lastSep = filePath.lastIndexOf("/");
+  return lastSep < 0 ? "" : filePath.substring(0, lastSep);
 }
 
 export interface BlastRadiusOptions {
@@ -102,13 +137,27 @@ export function computeBlastRadius(
   const inc = bfs(targetFile, incomingAdj, maxHops, maxNodes);
   const out = bfs(targetFile, outgoingAdj, maxHops, maxNodes);
 
+  const targetModule = modulePathOf(targetFile);
+  const incoming = inc.entries.map((e) => ({
+    ...e,
+    crossModule: modulePathOf(e.filePath) !== targetModule,
+  }));
+  const outgoing = out.entries.map((e) => ({
+    ...e,
+    crossModule: modulePathOf(e.filePath) !== targetModule,
+  }));
+
   return {
     target: targetFile,
-    incoming: inc.entries,
-    outgoing: out.entries,
+    incoming,
+    outgoing,
     byHop: {
       incoming: tallyByHop(inc.entries),
       outgoing: tallyByHop(out.entries),
+    },
+    crossModuleCounts: {
+      incoming: incoming.filter((e) => e.crossModule).length,
+      outgoing: outgoing.filter((e) => e.crossModule).length,
     },
     truncated: truncationMessage(inc.truncated || out.truncated, maxNodes, "files"),
   };
@@ -163,17 +212,33 @@ export function computeFunctionBlastRadius(
   const inc = bfs(targetId, incomingAdj, maxHops, maxNodes);
   const out = bfs(targetId, outgoingAdj, maxHops, maxNodes);
 
+  const targetModule = modulePathOf(targetFile);
+  const decorate = (e: BfsEntry): FunctionBlastEntry => {
+    const decoded = decodeFn(e.filePath);
+    return {
+      ...decoded,
+      hop: e.hop,
+      crossModule: modulePathOf(decoded.filePath) !== targetModule,
+    };
+  };
+  const incoming = inc.entries.map(decorate);
+  const outgoing = out.entries.map(decorate);
+
   return {
     target: {
       filePath: targetFile,
       name: targetFunction,
       containerType: targetContainerType,
     },
-    incoming: inc.entries.map((e) => ({ ...decodeFn(e.filePath), hop: e.hop })),
-    outgoing: out.entries.map((e) => ({ ...decodeFn(e.filePath), hop: e.hop })),
+    incoming,
+    outgoing,
     byHop: {
       incoming: tallyByHop(inc.entries),
       outgoing: tallyByHop(out.entries),
+    },
+    crossModuleCounts: {
+      incoming: incoming.filter((e) => e.crossModule).length,
+      outgoing: outgoing.filter((e) => e.crossModule).length,
     },
     truncated: truncationMessage(
       inc.truncated || out.truncated,
@@ -243,8 +308,19 @@ function addEdge(
   ins.add(from);
 }
 
+/** Internal BFS shape — bare (filePath, hop) tuples. compute* functions
+ *  decorate these with crossModule before returning to callers. Keeping the
+ *  BFS result minimal lets us reuse the same BFS for both file-level and
+ *  function-level paths (the function-level "filePath" here is actually an
+ *  encoded function id; decoding + cross-module flagging both happen in
+ *  the caller). */
+interface BfsEntry {
+  filePath: string;
+  hop: number;
+}
+
 interface BfsResult {
-  entries: BlastRadiusEntry[];
+  entries: BfsEntry[];
   truncated: boolean;
 }
 
@@ -282,7 +358,7 @@ function bfs(
     if (truncated) break;
   }
 
-  const entries: BlastRadiusEntry[] = [];
+  const entries: BfsEntry[] = [];
   for (const [file, hop] of hopOf) {
     if (file === start) continue;
     entries.push({ filePath: file, hop });
@@ -291,7 +367,7 @@ function bfs(
   return { entries, truncated };
 }
 
-function tallyByHop(entries: BlastRadiusEntry[]): Record<number, number> {
+function tallyByHop(entries: BfsEntry[]): Record<number, number> {
   const out: Record<number, number> = {};
   for (const e of entries) out[e.hop] = (out[e.hop] ?? 0) + 1;
   return out;

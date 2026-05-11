@@ -91,6 +91,9 @@ export async function handleBlastRadius(input: Input) {
         incoming: result.incoming.length,
         outgoing: result.outgoing.length,
         byHop: result.byHop,
+        // Cross-module subset — entries whose filePath sits in a different
+        // directory than the target's. Sharper risk signal than raw count.
+        crossModule: result.crossModuleCounts,
       },
       truncated: result.truncated,
     });
@@ -107,6 +110,7 @@ export async function handleBlastRadius(input: Input) {
       incoming: result.incoming.length,
       outgoing: result.outgoing.length,
       byHop: result.byHop,
+      crossModule: result.crossModuleCounts,
     },
     truncated: result.truncated,
   });
