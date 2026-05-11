@@ -133,3 +133,82 @@ prompts:
       tool: composite
       args: {}
     primary_metric: recall_and_tool_diversity
+
+  # P5 — Simulated PR review. Closest direct test of the PR-bot use case.
+  # Input is picked from MCP data per-repo: top untested hotspot becomes
+  # the "function being modified". Truth = its blast_radius + co-hotspots
+  # in the same file + nearby find_duplicates groups. Tests Claude's
+  # ability to chain multiple signals into a reviewer's mental model.
+  # Roadmap signal: "Synthesis across signals works on language X but
+  # not on Y" OR "Claude misses the duplicate-utility angle even when
+  # data is right there."
+  - id: P5_pr_review
+    description: "Simulated PR review on an untested hotspot. Tests synthesis across multiple MCP signals."
+    target_repos: [py_flask, go_compiler, java_petclinic, rb_rspec, cs_serilog]
+    template_kind: hotspot_pr
+    prompt_template: |
+      Reviewer simulation. Someone has opened a PR that modifies the
+      function `{fn_name}` in `{fn_file}` (cyclomatic complexity
+      {fn_complexity}, no direct test coverage).
+
+      Name 3-5 specific concerns a reviewer should raise. For each:
+        - Why it's a risk (cite the relevant signal: blast radius,
+          duplicate utility nearby, other untested functions in the
+          same file, etc.)
+        - What specifically should be checked or tested before merge
+
+      Be specific. Name actual file paths and function names where
+      possible.
+    ground_truth:
+      tool: templated
+    primary_metric: recall
+
+  # P6 — Direct blast radius query. Tests the underused MCP tool.
+  # blast_radius was called 0 times as primary truth source in P1-P4.
+  # This isolates its quality: given a function, does MCP help Claude
+  # name its actual callers and downstream effects vs. guessing?
+  # Roadmap signal: "blast_radius fails on language X — the call graph
+  # plugin needs work" OR "Claude doesn't use blast_radius when it
+  # should."
+  - id: P6_blast_impact
+    description: "Focused blast radius query — tests the underused MCP tool directly."
+    target_repos: [py_flask, go_compiler, java_petclinic, rb_rspec, cs_serilog]
+    template_kind: hotspot_blast
+    prompt_template: |
+      Function `{fn_name}` in `{fn_file}` (cyclomatic complexity
+      {fn_complexity}) is being refactored. List the specific callers
+      (incoming dependencies) and downstream code (outgoing) that
+      would be affected by this change.
+
+      Name actual file paths and function names. If you cannot
+      determine the callers, say so explicitly.
+    ground_truth:
+      tool: templated
+      selector_args:
+        limit: 1
+    primary_metric: recall
+
+  # P7 — Duplicate-utility detection. Core AI-aware positioning signal.
+  # The "AI just wrote a function that already exists" case. Pick a
+  # find_duplicates group, treat first member as the dev's intent,
+  # other members as the existing utilities Claude should surface.
+  # Only runs on repos where find_duplicates returns groups; others
+  # get _skipped → untestable category.
+  # Roadmap signal: "find_duplicates over- or under-reports on language
+  # X" OR "Claude misses the duplicate-detection use even with MCP."
+  - id: P7_duplicate_check
+    description: "Pre-write duplicate detection — tests find_duplicates against AI-aware positioning."
+    target_repos: [py_flask, go_compiler, java_petclinic, rb_rspec, cs_serilog]
+    template_kind: duplicate_intent
+    prompt_template: |
+      You're about to add a function with this signature and intent:
+      `{seed_fn}` (similar in shape to `{seed_file}`, complexity
+      {seed_complexity}).
+
+      Before you write it: does anything similar already exist in
+      this codebase? If so, name the existing functions and their
+      file paths, and briefly note how they differ. If not, confirm
+      that no similar utility exists.
+    ground_truth:
+      tool: templated
+    primary_metric: recall

@@ -153,7 +153,7 @@ def _looks_like_tool_output(data: Any, tool: str) -> bool:
 
 
 async def main(run_dir: Path) -> None:
-    load_dotenv()
+    load_dotenv(override=True)
     cfg = GitVisionConfig.from_env()
     eval_dir = Path(__file__).parent
     repos, prompts = _load_prompts(eval_dir / "prompts.yaml")

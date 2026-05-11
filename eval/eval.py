@@ -69,9 +69,16 @@ class Prompt:
     id: str
     description: str
     target_repos: list[str]
-    prompt: str
     ground_truth: dict[str, Any]
     primary_metric: str
+    # Static prompts (P1-P4) use `prompt`. Template prompts (P5-P7) leave
+    # `prompt` empty and use `prompt_template` + `template_kind` — the
+    # template renderer fills in seed values picked from MCP output at
+    # capture time. Rendered text is stored in truth["_rendered_prompt"]
+    # so re-scoring can reuse it without re-rendering.
+    prompt: str = ""
+    prompt_template: str = ""
+    template_kind: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +124,124 @@ async def call_tool(session: ClientSession, name: str, args: dict[str, Any]) -> 
 COMPOSITE_TOOLS = ["signals", "untested_hotspots", "find_duplicates"]
 
 
+# ---------------------------------------------------------------------------
+# Template handlers — for prompts whose input is selected from MCP output
+# (P5/P6/P7). Each handler returns a truth payload that includes the
+# rendered prompt text + the structured truth set. Empty payloads (no
+# seed available) get marked _skipped and produce untestable cells.
+# ---------------------------------------------------------------------------
+
+async def _handle_hotspot_blast(
+    session: ClientSession, prompt: Prompt, session_id: str
+) -> dict[str, Any]:
+    """P6: pick the top untested hotspot, capture its blast_radius as truth."""
+    uh_args: dict[str, Any] = {"sessionId": session_id, **prompt.ground_truth.get("selector_args", {})}
+    uh = await call_tool(session, "untested_hotspots", uh_args)
+    uh_data = json.loads(uh["text"]) if uh["text"] else {}
+    hotspots = (uh_data.get("hotspots") or [])
+    if not hotspots:
+        return {"_skipped": True, "_reason": "no untested hotspots for selector"}
+    seed = hotspots[0]
+    br_args: dict[str, Any] = {
+        "sessionId": session_id,
+        "file": seed["filePath"],
+        "fn": seed["name"],
+    }
+    if seed.get("containerType"):
+        br_args["container"] = seed["containerType"]
+    br = await call_tool(session, "blast_radius", br_args)
+    br_data = json.loads(br["text"]) if br["text"] else {}
+    rendered = prompt.prompt_template.format(
+        fn_name=seed.get("name", "?"),
+        fn_file=seed.get("filePath", "?"),
+        fn_complexity=seed.get("complexity", "?"),
+    )
+    return {"_seed": seed, "_rendered_prompt": rendered, **br_data}
+
+
+async def _handle_hotspot_pr(
+    session: ClientSession, prompt: Prompt, session_id: str
+) -> dict[str, Any]:
+    """P5: simulate PR review on top hotspot. Synthesizes
+    untested_hotspots + blast_radius + find_duplicates relevant to the
+    same file. Tests Claude's ability to chain signals."""
+    uh_args = {"sessionId": session_id, "limit": 5}
+    uh = await call_tool(session, "untested_hotspots", uh_args)
+    uh_data = json.loads(uh["text"]) if uh["text"] else {}
+    hotspots = uh_data.get("hotspots") or []
+    if not hotspots:
+        return {"_skipped": True, "_reason": "no untested hotspots"}
+    seed = hotspots[0]
+    co_hotspots = [
+        h for h in hotspots[1:]
+        if h.get("filePath") == seed.get("filePath") and h.get("name") != seed.get("name")
+    ]
+    br_args: dict[str, Any] = {
+        "sessionId": session_id,
+        "file": seed["filePath"],
+        "fn": seed["name"],
+    }
+    if seed.get("containerType"):
+        br_args["container"] = seed["containerType"]
+    br = await call_tool(session, "blast_radius", br_args)
+    br_data = json.loads(br["text"]) if br["text"] else {}
+    fd = await call_tool(session, "find_duplicates", {"sessionId": session_id})
+    fd_data = json.loads(fd["text"]) if fd["text"] else {}
+    relevant_dupes: list[dict[str, Any]] = []
+    for g in fd_data.get("groups") or []:
+        if any(m.get("filePath") == seed.get("filePath") for m in g.get("members") or []):
+            relevant_dupes.append(g)
+    rendered = prompt.prompt_template.format(
+        fn_name=seed.get("name", "?"),
+        fn_file=seed.get("filePath", "?"),
+        fn_complexity=seed.get("complexity", "?"),
+    )
+    return {
+        "_seed": seed,
+        "_rendered_prompt": rendered,
+        "co_hotspots": co_hotspots,
+        "blast_radius": br_data,
+        "duplicates": relevant_dupes,
+    }
+
+
+async def _handle_duplicate_intent(
+    session: ClientSession, prompt: Prompt, session_id: str
+) -> dict[str, Any]:
+    """P7: pick a duplicate group, use first member as 'intent', other
+    members as truth. Tests Claude's ability to find existing utilities
+    before writing new code."""
+    fd = await call_tool(session, "find_duplicates", {"sessionId": session_id})
+    fd_data = json.loads(fd["text"]) if fd["text"] else {}
+    groups = fd_data.get("groups") or []
+    target_group = next(
+        (g for g in groups if len(g.get("members") or []) >= 2), None
+    )
+    if not target_group:
+        return {"_skipped": True, "_reason": "no duplicate group with ≥2 members"}
+    members = target_group["members"]
+    seed = members[0]
+    others = members[1:]
+    rendered = prompt.prompt_template.format(
+        seed_fn=seed.get("name", "?"),
+        seed_file=seed.get("filePath", "?"),
+        seed_complexity=seed.get("complexity", "?"),
+    )
+    return {
+        "_seed": seed,
+        "_rendered_prompt": rendered,
+        "other_members": others,
+        "_group_size": len(members),
+    }
+
+
+TEMPLATE_HANDLERS = {
+    "hotspot_blast": _handle_hotspot_blast,
+    "hotspot_pr": _handle_hotspot_pr,
+    "duplicate_intent": _handle_duplicate_intent,
+}
+
+
 async def capture_ground_truth(
     session: ClientSession,
     repo: TargetRepo,
@@ -148,7 +273,17 @@ async def capture_ground_truth(
         gt = prompt.ground_truth
         tool = gt.get("tool")
 
-        if tool == "analyze_repo":
+        if prompt.template_kind:
+            handler = TEMPLATE_HANDLERS.get(prompt.template_kind)
+            if handler is None:
+                raise RuntimeError(
+                    f"Unknown template_kind '{prompt.template_kind}' for {prompt.id}"
+                )
+            print(f"    [{prompt.template_kind}] {prompt.id}")
+            payload = await handler(session, prompt, session_id)
+            truths[prompt.id] = payload
+            (repo_dir / f"{prompt.id}.json").write_text(json.dumps(payload, indent=2))
+        elif tool == "analyze_repo":
             truths[prompt.id] = analyze_payload
             (repo_dir / f"{prompt.id}.json").write_text(json.dumps(analyze_payload, indent=2))
         elif tool == "composite":
@@ -282,12 +417,51 @@ IDENT_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]{2,})\b")
 PATH_RE = re.compile(r"\b([\w./-]+\.(?:go|ts|tsx|js|jsx|py|java|cs|rb|php))\b")
 
 
+def _collect_recursive(
+    obj: Any, files: set[str], idents: set[str], skip_keys: tuple[str, ...] = ()
+) -> None:
+    """Walk a nested dict/list and collect any value under `filePath`,
+    `file`, or `name`. Used by templated-prompt truths where the shape
+    is irregular (union of multiple tool outputs).
+
+    `skip_keys` lets P7 exclude the seed function (Claude is supposed
+    to discover the *other* members of the duplicate group, not the
+    seed it's already shown)."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in skip_keys:
+                continue
+            if k == "_rendered_prompt":
+                continue
+            if k in ("filePath", "file") and isinstance(v, str):
+                files.add(v)
+            elif k == "name" and isinstance(v, str):
+                idents.add(v)
+            else:
+                _collect_recursive(v, files, idents, skip_keys)
+    elif isinstance(obj, list):
+        for item in obj:
+            _collect_recursive(item, files, idents, skip_keys)
+
+
 def _truth_items(prompt: Prompt, truth: Any) -> tuple[set[str], set[str]]:
     """Extract (file_paths, identifier_names) from the prompt's ground
-    truth payload. Mirrors the existing eval's _truth_shape but trimmed
-    to the prompts we actually use."""
+    truth payload. Static prompts (P1-P4) use shape-specific handlers
+    below; templated prompts use a generic recursive scanner."""
     files: set[str] = set()
     idents: set[str] = set()
+
+    # Templated prompts (P5/P6/P7) — generic recursive scan
+    if prompt.template_kind:
+        if (truth or {}).get("_skipped"):
+            return files, idents  # empty → recall=None → category="untestable"
+        # P7: Claude shouldn't get credit for repeating the seed — those
+        # values are part of the *question*, not the answer.
+        skip_keys: tuple[str, ...] = ()
+        if prompt.template_kind == "duplicate_intent":
+            skip_keys = ("_seed",)
+        _collect_recursive(truth, files, idents, skip_keys)
+        return files, idents
 
     if prompt.ground_truth.get("tool") == "signals":
         for sig in (truth.get("signals", {}) or {}).get(prompt.ground_truth["args"].get("bucket", "all"), []) or []:
@@ -586,7 +760,7 @@ def _filter_subset(
 
 
 async def main() -> None:
-    load_dotenv()
+    load_dotenv(override=True)  # .env wins over shell exports (some shells set empty ANTHROPIC_API_KEY)
     here = Path(__file__).parent
     config = yaml.safe_load((here / "prompts.yaml").read_text(encoding="utf-8"))
 
@@ -653,7 +827,17 @@ async def main() -> None:
                 continue  # filtered out
             repo = next(r for r in repos if r.id == repo_id)
             print(f"\n[{prompt.id} × {repo.id}]")
-            user_msg = _seed_user_message(prompt.prompt, repo)
+
+            # Templated prompts may have skipped (no seed available);
+            # treat as untestable and skip the runs.
+            truth = truths[repo.id].get(prompt.id, {})
+            if prompt.template_kind and (truth or {}).get("_skipped"):
+                print(f"    skipped: {truth.get('_reason', 'no seed')}")
+                continue
+
+            prompt_text = truth.get("_rendered_prompt") if prompt.template_kind else prompt.prompt
+            prompt_text = prompt_text or prompt.prompt
+            user_msg = _seed_user_message(prompt_text, repo)
 
             print("  no_mcp...")
             no_mcp_run = run_no_mcp(client, model, user_msg)
@@ -665,8 +849,7 @@ async def main() -> None:
                   f"{len(with_mcp_run['tool_calls'])} tool calls, "
                   f"{with_mcp_run['usage']['output_tokens']}out")
 
-            # Score
-            truth = truths[repo.id].get(prompt.id, {})
+            # Score (truth already resolved above)
             ap = analyze_payloads[repo.id]
             no_mcp_score = score_run(no_mcp_run["text"], prompt, truth, ap)
             with_mcp_score = score_run(with_mcp_run["text"], prompt, truth, ap)
