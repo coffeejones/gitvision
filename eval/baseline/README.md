@@ -1,10 +1,16 @@
-# Eval baseline — P1 + P2 strong cells
+# Eval baseline — strong cells across P1 + P2 + P6
 
-Frozen snapshot of the 11 (prompt × repo) cells that demonstrated
-**consistent cross-language MCP gains** in the first calibrated eval run.
+Frozen snapshots of (prompt × repo) cells that demonstrate **consistent
+cross-language MCP gains**. Used as a regression-vigilance reference:
+any future change that causes one of these cells to regress is a signal
+worth investigating before merging.
 
-Captured: 2026-05-10 from `runs/20260510T113151Z/` (post P1 truth-shape
-fix and rescore-args fix).
+Two snapshots, captured at different points:
+
+- `p1-p2-cells.json` — 11 cells from `runs/20260510T113151Z/`
+  (2026-05-10, post P1 truth-shape fix and rescore-args fix)
+- `p6-cells.json` — 5 cells from `runs/20260511T190622Z/`
+  (2026-05-11, post fn_qualname fix and cross-module heuristic)
 
 ## Why this exists
 
@@ -56,7 +62,34 @@ csharp 78% · ruby 59% · java 54% · python 50% · ts 43% · go 42%
   P2's targeting comment suggested) — first 47% recall on P1 confirms
   the tool fires for zod.
 
+## P6 (blast_impact) — added 2026-05-11
+
+Captured after the fn_qualname fix (commit 6d67ca0) and the cross-module
+heuristic (commit f9940ed). All 5 cells categorize as **strong** —
+recall ≥80% on every tested language.
+
+| Cell | Recall no→with | Hallucination no→with | Cat |
+|---|---|---|---|
+| P6 py_flask | 26% → 100% | 80% → **7%** | strong |
+| P6 go_compiler | 44% → 96% | 89% → 50% | strong |
+| P6 java_petclinic | 75% → 88% | 85% → 50% | strong |
+| P6 rb_rspec | 46% → 100% | 86% → 42% | strong |
+| P6 cs_serilog | 17% → 100% | 86% → 36% | strong |
+
+Floor: +13pp recall (java). Best: +83pp (cs_serilog). Cross-language
+with-MCP recall on P6: py 100%, go 96%, java 88%, rb 100%, cs 100%.
+
+The cross-module heuristic was a **quality** win, not a recall win:
+recall was already strong before the heuristic landed. What changed is
+that Claude now writes architectural framing in its answers ("limited
+to the owner package — no cross-module dependencies") and hallucination
+ratios dropped consistently (py_flask 13% → 7% with-MCP, cs_serilog
+40% → 36%).
+
 ## Files
 
 - `p1-p2-cells.json` — full result records (text, scores, tool calls,
-  matched truth items, latency) for these 11 cells. Self-contained.
+  matched truth items, latency) for the 11 P1 + P2 cells. Self-contained.
+- `p6-cells.json` — full result records for the 5 P6 cells, captured
+  post cross-module heuristic. Includes Claude's actual answer text
+  showing cross-module-aware framing.
