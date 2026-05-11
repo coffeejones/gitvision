@@ -263,6 +263,12 @@ export interface AnalysisSnapshot {
    *  "Analyzed subdir: …" indicator so users know they aren't seeing
    *  the full repo. Absent when the whole repo was analyzed. v0.24+. */
   analyzedSubdir?: string;
+  /** Git ref (branch, tag, or commit SHA) that was analyzed. Absent
+   *  when the analysis used the repo's default branch (the common
+   *  case). Set when the caller explicitly asked for a non-default
+   *  ref — used by analyze_diff to pair base vs head snapshots of the
+   *  same repo. v0.79+. */
+  analyzedRef?: string;
   /** Secret-scan results from the analyze pipeline (v0.61+). Pure
    *  regex-based pass over .env / config / source files at refresh
    *  time. Only stores redacted previews — the raw credential never

@@ -26,6 +26,12 @@ export const analyzeRepoInputSchema = {
     .describe(
       "Optional subdirectory to scope code-analysis to (e.g. 'src/cmd'). Whole-repo metadata still uses the full repo."
     ),
+  ref: z
+    .string()
+    .optional()
+    .describe(
+      "Optional git ref to analyze — branch name, tag, or commit SHA. Defaults to the repo's default branch. Use this for diff-aware workflows: call analyze_repo on the base ref (e.g. 'main'), then again on the head ref (e.g. 'feature-x'), then pass both session ids to analyze_diff. Distinct refs get distinct session ids so they don't collide in the cache."
+    ),
 };
 
 const InputSchema = z.object(analyzeRepoInputSchema);
@@ -39,7 +45,7 @@ export async function handleAnalyzeRepo(input: Input) {
     );
   }
 
-  const sessionId = sessionIdFor(input.repoUrl);
+  const sessionId = sessionIdFor(input.repoUrl, input.ref);
 
   // Run the same pipeline the workspace UI uses. Returns a complete
   // AnalysisSnapshot — every downstream tool can derive what it needs
@@ -48,6 +54,7 @@ export async function handleAnalyzeRepo(input: Input) {
   try {
     snapshot = await analyzeRepo(parsed.owner, parsed.repo, {
       subdir: input.subdir ?? null,
+      ref: input.ref ?? null,
     });
   } catch (err) {
     return errorResult(
@@ -73,6 +80,11 @@ export async function handleAnalyzeRepo(input: Input) {
       pushedAt: snapshot.repo.pushedAt,
       license: snapshot.repo.license,
     },
+    /** Echoes the ref that was actually analyzed. When the caller passed
+     *  no `ref`, this is undefined — and the analysis used the repo's
+     *  default branch. Surfaced so a diff-aware caller can confirm it
+     *  got distinct sessions for base vs head. */
+    analyzedRef: snapshot.analyzedRef,
     languages: topLanguages(snapshot.languages, 5),
     contributors: snapshot.contributors.length,
     pullRequests: snapshot.pullRequests?.length ?? 0,

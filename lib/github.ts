@@ -391,6 +391,14 @@ export interface AnalyzeRepoOptions {
    *  (contributors, PRs, language mix, dep-health) still uses the full
    *  repo — those signals don't make sense to scope. v0.24+. */
   subdir?: string | null;
+  /** Git ref to analyze — branch name, tag, or commit SHA. When unset,
+   *  uses the repo's default branch (the common case). Required for
+   *  diff-aware workflows where the caller wants to compare a feature
+   *  branch against main: call analyze_repo twice with different refs,
+   *  then analyze_diff on the two session ids. Only affects the source
+   *  tarball used for codeAnalysis + secret-scan + file-graph; repo
+   *  metadata (stars, languages, etc.) is always whole-repo. v0.79+. */
+  ref?: string | null;
 }
 
 export async function analyzeRepo(
@@ -399,6 +407,7 @@ export async function analyzeRepo(
   opts: AnalyzeRepoOptions = {}
 ): Promise<AnalysisSnapshot> {
   const subdir = opts.subdir ?? null;
+  const explicitRef = opts.ref ?? null;
   const [
     repoMeta,
     contributors,
@@ -505,7 +514,7 @@ export async function analyzeRepo(
       octokit,
       owner,
       repo,
-      repoMeta.defaultBranch,
+      explicitRef ?? repoMeta.defaultBranch,
       { subdir }
     );
     cleanup = extracted.cleanup;
@@ -595,7 +604,7 @@ export async function analyzeRepo(
       octokit,
       owner,
       repo,
-      repoMeta.defaultBranch
+      explicitRef ?? repoMeta.defaultBranch
     );
     codeGraph = undefined;
     codeGraphSkipReason = `Tarball extraction failed: ${
@@ -637,6 +646,7 @@ export async function analyzeRepo(
     hasReadme,
     dependencyHealths: dependencyHealths.length > 0 ? dependencyHealths : undefined,
     analyzedSubdir: subdir ?? undefined,
+    analyzedRef: explicitRef ?? undefined,
     secretFindings,
     rateLimitInfo,
   };

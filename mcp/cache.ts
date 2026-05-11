@@ -36,11 +36,18 @@ const MAX_MEMORY_ENTRIES = 8;
 
 const CACHE_DIR = path.join(homedir(), ".gitvision", "cache");
 
-/** sessionId from repoUrl: stable, opaque, doesn't leak the URL into
- *  the wire format. 12 chars of SHA-1 in hex is plenty unique for the
- *  scale we're at (one user's MCP session = handful of repos in flight). */
-export function sessionIdFor(repoUrl: string): string {
-  return createHash("sha1").update(repoUrl).digest("hex").slice(0, 12);
+/** sessionId from repoUrl (+ optional ref): stable, opaque, doesn't
+ *  leak the URL into the wire format. 12 chars of SHA-1 in hex is
+ *  plenty unique for the scale we're at.
+ *
+ *  When `ref` is provided (v0.79+ for diff-aware workflows), it's
+ *  folded into the hash so two analyses of the same repo at different
+ *  refs (e.g. main vs feature-x) get distinct session ids and cache
+ *  entries. Backward-compatible: passing no ref produces the same
+ *  hash as before, so existing callers keep their cache. */
+export function sessionIdFor(repoUrl: string, ref?: string | null): string {
+  const key = ref ? `${repoUrl}@${ref}` : repoUrl;
+  return createHash("sha1").update(key).digest("hex").slice(0, 12);
 }
 
 const memoryCache = new Map<string, CacheEntry>();
@@ -167,13 +174,17 @@ export async function setCached(
   await setOnDisk(sessionId, snapshot);
 }
 
-/** Convenience: combined "did we already analyze this URL recently?"
- *  lookup. Returns the sessionId either way; snapshot is undefined
- *  on miss. */
-export async function lookup(repoUrl: string): Promise<{
+/** Convenience: combined "did we already analyze this URL (+ ref)
+ *  recently?" lookup. Returns the sessionId either way; snapshot is
+ *  undefined on miss. Pass `ref` to look up a non-default branch
+ *  analysis (v0.79+). */
+export async function lookup(
+  repoUrl: string,
+  ref?: string | null
+): Promise<{
   sessionId: string;
   snapshot: AnalysisSnapshot | undefined;
 }> {
-  const sessionId = sessionIdFor(repoUrl);
+  const sessionId = sessionIdFor(repoUrl, ref);
   return { sessionId, snapshot: await getCached(sessionId) };
 }
