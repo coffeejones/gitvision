@@ -30,6 +30,7 @@ import {
   FileCode,
   Copy,
   FlaskConical,
+  Network,
   PhoneIncoming,
   PhoneOutgoing,
   ShieldOff,
@@ -737,11 +738,14 @@ function SelectedFileHeader({
 
 /** Unified shape for both file-level and function-level entries. The list
  *  primitive renders `primary` prominently and `secondary` (when set) muted
- *  underneath. */
+ *  underneath. `crossModule` (v0.79+) flags entries whose file lives in a
+ *  different directory than the target — surfaced as a small icon next to
+ *  the entry. */
 interface BlastListEntry {
   primary: string;
   secondary?: string;
   hop: number;
+  crossModule?: boolean;
 }
 
 function BlastRadiusView({
@@ -773,16 +777,26 @@ function BlastRadiusView({
           icon={<ArrowDownToLine size={14} />}
           accent={TOK.amber}
           unit="files"
-          entries={blast.incoming.map((e) => ({ primary: e.filePath, hop: e.hop }))}
+          entries={blast.incoming.map((e) => ({
+            primary: e.filePath,
+            hop: e.hop,
+            crossModule: e.crossModule,
+          }))}
           byHop={blast.byHop.incoming}
+          crossModuleCount={blast.crossModuleCounts.incoming}
         />
         <BlastSection
           title="Outgoing — what this depends on"
           icon={<ArrowUpFromLine size={14} />}
           accent={TOK.accent}
           unit="files"
-          entries={blast.outgoing.map((e) => ({ primary: e.filePath, hop: e.hop }))}
+          entries={blast.outgoing.map((e) => ({
+            primary: e.filePath,
+            hop: e.hop,
+            crossModule: e.crossModule,
+          }))}
           byHop={blast.byHop.outgoing}
+          crossModuleCount={blast.crossModuleCounts.outgoing}
         />
         {blast.truncated && (
           <div
@@ -892,8 +906,10 @@ function FunctionBlastRadiusView({
             primary: e.containerType ? `${e.containerType}.${e.name}` : e.name,
             secondary: e.filePath,
             hop: e.hop,
+            crossModule: e.crossModule,
           }))}
           byHop={blast.byHop.incoming}
+          crossModuleCount={blast.crossModuleCounts.incoming}
         />
         <BlastSection
           title="Callees — functions this calls"
@@ -904,8 +920,10 @@ function FunctionBlastRadiusView({
             primary: e.containerType ? `${e.containerType}.${e.name}` : e.name,
             secondary: e.filePath,
             hop: e.hop,
+            crossModule: e.crossModule,
           }))}
           byHop={blast.byHop.outgoing}
+          crossModuleCount={blast.crossModuleCounts.outgoing}
         />
         {blast.truncated && (
           <div
@@ -927,6 +945,7 @@ function BlastSection({
   unit,
   entries,
   byHop,
+  crossModuleCount = 0,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -934,6 +953,10 @@ function BlastSection({
   unit: "files" | "functions";
   entries: BlastListEntry[];
   byHop: Record<number, number>;
+  /** Number of entries whose filePath sits in a different directory than
+   *  the blast target. v0.79+. Renders an additional chip in the by-hop
+   *  row + a small Network icon next to each cross-module entry. */
+  crossModuleCount?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const limit = expanded ? EXPANDED_LIST_SIZE : INITIAL_LIST_SIZE;
@@ -961,7 +984,10 @@ function BlastSection({
         </span>
       </div>
 
-      {/* Hop counters */}
+      {/* Hop counters + cross-module count chip when present. The
+       *  cross-module chip uses an amber tint regardless of section
+       *  accent — it's an attention-grabbing risk indicator, not a
+       *  neutral count. */}
       <div className="flex flex-wrap gap-1.5 text-[11px]">
         {Object.keys(byHop).length === 0 ? (
           <span style={{ color: TOK.textMuted }}>none</span>
@@ -981,6 +1007,20 @@ function BlastSection({
                 hop {hop}: {count}
               </span>
             ))
+        )}
+        {crossModuleCount > 0 && (
+          <span
+            className="px-1.5 py-0.5 rounded font-mono tabular-nums flex items-center gap-1"
+            style={{
+              background: `${TOK.amber}1a`,
+              color: TOK.amber,
+              border: `1px solid ${TOK.amber}55`,
+            }}
+            title={`${crossModuleCount} of these ${unit} live in a different directory than the target — sharper refactor-risk signal than raw count`}
+          >
+            <Network size={10} />
+            {crossModuleCount} cross-module
+          </span>
         )}
       </div>
 
@@ -1019,6 +1059,16 @@ function BlastSection({
                   </span>
                 )}
               </div>
+              {e.crossModule && (
+                <span
+                  className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded"
+                  style={{ color: TOK.amber }}
+                  title="Cross-module — lives in a different directory than the target"
+                  aria-label="Cross-module dependency"
+                >
+                  <Network size={10} />
+                </span>
+              )}
             </li>
           ))}
         </ul>
