@@ -67,12 +67,13 @@ describe("MCP server · initialization", () => {
 });
 
 describe("MCP server · tools/list", () => {
-  it("exposes all six GitVision tools", async () => {
+  it("exposes all seven GitVision tools", async () => {
     const { client, cleanup } = await connectInMemory();
     try {
       const result = await client.listTools();
       const names = result.tools.map((t) => t.name).sort();
       expect(names).toEqual([
+        "analyze_diff",
         "analyze_repo",
         "blast_radius",
         "compare_sessions",
@@ -127,6 +128,20 @@ describe("MCP server · tools/list", () => {
       const schema = tool!.inputSchema as { required?: string[] };
       expect(schema.required).toContain("fromSessionId");
       expect(schema.required).toContain("toSessionId");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("analyze_diff requires baseSessionId + headSessionId", async () => {
+    const { client, cleanup } = await connectInMemory();
+    try {
+      const result = await client.listTools();
+      const tool = result.tools.find((t) => t.name === "analyze_diff");
+      expect(tool).toBeDefined();
+      const schema = tool!.inputSchema as { required?: string[] };
+      expect(schema.required).toContain("baseSessionId");
+      expect(schema.required).toContain("headSessionId");
     } finally {
       await cleanup();
     }
@@ -203,6 +218,22 @@ describe("MCP server · tool error paths", () => {
       // The first-missing path fires first — the error should name the
       // earlier session that wasn't found.
       expect(content[0].text).toMatch(/nope-from/);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("analyze_diff returns an error when either side is missing", async () => {
+    const { client, cleanup } = await connectInMemory();
+    try {
+      const result = await client.callTool({
+        name: "analyze_diff",
+        arguments: { baseSessionId: "nope-base", headSessionId: "nope-head" },
+      });
+      expect(result.isError).toBe(true);
+      const content = result.content as Array<{ type: string; text: string }>;
+      // Base is checked first — error should reference the base session
+      expect(content[0].text).toMatch(/nope-base/);
     } finally {
       await cleanup();
     }

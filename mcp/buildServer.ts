@@ -32,6 +32,10 @@ import {
   compareSessionsInputSchema,
   handleCompareSessions,
 } from "./tools/compareSessions.js";
+import {
+  analyzeDiffInputSchema,
+  handleAnalyzeDiff,
+} from "./tools/analyzeDiff.js";
 
 export const SERVER_NAME = "gitvision";
 export const SERVER_VERSION = "0.67.0";
@@ -103,6 +107,16 @@ export function buildServer(): McpServer {
       inputSchema: compareSessionsInputSchema,
     },
     handleCompareSessions
+  );
+
+  server.registerTool(
+    "analyze_diff",
+    {
+      description:
+        "Function-level diff between two AnalysisSnapshots, designed for PR-comment-grade detail. Returns every changed function classified as added/removed/modified/unchanged, with per-function complexity delta and a bodyChanged flag (catches bug fixes that don't change complexity). Use this for PR review workflows where you need to enumerate each change; use compare_sessions for high-level overview (top-10 lists + dup-group + coverage delta). Both session ids must already be cached.",
+      inputSchema: analyzeDiffInputSchema,
+    },
+    handleAnalyzeDiff
   );
 
   return server;
