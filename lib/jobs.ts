@@ -19,6 +19,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { nanoid } from "nanoid";
+import { atomicWriteJson } from "./atomicWrite";
 import { analyzeRepo, parseRepoUrl } from "./github";
 import { SubdirNotFoundError } from "./graph";
 import {
@@ -43,25 +44,6 @@ async function ensureDir() {
 
 function jobPath(id: string) {
   return path.join(jobsDir(), `${id}.json`);
-}
-
-// ------------------- Atomic write -------------------
-
-/** Write JSON to disk atomically: write to a sibling temp file, rename
- *  into place. Rename is atomic on POSIX as long as the temp file is on
- *  the same filesystem (which it is — we put both in jobsDir). Polling
- *  reads can never see a half-written file with this pattern. */
-async function atomicWriteJson(filePath: string, data: unknown): Promise<void> {
-  const tmp = `${filePath}.tmp.${process.pid}.${Date.now()}.${nanoid(4)}`;
-  await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf-8");
-  try {
-    await fs.rename(tmp, filePath);
-  } catch (err) {
-    // If rename failed, try to clean up the temp file. Don't mask the
-    // original error.
-    await fs.unlink(tmp).catch(() => {});
-    throw err;
-  }
 }
 
 // ------------------- Public API -------------------

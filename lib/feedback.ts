@@ -22,6 +22,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { nanoid } from "nanoid";
+import { atomicWriteJson } from "./atomicWrite";
 import type { FeedbackInput } from "./feedbackTypes";
 
 // Intentionally NOT re-exporting from feedbackTypes here. Re-exports
@@ -60,16 +61,6 @@ function feedbackPath(id: string) {
   return path.join(feedbackDir(), `${id}.json`);
 }
 
-async function atomicWriteJson(filePath: string, data: unknown): Promise<void> {
-  const tmp = `${filePath}.tmp.${process.pid}.${Date.now()}.${nanoid(4)}`;
-  await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf-8");
-  try {
-    await fs.rename(tmp, filePath);
-  } catch (err) {
-    await fs.unlink(tmp).catch(() => {});
-    throw err;
-  }
-}
 
 /** Apply length caps + trimming to context fields that come from
  *  client-side window state. Defensive — we always trust ourselves

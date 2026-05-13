@@ -6,6 +6,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { nanoid } from "nanoid";
+import { atomicWriteJson } from "./atomicWrite";
 import type { Session, SessionSummary, AnalysisSnapshot } from "./types";
 
 const DATA_DIR =
@@ -40,7 +41,7 @@ export async function createSession(params: {
     updatedAt: now,
     snapshots: [params.initialSnapshot],
   };
-  await fs.writeFile(sessionPath(session.id), JSON.stringify(session, null, 2), "utf-8");
+  await atomicWriteJson(sessionPath(session.id), session);
   return session;
 }
 
@@ -94,7 +95,7 @@ export async function appendSnapshot(
   if (!session) return null;
   session.snapshots.push(snapshot);
   session.updatedAt = new Date().toISOString();
-  await fs.writeFile(sessionPath(id), JSON.stringify(session, null, 2), "utf-8");
+  await atomicWriteJson(sessionPath(id), session);
   return session;
 }
 
@@ -103,7 +104,7 @@ export async function renameSession(id: string, name: string): Promise<Session |
   if (!session) return null;
   session.name = name;
   session.updatedAt = new Date().toISOString();
-  await fs.writeFile(sessionPath(id), JSON.stringify(session, null, 2), "utf-8");
+  await atomicWriteJson(sessionPath(id), session);
   return session;
 }
 
@@ -122,7 +123,7 @@ export async function patchLatestSnapshot(
   if (!last) return null;
   session.snapshots[session.snapshots.length - 1] = { ...last, ...patch };
   session.updatedAt = new Date().toISOString();
-  await fs.writeFile(sessionPath(id), JSON.stringify(session, null, 2), "utf-8");
+  await atomicWriteJson(sessionPath(id), session);
   return session;
 }
 

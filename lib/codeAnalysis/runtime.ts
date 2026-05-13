@@ -30,16 +30,35 @@ const VSCODE_GRAMMAR_DIR = path.join(
 let initPromise: Promise<void> | null = null;
 
 /** Boot the core runtime. Safe to call multiple times — the work happens once.
- *  Must be awaited before constructing a Parser or loading a Language. */
+ *  Must be awaited before constructing a Parser or loading a Language.
+ *
+ *  Resilience note: a rejected init (transient WASM file read failure, missing
+ *  binary right after a redeploy, OOM during init) used to stay cached forever
+ *  in `initPromise`, leaving the entire code-analysis pipeline broken until
+ *  the process restarted. We now clear the cache on rejection so the next
+ *  caller re-attempts init from scratch. */
 export function ensureRuntime(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       const corePath = path.join(WTS_DIR, "web-tree-sitter.wasm");
       const buf = await fs.readFile(corePath);
       await Parser.init({ wasmBinary: new Uint8Array(buf) });
-    })();
+    })().catch((err) => {
+      // Clear so a retry isn't stuck on the failed promise. Re-throw so
+      // the current caller still sees the original failure.
+      initPromise = null;
+      throw err;
+    });
   }
   return initPromise;
+}
+
+/** Test-only: reset the runtime singleton so a fresh ensureRuntime() call
+ *  re-runs init from scratch. Used by the regression test for cached-
+ *  rejection recovery. Not exported elsewhere. */
+export function _resetRuntimeForTests(): void {
+  initPromise = null;
+  langCache.clear();
 }
 
 /** Absolute path to a grammar WASM in @vscode/tree-sitter-wasm.

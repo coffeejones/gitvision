@@ -41,7 +41,22 @@ const octokit = new Octokit({
   userAgent: "GitVision/0.1",
 });
 
+/** Gate: never expose this endpoint in production. It runs the full
+ *  tarball-download + tree-sitter-parse pipeline on any URL with no auth
+ *  or rate limit — that's a worker-pinning DoS vector if it's reachable
+ *  publicly. Dev + test environments retain access (the endpoint exists
+ *  exactly to feedback-loop against real repos during development). */
+function productionGuard(): Response | null {
+  if (process.env.NODE_ENV === "production") {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+  return null;
+}
+
 export async function GET(req: Request): Promise<Response> {
+  const blocked = productionGuard();
+  if (blocked) return blocked;
+
   const url = new URL(req.url);
   const repo = url.searchParams.get("repo");
   if (!repo) {
@@ -58,6 +73,9 @@ export async function GET(req: Request): Promise<Response> {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  const blocked = productionGuard();
+  if (blocked) return blocked;
+
   const body = await req.json().catch(() => null);
   const parsed = PostBody.safeParse(body);
   if (!parsed.success) {
