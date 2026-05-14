@@ -10,7 +10,7 @@
 // would multiply analysis cost and risk duplicate comments. Failures
 // are logged for our visibility, not surfaced back to GitHub.
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 
 import { dispatchEvent, verifyWebhookSignature } from "@/lib/githubApp/webhook";
 
@@ -63,8 +63,9 @@ export async function POST(req: Request): Promise<NextResponse> {
     return new NextResponse("Invalid JSON body", { status: 400 });
   }
 
+  let result;
   try {
-    await dispatchEvent(eventType, payload, deliveryId);
+    result = await dispatchEvent(eventType, payload, deliveryId);
   } catch (err) {
     // Per design: do NOT propagate handler failure back to GitHub.
     // Logging is our visibility layer.
@@ -72,6 +73,28 @@ export async function POST(req: Request): Promise<NextResponse> {
       `[github-app] dispatch failed delivery=${deliveryId ?? "—"} event=${eventType}:`,
       err,
     );
+    return new NextResponse("OK", { status: 200 });
+  }
+
+  // Schedule heavy work (clone + analyze + diff + rules + comment) to
+  // run AFTER the 200 ships. GitHub's webhook timeout is ~10s for the
+  // HTTP response; analysis routinely takes 30s-2min. `after()` lets
+  // those two timelines decouple. Pipeline never throws — failures are
+  // logged inside the closure.
+  if (result.status === "accepted" && result.backgroundWork) {
+    after(async () => {
+      try {
+        await result.backgroundWork!();
+      } catch (err) {
+        // Defensive — the pipeline catches its own errors, but if
+        // anything slips through we still don't want to crash the
+        // request lifecycle hook.
+        console.error(
+          `[github-app] background work failed delivery=${deliveryId ?? "—"}:`,
+          err,
+        );
+      }
+    });
   }
 
   return new NextResponse("OK", { status: 200 });

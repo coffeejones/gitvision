@@ -14,7 +14,9 @@ import { handlePullRequestEvent } from "./events/pullRequest";
 /**
  * Outcome of dispatching a webhook event.
  *
- *   accepted — filters passed; downstream pipeline will (eventually) run
+ *   accepted — filters passed; if backgroundWork is set, the route
+ *              handler will schedule it via Next.js `after()` so the
+ *              heavy pipeline runs detached from the webhook response
  *   skipped  — filtered out for an expected reason (bot, draft, etc.)
  *   error    — payload was malformed or handler failed unexpectedly
  *
@@ -22,7 +24,12 @@ import { handlePullRequestEvent } from "./events/pullRequest";
  * the discriminator is purely for our logs + tests.
  */
 export type HandleResult =
-  | { status: "accepted"; reason?: string }
+  | {
+      status: "accepted";
+      reason?: string;
+      /** Heavy work to run via `after()` after the 200 ships. */
+      backgroundWork?: () => Promise<unknown>;
+    }
   | { status: "skipped"; reason: string }
   | { status: "error"; reason: string };
 

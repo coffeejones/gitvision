@@ -45,10 +45,29 @@ afterEach(() => {
 describe("handlePullRequestEvent — happy path", () => {
   it("accepts an opened PR from a human on a public non-draft repo", async () => {
     const result = await handlePullRequestEvent(makePayload(), "d-1");
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       status: "accepted",
       reason: "passed all filters",
     });
+  });
+
+  it("attaches backgroundWork as a function when filters pass", async () => {
+    const result = await handlePullRequestEvent(makePayload(), "d");
+    expect(result.status).toBe("accepted");
+    if (result.status === "accepted") {
+      expect(typeof result.backgroundWork).toBe("function");
+    }
+  });
+
+  it("does not attach backgroundWork on skipped results", async () => {
+    const result = await handlePullRequestEvent(
+      makePayload({ action: "labeled" }),
+      "d",
+    );
+    expect(result.status).toBe("skipped");
+    expect(
+      (result as { backgroundWork?: unknown }).backgroundWork,
+    ).toBeUndefined();
   });
 
   it("accepts synchronize (force-push / new commits)", async () => {
