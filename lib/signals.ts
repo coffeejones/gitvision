@@ -8,6 +8,7 @@
 // The AI narrative layer (lib/healthAnalysis.ts) consumes this output; humans
 // see both the AI prose AND the raw signals in the UI via an evidence toggle.
 
+import { isBotAuthor } from "./botDetection";
 import type {
   AnalysisSnapshot,
   HealthSignal,
@@ -60,29 +61,9 @@ function summarizeByEcosystem<T>(tagged: TaggedDep<T>[]): string {
     .join(", ");
 }
 
-// ------------------- Bot detection -------------------
-// PR cycle-time and throughput should reflect *human* workflow, not bot churn.
-// Bots like dependabot auto-merge minutes after opening and skew the median.
-
-const BOT_LOGIN_PATTERNS: RegExp[] = [
-  /\[bot\]$/i,
-  /-bot$/i,
-  /^bot-/i,
-  /^dependabot/i,
-  /^renovate/i,
-  /^github-actions/i,
-  /^vercel-release/i,
-  /^mergify/i,
-  /^codecov/i,
-  /^snyk-bot/i,
-  /^greenkeeper/i,
-  /^imgbot/i,
-];
-
-function isBotAuthor(login: string | null): boolean {
-  if (!login) return false;
-  return BOT_LOGIN_PATTERNS.some((re) => re.test(login));
-}
+// Bot-author detection lives in lib/botDetection.ts so the GitHub App
+// shares one canonical list with these signals — see PROGRESS.md and
+// the eval/strategy/github-app-skeleton doc for the rationale.
 
 // ------------------- File-classification helpers -------------------
 

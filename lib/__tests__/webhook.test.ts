@@ -94,50 +94,66 @@ describe("verifyWebhookSignature", () => {
   });
 });
 
-describe("dispatchEvent (stub)", () => {
-  it("logs event metadata without throwing on valid pull_request payload", async () => {
+describe("dispatchEvent routing", () => {
+  it("returns accepted on ping events", async () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    const payload = {
-      action: "opened",
-      repository: { full_name: "octocat/hello-world" },
-    };
-
-    await expect(
-      dispatchEvent("pull_request", payload, "delivery-abc"),
-    ).resolves.toBeUndefined();
-
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("event=pull_request"),
-    );
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("action=opened"),
-    );
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("repo=octocat/hello-world"),
-    );
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("delivery=delivery-abc"),
-    );
-
+    const result = await dispatchEvent("ping", { zen: "hi" }, "delivery-1");
+    expect(result).toEqual({ status: "accepted", reason: "ping" });
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("ping"));
     logSpy.mockRestore();
   });
 
-  it("handles a non-object payload gracefully", async () => {
+  it("returns skipped for unsupported event types", async () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await expect(dispatchEvent("ping", null)).resolves.toBeUndefined();
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("event=ping"));
+    const result = await dispatchEvent("star", {}, "delivery-2");
+    expect(result.status).toBe("skipped");
+    expect(result.reason).toContain("star");
     logSpy.mockRestore();
   });
 
-  it("handles a payload missing repository field", async () => {
+  it("routes pull_request events to the pull-request handler", async () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await expect(
-      dispatchEvent("installation", { action: "created" }),
-    ).resolves.toBeUndefined();
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("event=installation"),
+    const result = await dispatchEvent(
+      "pull_request",
+      {
+        action: "opened",
+        pull_request: {
+          number: 1,
+          user: { login: "alice" },
+          base: { sha: "a".repeat(40), ref: "main" },
+          head: { sha: "b".repeat(40), ref: "feature" },
+        },
+        repository: {
+          full_name: "alice/repo",
+          private: false,
+          clone_url: "https://github.com/alice/repo.git",
+        },
+      },
+      "delivery-3",
     );
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("repo=—"));
+    expect(result.status).toBe("accepted");
     logSpy.mockRestore();
+  });
+
+  it("routes installation events to the installation handler", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await dispatchEvent(
+      "installation",
+      {
+        action: "created",
+        installation: { id: 99, account: { login: "alice" } },
+        repositories: [{ full_name: "alice/repo", private: false }],
+      },
+      "delivery-4",
+    );
+    expect(result.status).toBe("accepted");
+    logSpy.mockRestore();
+  });
+
+  it("returns error when pull_request payload fails validation", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await dispatchEvent("pull_request", { not: "valid" }, "d");
+    expect(result.status).toBe("error");
+    warnSpy.mockRestore();
   });
 });

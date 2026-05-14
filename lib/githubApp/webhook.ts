@@ -8,6 +8,24 @@
 
 import crypto from "node:crypto";
 
+import { handleInstallationEvent } from "./events/installation";
+import { handlePullRequestEvent } from "./events/pullRequest";
+
+/**
+ * Outcome of dispatching a webhook event.
+ *
+ *   accepted — filters passed; downstream pipeline will (eventually) run
+ *   skipped  — filtered out for an expected reason (bot, draft, etc.)
+ *   error    — payload was malformed or handler failed unexpectedly
+ *
+ * The webhook route returns 200 in every case so GitHub doesn't retry;
+ * the discriminator is purely for our logs + tests.
+ */
+export type HandleResult =
+  | { status: "accepted"; reason?: string }
+  | { status: "skipped"; reason: string }
+  | { status: "error"; reason: string };
+
 /**
  * Verify an incoming webhook's HMAC-SHA256 signature.
  *
@@ -51,41 +69,35 @@ export function verifyWebhookSignature(
 }
 
 /**
- * Lightly extract structured fields from an unknown payload, for
- * logging. Real type-safe parsing happens in the event handlers
- * (Commit 3+).
- */
-function extractPayloadMetadata(payload: unknown): {
-  action: string | undefined;
-  repoFullName: string | undefined;
-} {
-  if (typeof payload !== "object" || payload === null) {
-    return { action: undefined, repoFullName: undefined };
-  }
-  const p = payload as Record<string, unknown>;
-  const action = typeof p.action === "string" ? p.action : undefined;
-  const repo =
-    typeof p.repository === "object" && p.repository !== null
-      ? (p.repository as Record<string, unknown>)
-      : null;
-  const repoFullName =
-    repo && typeof repo.full_name === "string" ? repo.full_name : undefined;
-  return { action, repoFullName };
-}
-
-/**
  * Dispatch a parsed webhook event to its handler.
  *
- * Commit 1 stub: logs the event and returns. Real per-event handlers
- * (events/pullRequest.ts, events/installation.ts) land in Commit 3+.
+ * Routes by event type. Unknown events are logged-and-skipped — not
+ * an error (GitHub may send event types we don't subscribe to via
+ * future API changes, or testing tools may probe with arbitrary
+ * types).
  */
 export async function dispatchEvent(
   eventType: string,
   payload: unknown,
   deliveryId?: string | null,
-): Promise<void> {
-  const { action, repoFullName } = extractPayloadMetadata(payload);
-  console.log(
-    `[github-app] event=${eventType} action=${action ?? "—"} repo=${repoFullName ?? "—"} delivery=${deliveryId ?? "—"}`,
-  );
+): Promise<HandleResult> {
+  switch (eventType) {
+    case "pull_request":
+      return handlePullRequestEvent(payload, deliveryId);
+
+    case "installation":
+      return handleInstallationEvent(payload, deliveryId);
+
+    case "ping":
+      // Sent once when the webhook is first configured. Acknowledge
+      // so the GitHub UI shows a green check.
+      console.log(`[github-app] ping delivery=${deliveryId ?? "—"}`);
+      return { status: "accepted", reason: "ping" };
+
+    default:
+      console.log(
+        `[github-app] ignoring unsupported event=${eventType} delivery=${deliveryId ?? "—"}`,
+      );
+      return { status: "skipped", reason: `unsupported event: ${eventType}` };
+  }
 }
