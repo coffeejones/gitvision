@@ -177,17 +177,24 @@ function qualname(c: ChangedFunction): string {
 
 // ---------------- rules ----------------
 
+// Threshold-calibration history:
+//   v1 (initial)  thresholds tuned on synthetic-test intuition
+//   v2 (2026-05-14)  lowered after real-world validation against Flask
+//                    3.1.2→3.1.3 and 3.0.3→3.1.0 showed zero rules
+//                    fired on 109 actual changes. See eval/strategy/
+//                    rule-tuning-2026-05.md for the data trail.
+
 const complexityIncreaseWithoutTest: VerificationRule = {
   id: "complexity-increase-without-test",
   description:
-    "Flags modified production functions whose cyclomatic complexity rose by more than 5 without a corresponding test-file change in the same module.",
+    "Flags modified production functions whose cyclomatic complexity rose by 4 or more without a corresponding test-file change in the same module.",
   evaluate(ctx) {
     const out: VerificationSuggestion[] = [];
     for (const c of ctx.diff.changes) {
       if (c.status !== "modified") continue;
       if (isTestFile(c.filePath)) continue;
       const delta = c.complexityDelta ?? 0;
-      if (delta < 5) continue;  // threshold: +5 or more
+      if (delta < 4) continue;  // threshold: +4 or more
       if (moduleHasTestChange(ctx.diff, c.filePath)) continue;
       out.push({
         ruleId: this.id,
@@ -214,14 +221,14 @@ const complexityIncreaseWithoutTest: VerificationRule = {
 const newComplexFunctionUntested: VerificationRule = {
   id: "new-complex-function-untested",
   description:
-    "Flags newly added production functions with cyclomatic complexity >= 5 when no test file in the same module was added or modified.",
+    "Flags newly added production functions with cyclomatic complexity >= 4 when no test file in the same module was added or modified.",
   evaluate(ctx) {
     const out: VerificationSuggestion[] = [];
     for (const c of ctx.diff.changes) {
       if (c.status !== "added") continue;
       if (isTestFile(c.filePath)) continue;
       const cx = c.complexityAfter ?? 0;
-      if (cx < 5) continue;
+      if (cx < 4) continue;
       if (moduleHasTestChange(ctx.diff, c.filePath)) continue;
       out.push({
         ruleId: this.id,
@@ -246,14 +253,14 @@ const newComplexFunctionUntested: VerificationRule = {
 const removedFunctionWithImpact: VerificationRule = {
   id: "removed-function-with-impact",
   description:
-    "Flags removed functions whose pre-removal complexity was >= 3 — non-trivial code paths that may still be referenced elsewhere.",
+    "Flags removed functions whose pre-removal complexity was >= 2 — even simple methods are part of the API surface and may have callers.",
   evaluate(ctx) {
     const out: VerificationSuggestion[] = [];
     for (const c of ctx.diff.changes) {
       if (c.status !== "removed") continue;
       if (isTestFile(c.filePath)) continue;
       const cx = c.complexityBefore ?? 0;
-      if (cx < 3) continue;
+      if (cx < 2) continue;
       out.push({
         ruleId: this.id,
         severity: "warning",
@@ -272,13 +279,53 @@ const removedFunctionWithImpact: VerificationRule = {
   },
 };
 
+const multipleRemovalsFromContainer: VerificationRule = {
+  id: "multiple-removals-from-container",
+  description:
+    "Fires when 3 or more functions are removed from the same class/struct/container — an API-surface change that won't be caught by per-function complexity rules when each individual removal is trivial.",
+  evaluate(ctx) {
+    const removalsByContainer = new Map<string, ChangedFunction[]>();
+    for (const c of ctx.diff.changes) {
+      if (c.status !== "removed") continue;
+      if (isTestFile(c.filePath)) continue;
+      if (!c.containerType) continue; // top-level removals handled by removed-function-with-impact
+      const arr = removalsByContainer.get(c.containerType) ?? [];
+      arr.push(c);
+      removalsByContainer.set(c.containerType, arr);
+    }
+    const out: VerificationSuggestion[] = [];
+    for (const [container, removals] of removalsByContainer) {
+      if (removals.length < 3) continue;
+      const names = removals.map((r) => r.name).slice(0, 5).join(", ");
+      const more = removals.length > 5 ? ` (+${removals.length - 5} more)` : "";
+      const filePath = removals[0].filePath; // any — they share container
+      out.push({
+        ruleId: this.id,
+        severity: "warning",
+        text:
+          `${removals.length} methods were removed from \`${container}\` in ` +
+          `\`${filePath}\`: ${names}${more}. This is an API-surface change ` +
+          `even when individual methods are trivial — verify all callers ` +
+          `across the codebase are updated.`,
+        evidence: [
+          `container=${container}`,
+          `removals_count=${removals.length}`,
+          `file=${filePath}`,
+        ],
+        impactScore: removals.length,
+      });
+    }
+    return out;
+  },
+};
+
 const highNetComplexityDelta: VerificationRule = {
   id: "high-net-complexity-delta",
   description:
-    "Fires once when the PR's total cyclomatic complexity increased by more than 20 — invites the reviewer to consider whether the change can be split into smaller PRs.",
+    "Fires once when the PR's total cyclomatic complexity increased by more than 10 — invites the reviewer to consider whether the change can be split into smaller PRs.",
   evaluate(ctx) {
     const delta = ctx.diff.summary.netComplexityDelta;
-    if (delta <= 20) return [];
+    if (delta <= 10) return [];
     const modCount = ctx.diff.summary.functionsModified;
     const addCount = ctx.diff.summary.functionsAdded;
     return [
@@ -301,11 +348,46 @@ const highNetComplexityDelta: VerificationRule = {
   },
 };
 
+const largePrOverview: VerificationRule = {
+  id: "large-pr-overview",
+  description:
+    "Fires when a PR touches more than 10 files. Surfaces scope context (info-severity, sorts below critical/warning) — useful when otherwise-quiet rules leave the reviewer thinking 'wait, is this PR big or small?'.",
+  evaluate(ctx) {
+    const files = ctx.diff.summary.filesChanged;
+    if (files <= 10) return [];
+    const total =
+      ctx.diff.summary.functionsAdded +
+      ctx.diff.summary.functionsRemoved +
+      ctx.diff.summary.functionsModified;
+    return [
+      {
+        ruleId: this.id,
+        severity: "info",
+        text:
+          `Sizeable PR — touches **${files} files** with ${total} function-` +
+          `level changes (${ctx.diff.summary.functionsAdded} added, ` +
+          `${ctx.diff.summary.functionsRemoved} removed, ` +
+          `${ctx.diff.summary.functionsModified} modified). Worth a ` +
+          `holistic read; not just patch-by-patch review.`,
+        evidence: [
+          `files_changed=${files}`,
+          `functions_added=${ctx.diff.summary.functionsAdded}`,
+          `functions_removed=${ctx.diff.summary.functionsRemoved}`,
+          `functions_modified=${ctx.diff.summary.functionsModified}`,
+        ],
+        impactScore: files,
+      },
+    ];
+  },
+};
+
 const REGISTERED_RULES: VerificationRule[] = [
   complexityIncreaseWithoutTest,
   newComplexFunctionUntested,
   removedFunctionWithImpact,
+  multipleRemovalsFromContainer,
   highNetComplexityDelta,
+  largePrOverview,
 ];
 
 /** Export the rules array for testing — lets tests verify the registry

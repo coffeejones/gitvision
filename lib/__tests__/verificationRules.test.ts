@@ -161,11 +161,13 @@ describe("evaluateVerificationRules — framework", () => {
   });
 
   it("returns only registered rules and nothing else", () => {
-    expect(registeredRules().length).toBe(4);
+    expect(registeredRules().length).toBe(6);
     const ids = registeredRules().map((r) => r.id).sort();
     expect(ids).toEqual([
       "complexity-increase-without-test",
       "high-net-complexity-delta",
+      "large-pr-overview",
+      "multiple-removals-from-container",
       "new-complex-function-untested",
       "removed-function-with-impact",
     ]);
@@ -281,16 +283,18 @@ describe("Rule: complexity-increase-without-test", () => {
     expect(out[0].impactScore).toBe(8);
   });
 
-  it("does NOT fire when delta is below 5 (threshold is >= 5)", () => {
+  it("does NOT fire when delta is below 4 (threshold lowered 2026-05-14)", () => {
     const out = evaluateVerificationRules(
-      ctx([modified("src/owner/Owner.java", "addPet", 3, 7)])  // delta=4
+      ctx([modified("src/owner/Owner.java", "addPet", 3, 6)])  // delta=3
     );
     expect(out.filter((s) => s.ruleId === "complexity-increase-without-test")).toEqual([]);
   });
 
-  it("does fire when delta is exactly 5 (inclusive threshold)", () => {
+  it("does fire when delta is exactly 4 (inclusive threshold, catches load_dotenv-class changes)", () => {
+    // Calibrated on real-world Flask 3.0.3→3.1.0: load_dotenv had Δ=4
+    // and is a security-sensitive CLI path that should be flagged.
     const out = evaluateVerificationRules(
-      ctx([modified("src/owner/Owner.java", "addPet", 3, 8)])  // delta=5
+      ctx([modified("src/owner/Owner.java", "addPet", 3, 7)])  // delta=4
     );
     expect(
       out.some((s) => s.ruleId === "complexity-increase-without-test")
@@ -355,9 +359,9 @@ describe("Rule: new-complex-function-untested", () => {
     expect(out[0].impactScore).toBe(7);
   });
 
-  it("does NOT fire below complexity threshold", () => {
+  it("does NOT fire below complexity threshold (now 4)", () => {
     const out = evaluateVerificationRules(
-      ctx([added("src/owner/Validator.java", "validate", 4)])
+      ctx([added("src/owner/Validator.java", "validate", 3)])
     );
     expect(out.filter((s) => s.ruleId === "new-complex-function-untested")).toEqual([]);
   });
@@ -422,9 +426,9 @@ describe("Rule: high-net-complexity-delta", () => {
     expect(item.text).toContain("+25");
   });
 
-  it("does NOT fire at the 20 threshold (must exceed)", () => {
+  it("does NOT fire at the 10 threshold (must exceed; threshold lowered 2026-05-14)", () => {
     const out = evaluateVerificationRules(
-      ctx([], { netComplexityDelta: 20 })
+      ctx([], { netComplexityDelta: 10 })
     );
     expect(out.filter((s) => s.ruleId === "high-net-complexity-delta")).toEqual([]);
   });
@@ -447,6 +451,149 @@ describe("Rule: high-net-complexity-delta", () => {
       { maxResults: 10 }
     );
     expect(out.filter((s) => s.ruleId === "high-net-complexity-delta").length).toBe(1);
+  });
+});
+
+// ---------------- Rule: multipleRemovalsFromContainer ----------------
+
+describe("Rule: multiple-removals-from-container", () => {
+  it("fires when 3+ methods are removed from the same container class", () => {
+    // Mirrors the Flask 3.1.2 → 3.1.3 SecureCookieSession case that
+    // motivated this rule — three trivial methods removed from one
+    // class. Each is complexity 1 (below the per-function threshold)
+    // but together they're an API-surface change.
+    const out = evaluateVerificationRules(
+      ctx([
+        removed("src/flask/sessions.py", "__getitem__", 1, {
+          containerType: "SecureCookieSession",
+        }),
+        removed("src/flask/sessions.py", "get", 1, {
+          containerType: "SecureCookieSession",
+        }),
+        removed("src/flask/sessions.py", "setdefault", 1, {
+          containerType: "SecureCookieSession",
+        }),
+      ])
+    );
+    const fired = out.filter(
+      (s) => s.ruleId === "multiple-removals-from-container"
+    );
+    expect(fired).toHaveLength(1);
+    expect(fired[0].severity).toBe("warning");
+    expect(fired[0].text).toContain("SecureCookieSession");
+    expect(fired[0].text).toContain("3 methods");
+    expect(fired[0].impactScore).toBe(3);
+  });
+
+  it("does NOT fire when only 2 methods are removed from a container", () => {
+    const out = evaluateVerificationRules(
+      ctx([
+        removed("x.ts", "a", 1, { containerType: "Foo" }),
+        removed("x.ts", "b", 1, { containerType: "Foo" }),
+      ])
+    );
+    expect(out.filter((s) => s.ruleId === "multiple-removals-from-container")).toEqual([]);
+  });
+
+  it("fires per-container when multiple containers each have 3+ removals", () => {
+    const out = evaluateVerificationRules(
+      ctx([
+        // ClassA: 3 removals
+        removed("a.ts", "x", 1, { containerType: "ClassA" }),
+        removed("a.ts", "y", 1, { containerType: "ClassA" }),
+        removed("a.ts", "z", 1, { containerType: "ClassA" }),
+        // ClassB: 4 removals
+        removed("b.ts", "p", 1, { containerType: "ClassB" }),
+        removed("b.ts", "q", 1, { containerType: "ClassB" }),
+        removed("b.ts", "r", 1, { containerType: "ClassB" }),
+        removed("b.ts", "s", 1, { containerType: "ClassB" }),
+      ]),
+      { maxResults: 5 }
+    );
+    const fired = out.filter(
+      (s) => s.ruleId === "multiple-removals-from-container"
+    );
+    expect(fired).toHaveLength(2);
+    // Higher impactScore (4) sorts first
+    expect(fired[0].impactScore).toBe(4);
+    expect(fired[0].text).toContain("ClassB");
+  });
+
+  it("ignores top-level (no containerType) removals to avoid double-flagging", () => {
+    // Top-level function removals are handled by removed-function-with-impact;
+    // this rule is specifically for API-surface changes via class boundaries.
+    const out = evaluateVerificationRules(
+      ctx([
+        removed("x.ts", "fn1", 1),
+        removed("x.ts", "fn2", 1),
+        removed("x.ts", "fn3", 1),
+      ])
+    );
+    expect(out.filter((s) => s.ruleId === "multiple-removals-from-container")).toEqual([]);
+  });
+
+  it("ignores test files when grouping removals", () => {
+    const out = evaluateVerificationRules(
+      ctx([
+        removed("src/test/java/owner/Tests.java", "testA", 1, { containerType: "Tests" }),
+        removed("src/test/java/owner/Tests.java", "testB", 1, { containerType: "Tests" }),
+        removed("src/test/java/owner/Tests.java", "testC", 1, { containerType: "Tests" }),
+      ])
+    );
+    expect(out.filter((s) => s.ruleId === "multiple-removals-from-container")).toEqual([]);
+  });
+});
+
+// ---------------- Rule: largePrOverview ----------------
+
+describe("Rule: large-pr-overview", () => {
+  it("fires when summary.filesChanged exceeds 10", () => {
+    // Construct synthetic changes across 11 distinct files to push
+    // filesChanged > 10.
+    const changes: ChangedFunction[] = [];
+    for (let i = 0; i < 11; i++) {
+      changes.push(modified(`src/f${i}.ts`, "fn", 1, 2));
+    }
+    const out = evaluateVerificationRules(
+      ctx(changes, { filesChanged: 11, netComplexityDelta: 11 }),
+      { maxResults: 10 }
+    );
+    const fired = out.filter((s) => s.ruleId === "large-pr-overview");
+    expect(fired).toHaveLength(1);
+    expect(fired[0].severity).toBe("info");
+    expect(fired[0].text).toContain("11 files");
+  });
+
+  it("does NOT fire at the 10-files threshold (must exceed)", () => {
+    const changes: ChangedFunction[] = [];
+    for (let i = 0; i < 10; i++) {
+      changes.push(modified(`src/f${i}.ts`, "fn", 1, 2));
+    }
+    const out = evaluateVerificationRules(
+      ctx(changes, { filesChanged: 10 }),
+      { maxResults: 10 }
+    );
+    expect(out.filter((s) => s.ruleId === "large-pr-overview")).toEqual([]);
+  });
+
+  it("sorts below critical/warning when both fire (info severity)", () => {
+    // Build a diff with both: 11 files (large-pr-overview fires, info)
+    // + one critical function (complexity-increase, critical).
+    const changes: ChangedFunction[] = [];
+    for (let i = 0; i < 11; i++) {
+      changes.push(modified(`src/f${i}.ts`, "fn", 1, 2));
+    }
+    // One critical-severity function bump
+    changes.push(modified("src/hot.ts", "loadDotenv", 9, 13));
+    const out = evaluateVerificationRules(
+      ctx(changes, { filesChanged: 12, netComplexityDelta: 15 }),
+      { maxResults: 10 }
+    );
+    // Critical first, info last
+    expect(out[0].severity).toBe("critical");
+    const overview = out.find((s) => s.ruleId === "large-pr-overview");
+    expect(overview).toBeDefined();
+    expect(overview!.severity).toBe("info");
   });
 });
 
