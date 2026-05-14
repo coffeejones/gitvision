@@ -36,6 +36,10 @@ import {
   analyzeDiffInputSchema,
   handleAnalyzeDiff,
 } from "./tools/analyzeDiff.js";
+import {
+  reviewChangesInputSchema,
+  handleReviewChanges,
+} from "./tools/reviewChanges.js";
 
 export const SERVER_NAME = "gitvision";
 export const SERVER_VERSION = "0.67.0";
@@ -117,6 +121,16 @@ export function buildServer(): McpServer {
       inputSchema: analyzeDiffInputSchema,
     },
     handleAnalyzeDiff
+  );
+
+  server.registerTool(
+    "review_changes",
+    {
+      description:
+        "Generate prioritized verification suggestions for a PR-style review. Companion to analyze_diff: where analyze_diff returns the raw ChangedFunction[], review_changes runs the deterministic rules engine on top and returns top-3 actionable suggestions (e.g. 'addPet complexity rose +7 without tests' or 'PR adds +29 complexity across 174 functions'). Each suggestion carries severity (critical/warning/info), human-readable text, evidence list, and impact score. Use for PR-bot output and reviewer hints; use analyze_diff when you need the raw enumeration.",
+      inputSchema: reviewChangesInputSchema,
+    },
+    handleReviewChanges
   );
 
   return server;

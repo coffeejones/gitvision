@@ -67,7 +67,7 @@ describe("MCP server · initialization", () => {
 });
 
 describe("MCP server · tools/list", () => {
-  it("exposes all seven GitVision tools", async () => {
+  it("exposes all eight GitVision tools", async () => {
     const { client, cleanup } = await connectInMemory();
     try {
       const result = await client.listTools();
@@ -78,6 +78,7 @@ describe("MCP server · tools/list", () => {
         "blast_radius",
         "compare_sessions",
         "find_duplicates",
+        "review_changes",
         "signals",
         "untested_hotspots",
       ]);
@@ -142,6 +143,22 @@ describe("MCP server · tools/list", () => {
       const schema = tool!.inputSchema as { required?: string[] };
       expect(schema.required).toContain("baseSessionId");
       expect(schema.required).toContain("headSessionId");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("review_changes requires baseSessionId + headSessionId", async () => {
+    const { client, cleanup } = await connectInMemory();
+    try {
+      const result = await client.listTools();
+      const tool = result.tools.find((t) => t.name === "review_changes");
+      expect(tool).toBeDefined();
+      const schema = tool!.inputSchema as { required?: string[] };
+      expect(schema.required).toContain("baseSessionId");
+      expect(schema.required).toContain("headSessionId");
+      // maxResults is optional — don't require it
+      expect(schema.required).not.toContain("maxResults");
     } finally {
       await cleanup();
     }
@@ -228,6 +245,22 @@ describe("MCP server · tool error paths", () => {
     try {
       const result = await client.callTool({
         name: "analyze_diff",
+        arguments: { baseSessionId: "nope-base", headSessionId: "nope-head" },
+      });
+      expect(result.isError).toBe(true);
+      const content = result.content as Array<{ type: string; text: string }>;
+      // Base is checked first — error should reference the base session
+      expect(content[0].text).toMatch(/nope-base/);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("review_changes returns an error when either side is missing", async () => {
+    const { client, cleanup } = await connectInMemory();
+    try {
+      const result = await client.callTool({
+        name: "review_changes",
         arguments: { baseSessionId: "nope-base", headSessionId: "nope-head" },
       });
       expect(result.isError).toBe(true);
