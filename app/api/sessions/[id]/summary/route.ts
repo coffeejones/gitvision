@@ -4,6 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { consumeAiBudget } from "@/lib/aiBudget";
+import { requireSessionOwnership } from "@/lib/ownership";
 import {
   RATE_LIMITS,
   checkRateLimit,
@@ -43,6 +44,18 @@ export async function POST(req: Request, ctx: Ctx) {
     );
   }
 
+  // Look up the session BEFORE consuming AI budget so a non-owner caller
+  // never costs us anything. The previous order (budget first, ownership
+  // never) was the audit-flagged hole — anyone with a session id could
+  // drain the Anthropic quota.
+  const { id } = await ctx.params;
+  const session = await getSession(id);
+  if (!session) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+  const denied = requireSessionOwnership(session, req);
+  if (denied) return denied;
+
   // Daily AI budget kill-switch (global, ALL callers combined).
   // Layered with the Anthropic console spending cap as defense in depth.
   const budget = consumeAiBudget();
@@ -59,11 +72,6 @@ export async function POST(req: Request, ctx: Ctx) {
     );
   }
 
-  const { id } = await ctx.params;
-  const session = await getSession(id);
-  if (!session) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
   const snap = session.snapshots[session.snapshots.length - 1];
   if (!snap) {
     return NextResponse.json(

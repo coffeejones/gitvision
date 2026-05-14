@@ -9,28 +9,10 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import type { Session } from "@/lib/types";
-import { OWNER_ID_HEADER } from "@/lib/ownerId";
+import { requireSessionOwnership } from "@/lib/ownership";
 import { getSession, deleteSession, renameSession } from "@/lib/storage";
 
 type Ctx = { params: Promise<{ id: string }> };
-
-/** Common ownership check for mutating endpoints. Returns null when the
- *  caller is permitted; returns a Response (403/404) to short-circuit
- *  the handler when not. Sessions without ownerId are treated as legacy
- *  and accept any caller. */
-function checkOwnership(session: Session, req: Request): Response | null {
-  if (!session.ownerId) return null; // legacy ownerless session — open
-  const callerOwnerId = req.headers.get(OWNER_ID_HEADER);
-  if (callerOwnerId === session.ownerId) return null;
-  return NextResponse.json(
-    {
-      error:
-        "This session belongs to a different browser. Open the original tab to modify it, or create a new analysis.",
-    },
-    { status: 403 }
-  );
-}
 
 export async function GET(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
@@ -46,7 +28,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const session = await getSession(id);
   if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const denied = checkOwnership(session, req);
+  const denied = requireSessionOwnership(session, req);
   if (denied) return denied;
   await deleteSession(id);
   return NextResponse.json({ ok: true });
@@ -58,7 +40,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const session = await getSession(id);
   if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const denied = checkOwnership(session, req);
+  const denied = requireSessionOwnership(session, req);
   if (denied) return denied;
   const body = await req.json().catch(() => null);
   const parsed = PatchSchema.safeParse(body);

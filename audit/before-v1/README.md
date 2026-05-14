@@ -8,18 +8,37 @@ batched into focused sessions.
 
 ## Security · session ownership cluster (IDOR)
 
-Five findings, all the same root cause — ownership is a plain-text
-localStorage UUID compared against an HTTP header. Trivially spoofable.
-Fix together (HMAC-signed owner tokens + strip ownerId from responses +
-filter `/api/sessions` listing per owner). **~50 lines + tests, ~1.5h.**
+Triaged 2026-05-14. The audit framed this as "fix together with HMAC
+tokens" but reading the actual ownership code revealed nuance the agents
+missed: GitVision's session-GET is intentionally open (the share-by-URL
+feature). The only real exploit was AI budget exposure — the other
+findings are cosmetic-leak / privacy concerns that are mostly throwaway
+work under the OAuth migration on the v2 roadmap.
 
-- [ ] `app/api/sessions/[id]/route.ts:22` — Ownership check is plain header vs localStorage UUID (SEC-001/002)
-- [ ] `app/api/sessions/[id]/route.ts:23` — Legacy sessions without `ownerId` are open to anyone for rename/delete (SEC-002 r2)
-- [ ] `app/api/sessions/[id]/route.ts:35` — GET returns full session including `ownerId` to any caller (SEC-003)
-- [ ] `app/api/sessions/[id]/route.ts:42` — Stored `secretFindings` (file:line + preview) returned via unauthenticated GET (SEC-008)
-- [ ] `app/api/sessions/[id]/summary/route.ts:17` — AI summary endpoint has no ownership check — anyone can spend AI budget on any session (SEC-013 / QUAL-001)
-- [ ] `app/api/sessions/route.ts:29` — GET /api/sessions exposes every session on the instance (SEC-004)
-- [ ] `app/api/jobs/[id]/route.ts:14` — Returns full Job record (including ownerId) without ownership check (SEC-009)
+### Closed in this batch
+
+- [x] `app/api/sessions/[id]/summary/route.ts:17` — AI summary now requires session ownership (SEC-013 / QUAL-001)
+  - Extracted `requireSessionOwnership` to shared `lib/ownership.ts`, used in summary + health + (already existing) DELETE/PATCH on the session itself. Order matters: ownership check now fires BEFORE `consumeAiBudget`, so non-owner calls cost nothing.
+- [x] `app/api/sessions/[id]/health/route.ts` — same hole, same fix (not in original audit list, found via verification)
+
+### Deferred to OAuth migration (v2)
+
+The remaining items are either by-design (share-by-URL) or cosmetic
+leaks (ownerId visible in responses) that get replaced entirely when we
+move to OAuth + server-side identity. Fixing them now would be ~50
+lines of work that gets deleted again at migration time.
+
+- [ ] `app/api/sessions/[id]/route.ts:22` — Ownership comparison is plain string (SEC-001/002) — **by design** for share feature; gets replaced by signed-session-cookie under OAuth
+- [ ] `app/api/sessions/[id]/route.ts:23` — Legacy ownerless sessions accept any caller (SEC-002 r2) — **by design**, documented pre-v0.26 behavior; eventual cleanup is a data-migration concern
+- [ ] `app/api/sessions/[id]/route.ts:35` — GET returns `ownerId` to any caller (SEC-003) — cosmetic; share feature means GET is intentionally open. Strip when ownerId becomes user_id under OAuth
+- [ ] `app/api/sessions/[id]/route.ts:42` — `secretFindings` via unauth GET (SEC-008) — public-repos-only currently; same as anyone running secretsScan themselves. Re-evaluate if/when private-repo analysis ships
+- [ ] `app/api/sessions/route.ts:29` — GET /api/sessions lists all sessions (SEC-004) — privacy leak but no exploit; gets replaced by `WHERE user_id = ?` under OAuth
+- [ ] `app/api/jobs/[id]/route.ts:14` — Job record includes ownerId (SEC-009) — privacy leak only; jobs are short-lived. Strip when migrating to user_id
+
+If commercial launch arrives BEFORE OAuth (i.e. paid hobby tier without
+real auth), revisit the deferred list — HMAC-signed tokens or similar
+becomes warranted at that point. Until then: the AI-budget hole was the
+only one with real cost-or-correctness impact.
 
 ## Security · rate limiter
 
