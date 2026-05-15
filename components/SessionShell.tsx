@@ -54,6 +54,10 @@ interface NavItem {
   /** Red dot for "issues found" — used for the Packages tab when
    *  vulnerable / deprecated packages exist. */
   hasIssueBadge?: boolean;
+  /** Accent dot for "new feature lives here" — used for the PRs
+   *  tab to surface the GitVision PR-bot callout that sits below
+   *  the historical PR-flow analysis. Discrete; not an alert. */
+  hasNewFeatureBadge?: boolean;
   /** Subtle "refresh me" hint for tabs whose data isn't on the
    *  snapshot yet (legacy snapshots without codeGraph etc.). */
   hint?: string;
@@ -154,6 +158,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       href: `${base}/prs`,
       icon: <GitPullRequest size={14} />,
       count: prCount > 0 ? prCount : undefined,
+      hasNewFeatureBadge: true,
     },
     null, // separator
     {
@@ -295,6 +300,13 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
           className="h-1.5 w-1.5 rounded-full shrink-0"
           style={{ background: TOK.rose }}
           title="Issues detected"
+        />
+      )}
+      {item.hasNewFeatureBadge && (
+        <span
+          className="h-1.5 w-1.5 rounded-full shrink-0"
+          style={{ background: TOK.accent }}
+          title="New: GitVision PR-bot available"
         />
       )}
       {item.count !== undefined && (
