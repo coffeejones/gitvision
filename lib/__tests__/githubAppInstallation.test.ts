@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { handleInstallationEvent } from "../githubApp/events/installation";
+import {
+  handleInstallationEvent,
+  type InstallationHandlerDeps,
+} from "../githubApp/events/installation";
 
 interface InstallationOverrides {
   action?: string;
@@ -26,9 +29,22 @@ function makePayload(overrides: InstallationOverrides = {}): unknown {
   };
 }
 
+function makeDeps(
+  override: Partial<InstallationHandlerDeps> = {},
+): InstallationHandlerDeps {
+  return {
+    deleteSessionsByInstallation:
+      override.deleteSessionsByInstallation ??
+      (vi.fn(
+        async () => 0,
+      ) as unknown as InstallationHandlerDeps["deleteSessionsByInstallation"]),
+  };
+}
+
 beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -125,5 +141,76 @@ describe("handleInstallationEvent — logging", () => {
     const logs = logSpy.mock.calls.flat().join(" ");
     expect(logs).toContain("account=bob");
     expect(logs).toContain("repos=3");
+  });
+});
+
+describe("handleInstallationEvent — session GC on deleted", () => {
+  it("invokes deleteSessionsByInstallation with the right id on deleted", async () => {
+    const deps = makeDeps();
+    await handleInstallationEvent(
+      makePayload({ action: "deleted", id: 12345 }),
+      "d",
+      deps,
+    );
+
+    expect(deps.deleteSessionsByInstallation).toHaveBeenCalledTimes(1);
+    expect(deps.deleteSessionsByInstallation).toHaveBeenCalledWith(12345);
+  });
+
+  it("does NOT invoke deleteSessionsByInstallation on created", async () => {
+    const deps = makeDeps();
+    await handleInstallationEvent(
+      makePayload({ action: "created" }),
+      "d",
+      deps,
+    );
+
+    expect(deps.deleteSessionsByInstallation).not.toHaveBeenCalled();
+  });
+
+  it.each(["suspend", "unsuspend", "new_permissions_accepted"])(
+    "does NOT invoke deleteSessionsByInstallation on action=%s",
+    async (action) => {
+      const deps = makeDeps();
+      await handleInstallationEvent(makePayload({ action }), "d", deps);
+      expect(deps.deleteSessionsByInstallation).not.toHaveBeenCalled();
+    },
+  );
+
+  it("logs the count returned by deleteSessionsByInstallation", async () => {
+    const logSpy = vi.spyOn(console, "log");
+    const deps = makeDeps({
+      deleteSessionsByInstallation: vi.fn(
+        async () => 7,
+      ) as unknown as InstallationHandlerDeps["deleteSessionsByInstallation"],
+    });
+    await handleInstallationEvent(
+      makePayload({ action: "deleted", id: 42 }),
+      "d",
+      deps,
+    );
+
+    const logs = logSpy.mock.calls.flat().join(" ");
+    expect(logs).toContain("deleted_sessions=7");
+  });
+
+  it("still returns accepted when deleteSessionsByInstallation throws", async () => {
+    // The GC helper is supposed to never throw; this asserts our
+    // defense-in-depth behavior if something slips through.
+    const deps = makeDeps({
+      deleteSessionsByInstallation: vi.fn(async () => {
+        throw new Error("disk error");
+      }) as unknown as InstallationHandlerDeps["deleteSessionsByInstallation"],
+    });
+    const result = await handleInstallationEvent(
+      makePayload({ action: "deleted", id: 7 }),
+      "d",
+      deps,
+    );
+
+    expect(result.status).toBe("accepted");
+    if (result.status === "accepted") {
+      expect(result.reason).toBe("deleted");
+    }
   });
 });

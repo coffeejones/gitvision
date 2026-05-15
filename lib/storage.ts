@@ -9,16 +9,22 @@ import { nanoid } from "nanoid";
 import { atomicWriteJson } from "./atomicWrite";
 import type { Session, SessionSummary, AnalysisSnapshot } from "./types";
 
-const DATA_DIR =
-  process.env.GITVISION_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
-const STORE_DIR = path.join(DATA_DIR, "sessions");
+// Read env lazily on each storage call so tests can swap
+// GITVISION_DATA_DIR per-test without module-import timing dances —
+// matches the pattern lib/jobs.ts already uses. Negligible perf hit
+// (couple of path.join calls per operation).
+function storeDir(): string {
+  const dataDir =
+    process.env.GITVISION_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
+  return path.join(dataDir, "sessions");
+}
 
 async function ensureDir() {
-  await fs.mkdir(STORE_DIR, { recursive: true });
+  await fs.mkdir(storeDir(), { recursive: true });
 }
 
 function sessionPath(id: string) {
-  return path.join(STORE_DIR, `${id}.json`);
+  return path.join(storeDir(), `${id}.json`);
 }
 
 export async function createSession(params: {
@@ -29,6 +35,11 @@ export async function createSession(params: {
    *  (v0.26+). Optional for backward compat with internal callers; in
    *  practice every session created through the API now carries one. */
   ownerId?: string;
+  /** GitHub App installation that created this session (Commit 8+).
+   *  Set only by the PR-bot pipeline so installation.deleted can GC
+   *  exactly the right sessions. Workspace-created sessions leave
+   *  this undefined. */
+  installationId?: number;
 }): Promise<Session> {
   await ensureDir();
   const now = new Date().toISOString();
@@ -37,6 +48,7 @@ export async function createSession(params: {
     name: params.name,
     repoUrl: params.repoUrl,
     ownerId: params.ownerId,
+    installationId: params.installationId,
     createdAt: now,
     updatedAt: now,
     snapshots: [params.initialSnapshot],
@@ -58,12 +70,13 @@ export async function getSession(id: string): Promise<Session | null> {
 export async function listSessions(): Promise<SessionSummary[]> {
   try {
     await ensureDir();
-    const files = await fs.readdir(STORE_DIR);
+    const dir = storeDir();
+    const files = await fs.readdir(dir);
     const summaries: SessionSummary[] = [];
     for (const file of files) {
       if (!file.endsWith(".json")) continue;
       try {
-        const raw = await fs.readFile(path.join(STORE_DIR, file), "utf-8");
+        const raw = await fs.readFile(path.join(dir, file), "utf-8");
         const session = JSON.parse(raw) as Session;
         const latest = session.snapshots[session.snapshots.length - 1];
         summaries.push({
@@ -134,4 +147,46 @@ export async function deleteSession(id: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Delete every session tagged with this installation id.
+ *
+ * Called from the GitHub App's installation.deleted handler — when a
+ * user uninstalls the app, their PR-bot-created sessions go away.
+ * Workspace-created sessions (installationId undefined) are NOT
+ * touched, even if they happen to be for the same repo: those came
+ * from the web UI under a different consent flow.
+ *
+ * Returns the count actually deleted. Never throws — file-by-file
+ * unlinks, and corrupted/missing session files are silently skipped
+ * so a single bad file doesn't abort the sweep.
+ */
+export async function deleteSessionsByInstallation(
+  installationId: number,
+): Promise<number> {
+  let deleted = 0;
+  try {
+    await ensureDir();
+    const dir = storeDir();
+    const files = await fs.readdir(dir);
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const raw = await fs.readFile(path.join(dir, file), "utf-8");
+        const session = JSON.parse(raw) as Session;
+        if (session.installationId === installationId) {
+          await fs.unlink(path.join(dir, file));
+          deleted++;
+        }
+      } catch {
+        // Corrupted session file or race with another deletion — skip
+        // and keep sweeping. Worst case: one orphan stays until the
+        // next sweep.
+      }
+    }
+  } catch {
+    // storeDir() doesn't exist yet — nothing to delete
+  }
+  return deleted;
 }

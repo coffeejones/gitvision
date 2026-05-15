@@ -293,6 +293,11 @@ export interface Session {
    *  before this field existed have ownerId undefined; they remain
    *  visible + editable for everyone (backward compat). */
   ownerId?: string;
+  /** GitHub App installation that created this session (Commit 8+).
+   *  Set only on sessions produced by the PR-bot pipeline. Used by
+   *  installation.deleted to GC the right sessions when a user
+   *  uninstalls the app — workspace-created sessions stay untouched. */
+  installationId?: number;
   // All snapshots kept for "since last visit" diffs. Latest = current view.
   snapshots: AnalysisSnapshot[];
 }

@@ -178,6 +178,22 @@ describe("runAnalysisPipeline — happy path", () => {
     expect(headCall.name).toContain("PR #7");
   });
 
+  it("tags both sessions with the installation id (so deleted-event GC works)", async () => {
+    const createSessionSpy = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "sess-base" })
+      .mockResolvedValueOnce({
+        id: "sess-head",
+      }) as unknown as PipelineDeps["createSession"];
+    const deps = makeDeps({ createSession: createSessionSpy });
+
+    await runAnalysisPipeline(makeEvent(), deps);
+
+    const mock = createSessionSpy as unknown as ReturnType<typeof vi.fn>;
+    expect(mock.mock.calls[0]?.[0]).toMatchObject({ installationId: 99 });
+    expect(mock.mock.calls[1]?.[0]).toMatchObject({ installationId: 99 });
+  });
+
   it("caps suggestions at maxResults=3", async () => {
     const ruleSpy = vi.fn(() => FAKE_SUGGESTIONS) as unknown as PipelineDeps["evaluateVerificationRules"];
     const deps = makeDeps({ evaluateVerificationRules: ruleSpy });

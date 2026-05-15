@@ -93,6 +93,11 @@ export async function runAnalysisPipeline(
   const prNumber = pr.number;
   const baseSha = pr.base.sha;
   const headSha = pr.head.sha;
+  // Tag sessions with the installation that produced them so
+  // installation.deleted can GC them precisely. Undefined for ad-hoc
+  // pipeline invocations (e.g. eval scripts) that don't go through a
+  // webhook — those don't need GC.
+  const installationId = event.installation?.id;
 
   // 1. Resolve the repo
   const parsed = deps.parseRepoUrl(repoUrl);
@@ -163,11 +168,13 @@ export async function runAnalysisPipeline(
       repoUrl,
       name: `${owner}/${repoName} @ ${baseSha.slice(0, 8)} (base of PR #${prNumber})`,
       initialSnapshot: baseSnapshot,
+      installationId,
     });
     headSession = await deps.createSession({
       repoUrl,
       name: `${owner}/${repoName} @ ${headSha.slice(0, 8)} (PR #${prNumber})`,
       initialSnapshot: headSnapshot,
+      installationId,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -2,17 +2,21 @@
 //
 // Receives installation lifecycle events:
 //   - `created` — app was just installed on one or more repos
-//   - `deleted` — app was uninstalled (Commit 8 will GC their sessions)
+//   - `deleted` — app was uninstalled → GC sessions tagged with this
+//                 installation id (per design Q3, recommendation A)
 //   - `suspend` / `unsuspend` — temporary disable (no action needed v1)
 //   - `new_permissions_accepted` — user accepted new perms (no action v1)
 //
-// Commit 3 scope: parse + log + return appropriate HandleResult.
-// Real housekeeping (delete sessions on uninstall) lands in Commit 8.
+// Workspace-created sessions for the same repo are NOT touched on
+// uninstall — they came from a different consent flow (web UI, user
+// explicitly created them) and have installationId=undefined, so the
+// storage helper's filter naturally protects them.
 //
-// Design: eval/strategy/github-app-skeleton-2026-05.md.
+// Design: eval/strategy/github-app-skeleton-2026-05.md §Q3.
 
 import { z } from "zod";
 
+import { deleteSessionsByInstallation } from "../../storage";
 import type { HandleResult } from "../webhook";
 
 const SUPPORTED_ACTIONS = new Set(["created", "deleted"]);
@@ -36,9 +40,18 @@ const InstallationEventSchema = z.object({
 
 export type InstallationEvent = z.infer<typeof InstallationEventSchema>;
 
+export interface InstallationHandlerDeps {
+  deleteSessionsByInstallation: typeof deleteSessionsByInstallation;
+}
+
+export const defaultInstallationHandlerDeps: InstallationHandlerDeps = {
+  deleteSessionsByInstallation,
+};
+
 export async function handleInstallationEvent(
   payload: unknown,
   deliveryId?: string | null,
+  deps: InstallationHandlerDeps = defaultInstallationHandlerDeps,
 ): Promise<HandleResult> {
   const parsed = InstallationEventSchema.safeParse(payload);
   if (!parsed.success) {
@@ -58,7 +71,27 @@ export async function handleInstallationEvent(
     return { status: "skipped", reason: `action=${action}` };
   }
 
-  // Commit 3 stub: log + return accepted. Real housekeeping in Commit 8.
+  if (action === "deleted") {
+    // GC sessions tied to this installation. Per design Q3-A: user
+    // uninstalled = they don't want us holding their analysis.
+    try {
+      const count = await deps.deleteSessionsByInstallation(installation.id);
+      console.log(
+        `[github-app] installation ${logCtx} deleted_sessions=${count}`,
+      );
+    } catch (err) {
+      // deleteSessionsByInstallation is supposed to never throw, but
+      // defense-in-depth: log and continue so the webhook still 200s.
+      console.error(
+        `[github-app] session GC failed ${logCtx}:`,
+        err,
+      );
+    }
+    return { status: "accepted", reason: "deleted" };
+  }
+
+  // action === "created" — no housekeeping needed; just log for
+  // visibility so we can spot install volume in Railway logs.
   console.log(`[github-app] installation ${logCtx}`);
   return { status: "accepted", reason: action };
 }
