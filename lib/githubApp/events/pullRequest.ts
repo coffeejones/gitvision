@@ -10,7 +10,7 @@
 import { z } from "zod";
 
 import { isBotAuthor } from "../../botDetection";
-import { runAnalysisPipeline } from "../pipeline";
+import { runReview } from "../runReview";
 import type { HandleResult } from "../webhook";
 
 // Actions on a pull_request webhook that should trigger analysis.
@@ -98,18 +98,18 @@ export async function handlePullRequestEvent(
     return { status: "skipped", reason: `bot author: ${pr.user.login}` };
   }
 
-  // All filters passed. Hand off the heavy pipeline (clone + analyze
-  // base + analyze head + diff + rules) as a backgroundWork closure —
-  // the route handler will schedule it via Next.js `after()` so the
-  // webhook responds 200 immediately and we run untimed in the
-  // background. Pipeline itself never throws; route handler doesn't
-  // need to handle rejection.
+  // All filters passed. Hand off the full review (pipeline + format +
+  // post-or-update comment) as a backgroundWork closure — the route
+  // handler will schedule it via Next.js `after()` so the webhook
+  // responds 200 immediately and the review runs untimed in the
+  // background. runReview never throws; route handler doesn't need
+  // to handle rejection.
   console.log(
     `[github-app] accepted ${logCtx} base=${pr.base.sha.slice(0, 8)} head=${pr.head.sha.slice(0, 8)}`,
   );
   return {
     status: "accepted",
     reason: "passed all filters",
-    backgroundWork: () => runAnalysisPipeline(parsed.data, undefined, deliveryId),
+    backgroundWork: () => runReview(parsed.data, undefined, deliveryId),
   };
 }
