@@ -201,8 +201,14 @@ export function RepoInputForm({
       <div
         className="flex items-center rounded-lg"
         style={{
-          background: TOK.surface,
-          border: `1px solid ${TOK.border}`,
+          // Lifted-card treatment: brighter surface + stronger border +
+          // elevation shadow + faint inner top-highlight. Reads as a
+          // distinct "primary action" element against the gradient
+          // background, rather than blending into the page.
+          background: TOK.surfaceElevated,
+          border: `1px solid ${TOK.borderStrong}`,
+          boxShadow:
+            "0 1px 0 rgba(255,255,255,0.05) inset, 0 8px 24px -8px rgba(0,0,0,0.5)",
         }}
       >
         <input
