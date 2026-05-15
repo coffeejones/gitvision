@@ -124,4 +124,9 @@ export const RATE_LIMITS = {
   /** AI generation endpoints — cheap CPU but real $$ to Anthropic.
    *  Layered with the daily AI budget kill-switch in lib/aiBudget.ts. */
   aiGenerate: { limit: 20, windowMs: 60 * 60_000 },
+  /** GitHub App PR analyses per installation — protects against a
+   *  repo firing pull_request events in a flood (e.g. force-pushing
+   *  50 branches back-to-back). Soft-fail: skip + log, don't post a
+   *  comment, GitHub gets 200 either way. */
+  githubAppPrPerInstallation: { limit: 10, windowMs: 60 * 60_000 },
 } as const;

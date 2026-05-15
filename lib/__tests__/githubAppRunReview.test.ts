@@ -68,7 +68,13 @@ interface DepsOverrides {
   >;
 }
 
-function makeDeps(overrides: DepsOverrides = {}): RunReviewDeps {
+interface ConcurrencyOverrides {
+  tryAcquireResult?: boolean;
+}
+
+function makeDeps(
+  overrides: DepsOverrides & ConcurrencyOverrides = {},
+): RunReviewDeps {
   // Use the `in` operator so explicit null (test "skip on failure")
   // doesn't get nullish-coalesced back to the default body.
   const body =
@@ -91,12 +97,20 @@ function makeDeps(overrides: DepsOverrides = {}): RunReviewDeps {
     ) as unknown as RunReviewDeps["postPrComment"],
     pipelineDeps: {} as RunReviewDeps["pipelineDeps"],
     posterDeps: {} as RunReviewDeps["posterDeps"],
+    concurrency: {
+      tryAcquireConcurrencySlot: vi.fn(
+        () => overrides.tryAcquireResult ?? true,
+      ) as RunReviewDeps["concurrency"]["tryAcquireConcurrencySlot"],
+      releaseConcurrencySlot:
+        vi.fn() as RunReviewDeps["concurrency"]["releaseConcurrencySlot"],
+    },
     workspaceBaseUrl: "https://gitvision.net",
   };
 }
 
 beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -212,6 +226,61 @@ describe("runReview — skip paths", () => {
 });
 
 // ---------------- composition fidelity ----------------
+
+describe("runReview — concurrency guardrail", () => {
+  it("skips pipeline + post when concurrency slot is unavailable", async () => {
+    const deps = makeDeps({ tryAcquireResult: false });
+    const result = await runReview(makeEvent(), deps);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("concurrency limit");
+    }
+    expect(deps.runAnalysisPipeline).not.toHaveBeenCalled();
+    expect(deps.postPrComment).not.toHaveBeenCalled();
+    // Importantly: we do NOT call release when we never acquired —
+    // that would corrupt the counter.
+    expect(deps.concurrency.releaseConcurrencySlot).not.toHaveBeenCalled();
+  });
+
+  it("releases the slot after a successful review", async () => {
+    const deps = makeDeps();
+    await runReview(makeEvent(), deps);
+
+    expect(deps.concurrency.tryAcquireConcurrencySlot).toHaveBeenCalledWith(42);
+    expect(deps.concurrency.releaseConcurrencySlot).toHaveBeenCalledWith(42);
+  });
+
+  it("releases the slot even when the pipeline fails", async () => {
+    const deps = makeDeps({
+      pipelineResult: makeFailPipelineResult(),
+      commentBody: null,
+    });
+    await runReview(makeEvent(), deps);
+
+    expect(deps.concurrency.releaseConcurrencySlot).toHaveBeenCalledWith(42);
+  });
+
+  it("releases the slot even when the poster throws past its catch", async () => {
+    // Defensive: postPrComment is supposed to never throw, but the
+    // finally must still release if something slips through.
+    const deps = makeDeps();
+    deps.postPrComment = vi.fn(async () => {
+      throw new Error("unexpected");
+    }) as unknown as RunReviewDeps["postPrComment"];
+
+    await expect(runReview(makeEvent(), deps)).rejects.toThrow("unexpected");
+    expect(deps.concurrency.releaseConcurrencySlot).toHaveBeenCalledWith(42);
+  });
+
+  it("does not try to acquire when installation id is missing", async () => {
+    const deps = makeDeps();
+    await runReview(makeEvent({ installationId: 0 }), deps);
+
+    expect(deps.concurrency.tryAcquireConcurrencySlot).not.toHaveBeenCalled();
+    expect(deps.concurrency.releaseConcurrencySlot).not.toHaveBeenCalled();
+  });
+});
 
 describe("runReview — composition fidelity", () => {
   it("still posts when pipeline returns 0 suggestions (formatter produces body)", async () => {

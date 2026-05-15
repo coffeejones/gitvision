@@ -10,6 +10,10 @@
 import { z } from "zod";
 
 import { isBotAuthor } from "../../botDetection";
+import {
+  checkInstallationRateLimit,
+  checkRepoSizeGuard,
+} from "../guardrails";
 import { runReview } from "../runReview";
 import type { HandleResult } from "../webhook";
 
@@ -96,6 +100,26 @@ export async function handlePullRequestEvent(
       `[github-app] skip (bot author=${pr.user.login}) ${logCtx}`,
     );
     return { status: "skipped", reason: `bot author: ${pr.user.login}` };
+  }
+
+  // Filter 5 — repo too large. Mega-repos eat bandwidth + clone time
+  // + disk; not the v1 target. Friendly opt-out messaging is v1.1.
+  const sizeGuard = checkRepoSizeGuard(repo.size);
+  if (!sizeGuard.ok) {
+    console.warn(`[github-app] skip (${sizeGuard.reason}) ${logCtx}`);
+    return { status: "skipped", reason: sizeGuard.reason };
+  }
+
+  // Filter 6 — per-installation rate limit. Runs LAST so we don't
+  // burn rate-limit tokens on PRs that would have skipped anyway for
+  // a cheaper reason.
+  const installationId = parsed.data.installation?.id;
+  if (installationId !== undefined) {
+    const rateGuard = checkInstallationRateLimit(installationId);
+    if (!rateGuard.ok) {
+      console.warn(`[github-app] skip (${rateGuard.reason}) ${logCtx}`);
+      return { status: "skipped", reason: rateGuard.reason };
+    }
   }
 
   // All filters passed. Hand off the full review (pipeline + format +

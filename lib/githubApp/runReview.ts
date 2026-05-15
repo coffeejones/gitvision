@@ -15,6 +15,10 @@
 import type { PullRequestEvent } from "./events/pullRequest";
 import { formatPrComment } from "./comment";
 import {
+  releaseConcurrencySlot,
+  tryAcquireConcurrencySlot,
+} from "./guardrails";
+import {
   defaultPipelineDeps,
   runAnalysisPipeline,
   type PipelineDeps,
@@ -27,12 +31,18 @@ import {
   type PosterDeps,
 } from "./poster";
 
+export interface ConcurrencyDeps {
+  tryAcquireConcurrencySlot: typeof tryAcquireConcurrencySlot;
+  releaseConcurrencySlot: typeof releaseConcurrencySlot;
+}
+
 export interface RunReviewDeps {
   runAnalysisPipeline: typeof runAnalysisPipeline;
   formatPrComment: typeof formatPrComment;
   postPrComment: typeof postPrComment;
   pipelineDeps: PipelineDeps;
   posterDeps: PosterDeps;
+  concurrency: ConcurrencyDeps;
   /** Used to build the "Full analysis" link in the comment footer.
    *  Default reads GITVISION_PUBLIC_URL env var, falling back to
    *  localhost so dev preview still produces a clickable link. */
@@ -46,6 +56,10 @@ export function defaultRunReviewDeps(): RunReviewDeps {
     postPrComment,
     pipelineDeps: defaultPipelineDeps,
     posterDeps: defaultPosterDeps,
+    concurrency: {
+      tryAcquireConcurrencySlot,
+      releaseConcurrencySlot,
+    },
     workspaceBaseUrl:
       process.env.GITVISION_PUBLIC_URL?.replace(/\/+$/, "") ||
       "http://localhost:3000",
@@ -89,39 +103,58 @@ export async function runReview(
     return { ok: false, reason };
   }
 
-  // 1. Run the heavy analysis pipeline
-  const pipelineResult = await deps.runAnalysisPipeline(
-    event,
-    deps.pipelineDeps,
-    deliveryId,
-  );
-
-  // 2. Render the comment body. Returns null on pipeline failure —
-  // we skip posting in that case (silent failure beats noisy failure
-  // for v1 per design).
-  const body = deps.formatPrComment(pipelineResult, {
-    workspaceBaseUrl: deps.workspaceBaseUrl,
-  });
-  if (!body) {
-    console.log(
-      `[github-app runReview] no comment body (pipeline ok=${pipelineResult.ok}) ${logCtx}`,
-    );
-    return {
-      ok: false,
-      reason: "no comment body — pipeline did not produce postable output",
-      pipelineResult,
-    };
+  // Claim a concurrency slot before doing any expensive work. If the
+  // installation already has MAX_CONCURRENT_PER_INSTALLATION analyses
+  // in flight, skip cleanly — GitHub will likely resend us a
+  // synchronize event later when the next commit lands, giving us
+  // another chance.
+  if (!deps.concurrency.tryAcquireConcurrencySlot(installationId)) {
+    const reason = `concurrency limit hit for installation ${installationId}`;
+    console.warn(`[github-app runReview] ${reason} ${logCtx}`);
+    return { ok: false, reason };
   }
 
-  // 3. Post or update the comment via installation auth
-  const postResult = await deps.postPrComment(
-    { installationId, owner, repo: repoName, prNumber, body },
-    deps.posterDeps,
-  );
+  try {
+    // 1. Run the heavy analysis pipeline
+    const pipelineResult = await deps.runAnalysisPipeline(
+      event,
+      deps.pipelineDeps,
+      deliveryId,
+    );
 
-  console.log(
-    `[github-app runReview] done ${logCtx} pipeline=${pipelineResult.ok ? "ok" : "fail"} post=${postResult.action}`,
-  );
+    // 2. Render the comment body. Returns null on pipeline failure —
+    // we skip posting in that case (silent failure beats noisy failure
+    // for v1 per design).
+    const body = deps.formatPrComment(pipelineResult, {
+      workspaceBaseUrl: deps.workspaceBaseUrl,
+    });
+    if (!body) {
+      console.log(
+        `[github-app runReview] no comment body (pipeline ok=${pipelineResult.ok}) ${logCtx}`,
+      );
+      return {
+        ok: false,
+        reason: "no comment body — pipeline did not produce postable output",
+        pipelineResult,
+      };
+    }
 
-  return { ok: true, pipelineResult, postResult };
+    // 3. Post or update the comment via installation auth
+    const postResult = await deps.postPrComment(
+      { installationId, owner, repo: repoName, prNumber, body },
+      deps.posterDeps,
+    );
+
+    console.log(
+      `[github-app runReview] done ${logCtx} pipeline=${pipelineResult.ok ? "ok" : "fail"} post=${postResult.action}`,
+    );
+
+    return { ok: true, pipelineResult, postResult };
+  } finally {
+    // ALWAYS release the slot — pipeline error, format null, post
+    // failure, even uncaught exceptions slipping past the inner
+    // catches. A leaked slot would silently shrink the per-
+    // installation budget until the process restarts.
+    deps.concurrency.releaseConcurrencySlot(installationId);
+  }
 }

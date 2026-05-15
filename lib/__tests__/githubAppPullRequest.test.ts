@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { handlePullRequestEvent } from "../githubApp/events/pullRequest";
+import {
+  MAX_REPO_SIZE_KB,
+  _resetConcurrencyForTest,
+} from "../githubApp/guardrails";
+import { _resetRateLimitForTest } from "../rateLimit";
 
 interface PrPayloadOverrides {
   action?: string;
@@ -8,6 +13,8 @@ interface PrPayloadOverrides {
   private?: boolean;
   authorLogin?: string;
   number?: number;
+  repoSizeKb?: number;
+  installationId?: number;
 }
 
 function makePayload(overrides: PrPayloadOverrides = {}): unknown {
@@ -25,21 +32,25 @@ function makePayload(overrides: PrPayloadOverrides = {}): unknown {
     repository: {
       full_name: "alice/repo",
       private: overrides.private ?? false,
-      size: 12_000,
+      size: overrides.repoSizeKb ?? 12_000,
       clone_url: "https://github.com/alice/repo.git",
       default_branch: "main",
     },
-    installation: { id: 99 },
+    installation: { id: overrides.installationId ?? 99 },
   };
 }
 
 beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
+  _resetRateLimitForTest();
+  _resetConcurrencyForTest();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  _resetRateLimitForTest();
+  _resetConcurrencyForTest();
 });
 
 describe("handlePullRequestEvent — happy path", () => {
@@ -208,6 +219,84 @@ describe("handlePullRequestEvent — payload validation", () => {
   it("returns error when payload is null", async () => {
     const result = await handlePullRequestEvent(null, "d");
     expect(result.status).toBe("error");
+  });
+});
+
+describe("handlePullRequestEvent — repo-size guardrail", () => {
+  it("skips when repository.size exceeds the 100 MB cap", async () => {
+    const result = await handlePullRequestEvent(
+      makePayload({ repoSizeKb: MAX_REPO_SIZE_KB + 1 }),
+      "d",
+    );
+    expect(result.status).toBe("skipped");
+    if (result.status === "skipped") {
+      expect(result.reason).toContain("exceeds limit");
+    }
+  });
+
+  it("accepts when repository.size is exactly at the cap", async () => {
+    const result = await handlePullRequestEvent(
+      makePayload({ repoSizeKb: MAX_REPO_SIZE_KB }),
+      "d",
+    );
+    expect(result.status).toBe("accepted");
+  });
+});
+
+describe("handlePullRequestEvent — installation rate limit", () => {
+  it("accepts the first 10 PRs from an installation", async () => {
+    for (let i = 0; i < 10; i++) {
+      const result = await handlePullRequestEvent(
+        makePayload({ number: i + 1, installationId: 7 }),
+        `d-${i}`,
+      );
+      expect(result.status).toBe("accepted");
+    }
+  });
+
+  it("skips the 11th PR from the same installation", async () => {
+    for (let i = 0; i < 10; i++) {
+      await handlePullRequestEvent(
+        makePayload({ number: i + 1, installationId: 7 }),
+        "d",
+      );
+    }
+    const result = await handlePullRequestEvent(
+      makePayload({ number: 11, installationId: 7 }),
+      "d",
+    );
+    expect(result.status).toBe("skipped");
+    if (result.status === "skipped") {
+      expect(result.reason).toContain("rate limit");
+    }
+  });
+
+  it("tracks separate rate-limit buckets per installation", async () => {
+    // Fill installation 100.
+    for (let i = 0; i < 10; i++) {
+      await handlePullRequestEvent(
+        makePayload({ number: i, installationId: 100 }),
+        "d",
+      );
+    }
+    // 11th from 100 → skipped.
+    expect(
+      (
+        await handlePullRequestEvent(
+          makePayload({ number: 99, installationId: 100 }),
+          "d",
+        )
+      ).status,
+    ).toBe("skipped");
+    // First from 200 → still accepted.
+    expect(
+      (
+        await handlePullRequestEvent(
+          makePayload({ number: 1, installationId: 200 }),
+          "d",
+        )
+      ).status,
+    ).toBe("accepted");
   });
 });
 
