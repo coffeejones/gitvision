@@ -115,6 +115,90 @@ Plus, on the Overview page:
 functions. Linear / Raycast / Sublime pattern — type to filter, arrows
 to navigate, Enter to jump.
 
+## PR bot (GitHub App)
+
+Beyond the workspace, GitVision ships as a **GitHub App** that posts
+a single grounded review comment on every PR — same deterministic
+signal layer as the workspace, packaged for the PR-review workflow.
+
+### What you get
+
+A comment like this on every PR:
+
+```markdown
+## GitVision Review
+
+**Diff summary:** 3 files changed · functions: 5 added, 2 removed, 7 modified · net complexity +4
+
+### Suggested verification (top 3)
+
+1. 🔴 **CRITICAL** — load_dotenv in `src/flask/cli.py` grew by +4 cyclomatic complexity (9 → 13). No tests in the same module were changed.
+2. 🟡 **WARNING** — _path_is_relative_to was removed from `src/flask/sansio/scaffold.py` (original complexity 2). Verify no callers still depend on it.
+3. 🟢 **INFO** — Sizeable PR — touches 23 files with 109 function-level changes.
+
+---
+[Full analysis ↗](https://gitvision.net/session/…) · _Signals computed deterministically — no LLM in this comment_
+```
+
+When nothing crosses the calibrated thresholds, you still get a short
+positive comment (`Nothing notable on this PR ✅`) so reviewers know we
+ran. No silent skips.
+
+### How it works
+
+1. You install the app on a public repo
+2. On `pull_request.opened` / `synchronize` / `reopened` /
+   `ready_for_review`, the app analyzes the base + head SHAs
+3. `computeDiff` + the rules engine produce up to 3 prioritized
+   verification suggestions
+4. Comment posted via the installation token, find-or-update so
+   re-runs on the same PR don't stack duplicates
+
+Same pipeline as the workspace — diff-aware AST analysis across 7
+languages via tree-sitter, computed server-side. **No LLM in the
+comment**: every claim maps to a deterministic signal with citable
+evidence.
+
+### Install
+
+🚧 **Currently in private beta.** v1.0 install ceremony will land at
+`https://github.com/apps/gitvision-pr` (or successor URL) once we've
+validated noise rate on 2-3 friendly real-world repos. If you want
+to be one of those early installs, [open an issue](https://github.com/coffeejones/gitvision/issues).
+
+### Limits & guardrails
+
+| Guardrail | Cap | Why |
+|---|---|---|
+| Repo size | 100 MB | Mega-repos eat bandwidth + clone time + disk |
+| PRs per installation per hour | 10 | Protects against flood (e.g. force-push of 50 branches) |
+| Concurrent analyses per installation | 2 | Per-process memory ceiling on Railway |
+| Public repos only | yes | Private-repo support deferred to v2 (with OAuth) |
+
+### Privacy
+
+- We **clone your repo** read-only to analyze it. Analysis runs on
+  Railway, results are stored as JSON sessions
+- Sessions created by the PR-bot are **public-by-default** — the
+  "Full analysis" link is a public read-only URL. Don't install the
+  app on a repo whose code shouldn't be analyzed publicly.
+- **No LLM** sees the diff. The comment text is rendered from
+  deterministic rules, not generated.
+- When you **uninstall**, every session the bot created for that
+  installation is deleted within seconds (`installation.deleted` →
+  GC sweep). Workspace-created sessions for the same repo are NOT
+  affected — they came from a different consent flow.
+
+### Architecture
+
+The whole PR-bot lives in the same Next.js app as the workspace.
+Webhook handler at `app/api/github/webhook/route.ts`, business logic
+in `lib/githubApp/`. Heavy work runs via Next's `after()` so the
+webhook response ships in <100ms regardless of analysis duration.
+
+Design + decisions: [eval/strategy/github-app-skeleton-2026-05.md](./eval/strategy/github-app-skeleton-2026-05.md).
+End-to-end validation: [eval/strategy/github-app-validation-2026-05.md](./eval/strategy/github-app-validation-2026-05.md).
+
 ## Language coverage
 
 | Language     | Plugin           | Imports | Functions | Calls | Complexity | Type-aware |
