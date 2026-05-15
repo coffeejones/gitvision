@@ -52,8 +52,8 @@ const FAKE_SUGGESTIONS = [
     ruleId: "complexity-increase-without-test",
     severity: "critical" as const,
     impactScore: 4,
-    message: "load_dotenv grew +4 complexity",
-    evidence: {},
+    text: "load_dotenv grew +4 complexity",
+    evidence: ["complexity_delta=4"],
   },
 ];
 const FAKE_BASE_SNAPSHOT = {
