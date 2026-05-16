@@ -22,6 +22,9 @@
 
 html {
   color-scheme: dark;
+  /* Smooth in-page anchor navigation for the marketing nav's
+   * "What's new" / "PR-bot" links — feels modern, no hard jumps. */
+  scroll-behavior: smooth;
 }
 
 body {

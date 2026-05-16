@@ -14,7 +14,8 @@ import { STYLE, TOK } from "@/lib/theme";
 import { type DemoRepo } from "@/components/RepoInputForm";
 import { LandingPanel } from "@/components/LandingPanel";
 import { FeedbackLink } from "@/components/FeedbackLink";
-import { Logo } from "@/components/Logo";
+import { MarketingNav } from "@/components/MarketingNav";
+import { Roadmap } from "@/components/Roadmap";
 import type { SessionSummary } from "@/lib/types";
 
 interface Props {
@@ -49,15 +50,14 @@ export function MarketingHome({
         backgroundAttachment: "fixed, fixed, fixed",
       }}
     >
-      <main className="max-w-6xl w-full mx-auto px-6 sm:px-10 lg:px-16 pt-20 pb-24 flex flex-col gap-20">
+      <MarketingNav />
+      <main className="max-w-6xl w-full mx-auto px-6 sm:px-10 lg:px-16 pt-12 pb-24 flex flex-col gap-20">
         {/* Hero — text only. Form + Try-a-demo + Your-sessions live in
          *  LandingPanel below so the URL field, demo picker, and saved
-         *  sessions share one client component (lifted value state). */}
+         *  sessions share one client component (lifted value state).
+         *  Logo lives in the nav-bar now; removing it from the hero
+         *  gives the headline more vertical breathing room. */}
         <section className="flex flex-col gap-8">
-          {/* Brand mark — bigger here than the topbar treatment because
-           *  this is the visitor's first anchor. */}
-          <Logo size={28} wordmark />
-
           <h1
             className="text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.02]"
             style={{ letterSpacing: "-0.035em" }}
@@ -241,8 +241,13 @@ export function MarketingHome({
       {/* Two surfaces — explicit workspace-vs-bot positioning so new
        *  visitors understand that the PR-bot is a feature of the
        *  broader codebase-intelligence platform, not the product
-       *  itself. Includes a sample PR comment for tangibility. */}
-      <section className="flex flex-col gap-6">
+       *  itself. Includes a sample PR comment for tangibility.
+       *  id + scroll-margin-top: lands the section header below the
+       *  sticky nav-bar when navigated to via #pr-bot. */}
+      <section
+        id="pr-bot"
+        className="flex flex-col gap-6 scroll-mt-20"
+      >
         <div className="flex items-baseline justify-between">
           <h2 className={STYLE.sectionTitle}>Two surfaces, one signal layer</h2>
           <div className="text-xs" style={{ color: TOK.textMuted }}>
@@ -355,6 +360,9 @@ export function MarketingHome({
           </div>
         </div>
       </section>
+
+
+      <Roadmap />
 
       {/* Footer. */}
       <footer
