@@ -14,7 +14,7 @@ hotspots, structural duplicates, and architecture diagrams in under
 ![Tests](https://img.shields.io/badge/tests-1000%2B%20passing-emerald)
 ![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-purple)
 
-![GitVision landing page — paste any GitHub URL, click any of 4 instant demos](doc/screenshots/Landing.png)
+![GitVision landing — paste any URL or click any of 4 instant demos. Sticky nav, real findings, and a public roadmap below.](doc/screenshots/Landing.png)
 
 ## Why GitVision
 
@@ -83,6 +83,8 @@ repeated `synchronize` events don't stack duplicate comments.
 Both surfaces share the same diff-aware AST analysis, the same
 calibrated rules engine, the same plugin architecture. Improvements
 to one improve the other.
+
+![Public roadmap section on gitvision.net — recently-shipped items in green tags, upcoming work in muted tags](doc/screenshots/Roadmap.png)
 
 ## What you'll find
 
