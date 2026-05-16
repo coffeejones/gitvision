@@ -1,15 +1,17 @@
 # GitVision
 
-> Map any GitHub repo. Find what's risky, duplicated, or untested.
+> Know your code before you touch it.
 
-Paste a URL. Get blast radius, structural duplicates, untested hotspots,
-and an AI health verdict grounded in 17 deterministic signals — in
-under 20 seconds, across 7 languages.
+A codebase intelligence layer for the AI-augmented era — workspace
+dashboards plus a GitHub PR-bot, sharing one deterministic signal
+pipeline across 7 languages. Paste a URL, get blast radius, untested
+hotspots, structural duplicates, and architecture diagrams in under
+20 seconds.
 
 ![GitVision alpha](https://img.shields.io/badge/status-alpha-amber)
 ![Next.js 16](https://img.shields.io/badge/next.js-16-black)
 ![React 19](https://img.shields.io/badge/react-19-blue)
-![Tests](https://img.shields.io/badge/tests-531%20passing-emerald)
+![Tests](https://img.shields.io/badge/tests-1000%2B%20passing-emerald)
 ![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-purple)
 
 ![GitVision landing page — paste any GitHub URL, click any of 4 instant demos](doc/screenshots/Landing.png)
@@ -61,7 +63,28 @@ npm run dev
 
 Node 20.9+ required (tested on 25.x).
 
-## What you'll see
+## Two surfaces, one signal layer
+
+GitVision delivers the same analysis through two different surfaces:
+
+**Workspace** — `gitvision.net`. Paste a URL, get an explorable
+dashboard with blast radius, untested hotspots, near-duplicates,
+architecture diagrams, dependency health, and a red / yellow / green
+verdict grounded in 17 deterministic signals. The destination for
+deep-dive analysis and "understand this repo before I work on it"
+workflows.
+
+**PR-bot** — a native GitHub App. Install on a public repo and every
+new PR gets one grounded review comment with the top verification
+signals from the diff. Same pipeline as the workspace, packaged for
+review-time. Zero LLM cost, deterministic-only, find-or-update so
+repeated `synchronize` events don't stack duplicate comments.
+
+Both surfaces share the same diff-aware AST analysis, the same
+calibrated rules engine, the same plugin architecture. Improvements
+to one improve the other.
+
+## What you'll find
 
 Each session opens as a workspace with a persistent sidebar — every
 tab is its own URL, screenshot-worthy alone.
@@ -89,11 +112,17 @@ twin lists:
 
 ![Code tab — Near-Duplicates panel surfaces structurally identical functions](doc/screenshots/NearDuplicate.png)
 
+**Architecture** — Auto-generated class diagrams from the AST.
+First inhabitant of the Architecture tab — class hierarchies,
+field types, method signatures rendered as boxes you can pan around.
+Across all 7 AST-supported languages, no manual UML, no setup.
+
 **Packages** — Multi-ecosystem dependency health (npm, Cargo, PyPI).
 Vulnerable / outdated / deprecated packages with direct CVE links.
 
 **PRs** — Sankey of cycle-time flow: Opened → Outcome → time-to-merge
-bucket.
+bucket. Plus an inline PR-bot install callout for "want this analysis
+on every new PR?".
 
 Plus, on the Overview page:
 
@@ -115,11 +144,11 @@ Plus, on the Overview page:
 functions. Linear / Raycast / Sublime pattern — type to filter, arrows
 to navigate, Enter to jump.
 
-## PR bot (GitHub App)
+## GitHub App (PR-bot)
 
-Beyond the workspace, GitVision ships as a **GitHub App** that posts
-a single grounded review comment on every PR — same deterministic
-signal layer as the workspace, packaged for the PR-review workflow.
+The PR-bot half of the two surfaces above — installable on any public
+repo, posts a single grounded review comment on every PR. Same signal
+layer as the workspace, packaged for the PR-review workflow.
 
 ### What you get
 
@@ -221,18 +250,21 @@ Until a compatible WASM grammar appears, Kotlin gets imports only.
 
 ```
 app/                        Next.js App Router
-├─ page.tsx                 Landing
+├─ page.tsx                 Landing (adaptive: marketing or workspace)
 ├─ session/[id]/page.tsx    Session dashboard
-└─ api/                     POST /sessions, /refresh, /summary, /health, …
+└─ api/
+   ├─ sessions/             POST /sessions, /refresh, /summary, /health
+   └─ github/webhook/       PR-bot webhook receiver
 
 components/                 React Flow canvases + panels + UI primitives
 lib/
 ├─ codeAnalysis/            AST pipeline — plugins/ per language + WASM runtime
 ├─ depsHealth/              Multi-ecosystem dep-health — ecosystems/ per registry
+├─ githubApp/               PR-bot pipeline (webhook, auth, events, poster)
 ├─ signals.ts               17 deterministic health detectors (no AI)
 ├─ healthAnalysis.ts        Constrained Claude narrative grounded in signals
 ├─ aiSummary.ts             Claude repo profile generator
-├─ rateLimit.ts             Per-IP rate limiter (alpha launch safety)
+├─ rateLimit.ts             Per-IP / per-installation rate limiter
 ├─ aiBudget.ts              Daily Anthropic call kill-switch
 └─ storage.ts               File-based sessions (.gitvision/sessions/*.json)
 ```
@@ -252,8 +284,8 @@ contributing or branching ideas off the codebase.
 - **Octokit** for GitHub REST API
 - **`@iarna/toml`** for Cargo + PyPI manifest parsing
 - **`@anthropic-ai/sdk`** Claude Sonnet 4.5 (optional)
-- **vitest** — 527 unit tests across plugins, signals, parsers, and
-  the rate-limit / AI-budget rails
+- **vitest** — 1000+ unit tests across plugins, signals, parsers,
+  the rate-limit / AI-budget rails, and the GitHub App pipeline
 
 Storage is filesystem-based (`.gitvision/sessions/<id>.json`). No
 database. Inspectable, portable, gitignored.
