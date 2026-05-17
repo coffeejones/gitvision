@@ -85,11 +85,11 @@ export default async function Home() {
   // cookie present, server picks the right layout up front and
   // hydration is silent.
   const ownerIdFromCookie = await getOwnerIdFromCookies();
-  const initialOwnedSessionsExist = ownerIdFromCookie
-    ? filterSessionsByOwner(sessions, ownerIdFromCookie).length > 0
-    : false;
+  const userOwnedSessions = ownerIdFromCookie
+    ? filterSessionsByOwner(sessions, ownerIdFromCookie)
+    : [];
   const initialLayout: "marketing" | "workspace" =
-    initialOwnedSessionsExist ? "workspace" : "marketing";
+    userOwnedSessions.length > 0 ? "workspace" : "marketing";
 
   return (
     <AdaptiveHome
@@ -97,7 +97,14 @@ export default async function Home() {
       demoSessions={demoSessions}
       initialSessions={sessions}
       workspaceSummaries={workspaceSummaries}
-      totalOnDisk={sessions.length}
+      // Bug fix (2026-05-16): was sessions.length — that counted ALL
+      // sessions on disk (including other users' sessions), so the
+      // "Showing N of M" hint in WorkspaceHome showed inflated totals
+      // like "1 of 68" when the caller only owns 1 session. Filter
+      // by cookie first so M represents the caller's actual total.
+      // AdaptiveHome may further override post-hydration if the
+      // client-side cookie state differs from the server's view.
+      totalOnDisk={userOwnedSessions.length}
       initialLayout={initialLayout}
     />
   );

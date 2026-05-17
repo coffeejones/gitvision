@@ -88,8 +88,29 @@ export function WorkspaceHome({ summaries, totalOnDisk }: Props) {
             style={{ color: TOK.textMuted }}
           >
             Showing the {summaries.length} most recent of {totalOnDisk}{" "}
-            sessions. Older ones still exist on disk — use ⌘K to search
-            by name.
+            sessions. Older ones still exist on disk — press{" "}
+            <kbd
+              className="font-mono px-1.5 py-0.5 rounded text-[10px] mx-0.5"
+              style={{
+                background: TOK.surfaceElevated,
+                border: `1px solid ${TOK.border}`,
+                color: TOK.textSecondary,
+              }}
+            >
+              ⌘K
+            </kbd>
+            <span> or </span>
+            <kbd
+              className="font-mono px-1.5 py-0.5 rounded text-[10px] mx-0.5"
+              style={{
+                background: TOK.surfaceElevated,
+                border: `1px solid ${TOK.border}`,
+                color: TOK.textSecondary,
+              }}
+            >
+              Ctrl+K
+            </kbd>{" "}
+            to search by name.
           </div>
         )}
 

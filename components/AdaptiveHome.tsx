@@ -126,7 +126,14 @@ export function AdaptiveHome({
     );
   }
 
+  // Post-hydration: override the server's totalOnDisk with the
+  // precise client-side filtered count. Server can only see what's
+  // in the cookie; client knows the authoritative owner-id from
+  // localStorage and may have a different (newer / corrected) view.
   return (
-    <WorkspaceHome summaries={visibleSummaries} totalOnDisk={totalOnDisk} />
+    <WorkspaceHome
+      summaries={visibleSummaries}
+      totalOnDisk={visibleSessions.length}
+    />
   );
 }
