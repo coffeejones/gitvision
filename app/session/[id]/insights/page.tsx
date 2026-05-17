@@ -35,8 +35,8 @@ export default async function InsightsRoute({
   const current = session.snapshots[session.snapshots.length - 1];
 
   return (
-    <main className="px-8 py-8 flex flex-col gap-6">
-      <div id="screenshot-target" className="flex flex-col gap-6 max-w-4xl">
+    <main className="px-8 py-8 flex flex-col gap-6 max-w-7xl mx-auto w-full">
+      <div id="screenshot-target" className="flex flex-col gap-6">
         <header className="flex items-baseline justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Sparkles size={14} style={{ color: TOK.accent }} />

@@ -21,7 +21,7 @@ export default async function ImportsPage({
   const current = session.snapshots[session.snapshots.length - 1];
 
   return (
-    <main className="px-8 py-8 flex flex-col gap-4">
+    <main className="px-8 py-8 flex flex-col gap-4 max-w-7xl mx-auto w-full">
       <div id="screenshot-target" className="flex flex-col gap-4">
         {current.fileGraph && current.fileGraph.nodes.length > 0 ? (
           <DependencyCanvas graph={current.fileGraph} />

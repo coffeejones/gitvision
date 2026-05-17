@@ -184,8 +184,8 @@ export default async function OverviewPage({
   const base = `/session/${session.id}`;
 
   return (
-    <main className="px-8 py-10 flex flex-col gap-10">
-      <div id="screenshot-target" className="flex flex-col gap-10 max-w-5xl">
+    <main className="px-8 py-10 flex flex-col gap-10 max-w-7xl mx-auto w-full">
+      <div id="screenshot-target" className="flex flex-col gap-10">
         {/* Hero */}
         <section className="flex flex-col gap-4">
           <div className="flex items-baseline gap-3 flex-wrap">

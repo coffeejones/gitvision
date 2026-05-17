@@ -18,7 +18,7 @@ export default async function CanvasPage({
   const current = session.snapshots[session.snapshots.length - 1];
 
   return (
-    <main className="px-8 py-8 flex flex-col gap-4">
+    <main className="px-8 py-8 flex flex-col gap-4 max-w-7xl mx-auto w-full">
       <div id="screenshot-target" className="flex flex-col gap-4">
         <Constellation snapshot={current} />
         <p className="text-xs" style={{ color: TOK.textMuted }}>
