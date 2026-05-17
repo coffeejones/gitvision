@@ -30,6 +30,7 @@ import {
 import type { SessionSummary } from "@/lib/types";
 import { type DemoRepo } from "@/components/RepoInputForm";
 import { MarketingHome } from "@/components/MarketingHome";
+import { SessionSearchPalette } from "@/components/SessionSearchPalette";
 import { WorkspaceHome } from "@/components/WorkspaceHome";
 
 interface Props {
@@ -59,11 +60,42 @@ export function AdaptiveHome({
 }: Props) {
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     setOwnerId(getOrCreateOwnerId());
     setHydrated(true);
   }, []);
+
+  // ⌘K / Ctrl+K opens the session-search palette. Listener lives at
+  // the AdaptiveHome level so it's active on both the marketing and
+  // workspace layouts — the palette itself short-circuits to a
+  // helpful empty state if the visitor has no sessions to search.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  // The palette renders on top of whichever layout is active. We
+  // build the searchable session list before branching so the
+  // shortcut works identically on marketing and workspace surfaces.
+  const visibleSessions = hydrated
+    ? filterSessionsByOwner(initialSessions, ownerId)
+    : [];
+
+  const palette = (
+    <SessionSearchPalette
+      sessions={visibleSessions}
+      open={paletteOpen}
+      onClose={() => setPaletteOpen(false)}
+    />
+  );
 
   // Pre-hydration: trust the server-decided layout. The server read
   // gv_owner_id from cookies and matched it against the loaded
@@ -80,27 +112,34 @@ export function AdaptiveHome({
       // shuffle when the client takes over.
       const sorted = sortWorkspaceByPriority(workspaceSummaries);
       return (
-        <WorkspaceHome summaries={sorted} totalOnDisk={totalOnDisk} />
+        <>
+          <WorkspaceHome summaries={sorted} totalOnDisk={totalOnDisk} />
+          {palette}
+        </>
       );
     }
     return (
-      <MarketingHome
-        demoRepos={demoRepos}
-        demoSessions={demoSessions}
-        initialSessions={initialSessions}
-      />
+      <>
+        <MarketingHome
+          demoRepos={demoRepos}
+          demoSessions={demoSessions}
+          initialSessions={initialSessions}
+        />
+        {palette}
+      </>
     );
   }
 
-  const visibleSessions = filterSessionsByOwner(initialSessions, ownerId);
-
   if (visibleSessions.length === 0) {
     return (
-      <MarketingHome
-        demoRepos={demoRepos}
-        demoSessions={demoSessions}
-        initialSessions={initialSessions}
-      />
+      <>
+        <MarketingHome
+          demoRepos={demoRepos}
+          demoSessions={demoSessions}
+          initialSessions={initialSessions}
+        />
+        {palette}
+      </>
     );
   }
 
@@ -118,11 +157,14 @@ export function AdaptiveHome({
   // would be confusing.
   if (visibleSummaries.length === 0) {
     return (
-      <MarketingHome
-        demoRepos={demoRepos}
-        demoSessions={demoSessions}
-        initialSessions={initialSessions}
-      />
+      <>
+        <MarketingHome
+          demoRepos={demoRepos}
+          demoSessions={demoSessions}
+          initialSessions={initialSessions}
+        />
+        {palette}
+      </>
     );
   }
 
@@ -131,9 +173,12 @@ export function AdaptiveHome({
   // in the cookie; client knows the authoritative owner-id from
   // localStorage and may have a different (newer / corrected) view.
   return (
-    <WorkspaceHome
-      summaries={visibleSummaries}
-      totalOnDisk={visibleSessions.length}
-    />
+    <>
+      <WorkspaceHome
+        summaries={visibleSummaries}
+        totalOnDisk={visibleSessions.length}
+      />
+      {palette}
+    </>
   );
 }

@@ -82,37 +82,44 @@ export function WorkspaceHome({ summaries, totalOnDisk }: Props) {
           ))}
         </div>
 
-        {totalOnDisk > summaries.length && (
-          <div
-            className="text-xs text-center -mt-8"
-            style={{ color: TOK.textMuted }}
+        {/* Sessions footer-hint: the keyboard shortcut tip is always
+         *  useful (discoverability), but the "Showing N of M" prefix
+         *  only makes sense when there's real truncation. So split:
+         *  truncation prefix is conditional, kbd hint is permanent. */}
+        <div
+          className="text-xs text-center -mt-8"
+          style={{ color: TOK.textMuted }}
+        >
+          {totalOnDisk > summaries.length && (
+            <>
+              Showing the {summaries.length} most recent of {totalOnDisk}{" "}
+              sessions. Older ones still exist on disk — press{" "}
+            </>
+          )}
+          {totalOnDisk <= summaries.length && <>Press </>}
+          <kbd
+            className="font-mono px-1.5 py-0.5 rounded text-[10px] mx-0.5"
+            style={{
+              background: TOK.surfaceElevated,
+              border: `1px solid ${TOK.border}`,
+              color: TOK.textSecondary,
+            }}
           >
-            Showing the {summaries.length} most recent of {totalOnDisk}{" "}
-            sessions. Older ones still exist on disk — press{" "}
-            <kbd
-              className="font-mono px-1.5 py-0.5 rounded text-[10px] mx-0.5"
-              style={{
-                background: TOK.surfaceElevated,
-                border: `1px solid ${TOK.border}`,
-                color: TOK.textSecondary,
-              }}
-            >
-              ⌘K
-            </kbd>
-            <span> or </span>
-            <kbd
-              className="font-mono px-1.5 py-0.5 rounded text-[10px] mx-0.5"
-              style={{
-                background: TOK.surfaceElevated,
-                border: `1px solid ${TOK.border}`,
-                color: TOK.textSecondary,
-              }}
-            >
-              Ctrl+K
-            </kbd>{" "}
-            to search by name.
-          </div>
-        )}
+            ⌘K
+          </kbd>
+          <span> or </span>
+          <kbd
+            className="font-mono px-1.5 py-0.5 rounded text-[10px] mx-0.5"
+            style={{
+              background: TOK.surfaceElevated,
+              border: `1px solid ${TOK.border}`,
+              color: TOK.textSecondary,
+            }}
+          >
+            Ctrl+K
+          </kbd>{" "}
+          to search your sessions by name.
+        </div>
 
         {/* Roadmap — same component as MarketingHome. Returning
          *  power-users get the "what changed since I was last here"
