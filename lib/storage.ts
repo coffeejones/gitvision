@@ -78,6 +78,21 @@ export async function listSessions(): Promise<SessionSummary[]> {
       try {
         const raw = await fs.readFile(path.join(dir, file), "utf-8");
         const session = JSON.parse(raw) as Session;
+        // PR-bot sessions are private analysis artifacts created by
+        // the GitHub App pipeline (commit a2c6acc). They must never
+        // appear in workspace listings — otherwise they leak into:
+        //   1. "Your sessions" panel for every visitor (they have no
+        //      ownerId, and lib/ownerId.ts's filterSessionsByOwner
+        //      treats ownerless sessions as "everyone's" for
+        //      pre-v0.26 backward compat).
+        //   2. AdaptiveHome routing — any session counted here pushes
+        //      first-time visitors into WorkspaceHome instead of the
+        //      marketing landing.
+        //   3. GET /api/sessions response.
+        // The bot's "Full analysis ↗" link still works because it
+        // navigates directly to /session/<id>, which uses getSession
+        // (not listSessions).
+        if (session.installationId !== undefined) continue;
         const latest = session.snapshots[session.snapshots.length - 1];
         summaries.push({
           id: session.id,

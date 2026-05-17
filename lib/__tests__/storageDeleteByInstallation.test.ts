@@ -183,15 +183,105 @@ describe("createSession — installationId persistence", () => {
   it("does not surface installationId in SessionSummary list (yet)", async () => {
     await createSession({
       repoUrl: "https://github.com/alice/repo",
-      name: "x",
+      name: "user-created",
       initialSnapshot: minimalSnapshot(),
-      installationId: 7,
+      ownerId: "anon-uuid",
     });
     const summaries = await listSessions();
-    // Sanity check — installationId isn't part of SessionSummary, so
-    // the field shouldn't be present on the listing row even if the
-    // underlying Session has it.
-    expect(summaries.length).toBeGreaterThan(0);
+    expect(summaries.length).toBe(1);
     expect("installationId" in summaries[0]!).toBe(false);
+  });
+});
+
+describe("listSessions — bot-session visibility filter", () => {
+  it("excludes PR-bot sessions (installationId set) from listings", async () => {
+    // The exact bug Jonas reported: bot sessions had no ownerId, so
+    // filterSessionsByOwner treated them as legacy-visible-to-all,
+    // routing every new visitor into WorkspaceHome and showing the
+    // bot's analysis sessions in "Your sessions". listSessions must
+    // never surface them in the first place.
+    await createSession({
+      repoUrl: "https://github.com/coffeejones/gitvisionTest",
+      name: "coffeejones/gitvisionTest @ f5b003b5 (PR #1)",
+      initialSnapshot: minimalSnapshot(),
+      installationId: 99,
+    });
+    await createSession({
+      repoUrl: "https://github.com/coffeejones/gitvisionTest",
+      name: "coffeejones/gitvisionTest @ a1b2c3d4 (base of PR #1)",
+      initialSnapshot: minimalSnapshot(),
+      installationId: 99,
+    });
+
+    const summaries = await listSessions();
+    expect(summaries).toHaveLength(0);
+  });
+
+  it("still includes workspace-created sessions (installationId undefined)", async () => {
+    await createSession({
+      repoUrl: "https://github.com/alice/repo",
+      name: "workspace-session",
+      initialSnapshot: minimalSnapshot(),
+      ownerId: "anon-uuid",
+    });
+
+    const summaries = await listSessions();
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]!.name).toBe("workspace-session");
+  });
+
+  it("mixes correctly — only workspace sessions returned when both exist", async () => {
+    await createSession({
+      repoUrl: "https://github.com/alice/repo",
+      name: "user-1",
+      initialSnapshot: minimalSnapshot(),
+      ownerId: "anon-uuid",
+    });
+    await createSession({
+      repoUrl: "https://github.com/coffeejones/gitvisionTest",
+      name: "bot-1",
+      initialSnapshot: minimalSnapshot(),
+      installationId: 99,
+    });
+    await createSession({
+      repoUrl: "https://github.com/alice/repo-2",
+      name: "user-2",
+      initialSnapshot: minimalSnapshot(),
+      ownerId: "anon-uuid",
+    });
+    await createSession({
+      repoUrl: "https://github.com/coffeejones/gitvisionTest",
+      name: "bot-2",
+      initialSnapshot: minimalSnapshot(),
+      installationId: 99,
+    });
+
+    const summaries = await listSessions();
+    const names = summaries.map((s) => s.name).sort();
+    expect(names).toEqual(["user-1", "user-2"]);
+  });
+
+  it("excludes legacy bot sessions even without ownerId on user sessions", async () => {
+    // Pre-v0.26 "legacy" workspace sessions (no ownerId) must stay
+    // visible — that's why the original ownership filter has the
+    // !ownerId backward-compat clause. But bot sessions with
+    // installationId set are NOT legacy — they should be filtered
+    // out regardless of ownerId state.
+    await createSession({
+      repoUrl: "https://github.com/legacy/repo",
+      name: "true-legacy",
+      initialSnapshot: minimalSnapshot(),
+      // no ownerId, no installationId — pre-v0.26 workspace session
+    });
+    await createSession({
+      repoUrl: "https://github.com/coffeejones/gitvisionTest",
+      name: "bot-no-owner",
+      initialSnapshot: minimalSnapshot(),
+      installationId: 99,
+      // no ownerId — like every bot session
+    });
+
+    const summaries = await listSessions();
+    expect(summaries.map((s) => s.name)).toEqual(["true-legacy"]);
   });
 });
