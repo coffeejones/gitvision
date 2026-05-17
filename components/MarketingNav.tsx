@@ -25,8 +25,9 @@
 // most likely to be valuable when someone clicks the nav link.
 
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, MessageSquare } from "lucide-react";
 import { TOK } from "@/lib/theme";
+import { FeedbackLink } from "@/components/FeedbackLink";
 import { Logo } from "@/components/Logo";
 
 export function MarketingNav() {
@@ -88,6 +89,20 @@ export function MarketingNav() {
             GitHub
             <ArrowUpRight size={12} />
           </a>
+          {/* Feedback CTA — emphasized during early beta with an
+           *  accent-bordered pill instead of a plain link, so testers
+           *  see "we want your feedback" before they even scroll. */}
+          <FeedbackLink
+            className="inline-flex items-center gap-1.5 ml-1 px-3 py-1.5 rounded-md text-xs sm:text-sm transition hover:opacity-80 cursor-pointer"
+            style={{
+              color: TOK.accent,
+              border: `1px solid ${TOK.accent}`,
+              background: TOK.accentSoft,
+            }}
+          >
+            <MessageSquare size={12} />
+            Feedback
+          </FeedbackLink>
         </nav>
       </div>
     </header>

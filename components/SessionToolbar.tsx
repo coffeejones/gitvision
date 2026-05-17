@@ -267,6 +267,26 @@ export function SessionToolbar({
             )}
           </div>
 
+          {/* Feedback — emphasized during early beta (accent-bordered
+           *  pill, matches MarketingNav's Feedback treatment). Sits
+           *  between Share and Refresh so testers see "we want your
+           *  feedback" without it competing with the primary Refresh
+           *  action. Was previously buried in the overflow menu;
+           *  promoted to top-level so beta-users can fire a thought
+           *  the moment they hit a rough edge. */}
+          <button
+            onClick={() => setFeedbackOpen(true)}
+            className="h-8 px-3 rounded-md text-xs font-medium transition flex items-center gap-1.5 hover:opacity-80"
+            style={{
+              color: TOK.accent,
+              border: `1px solid ${TOK.accent}`,
+              background: TOK.accentSoft,
+            }}
+          >
+            <MessageSquarePlus size={13} />
+            <span>Feedback</span>
+          </button>
+
           {/* Refresh — primary */}
           <button
             onClick={refresh}
@@ -342,36 +362,9 @@ export function SessionToolbar({
                     </span>
                   </div>
                 </Link>
-                <button
-                  onClick={() => {
-                    setOverflowOpen(false);
-                    setFeedbackOpen(true);
-                  }}
-                  className="w-full flex items-start gap-2.5 px-3 py-2 text-xs transition cursor-pointer text-left"
-                  style={{ color: TOK.textSecondary }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = TOK.surface;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <MessageSquarePlus
-                    size={14}
-                    style={{ color: TOK.textMuted, marginTop: 1 }}
-                  />
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <span style={{ color: TOK.textPrimary }}>
-                      Send feedback
-                    </span>
-                    <span
-                      className="text-[11px]"
-                      style={{ color: TOK.textMuted }}
-                    >
-                      Bug, feature idea, or general note
-                    </span>
-                  </div>
-                </button>
+                {/* Send feedback moved to top-level toolbar button
+                 *  (emphasis during early beta). Removed the
+                 *  overflow-menu entry to avoid duplication. */}
                 <div
                   className="my-1 mx-2 h-px"
                   style={{ background: TOK.border }}

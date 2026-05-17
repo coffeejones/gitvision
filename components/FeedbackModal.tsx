@@ -19,6 +19,7 @@
 // this so it's not a surprise.
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Send, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { TOK } from "@/lib/theme";
 // Import from the browser-safe surface — lib/feedback.ts itself
@@ -79,6 +80,9 @@ export function FeedbackModal({ open, onClose, sessionId }: Props) {
   }, [open, onClose]);
 
   if (!open) return null;
+  // SSR-safe: createPortal needs document.body, only available client-side.
+  // open=true only happens after user click, so window is defined by then.
+  if (typeof window === "undefined") return null;
 
   const submitting = status.kind === "submitting";
   const isSuccess = status.kind === "success";
@@ -132,14 +136,23 @@ export function FeedbackModal({ open, onClose, sessionId }: Props) {
     }
   }
 
-  return (
+  // Render via portal at document.body so the modal escapes any
+  // ancestor that creates a containing block for fixed-position
+  // descendants (notably MarketingNav's `backdrop-filter: blur` —
+  // without the portal, `fixed inset-0` would be relative to the
+  // nav bar, not the viewport, and the modal renders only inside
+  // the nav's bounds).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
       style={{ background: "rgba(0,0,0,0.75)" }}
       onClick={onClose}
     >
       <div
-        className="relative rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full"
+        // Modal centered. maxHeight caps it at 90vh; header stays
+        // pinned (no scroll), body scrolls internally if form is
+        // taller than what fits.
+        className="relative rounded-2xl shadow-2xl flex flex-col w-full overflow-hidden"
         style={{
           background: TOK.surface,
           border: `1px solid ${TOK.border}`,
@@ -177,7 +190,11 @@ export function FeedbackModal({ open, onClose, sessionId }: Props) {
           </button>
         </div>
 
-        {/* Body — switches between form and success state */}
+        {/* Body — switches between form and success state. Wrapper
+         *  has flex-1 + min-h-0 + overflow-y-auto so it scrolls
+         *  internally when the form is taller than what fits inside
+         *  the modal's 90vh max. Header above stays pinned. */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
         {isSuccess ? (
           <SuccessState onClose={onClose} />
         ) : (
@@ -296,8 +313,10 @@ export function FeedbackModal({ open, onClose, sessionId }: Props) {
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
