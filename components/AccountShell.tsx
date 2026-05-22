@@ -18,6 +18,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ChevronRight,
+  CreditCard,
   User as UserIcon,
   Shield,
   Link as LinkIcon,
@@ -40,6 +41,11 @@ interface SectionLink {
 
 const SECTIONS: SectionLink[] = [
   { path: "/account/general", label: "General", icon: <UserIcon size={14} /> },
+  {
+    path: "/account/billing",
+    label: "Billing",
+    icon: <CreditCard size={14} />,
+  },
   { path: "/account/security", label: "Security", icon: <Shield size={14} /> },
   {
     path: "/account/connections",
