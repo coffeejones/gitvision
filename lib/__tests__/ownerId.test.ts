@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 import {
   DEMO_OWNER_ID,
   filterSessionsByOwner,
+  filterSessionsByUser,
   OWNER_ID_HEADER,
 } from "../ownerId";
 
@@ -158,5 +159,67 @@ describe("filterSessionsByOwner", () => {
       // matching data migration.
       expect(DEMO_OWNER_ID).toBe("demo");
     });
+  });
+});
+
+describe("filterSessionsByUser (v0.76 — login-required model)", () => {
+  // Annotated explicitly so the generic constraint `extends
+  // { ownerId?: string; userId?: string }` is satisfied even when
+  // all fields are omitted on a row.
+  type Like = { id: string; ownerId?: string; userId?: string };
+
+  const everything: Like[] = [
+    { id: "u-alice", userId: "alice" },                       // alice's account-owned
+    { id: "u-bob", userId: "bob" },                           // bob's account-owned
+    { id: "u-alice-both", userId: "alice", ownerId: "ck-1" }, // alice's account + her cookie
+    { id: "anon-1", ownerId: "ck-1" },                         // anonymous (pre-v0.76)
+    { id: "anon-2", ownerId: "ck-2" },                         // anonymous, other cookie
+    { id: "legacy" },                                          // pre-v0.26 — open
+    { id: "demo-1", ownerId: DEMO_OWNER_ID },                  // demo — excluded
+  ];
+
+  it("returns [] for logged-out callers", () => {
+    // Workspace listings are gated behind sign-in in the v0.76 model.
+    // Logged-out visitors browse the marketing landing + demos only.
+    expect(filterSessionsByUser(everything, null)).toEqual([]);
+  });
+
+  it("returns the caller's account-owned sessions + legacy-open", () => {
+    const out = filterSessionsByUser(everything, "alice");
+    expect(out.map((s) => s.id).sort()).toEqual([
+      "legacy",
+      "u-alice",
+      "u-alice-both",
+    ]);
+  });
+
+  it("does not include other users' sessions", () => {
+    const out = filterSessionsByUser(everything, "alice");
+    expect(out.map((s) => s.id)).not.toContain("u-bob");
+  });
+
+  it("hides anonymous ownerId-only sessions from logged-in callers", () => {
+    // Anonymous sessions (pre-v0.76 ownerId-only, no userId) are
+    // invisible in the workspace listing. They remain reachable by
+    // direct URL — sharing isn't broken — but they don't surface as
+    // "Your sessions" since there's no account binding.
+    const out = filterSessionsByUser(everything, "alice");
+    expect(out.map((s) => s.id)).not.toContain("anon-1");
+    expect(out.map((s) => s.id)).not.toContain("anon-2");
+  });
+
+  it("hides demo sessions even from logged-in callers", () => {
+    const out = filterSessionsByUser(everything, "alice");
+    expect(out.map((s) => s.id)).not.toContain("demo-1");
+  });
+
+  it("returns new arrays (callers can mutate the result safely)", () => {
+    const out = filterSessionsByUser(everything, "alice");
+    expect(out).not.toBe(everything as unknown as Like[]);
+  });
+
+  it("handles an empty input", () => {
+    expect(filterSessionsByUser([], "alice")).toEqual([]);
+    expect(filterSessionsByUser([], null)).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-# GitVision
+# RepoBaron
 
 > Know your code before you touch it.
 
@@ -8,17 +8,17 @@ pipeline across 7 languages. Paste a URL, get blast radius, untested
 hotspots, structural duplicates, and architecture diagrams in under
 20 seconds.
 
-![GitVision alpha](https://img.shields.io/badge/status-alpha-amber)
+![RepoBaron alpha](https://img.shields.io/badge/status-alpha-amber)
 ![Next.js 16](https://img.shields.io/badge/next.js-16-black)
 ![React 19](https://img.shields.io/badge/react-19-blue)
 ![Tests](https://img.shields.io/badge/tests-1000%2B%20passing-emerald)
 ![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-purple)
 
-![GitVision landing — paste any URL or click any of 4 instant demos. Sticky nav, real findings, and a public roadmap below.](doc/screenshots/Landing.png)
+![RepoBaron landing — paste any URL or click any of 4 instant demos. Sticky nav, real findings, and a public roadmap below.](doc/screenshots/Landing.png)
 
-## Why GitVision
+## Why RepoBaron
 
-GitHub Insights gives you commit counts and a contributor list. GitVision
+GitHub Insights gives you commit counts and a contributor list. RepoBaron
 gives you the questions an engineering manager actually asks:
 
 - **What breaks if I change this file?** — three-hop blast radius across
@@ -37,14 +37,14 @@ server-side. Zero hallucination room.
 
 ## Try it
 
-👉 **[gitvision.net](https://gitvision.net)** — 4 pre-analyzed demo repos load instantly. No signup, no setup.
+👉 **[repobaron.com](https://repobaron.com)** — 4 pre-analyzed demo repos load instantly. No signup, no setup.
 
 Or run it locally:
 
 ```bash
 # 1. Install
-git clone https://github.com/coffeejones/gitvision
-cd gitvision
+git clone https://github.com/coffeejones/repobaron
+cd repobaron
 npm install
 
 # 2. Recommended: GitHub token (60 → 5000 req/hr)
@@ -65,9 +65,9 @@ Node 20.9+ required (tested on 25.x).
 
 ## Two surfaces, one signal layer
 
-GitVision delivers the same analysis through two different surfaces:
+RepoBaron delivers the same analysis through two different surfaces:
 
-**Workspace** — `gitvision.net`. Paste a URL, get an explorable
+**Workspace** — `repobaron.com`. Paste a URL, get an explorable
 dashboard with blast radius, untested hotspots, near-duplicates,
 architecture diagrams, dependency health, and a red / yellow / green
 verdict grounded in 17 deterministic signals. The destination for
@@ -84,7 +84,7 @@ Both surfaces share the same diff-aware AST analysis, the same
 calibrated rules engine, the same plugin architecture. Improvements
 to one improve the other.
 
-![Public roadmap section on gitvision.net — recently-shipped items in green tags, upcoming work in muted tags](doc/screenshots/Roadmap.png)
+![Public roadmap section on repobaron.com — recently-shipped items in green tags, upcoming work in muted tags](doc/screenshots/Roadmap.png)
 
 ## What you'll find
 
@@ -157,7 +157,7 @@ layer as the workspace, packaged for the PR-review workflow.
 A comment like this on every PR:
 
 ```markdown
-## GitVision Review
+## RepoBaron Review
 
 **Diff summary:** 3 files changed · functions: 5 added, 2 removed, 7 modified · net complexity +4
 
@@ -168,7 +168,7 @@ A comment like this on every PR:
 3. 🟢 **INFO** — Sizeable PR — touches 23 files with 109 function-level changes.
 
 ---
-[Full analysis ↗](https://gitvision.net/session/…) · _Signals computed deterministically — no LLM in this comment_
+[Full analysis ↗](https://repobaron.com/session/…) · _Signals computed deterministically — no LLM in this comment_
 ```
 
 When nothing crosses the calibrated thresholds, you still get a short
@@ -193,9 +193,9 @@ evidence.
 ### Install
 
 🚧 **Currently in private beta.** v1.0 install ceremony will land at
-`https://github.com/apps/gitvision-pr` (or successor URL) once we've
+`https://github.com/apps/repobaron-pr` (or successor URL) once we've
 validated noise rate on 2-3 friendly real-world repos. If you want
-to be one of those early installs, [open an issue](https://github.com/coffeejones/gitvision/issues).
+to be one of those early installs, [open an issue](https://github.com/coffeejones/repobaron/issues).
 
 ### Limits & guardrails
 
@@ -300,12 +300,12 @@ npm scripts; `.gitattributes` pins LF line endings.
 ## Contributing
 
 Project status is **alpha**. Bug reports and feature ideas are welcome
-via [GitHub Issues](https://github.com/coffeejones/gitvision/issues). Note
+via [GitHub Issues](https://github.com/coffeejones/repobaron/issues). Note
 the license — see below.
 
 ## License
 
-GitVision is licensed under the **PolyForm Noncommercial License 1.0.0**
+RepoBaron is licensed under the **PolyForm Noncommercial License 1.0.0**
 — see [LICENSE](./LICENSE).
 
 - **Yes** to personal use, learning, experimentation, hobby projects,
@@ -313,7 +313,7 @@ GitVision is licensed under the **PolyForm Noncommercial License 1.0.0**
 - **No** to using this code (or derivatives) in a commercial product
   or for-profit service without a separate commercial license.
 
-If you want to use GitVision commercially, [open an issue](https://github.com/coffeejones/gitvision/issues)
+If you want to use RepoBaron commercially, [open an issue](https://github.com/coffeejones/repobaron/issues)
 or get in touch.
 
 Copyright © 2026 Jonas Hansen.

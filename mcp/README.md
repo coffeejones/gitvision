@@ -1,6 +1,6 @@
-# gitvision-mcp
+# repobaron-mcp
 
-MCP server that exposes the GitVision code-analysis pipeline as
+MCP server that exposes the RepoBaron code-analysis pipeline as
 Model Context Protocol tools — so AI coding agents (Claude Code,
 Cursor, Cline, Aider, anything that speaks MCP) can query
 deterministic structural information about a GitHub repo without
@@ -29,14 +29,14 @@ runs in milliseconds against a cached snapshot.
 ## Install
 
 > **Status:** v0.66 (C1.3). Pre-npm-publish — install from source.
-> A standalone npm package (`gitvision-mcp`) will follow once we
+> A standalone npm package (`repobaron-mcp`) will follow once we
 > have a few external integrations validating the surface.
 
-Clone the GitVision repo and build locally:
+Clone the RepoBaron repo and build locally:
 
 ```sh
-git clone https://github.com/coffeejones/gitvision.git
-cd gitvision
+git clone https://github.com/coffeejones/repobaron.git
+cd repobaron
 npm install
 npm run mcp:build
 ```
@@ -54,13 +54,13 @@ npm run mcp:validate     # build + run the MCP-layer test suite
 ### Claude Code (current install path)
 
 ```sh
-claude mcp add gitvision node /absolute/path/to/gitvision/mcp/dist/mcp/server.js
+claude mcp add repobaron node /absolute/path/to/repobaron/mcp/dist/mcp/server.js
 ```
 
-Once `gitvision-mcp` is published to npm, this will become:
+Once `repobaron-mcp` is published to npm, this will become:
 
 ```sh
-claude mcp add gitvision npx gitvision-mcp
+claude mcp add repobaron npx repobaron-mcp
 ```
 
 ### Cursor / Cline / others
@@ -70,9 +70,9 @@ Most MCP clients accept a JSON config of the same shape. Example:
 ```json
 {
   "mcpServers": {
-    "gitvision": {
+    "repobaron": {
       "command": "node",
-      "args": ["/absolute/path/to/gitvision/mcp/dist/mcp/server.js"]
+      "args": ["/absolute/path/to/repobaron/mcp/dist/mcp/server.js"]
     }
   }
 }
@@ -96,7 +96,7 @@ isn't supported in v0.65 — coming later.
 
 In a chat with a connected agent:
 
-> "Use gitvision to analyze https://github.com/vercel/next.js,
+> "Use repobaron to analyze https://github.com/vercel/next.js,
 > then tell me which functions have the largest blast radius."
 
 The agent will call `analyze_repo` first (returns sessionId), then
@@ -132,7 +132,7 @@ in `analyze_repo`'s summary but won't appear in `blast_radius` or
 ## Privacy
 
 The MCP server runs as a child process of your MCP client. Repo
-analysis happens on your machine. No GitVision-controlled server
+analysis happens on your machine. No RepoBaron-controlled server
 sees the repos you analyze. Cache stays in `~/.gitvision/cache` on
 your filesystem.
 

@@ -15,7 +15,7 @@ import {
 let tmp: string;
 
 beforeEach(async () => {
-  tmp = await fs.mkdtemp(path.join(os.tmpdir(), "gitvision-tsconfig-"));
+  tmp = await fs.mkdtemp(path.join(os.tmpdir(), "repobaron-tsconfig-"));
 });
 afterEach(async () => {
   await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});

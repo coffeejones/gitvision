@@ -44,7 +44,7 @@ export interface RunReviewDeps {
   posterDeps: PosterDeps;
   concurrency: ConcurrencyDeps;
   /** Used to build the "Full analysis" link in the comment footer.
-   *  Default reads GITVISION_PUBLIC_URL env var, falling back to
+   *  Default reads REPOBARON_PUBLIC_URL env var, falling back to
    *  localhost so dev preview still produces a clickable link. */
   workspaceBaseUrl: string;
 }
@@ -61,7 +61,7 @@ export function defaultRunReviewDeps(): RunReviewDeps {
       releaseConcurrencySlot,
     },
     workspaceBaseUrl:
-      process.env.GITVISION_PUBLIC_URL?.replace(/\/+$/, "") ||
+      process.env.REPOBARON_PUBLIC_URL?.replace(/\/+$/, "") ||
       "http://localhost:3000",
   };
 }

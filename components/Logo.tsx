@@ -1,16 +1,16 @@
-// GitVision logo — concept A (Concentric blast radius) shipped as the
+// RepoBaron logo — concept A (Concentric blast radius) shipped as the
 // brand's first visual identity (v0.75).
 //
 // Single component, three usage modes:
 //   <Logo size={20} />                   icon only
-//   <Logo size={20} wordmark />          icon + GitVision text
+//   <Logo size={20} wordmark />          icon + RepoBaron text
 //   <Logo size={20} wordmark href="/" /> icon + text wrapped in a Link
 //
 // SVG uses currentColor for the rings + dot so callers can re-tint
 // via the parent's `color` style. Default is TOK.accent (emerald).
 //
 // Why concentric rings: visually echoes blast-radius / impact-analysis
-// — GitVision's signature feature. Three ring opacities produce a
+// — RepoBaron's signature feature. Three ring opacities produce a
 // "ripple" feel without animation. Scales to favicon size cleanly
 // because the geometry is purely round.
 //
@@ -26,7 +26,7 @@ interface Props {
   /** Pixel size of the icon. Default 24 — works for topbar; scale up
    *  for hero placements (32-48), down for inline mentions (16). */
   size?: number;
-  /** Render the "GitVision" wordmark next to the icon. */
+  /** Render the "RepoBaron" wordmark next to the icon. */
   wordmark?: boolean;
   /** Wrap the whole thing in a Link to `href`. Useful for clickable
    *  brand-as-home-link in topbars. */
@@ -65,7 +65,7 @@ export function Logo({
             letterSpacing: "-0.02em",
           }}
         >
-          GitVision
+          RepoBaron
         </span>
       )}
     </span>

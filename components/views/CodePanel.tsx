@@ -316,13 +316,17 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
     <div className="flex flex-col gap-4">
       <CoverageChip cg={cg} />
 
-      {/* Hero: selected file + blast radius (file mode or function mode) */}
+      {/* Hero: selected file + blast radius (file mode or function mode).
+       *  Material card recipe (diagonal gradient + 1px ambient shadow)
+       *  matches the StatTile row above and the rest of the page. */}
       <div
         ref={blastRadiusRef}
         className="rounded-xl p-5 flex flex-col gap-4"
         style={{
-          background: TOK.surface,
+          background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
           border: `1px solid ${TOK.border}`,
+          boxShadow:
+            "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
         }}
       >
         <SelectedFileHeader
@@ -435,45 +439,114 @@ function CoverageChip({ cg }: { cg: CodeGraph }) {
   }
 
   const fnCount = cg.functions.length;
-  // Sentence-case list: "JS/TS, Python, Go" — short enough to fit inline,
-  // tells the user exactly which plugins ran on this repo.
-  const langSuffix =
-    activeAstLangs.length > 0 ? ` (${activeAstLangs.join(", ")})` : "";
+  const langList =
+    activeAstLangs.length > 0 ? activeAstLangs.join(", ") : undefined;
 
+  // Apple-style stat-tile grid (matches PackagesPanel summary tiles).
+  // Three primary tiles always render (AST files / functions / call
+  // sites); the regex-fallback tile only appears when there are
+  // languages we covered via the fallback plugin, so simple repos
+  // don't see a noise tile.
+  const tileCount = fbFiles > 0 ? 4 : 3;
   return (
     <div
-      className="flex flex-wrap items-center gap-2 text-xs px-3 py-2 rounded-lg"
+      className={`grid grid-cols-2 ${tileCount === 4 ? "md:grid-cols-4" : "md:grid-cols-3"} gap-3`}
+    >
+      <CodeStatTile
+        label="AST files"
+        count={astFiles}
+        sublabel={langList}
+        icon={<FileCode size={13} />}
+      />
+      <CodeStatTile
+        label="Functions"
+        count={fnCount}
+        sublabel="with complexity"
+        icon={<CodeIcon size={13} />}
+      />
+      <CodeStatTile
+        label="Call sites"
+        count={totalCalls}
+        icon={<Network size={13} />}
+      />
+      {fbFiles > 0 && (
+        <CodeStatTile
+          label="Regex fallback"
+          count={fbFiles}
+          sublabel="imports only"
+          icon={<ShieldOff size={13} />}
+          muted
+        />
+      )}
+    </div>
+  );
+}
+
+/** Apple-style stat tile for the Code page hero row. Mirrors the
+ *  PackagesPanel StatTile recipe: big number leads, uppercase label
+ *  above, optional sublabel below, small icon chip in the corner.
+ *  Diagonal-gradient + 1px ambient shadow gives the material feel.
+ *  `muted` dims the count down to textMuted for tiles that represent
+ *  "lower coverage" rather than a positive stat (regex fallback). */
+function CodeStatTile({
+  label,
+  count,
+  sublabel,
+  icon,
+  muted,
+}: {
+  label: string;
+  count: number;
+  sublabel?: string;
+  icon?: React.ReactNode;
+  muted?: boolean;
+}) {
+  return (
+    <div
+      className="rounded-xl p-4 flex flex-col gap-1.5"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${TOK.border}`,
-        color: TOK.textSecondary,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
-      <Sparkles size={13} style={{ color: TOK.accent }} />
-      <span>
-        <strong style={{ color: TOK.textPrimary }}>{astFiles}</strong> AST
-        files{langSuffix}
-      </span>
-      <span style={{ color: TOK.textMuted }}>·</span>
-      <span>
-        <strong style={{ color: TOK.textPrimary }}>{fnCount}</strong> functions
-        with complexity
-      </span>
-      <span style={{ color: TOK.textMuted }}>·</span>
-      <span>
-        <strong style={{ color: TOK.textPrimary }}>
-          {totalCalls.toLocaleString()}
-        </strong>{" "}
-        call-sites
-      </span>
-      {fbFiles > 0 && (
-        <>
-          <span style={{ color: TOK.textMuted }}>·</span>
-          <span>
-            <strong style={{ color: TOK.textPrimary }}>{fbFiles}</strong> regex-
-            fallback files (imports only)
+      <div className="flex items-start justify-between gap-2">
+        <span
+          className="text-[10px] uppercase tracking-[0.18em] font-medium"
+          style={{ color: TOK.textMuted }}
+        >
+          {label}
+        </span>
+        {icon && (
+          <span
+            className="rounded-md p-1 flex items-center justify-center"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              color: TOK.textSecondary,
+            }}
+          >
+            {icon}
           </span>
-        </>
+        )}
+      </div>
+      <span
+        className="text-3xl font-semibold tabular-nums tracking-tight"
+        style={{
+          color: muted ? TOK.textMuted : TOK.textPrimary,
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {count.toLocaleString()}
+      </span>
+      {sublabel && (
+        <span
+          className="text-[11px] leading-snug truncate"
+          style={{ color: TOK.textSecondary }}
+          title={sublabel}
+        >
+          {sublabel}
+        </span>
       )}
     </div>
   );
@@ -1119,8 +1192,10 @@ function HeavyFilesList({
     <div
       className="rounded-xl p-4 flex flex-col gap-3"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${TOK.border}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider" style={{ color: TOK.textMuted }}>
@@ -1222,8 +1297,10 @@ function UntestedHotspotsPanel({
     <div
       className="rounded-xl p-5 flex flex-col gap-4"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${TOK.border}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1401,8 +1478,10 @@ function NearDuplicatesPanel({
     <div
       className="rounded-xl p-5 flex flex-col gap-4"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${TOK.border}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1661,8 +1740,10 @@ function TopFunctionsList({
     <div
       className="rounded-xl p-4 flex flex-col gap-3"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${TOK.border}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider" style={{ color: TOK.textMuted }}>

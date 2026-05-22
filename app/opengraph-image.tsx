@@ -1,6 +1,6 @@
 // OpenGraph share-card image (v0.75 polish track).
 //
-// When someone pastes a GitVision URL into Slack, Discord, Twitter,
+// When someone pastes a RepoBaron URL into Slack, Discord, Twitter,
 // LinkedIn, iMessage, etc., the platform fetches og:image and
 // renders a preview card. Without this file we either get nothing
 // or whatever the page's first <img> happens to be — neither lands
@@ -17,7 +17,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 
-export const alt = "GitVision — map any GitHub repo";
+export const alt = "RepoBaron — map any GitHub repo";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -85,7 +85,7 @@ export default function OpenGraphImage() {
               color: "#E8E8EE",
             }}
           >
-            GitVision
+            RepoBaron
           </div>
         </div>
 
@@ -127,7 +127,7 @@ export default function OpenGraphImage() {
             letterSpacing: "0.02em",
           }}
         >
-          gitvision.net
+          repobaron.com
         </div>
       </div>
     ),

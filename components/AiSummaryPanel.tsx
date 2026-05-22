@@ -56,13 +56,19 @@ export function AiSummaryPanel({ sessionId, snapshot }: Props) {
       aria-label="AI repository briefing"
     >
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">
+        <div className="flex items-baseline gap-2">
+          <h2
+            className="text-lg font-semibold tracking-tight"
+            style={{
+              color: TOK.textPrimary,
+              letterSpacing: "-0.015em",
+            }}
+          >
             AI briefing
           </h2>
           {summary && (
             <span
-              className="text-[10px] font-mono"
+              className="text-[11px] font-mono tabular-nums"
               style={{ color: TOK.textMuted }}
             >
               · {summary.model} ·{" "}
@@ -111,10 +117,16 @@ export function AiSummaryPanel({ sessionId, snapshot }: Props) {
 
       {summary && (
         <article
+          // Material card — same diagonal gradient + layered shadow
+          // recipe as the WorkspaceCard / featured-finding hero on
+          // landing. Makes the AI briefing read as "a printed page"
+          // rather than "a flat colored rectangle".
           className="rounded-xl p-6 flex flex-col gap-3"
           style={{
-            background: TOK.surface,
+            background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
             border: `1px solid ${TOK.border}`,
+            boxShadow:
+              "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
           }}
         >
           <div

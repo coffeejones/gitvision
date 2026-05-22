@@ -165,9 +165,11 @@ function MermaidSourceDisclosure({ source }: { source: string }) {
         <pre
           className="rounded-xl p-4 text-[12px] leading-relaxed font-mono overflow-x-auto"
           style={{
-            background: TOK.surface,
+            background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
             border: `1px solid ${TOK.border}`,
             color: TOK.textPrimary,
+            boxShadow:
+              "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
           }}
         >
           {source}

@@ -1,6 +1,6 @@
 # GitHub App end-to-end validation — 2026-05-15
 
-_Records the first real-world run of the GitVision PR-bot from webhook
+_Records the first real-world run of the RepoBaron PR-bot from webhook
 delivery to posted comment. Captured immediately after the run so the
 trail is concrete, not reconstructed. Skitse:
 `github-app-skeleton-2026-05.md`._
@@ -11,18 +11,18 @@ After Commits 1-8 of the skeleton implementation shipped to production
 (branch `main`, commit `a2c6acc`), we registered the GitHub App on
 github.com and ran a single end-to-end test:
 
-- **App**: `GitVision-PR` (registered on `coffeejones` personal account)
+- **App**: `RepoBaron-PR` (registered on `coffeejones` personal account)
 - **Permissions**: Contents: Read, Pull requests: Read & Write, Metadata: Read
 - **Events subscribed**: Pull request, Installation
-- **Webhook URL**: `https://gitvision.net/api/github/webhook`
-- **Repo installed on**: `coffeejones/gitvisionTest` (public, freshly created)
+- **Webhook URL**: `https://repobaron.com/api/github/webhook`
+- **Repo installed on**: `coffeejones/repobaronTest` (public, freshly created)
 - **Test PR**: branch `test-pr-1` → `main`, modified `hello.py::is_even`
   (complexity 1 → 4, Δ+3)
 
 ## Verifying the route was live before opening the PR
 
 ```
-curl -X POST https://gitvision.net/api/github/webhook
+curl -X POST https://repobaron.com/api/github/webhook
 → HTTP 400 "Missing required webhook headers"
 ```
 
@@ -34,7 +34,7 @@ rejecting requests without `X-Hub-Signature-256` and `X-GitHub-Event`.
 
 Two webhooks fired during install (BEFORE the test PR opened):
 
-1. `installation.created` — when the app was installed on `gitvisionTest`
+1. `installation.created` — when the app was installed on `repobaronTest`
 2. `ping` — GitHub's standard webhook-config verification
 
 Both returned `200 OK` in ~130ms. The handler's filter for installation
@@ -44,7 +44,7 @@ ones).
 
 Then the test PR fired the actual pipeline:
 
-3. `pull_request.opened` — analyzed `coffeejones/gitvisionTest#1`
+3. `pull_request.opened` — analyzed `coffeejones/repobaronTest#1`
 
 ## End-to-end pipeline output
 
@@ -72,7 +72,7 @@ Total wall-clock from PR opened to comment posted: <60s on this small repo.
 ## Posted comment (as it appeared on the PR)
 
 ```markdown
-GitVision Review
+RepoBaron Review
 
 Diff summary: 1 file changed · functions: 1 modified · net complexity +3
 
@@ -82,7 +82,7 @@ our rules engine.
 Full analysis ↗ · Signals computed deterministically — no LLM in this comment
 ```
 
-Posted by user `gitvision-pr[bot]` (the installation-authenticated
+Posted by user `repobaron-pr[bot]` (the installation-authenticated
 identity GitHub assigns), with our invisible HTML marker comment
 `<!-- gitvision:pr-review v1 -->` at the top so future `synchronize`
 events can find-or-update this comment instead of stacking duplicates.
@@ -142,7 +142,7 @@ beta users, we should ALSO observe (each takes <10 min):
    pipeline doesn't have implicit Python assumptions.
 5. **Bot-author skip**: open a PR authored by a known bot (e.g.
    dependabot fork-style); verify our filter skips it cleanly.
-6. **Uninstall**: uninstall the app from `gitvisionTest`; verify
+6. **Uninstall**: uninstall the app from `repobaronTest`; verify
    `installation.deleted` fired and the two sessions we created
    (`base of PR #1` + `PR #1`) got GC'd.
 
@@ -155,7 +155,7 @@ beta users.
 A small open question this run surfaced: the "Nothing notable ✅"
 comment is concise (3 lines + footer). On a small PR that's right.
 On a substantive PR where we LOOKED HARD and found nothing, we might
-want richer reassurance — e.g. "GitVision analyzed 47 functions
+want richer reassurance — e.g. "RepoBaron analyzed 47 functions
 across 12 files. Top function complexity didn't change. No new
 untested branches. ✅"
 

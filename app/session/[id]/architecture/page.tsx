@@ -67,7 +67,44 @@ export default async function ArchitectureRoute({
     : null;
 
   return (
-    <main className="px-8 py-8 flex flex-col gap-4 max-w-7xl mx-auto w-full">
+    <main className="px-8 pt-12 pb-16 flex flex-col gap-8 max-w-7xl mx-auto w-full">
+      <header className="flex flex-col gap-3">
+        <span
+          className="text-[10px] uppercase tracking-[0.18em] font-medium"
+          style={{ color: TOK.textMuted }}
+        >
+          Architecture
+        </span>
+        <h1
+          className="text-2xl sm:text-3xl font-semibold tracking-tight"
+          style={{
+            color: TOK.textPrimary,
+            letterSpacing: "-0.02em",
+            lineHeight: 1.1,
+          }}
+        >
+          Auto-extracted class diagrams.
+        </h1>
+        <p
+          className="text-sm max-w-2xl leading-relaxed"
+          style={{ color: TOK.textSecondary }}
+        >
+          Classes, interfaces, and method relationships pulled from
+          your repo&apos;s AST. JavaScript &amp; TypeScript today;
+          Python, Go, Java, C#, PHP, Ruby roll out in the next phase.
+          Mermaid output pastes into{" "}
+          <a
+            href="https://mermaid.live"
+            target="_blank"
+            rel="noopener"
+            className="transition hover:underline"
+            style={{ color: TOK.textPrimary }}
+          >
+            mermaid.live
+          </a>
+          , any README, or any Markdown viewer with Mermaid support.
+        </p>
+      </header>
       <div id="screenshot-target" className="flex flex-col gap-4">
         <ArchitecturePanel
           diagram={diagram}
@@ -76,21 +113,6 @@ export default async function ArchitectureRoute({
           scopeOptions={scopeOptions}
           currentScope={currentScope}
         />
-        <p className="text-xs" style={{ color: TOK.textMuted }}>
-          Class extraction currently covers JavaScript &amp; TypeScript.
-          Python, Go, Java, C#, PHP, Ruby roll out in the next phase.
-          Output is Mermaid `classDiagram` syntax — paste into{" "}
-          <a
-            href="https://mermaid.live"
-            target="_blank"
-            rel="noopener"
-            className="transition hover:underline"
-            style={{ color: TOK.textSecondary }}
-          >
-            mermaid.live
-          </a>
-          , a README, or any Markdown viewer with Mermaid support.
-        </p>
       </div>
     </main>
   );

@@ -23,17 +23,22 @@ export function BusFactorPanel({ hotspots }: { hotspots: FileHotspot[] }) {
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-xl p-5"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${TOK.border}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3
-            className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-            style={{ color: TOK.textSecondary }}
+            className="text-base font-semibold tracking-tight"
+            style={{
+              color: TOK.textPrimary,
+              letterSpacing: "-0.01em",
+            }}
           >
             Knowledge concentration
           </h3>

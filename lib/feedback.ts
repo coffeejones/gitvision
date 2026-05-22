@@ -5,7 +5,7 @@
 // Design choices:
 //   - File storage matches the sessions + jobs pattern: write to disk,
 //     atomic temp+rename. Survives Railway redeploys, no DB needed.
-//   - Optional webhook (env: GITVISION_FEEDBACK_WEBHOOK_URL) — when set,
+//   - Optional webhook (env: REPOBARON_FEEDBACK_WEBHOOK_URL) — when set,
 //     each submission also POSTs a formatted payload so the maintainer
 //     gets a real-time ping. File storage is the source of truth; the
 //     webhook is fire-and-forget convenience.
@@ -49,7 +49,7 @@ export interface FeedbackEntry extends FeedbackInput {
 
 function feedbackDir(): string {
   const dataDir =
-    process.env.GITVISION_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
+    process.env.REPOBARON_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
   return path.join(dataDir, "feedback");
 }
 
@@ -99,7 +99,7 @@ export async function submitFeedback(
   };
   await atomicWriteJson(feedbackPath(entry.id), entry);
 
-  const webhookUrl = process.env.GITVISION_FEEDBACK_WEBHOOK_URL;
+  const webhookUrl = process.env.REPOBARON_FEEDBACK_WEBHOOK_URL;
   let webhookForwarded = false;
   if (webhookUrl) {
     try {

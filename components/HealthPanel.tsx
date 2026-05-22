@@ -130,13 +130,19 @@ export function HealthPanel({ sessionId, snapshot }: Props) {
       aria-label="Repository health check"
     >
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.2em]">
+        <div className="flex items-baseline gap-2">
+          <h2
+            className="text-lg font-semibold tracking-tight"
+            style={{
+              color: TOK.textPrimary,
+              letterSpacing: "-0.015em",
+            }}
+          >
             Health check
           </h2>
           {analysis && (
             <span
-              className="text-[10px] font-mono"
+              className="text-[11px] font-mono tabular-nums"
               style={{ color: TOK.textMuted }}
             >
               · {analysis.model} ·{" "}
@@ -246,25 +252,33 @@ function HealthColumn({
   return (
     <div
       id={anchorId}
-      className="rounded-xl p-4 flex flex-col gap-3"
+      // Material card recipe — diagonal gradient + 1px ambient shadow,
+      // matches the AI briefing + Packages tiles. The accent-tinted bar
+      // above the heading is now a subtle 2px top border instead of an
+      // inline pill, so each column reads as "section with severity-
+      // hinted edge" rather than "card with a colored label sticker".
+      className="rounded-xl p-5 flex flex-col gap-3 relative overflow-hidden"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${TOK.border}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
         scrollMarginTop: "5rem",
       }}
     >
-      <div className="flex items-center gap-2">
-        <span
-          className="h-1 w-5 rounded-full"
-          style={{ background: accent }}
-        />
-        <h3
-          className="text-[11px] font-semibold uppercase tracking-[0.15em]"
-          style={{ color: accent }}
-        >
-          {label}
-        </h3>
-      </div>
+      <span
+        className="absolute top-0 left-5 right-5 h-px"
+        style={{ background: accent }}
+      />
+      <h3
+        className="text-base font-semibold tracking-tight"
+        style={{
+          color: TOK.textPrimary,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {label}
+      </h3>
 
       <p
         className="text-[13px] leading-relaxed"

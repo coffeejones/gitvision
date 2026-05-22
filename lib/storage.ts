@@ -1,6 +1,6 @@
 // File-based session storage.
 // Local dev: sessions live in `.gitvision/sessions/<id>.json` relative to project root.
-// Production: set GITVISION_DATA_DIR to a persistent volume path (e.g. `/data` on Railway)
+// Production: set REPOBARON_DATA_DIR to a persistent volume path (e.g. `/data` on Railway)
 // so sessions survive redeploys and container restarts.
 
 import { promises as fs } from "node:fs";
@@ -10,12 +10,12 @@ import { atomicWriteJson } from "./atomicWrite";
 import type { Session, SessionSummary, AnalysisSnapshot } from "./types";
 
 // Read env lazily on each storage call so tests can swap
-// GITVISION_DATA_DIR per-test without module-import timing dances —
+// REPOBARON_DATA_DIR per-test without module-import timing dances —
 // matches the pattern lib/jobs.ts already uses. Negligible perf hit
 // (couple of path.join calls per operation).
 function storeDir(): string {
   const dataDir =
-    process.env.GITVISION_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
+    process.env.REPOBARON_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
   return path.join(dataDir, "sessions");
 }
 
@@ -33,8 +33,15 @@ export async function createSession(params: {
   initialSnapshot: AnalysisSnapshot;
   /** Anonymous owner-id supplied by the client via the X-Owner-Id header
    *  (v0.26+). Optional for backward compat with internal callers; in
-   *  practice every session created through the API now carries one. */
+   *  practice every session created through the API now carries one.
+   *  Kept on user-owned sessions too so the same browser can claim
+   *  pre-login sessions after sign-in. */
   ownerId?: string;
+  /** Better Auth user id (v0.76+). Set when the session is created by
+   *  a logged-in caller — that's the strong ownership claim used by
+   *  authorization checks. Workspace listings prefer userId matches
+   *  over ownerId matches when both exist. */
+  userId?: string;
   /** GitHub App installation that created this session (Commit 8+).
    *  Set only by the PR-bot pipeline so installation.deleted can GC
    *  exactly the right sessions. Workspace-created sessions leave
@@ -48,6 +55,7 @@ export async function createSession(params: {
     name: params.name,
     repoUrl: params.repoUrl,
     ownerId: params.ownerId,
+    userId: params.userId,
     installationId: params.installationId,
     createdAt: now,
     updatedAt: now,
@@ -103,6 +111,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
           updatedAt: session.updatedAt,
           snapshotCount: session.snapshots.length,
           ownerId: session.ownerId,
+          userId: session.userId,
         });
       } catch {
         // skip corrupted session file

@@ -12,7 +12,7 @@ import { loadWorkspacePackages } from "../codeAnalysis/workspaces";
 let tmp: string;
 
 beforeEach(async () => {
-  tmp = await fs.mkdtemp(path.join(os.tmpdir(), "gitvision-ws-"));
+  tmp = await fs.mkdtemp(path.join(os.tmpdir(), "repobaron-ws-"));
 });
 afterEach(async () => {
   await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});

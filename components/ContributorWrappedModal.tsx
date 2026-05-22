@@ -255,7 +255,7 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
               letterSpacing: "-0.01em",
             }}
           >
-            GitVision · Wrapped
+            RepoBaron · Wrapped
           </span>
         </div>
         <span
@@ -420,8 +420,8 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
           position: "relative",
         }}
       >
-        <span>gitvision.net</span>
-        <span>#GitVisionWrapped</span>
+        <span>repobaron.com</span>
+        <span>#RepoBaronWrapped</span>
       </div>
     </div>
   );
@@ -526,7 +526,7 @@ export function ContributorWrappedModal({ snapshot, open, onClose }: Props) {
       });
       const safe = displayName.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
       const link = document.createElement("a");
-      link.download = `gitvision-wrapped-${snapshot.repo.name}-${safe}.png`;
+      link.download = `repobaron-wrapped-${snapshot.repo.name}-${safe}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {

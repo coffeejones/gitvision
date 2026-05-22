@@ -1,6 +1,6 @@
-# gitvision-eval
+# repobaron-eval
 
-A/B evaluation harness for GitVision's MCP server. Same prompt, same model,
+A/B evaluation harness for RepoBaron's MCP server. Same prompt, same model,
 same target repo — the only variable is whether the MCP is connected.
 
 The output isn't a marketing artifact. It's **internal roadmap input**:
@@ -10,7 +10,7 @@ or rebuild.
 
 ## Design choices
 
-This is a deliberately thinner companion to the previous `gitvision-eval`
+This is a deliberately thinner companion to the previous `repobaron-eval`
 external repo. Three differences worth knowing about:
 
 1. **Tightened identifier extraction.** Designed around an existence
@@ -63,7 +63,7 @@ eval/
 
 
 ```bash
-# From the gitvision repo root
+# From the repobaron repo root
 npm install
 npx tsc -p mcp/tsconfig.json
 node mcp/dist/mcp/server.js   # smoke test — Ctrl+C
@@ -89,8 +89,8 @@ pip install -e .
 cp .env.example .env
 # Edit .env:
 #   - ANTHROPIC_API_KEY
-#   - GITHUB_TOKEN  (gitVision needs it to fetch repos)
-#   - GITVISION_REPO_PATH  (absolute path to this gitvision checkout)
+#   - GITHUB_TOKEN  (repobaron needs it to fetch repos)
+#   - GITVISION_REPO_PATH  (absolute path to this repobaron checkout)
 ```
 
 

@@ -14,9 +14,9 @@
 import { ArrowUpRight, GitPullRequest, ShieldCheck } from "lucide-react";
 import { TOK } from "@/lib/theme";
 
-const INSTALL_URL = "https://github.com/apps/gitvision-pr";
+const INSTALL_URL = "https://github.com/apps/repobaron-pr";
 const LEARN_MORE_URL =
-  "https://github.com/coffeejones/gitvision#pr-bot-github-app";
+  "https://github.com/coffeejones/repobaron#pr-bot-github-app";
 
 export function PRBotCallout() {
   return (
@@ -32,7 +32,7 @@ export function PRBotCallout() {
             className="text-xs uppercase tracking-[0.18em] font-medium"
             style={{ color: TOK.textMuted }}
           >
-            GitVision PR-bot · GitHub App · private beta
+            RepoBaron PR-bot · GitHub App · private beta
           </span>
         </div>
         <h2
@@ -45,7 +45,7 @@ export function PRBotCallout() {
           className="text-sm sm:text-base max-w-3xl leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          GitVision-PR is a GitHub App that runs the same signal layer
+          RepoBaron-PR is a GitHub App that runs the same signal layer
           as the analysis above — but on every new pull request,
           automatically. One grounded review comment per PR. No LLM
           in the comment, no token cost, no surprise bills.
@@ -72,7 +72,7 @@ export function PRBotCallout() {
             Sample comment on a PR
           </div>
           <div style={{ color: TOK.textPrimary }}>
-            <strong>GitVision Review</strong>
+            <strong>RepoBaron Review</strong>
           </div>
           <div>
             Diff summary: 3 files changed · functions: 5 added, 2
@@ -142,7 +142,7 @@ export function PRBotCallout() {
                 color: TOK.accentOn,
               }}
             >
-              Install GitVision-PR
+              Install RepoBaron-PR
               <ArrowUpRight size={14} />
             </a>
             <a

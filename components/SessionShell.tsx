@@ -5,7 +5,7 @@
 // Replaces the v0.3-era horizontal tab strip with a persistent left
 // sidebar. Each tab is now its own route under /session/[id]/<tab>;
 // the sidebar is the navigation. The change is bigger than it sounds:
-// it moves GitVision from "dashboard you scroll" to "workspace you
+// it moves RepoBaron from "dashboard you scroll" to "workspace you
 // inhabit", which is the right mental model for a tool you spend 20
 // minutes inside investigating a codebase.
 //
@@ -55,7 +55,7 @@ interface NavItem {
    *  vulnerable / deprecated packages exist. */
   hasIssueBadge?: boolean;
   /** Accent dot for "new feature lives here" — used for the PRs
-   *  tab to surface the GitVision PR-bot callout that sits below
+   *  tab to surface the RepoBaron PR-bot callout that sits below
    *  the historical PR-flow analysis. Discrete; not an alert. */
   hasNewFeatureBadge?: boolean;
   /** Subtle "refresh me" hint for tabs whose data isn't on the
@@ -306,7 +306,7 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
         <span
           className="h-1.5 w-1.5 rounded-full shrink-0"
           style={{ background: TOK.accent }}
-          title="New: GitVision PR-bot available"
+          title="New: RepoBaron PR-bot available"
         />
       )}
       {item.count !== undefined && (

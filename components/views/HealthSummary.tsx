@@ -287,15 +287,18 @@ function HealthTile({
     (isInteractive
       ? " group hover:brightness-110 cursor-pointer"
       : "");
-  // Diagonal gradient matches SinceLastVisit + HeadlineFinding so the
-  // panels read as one visual family. Status color tints the upper-left,
-  // fading to the deep page bg in the lower-right. p-4 padding matches
-  // QuickLookCard so the two strips read as the same card style.
+  // Severity-tinted diagonal gradient + the same 1px ambient + lift
+  // shadow recipe as the rest of the page's material cards. Matches
+  // SinceLastVisit + HeadlineFinding so the panels read as one
+  // visual family. Status colour tints upper-left, fading to the
+  // gradient-elevated surface in the lower-right.
   const inlineStyle = {
-    background: `linear-gradient(135deg, ${style.bg} 0%, transparent 70%), ${TOK.surface}`,
+    background: `linear-gradient(135deg, ${style.bg} 0%, transparent 70%), linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
     border: `1px solid ${style.border}`,
     color: style.fg,
     minHeight: 96,
+    boxShadow:
+      "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
   };
 
   if (isInteractive) {

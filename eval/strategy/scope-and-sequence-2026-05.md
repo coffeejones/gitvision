@@ -7,7 +7,7 @@ to look right._
 
 ## The vision (the destination, not v1)
 
-GitVision is **the codebase intelligence layer for teams where AI
+RepoBaron is **the codebase intelligence layer for teams where AI
 generates code at scale.** Three properties together that no current
 competitor offers:
 
@@ -23,7 +23,7 @@ competitor offers:
 
 Long-term narrative for external audiences:
 
-> *"GitVision is the codebase intelligence layer for teams where AI
+> *"RepoBaron is the codebase intelligence layer for teams where AI
 > generates code at scale. Before you open a PR: we tell you what your
 > AI-generated change collides with. After PR opens: we show reviewers
 > the structural facts AI PR-bots miss. We're not another LLM-on-diff
@@ -49,7 +49,7 @@ Long-term narrative for external audiences:
 
 **Primary surfaces:**
 - **GitHub App** (PR-bot) for distribution + revenue motion
-- **gitvision.net workspace** (existing, polished) for deep-dive +
+- **repobaron.com workspace** (existing, polished) for deep-dive +
   cross-PR view
 - Both surfaces share the same signals-pipeline
 
@@ -63,7 +63,7 @@ Long-term narrative for external audiences:
 **What we polish to ship-bar:**
 - PR comment format (single primary anchor — see open question #3)
 - Signal quality across all 8 languages (eval-driven)
-- gitvision.net auth + per-user state
+- repobaron.com auth + per-user state
 - Pricing + plan structure (see open question #2)
 - License decision (PolyForm vs. open-core — see open question #1)
 
@@ -131,7 +131,7 @@ ideally 2-3 sample comments drafted, validated against "would I as a
 reviewer actually click 'see full analysis'?".
 
 ### Q4 — Differentiating signals
-We need to enumerate explicitly which signals GitVision has that
+We need to enumerate explicitly which signals RepoBaron has that
 CodeRabbit / Greptile / Anthropic / DeepSource don't. Candidates:
 - Blast radius across existing call graph (we have this)
 - Duplicate-utility detection at semantic level (need to verify ours)
@@ -163,5 +163,5 @@ recon doc and reconsider direction.
 _Related artifacts:_
 - `eval/recon/competitors-2026-05.md` — competitive landscape this
   plan responds to
-- `eval/baseline/p1-p2-cells.json` — eval data underpinning "GitVision
+- `eval/baseline/p1-p2-cells.json` — eval data underpinning "RepoBaron
   delivers grounded answers" claim

@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { parseRepoUrl } from "@/lib/github";
 import { createJob, processJob } from "@/lib/jobs";
-import { OWNER_ID_HEADER } from "@/lib/ownerId";
+import { requireSessionOwnership } from "@/lib/ownership";
 import {
   RATE_LIMITS,
   checkRateLimit,
@@ -42,20 +42,13 @@ export async function POST(req: Request, ctx: Ctx) {
   const session = await getSession(id);
   if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Refresh creates a new snapshot — that's a mutation. Enforce
-  // ownership unless the session is legacy (no ownerId).
-  if (session.ownerId) {
-    const callerOwnerId = req.headers.get(OWNER_ID_HEADER);
-    if (callerOwnerId !== session.ownerId) {
-      return NextResponse.json(
-        {
-          error:
-            "This session belongs to a different browser. Open the original tab to refresh it, or create a new analysis.",
-        },
-        { status: 403 }
-      );
-    }
-  }
+  // Refresh creates a new snapshot — that's a mutation. Use the shared
+  // ownership helper so we honour both the userId (account) and ownerId
+  // (cookie) claims uniformly with the other mutating routes. Replaces
+  // an earlier inline ownerId-only check that would refuse refreshes
+  // from the legitimate account owner on user-owned sessions (v0.76+).
+  const denied = await requireSessionOwnership(session, req);
+  if (denied) return denied;
 
   const parsed = parseRepoUrl(session.repoUrl);
   if (!parsed) {

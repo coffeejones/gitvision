@@ -1,5 +1,5 @@
 // Layer B of extraction testing: run the same invariants from
-// invariants.test.ts against real source code (gitVision's own lib/).
+// invariants.test.ts against real source code (repobaron's own lib/).
 //
 // Why "lib/"? It's the largest piece of TypeScript we own, hits multiple
 // plugins (javascript), exercises cross-file resolution against tsconfig
@@ -34,7 +34,7 @@ beforeAll(async () => {
   graph = result.codeGraph;
 }, 30_000);
 
-describe("real-world invariants on gitVision's own lib/", () => {
+describe("real-world invariants on repobaron's own lib/", () => {
   it("graph is non-empty (sanity)", () => {
     // If this fails, analyzeDirectory didn't find any TS — config issue.
     expect(graph.functions.length).toBeGreaterThan(50);

@@ -28,7 +28,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const session = await getSession(id);
   if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const denied = requireSessionOwnership(session, req);
+  const denied = await requireSessionOwnership(session, req);
   if (denied) return denied;
   await deleteSession(id);
   return NextResponse.json({ ok: true });
@@ -40,7 +40,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const session = await getSession(id);
   if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const denied = requireSessionOwnership(session, req);
+  const denied = await requireSessionOwnership(session, req);
   if (denied) return denied;
   const body = await req.json().catch(() => null);
   const parsed = PatchSchema.safeParse(body);

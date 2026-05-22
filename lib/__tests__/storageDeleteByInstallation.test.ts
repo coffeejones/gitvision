@@ -25,8 +25,8 @@ function minimalSnapshot(): AnalysisSnapshot {
 }
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "gitvision-storage-"));
-  vi.stubEnv("GITVISION_DATA_DIR", tmpDir);
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "repobaron-storage-"));
+  vi.stubEnv("REPOBARON_DATA_DIR", tmpDir);
 });
 
 afterEach(async () => {
@@ -201,14 +201,14 @@ describe("listSessions — bot-session visibility filter", () => {
     // bot's analysis sessions in "Your sessions". listSessions must
     // never surface them in the first place.
     await createSession({
-      repoUrl: "https://github.com/coffeejones/gitvisionTest",
-      name: "coffeejones/gitvisionTest @ f5b003b5 (PR #1)",
+      repoUrl: "https://github.com/coffeejones/repobaronTest",
+      name: "coffeejones/repobaronTest @ f5b003b5 (PR #1)",
       initialSnapshot: minimalSnapshot(),
       installationId: 99,
     });
     await createSession({
-      repoUrl: "https://github.com/coffeejones/gitvisionTest",
-      name: "coffeejones/gitvisionTest @ a1b2c3d4 (base of PR #1)",
+      repoUrl: "https://github.com/coffeejones/repobaronTest",
+      name: "coffeejones/repobaronTest @ a1b2c3d4 (base of PR #1)",
       initialSnapshot: minimalSnapshot(),
       installationId: 99,
     });
@@ -238,7 +238,7 @@ describe("listSessions — bot-session visibility filter", () => {
       ownerId: "anon-uuid",
     });
     await createSession({
-      repoUrl: "https://github.com/coffeejones/gitvisionTest",
+      repoUrl: "https://github.com/coffeejones/repobaronTest",
       name: "bot-1",
       initialSnapshot: minimalSnapshot(),
       installationId: 99,
@@ -250,7 +250,7 @@ describe("listSessions — bot-session visibility filter", () => {
       ownerId: "anon-uuid",
     });
     await createSession({
-      repoUrl: "https://github.com/coffeejones/gitvisionTest",
+      repoUrl: "https://github.com/coffeejones/repobaronTest",
       name: "bot-2",
       initialSnapshot: minimalSnapshot(),
       installationId: 99,
@@ -274,7 +274,7 @@ describe("listSessions — bot-session visibility filter", () => {
       // no ownerId, no installationId — pre-v0.26 workspace session
     });
     await createSession({
-      repoUrl: "https://github.com/coffeejones/gitvisionTest",
+      repoUrl: "https://github.com/coffeejones/repobaronTest",
       name: "bot-no-owner",
       initialSnapshot: minimalSnapshot(),
       installationId: 99,

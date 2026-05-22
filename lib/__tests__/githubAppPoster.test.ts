@@ -65,7 +65,7 @@ const INPUT = {
   owner: "alice",
   repo: "repo",
   prNumber: 7,
-  body: `${COMMENT_MARKER}\n## GitVision Review\nblah`,
+  body: `${COMMENT_MARKER}\n## RepoBaron Review\nblah`,
 };
 
 beforeEach(() => {
@@ -126,7 +126,7 @@ describe("postPrComment — existing comment → update", () => {
         {
           id: 22,
           body: `${COMMENT_MARKER}\nold body`,
-          user: { login: "gitvision[bot]" },
+          user: { login: "repobaron[bot]" },
         },
         { id: 33, body: "other", user: { login: "bob" } },
       ],
@@ -155,7 +155,7 @@ describe("postPrComment — existing comment → update", () => {
     many.push({
       id: 999,
       body: `${COMMENT_MARKER}\nour comment`,
-      user: { login: "gitvision[bot]" },
+      user: { login: "repobaron[bot]" },
     });
     const octo = makeOctokit({
       existingComments: many,

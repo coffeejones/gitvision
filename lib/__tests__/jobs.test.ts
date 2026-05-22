@@ -18,9 +18,9 @@ import os from "node:os";
 // jobsDir() helper picks it up. Each test resets the dir to a clean slate.
 const TMP_ROOT = path.join(
   os.tmpdir(),
-  `gitvision-jobs-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  `repobaron-jobs-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 );
-process.env.GITVISION_DATA_DIR = TMP_ROOT;
+process.env.REPOBARON_DATA_DIR = TMP_ROOT;
 
 import {
   createJob,

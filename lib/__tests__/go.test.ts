@@ -146,7 +146,7 @@ describe("goPlugin.prepareForRepo", () => {
   let tmp: string;
 
   beforeEach(async () => {
-    tmp = await fs.mkdtemp(path.join(os.tmpdir(), "gitvision-go-"));
+    tmp = await fs.mkdtemp(path.join(os.tmpdir(), "repobaron-go-"));
   });
   afterEach(async () => {
     await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});

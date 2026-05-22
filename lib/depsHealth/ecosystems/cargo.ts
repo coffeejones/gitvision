@@ -83,7 +83,7 @@ async function fetchCargoMeta(
     const res = await fetch(`https://crates.io/api/v1/crates/${encodeURIComponent(name)}`, {
       headers: {
         // crates.io requires a descriptive User-Agent
-        "User-Agent": "GitVision (https://github.com/coffeejones/gitvision)",
+        "User-Agent": "RepoBaron (https://github.com/coffeejones/repobaron)",
         Accept: "application/json",
       },
     });

@@ -16,12 +16,12 @@ import os from "node:os";
 // feedbackDir() helper picks up our temp dir.
 const TMP_ROOT = path.join(
   os.tmpdir(),
-  `gitvision-feedback-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  `repobaron-feedback-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 );
-process.env.GITVISION_DATA_DIR = TMP_ROOT;
+process.env.REPOBARON_DATA_DIR = TMP_ROOT;
 // Make sure no webhook gets called during tests even if the dev shell
-// has GITVISION_FEEDBACK_WEBHOOK_URL set.
-delete process.env.GITVISION_FEEDBACK_WEBHOOK_URL;
+// has REPOBARON_FEEDBACK_WEBHOOK_URL set.
+delete process.env.REPOBARON_FEEDBACK_WEBHOOK_URL;
 
 import { submitFeedback } from "../feedback";
 import {
@@ -146,12 +146,12 @@ describe("submitFeedback", () => {
       type: "feature",
       description: "would love a keyboard shortcut for refresh",
       email: "test@example.com",
-      pageUrl: "https://gitvision.net/session/abc123",
+      pageUrl: "https://repobaron.com/session/abc123",
       sessionId: "abc123",
     });
     const entry = await readEntry(result.id);
     expect(entry.email).toBe("test@example.com");
-    expect(entry.pageUrl).toBe("https://gitvision.net/session/abc123");
+    expect(entry.pageUrl).toBe("https://repobaron.com/session/abc123");
     expect(entry.sessionId).toBe("abc123");
   });
 

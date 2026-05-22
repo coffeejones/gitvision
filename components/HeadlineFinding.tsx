@@ -160,9 +160,14 @@ export function HeadlineFinding({ headline, sessionId }: Props) {
   const containerClass =
     "rounded-xl p-6 flex flex-col gap-5 transition" +
     (href ? " group hover:brightness-110" : "");
+  // Severity-tinted gradient + the same 1px ambient + lift shadow
+  // recipe as the rest of the page's material cards. The severity
+  // gradient does the colour; the shadow stack does the depth.
   const containerStyle = {
-    background: `linear-gradient(135deg, ${style.bg} 0%, transparent 55%)`,
+    background: `linear-gradient(135deg, ${style.bg} 0%, transparent 55%), ${TOK.surface}`,
     border: `1px solid ${style.ring}`,
+    boxShadow:
+      "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
   };
 
   if (href) {

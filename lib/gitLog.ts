@@ -108,7 +108,7 @@ export async function analyzeRepoHistory(
   repo: string
 ): Promise<GitLogResult> {
   const started = Date.now();
-  const tmpDir = path.join(os.tmpdir(), `gitvision-git-${nanoid(8)}`);
+  const tmpDir = path.join(os.tmpdir(), `repobaron-git-${nanoid(8)}`);
   const cloneUrl = `https://github.com/${owner}/${repo}.git`;
 
   try {

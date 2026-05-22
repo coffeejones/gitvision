@@ -94,8 +94,10 @@ export function SecretFindingsPanel({ result }: Props) {
       <div
         className="rounded-xl overflow-hidden"
         style={{
-          background: TOK.surface,
+          background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
           border: `1px solid ${TOK.rose}33`,
+          boxShadow:
+            "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
         }}
       >
         {result.findings.map((f, i) => (

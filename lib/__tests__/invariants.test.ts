@@ -4,7 +4,7 @@
 // Two ways to read this file:
 //   1. As regression coverage — break an invariant when refactoring
 //      the extractor and these tests catch it.
-//   2. As a contract — the rest of gitVision (blast_radius,
+//   2. As a contract — the rest of repobaron (blast_radius,
 //      find_duplicates, signals, untested_hotspots) downstream of
 //      buildCodeGraph relies on these properties. If they don't hold,
 //      every consumer is suspect.

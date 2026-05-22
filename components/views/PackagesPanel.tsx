@@ -89,7 +89,7 @@ export function PackagesPanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
         title="No package manifests detected in this repo"
         body={
           <>
-            GitVision reads{" "}
+            RepoBaron reads{" "}
             <code className="font-mono">package.json</code>,{" "}
             <code className="font-mono">Cargo.toml</code>,{" "}
             <code className="font-mono">pyproject.toml</code>, and{" "}
@@ -103,54 +103,47 @@ export function PackagesPanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Summary bar */}
-      <div
-        className="rounded-xl p-4 flex items-center flex-wrap gap-x-6 gap-y-2"
-        style={{
-          background: TOK.surface,
-          border: `1px solid ${TOK.border}`,
-        }}
-      >
-        <div className="flex items-center gap-2">
-          <span
-            className="text-[11px] uppercase tracking-[0.18em] font-medium inline-flex items-center gap-1.5"
-            style={{ color: TOK.textMuted }}
-          >
-            Across
-            <HelpHint
-              anchor="dep-health"
-              label="What outdated, deprecated, vulnerable, and abandoned mean"
-            />
-          </span>
-          <span
-            className="text-sm font-semibold tabular-nums"
-            style={{ color: TOK.textPrimary }}
-          >
-            {healths.length}
-          </span>
-          <span className="text-sm" style={{ color: TOK.textSecondary }}>
-            ecosystem{healths.length === 1 ? "" : "s"}
-            {": "}
-            {healths.map((h) => ecosystemLabel(h.ecosystem)).join(", ")}
-          </span>
-        </div>
-        <div className="h-5 w-px" style={{ background: TOK.border }} />
-        <StatPill label="packages" count={totals.packages} />
-        <StatPill
-          label="vulnerable"
+    <div className="flex flex-col gap-6">
+      {/* Summary tiles — four-up stat grid (packages, vulnerable,
+       *  outdated, deprecated). Each tile carries the same material
+       *  recipe as WorkspaceCard: diagonal gradient + layered shadow
+       *  so the row reads as "objects on the page" not "row of
+       *  spreadsheet cells". Severity counts adopt their colour at
+       *  rest so the eye lands on red before green even reads. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatTile
+          label="Packages"
+          count={totals.packages}
+          sublabel={`${healths.length} ecosystem${healths.length === 1 ? "" : "s"}: ${healths.map((h) => ecosystemLabel(h.ecosystem)).join(", ")}`}
+        />
+        <StatTile
+          label="Vulnerable"
           count={totals.vulnerable}
           color={TOK.rose}
+          colorBg={TOK.roseSoft}
+          icon={<ShieldAlert size={13} />}
         />
-        <StatPill
-          label="outdated"
+        <StatTile
+          label="Outdated"
           count={totals.outdated}
           color={TOK.amber}
+          colorBg={TOK.amberSoft}
+          icon={<Clock size={13} />}
         />
-        <StatPill
-          label="deprecated"
+        <StatTile
+          label="Deprecated"
           count={totals.deprecated}
           color={TOK.amber}
+          colorBg={TOK.amberSoft}
+          icon={<AlertTriangle size={13} />}
+        />
+      </div>
+
+      {/* Help affordance — moved out of the summary bar prose. */}
+      <div className="flex items-center justify-end -mt-3">
+        <HelpHint
+          anchor="dep-health"
+          label="What outdated, deprecated, vulnerable, and abandoned mean"
         />
       </div>
 
@@ -186,33 +179,76 @@ export function PackagesPanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
   );
 }
 
-// ------------------- Stat pill -------------------
+// ------------------- Stat tile -------------------
 
-function StatPill({
+/** Apple-style summary tile. Large number leads, label sits below
+ *  in caps. Severity tiles (vulnerable / outdated / deprecated) get
+ *  their colour applied to both the count (so the eye lands on red
+ *  before green) and a small icon chip in the top-right. Material
+ *  recipe: diagonal gradient + 1px ambient shadow, same as the
+ *  WorkspaceCard. Zero-count severity tiles dim back to textMuted
+ *  so they don't shout when there's nothing to act on. */
+function StatTile({
   label,
   count,
+  sublabel,
   color,
+  colorBg,
+  icon,
 }: {
   label: string;
   count: number;
+  sublabel?: string;
   color?: string;
+  colorBg?: string;
+  icon?: React.ReactNode;
 }) {
   const isZero = count === 0;
   const activeColor = color && !isZero ? color : TOK.textPrimary;
   return (
-    <div className="flex items-baseline gap-1.5">
+    <div
+      className="rounded-xl p-4 flex flex-col gap-1.5"
+      style={{
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+        border: `1px solid ${TOK.border}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
+      }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span
+          className="text-[10px] uppercase tracking-[0.18em] font-medium"
+          style={{ color: TOK.textMuted }}
+        >
+          {label}
+        </span>
+        {icon && color && colorBg && !isZero && (
+          <span
+            className="rounded-md p-1 flex items-center justify-center"
+            style={{ background: colorBg, color }}
+          >
+            {icon}
+          </span>
+        )}
+      </div>
       <span
-        className="text-base font-semibold tabular-nums"
-        style={{ color: isZero ? TOK.textMuted : activeColor }}
+        className="text-3xl font-semibold tabular-nums tracking-tight"
+        style={{
+          color: isZero ? TOK.textMuted : activeColor,
+          letterSpacing: "-0.02em",
+        }}
       >
         {count.toLocaleString()}
       </span>
-      <span
-        className="text-xs"
-        style={{ color: TOK.textSecondary }}
-      >
-        {label}
-      </span>
+      {sublabel && (
+        <span
+          className="text-[11px] leading-snug truncate"
+          style={{ color: TOK.textSecondary }}
+          title={sublabel}
+        >
+          {sublabel}
+        </span>
+      )}
     </div>
   );
 }
@@ -244,53 +280,56 @@ function EcosystemSection({
     <section
       className="rounded-xl overflow-hidden"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${TOK.border}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
-      {/* Header */}
+      {/* Header — title-case ecosystem name as the lead. No accent
+       *  pill (it competed with the severity colours in the issue
+       *  groups below); meta lives as a subtle subtitle in textMuted. */}
       <header
-        className="flex items-center gap-3 px-5 py-3 border-b"
+        className="flex items-baseline justify-between gap-4 px-5 py-4 border-b flex-wrap"
         style={{ borderColor: TOK.border }}
       >
-        <span
-          className="text-[11px] uppercase tracking-[0.18em] font-semibold px-2 py-0.5 rounded"
-          style={{
-            background: TOK.accentSoft,
-            color: TOK.accent,
-          }}
-        >
-          {ecosystemLabel(health.ecosystem)}
-        </span>
-        <div className="flex items-center gap-4 text-xs flex-wrap">
-          <span style={{ color: TOK.textSecondary }}>
-            <span
-              className="font-semibold tabular-nums"
-              style={{ color: TOK.textPrimary }}
-            >
-              {health.uniquePackages ?? health.total}
-            </span>{" "}
-            packages
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h3
+            className="text-lg font-semibold tracking-tight"
+            style={{
+              color: TOK.textPrimary,
+              letterSpacing: "-0.015em",
+            }}
+          >
+            {ecosystemLabel(health.ecosystem)}
+          </h3>
+          <span
+            className="text-xs tabular-nums"
+            style={{ color: TOK.textMuted }}
+          >
+            {health.uniquePackages ?? health.total} packages
+            {health.packageFiles !== undefined && (
+              <>
+                {" · "}
+                {health.packageFiles} manifest
+                {health.packageFiles === 1 ? "" : "s"}
+              </>
+            )}
           </span>
-          {health.packageFiles !== undefined && (
-            <span style={{ color: TOK.textMuted }}>
-              <span className="tabular-nums">{health.packageFiles}</span>{" "}
-              manifest{health.packageFiles === 1 ? "" : "s"}
-            </span>
-          )}
-          {health.note && (
-            <span
-              className="text-[10px] px-1.5 py-0.5 rounded"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                color: TOK.textMuted,
-              }}
-              title={health.note}
-            >
-              note
-            </span>
-          )}
         </div>
+        {health.note && (
+          <span
+            className="text-[10px] px-1.5 py-0.5 rounded"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              color: TOK.textMuted,
+              border: `1px solid ${TOK.border}`,
+            }}
+            title={health.note}
+          >
+            note
+          </span>
+        )}
       </header>
 
       {/* Sections */}

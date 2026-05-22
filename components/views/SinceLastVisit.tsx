@@ -439,11 +439,13 @@ export function SinceLastVisit({ diff, repoFullName }: Props) {
   if (!headline) {
     return (
       <div
-        className="rounded-lg px-4 py-3 flex items-center gap-3 text-sm"
+        className="rounded-xl px-4 py-3 flex items-center gap-3 text-sm"
         style={{
-          background: TOK.surface,
+          background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
           border: `1px solid ${TOK.border}`,
           color: TOK.textSecondary,
+          boxShadow:
+            "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
         }}
       >
         <span
@@ -544,7 +546,7 @@ export function SinceLastVisit({ diff, repoFullName }: Props) {
           borderTop: `1px solid ${TOK.border}`,
         }}
       >
-        <span style={{ color: TOK.textSecondary }}>GitVision</span>
+        <span style={{ color: TOK.textSecondary }}>RepoBaron</span>
         <span>·</span>
         <span className="font-mono">{repoFullName}</span>
       </div>

@@ -15,14 +15,16 @@ export function LanguageBar({ languages }: { languages: LanguageBreakdown }) {
   const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
 
   const containerStyle = {
-    background: TOK.surface,
+    background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
     border: `1px solid ${TOK.border}`,
+    boxShadow:
+      "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
   };
 
   if (entries.length === 0) {
     return (
       <div
-        className="rounded-xl p-4 text-sm"
+        className="rounded-xl p-5 text-sm"
         style={{ ...containerStyle, color: TOK.textMuted }}
       >
         No language data available.
@@ -31,10 +33,13 @@ export function LanguageBar({ languages }: { languages: LanguageBreakdown }) {
   }
 
   return (
-    <div className="rounded-xl p-4" style={containerStyle}>
+    <div className="rounded-xl p-5" style={containerStyle}>
       <h3
-        className="text-[11px] font-semibold uppercase tracking-[0.18em] mb-3"
-        style={{ color: TOK.textSecondary }}
+        className="text-base font-semibold tracking-tight mb-3"
+        style={{
+          color: TOK.textPrimary,
+          letterSpacing: "-0.01em",
+        }}
       >
         Language mix
       </h3>

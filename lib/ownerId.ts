@@ -145,7 +145,11 @@ export const DEMO_OWNER_ID = "demo";
  *  filter out demo sessions so the SSR first paint doesn't briefly
  *  flash showcase content into "Your sessions" before the client
  *  hydrates. Generic so it works with both Session and SessionSummary
- *  records. */
+ *  records.
+ *
+ *  Kept for backward compat — new callers should prefer
+ *  filterSessionsByUser, which respects the userId field set on
+ *  sessions created by logged-in users (v0.76+). */
 export function filterSessionsByOwner<T extends { ownerId?: string }>(
   sessions: readonly T[],
   ownerId: string | null
@@ -155,4 +159,51 @@ export function filterSessionsByOwner<T extends { ownerId?: string }>(
   const nonDemo = sessions.filter((s) => s.ownerId !== DEMO_OWNER_ID);
   if (!ownerId) return [...nonDemo];
   return nonDemo.filter((s) => !s.ownerId || s.ownerId === ownerId);
+}
+
+/** User-aware session filter (v0.76 — login-required model).
+ *
+ *  RepoBaron moved to "login required to create sessions" in v0.76.
+ *  Anonymous browsing of a workspace listing no longer makes sense —
+ *  if you're not signed in, you have no sessions to list. The
+ *  marketing landing shows demo sessions as the "lokkemad"; the
+ *  full workspace listing is gated.
+ *
+ *  Visibility rules:
+ *    - Demo sessions (ownerId === "demo")  → always excluded from
+ *                                            "Your sessions" listings.
+ *                                            They appear separately as
+ *                                            click-through cards on the
+ *                                            marketing landing.
+ *    - Logged-in caller (userId provided):
+ *        - Sessions with matching userId  → visible
+ *        - Legacy ownerless sessions     → visible (pre-v0.26 open
+ *          (neither userId nor ownerId)    sessions, kept "open"
+ *                                          for backward compat)
+ *        - ownerId-only sessions         → invisible. They were
+ *          (no userId)                     created anonymously before
+ *                                          v0.76 and have no account
+ *                                          to claim them. Direct URL
+ *                                          still works for sharing,
+ *                                          but they don't surface in
+ *                                          the workspace listing.
+ *    - Logged-out caller (userId null):
+ *        - Returns []. Workspace is gated behind sign-in.
+ *
+ *  Generic so it works with both Session and SessionSummary. */
+export function filterSessionsByUser<
+  T extends { ownerId?: string; userId?: string },
+>(sessions: readonly T[], userId: string | null): T[] {
+  if (!userId) return [];
+  const nonDemo = sessions.filter((s) => s.ownerId !== DEMO_OWNER_ID);
+  return nonDemo.filter((s) => {
+    // Strong claim: account-bound session — only the owner.
+    if (s.userId) return s.userId === userId;
+    // Legacy open (pre-v0.26, no fields set) — visible to any
+    // logged-in user. Pre-existing posture.
+    if (!s.ownerId) return true;
+    // ownerId-only sessions (pre-v0.76 anonymous): invisible from
+    // workspace listings now that anonymous creation is removed.
+    return false;
+  });
 }

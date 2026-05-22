@@ -14,7 +14,7 @@ Two snapshots, captured at different points:
 
 ## Why this exists
 
-These results are roadmap-stable evidence that GitVision's MCP delivers
+These results are roadmap-stable evidence that RepoBaron's MCP delivers
 value across all 8 supported languages on the two prompt shapes that
 match its strengths:
 

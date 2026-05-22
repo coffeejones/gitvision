@@ -21,6 +21,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
 import { SessionToolbar } from "@/components/SessionToolbar";
 import { SessionShell } from "@/components/SessionShell";
+import { HideOnMarketing } from "@/components/MarketingModeWrapper";
 
 export const dynamic = "force-dynamic";
 
@@ -39,14 +40,20 @@ export default async function SessionLayout({
 
   return (
     <>
-      <SessionToolbar
-        sessionId={session.id}
-        sessionName={session.name}
-        snapshot={current}
-        targetId="screenshot-target"
-        updatedAtISO={session.updatedAt}
-        snapshotCount={session.snapshots.length}
-      />
+      {/* HideOnMarketing strips the top toolbar when ?marketing=1 is
+       *  in the URL. Used for taking clean session-page screenshots
+       *  for marketing assets (sidebar stays — adds product
+       *  credibility). */}
+      <HideOnMarketing>
+        <SessionToolbar
+          sessionId={session.id}
+          sessionName={session.name}
+          snapshot={current}
+          targetId="screenshot-target"
+          updatedAtISO={session.updatedAt}
+          snapshotCount={session.snapshots.length}
+        />
+      </HideOnMarketing>
 
       <SessionShell sessionId={session.id} snapshot={current}>
         {children}

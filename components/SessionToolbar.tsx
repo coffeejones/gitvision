@@ -169,7 +169,7 @@ export function SessionToolbar({
         cacheBust: true,
       });
       const link = document.createElement("a");
-      link.download = `gitvision-${sessionName.replace(/\s+/g, "-").toLowerCase()}.png`;
+      link.download = `repobaron-${sessionName.replace(/\s+/g, "-").toLowerCase()}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -267,20 +267,20 @@ export function SessionToolbar({
             )}
           </div>
 
-          {/* Feedback — emphasized during early beta (accent-bordered
-           *  pill, matches MarketingNav's Feedback treatment). Sits
-           *  between Share and Refresh so testers see "we want your
-           *  feedback" without it competing with the primary Refresh
-           *  action. Was previously buried in the overflow menu;
-           *  promoted to top-level so beta-users can fire a thought
-           *  the moment they hit a rough edge. */}
+          {/* Feedback — ghost pill (neutral border, secondary text).
+           *  Was previously a green accent-bordered pill, but it sat
+           *  right next to the green Refresh button — two competing
+           *  accent actions side-by-side. v0.76 polish neutralises it
+           *  (matches the MarketingNav Feedback treatment) so Refresh
+           *  stays the only green action in the toolbar. Beta testers
+           *  still see a dedicated pill, just without the colour
+           *  conflict. */}
           <button
             onClick={() => setFeedbackOpen(true)}
-            className="h-8 px-3 rounded-md text-xs font-medium transition flex items-center gap-1.5 hover:opacity-80"
+            className="h-8 px-3 rounded-md text-xs transition flex items-center gap-1.5 hover:bg-white/5"
             style={{
-              color: TOK.accent,
-              border: `1px solid ${TOK.accent}`,
-              background: TOK.accentSoft,
+              color: TOK.textSecondary,
+              border: `1px solid rgba(255, 255, 255, 0.1)`,
             }}
           >
             <MessageSquarePlus size={13} />

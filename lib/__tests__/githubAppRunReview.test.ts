@@ -80,7 +80,7 @@ function makeDeps(
   const body =
     "commentBody" in overrides
       ? overrides.commentBody
-      : "## GitVision Review\nhi";
+      : "## RepoBaron Review\nhi";
   return {
     runAnalysisPipeline: vi.fn(
       async () => overrides.pipelineResult ?? makeOkPipelineResult(),
@@ -104,7 +104,7 @@ function makeDeps(
       releaseConcurrencySlot:
         vi.fn() as RunReviewDeps["concurrency"]["releaseConcurrencySlot"],
     },
-    workspaceBaseUrl: "https://gitvision.net",
+    workspaceBaseUrl: "https://repobaron.com",
   };
 }
 
@@ -133,7 +133,7 @@ describe("runReview — happy path", () => {
 
   it("passes the rendered body + parsed owner/repo/pr to postPrComment", async () => {
     const deps = makeDeps({
-      commentBody: "## GitVision Review\nbody",
+      commentBody: "## RepoBaron Review\nbody",
       postResult: { action: "created", commentId: 5 },
     });
     await runReview(
@@ -147,7 +147,7 @@ describe("runReview — happy path", () => {
       owner: "octocat",
       repo: "hello-world",
       prNumber: 42,
-      body: "## GitVision Review\nbody",
+      body: "## RepoBaron Review\nbody",
     });
   });
 
@@ -157,7 +157,7 @@ describe("runReview — happy path", () => {
 
     const fmtMock = deps.formatPrComment as unknown as ReturnType<typeof vi.fn>;
     expect(fmtMock.mock.calls[0]?.[1]).toEqual({
-      workspaceBaseUrl: "https://gitvision.net",
+      workspaceBaseUrl: "https://repobaron.com",
     });
   });
 });
@@ -287,7 +287,7 @@ describe("runReview — composition fidelity", () => {
     const deps = makeDeps({
       pipelineResult: makeOkPipelineResult(),
       commentBody:
-        "## GitVision Review\n\nNothing notable on this PR ✅",
+        "## RepoBaron Review\n\nNothing notable on this PR ✅",
     });
     await runReview(makeEvent(), deps);
 

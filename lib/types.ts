@@ -1,4 +1,4 @@
-// Shared types for GitVision
+// Shared types for RepoBaron
 
 import type { CodeGraph } from "./codeAnalysis/types";
 
@@ -291,8 +291,18 @@ export interface Session {
   /** Anonymous owner-id from the creator's localStorage (v0.26+).
    *  Soft-isolates sessions on the landing page list. Sessions created
    *  before this field existed have ownerId undefined; they remain
-   *  visible + editable for everyone (backward compat). */
+   *  visible + editable for everyone (backward compat).
+   *
+   *  Coexists with `userId` (below): a session created while logged in
+   *  has both — userId is the strong identity, ownerId is kept so the
+   *  same browser can claim other-anonymous-sessions it created before
+   *  signing in (see claim flow, phase B2). */
   ownerId?: string;
+  /** Better Auth user id (v0.76+). Set when the session was created
+   *  by a logged-in user — that's the strong claim of ownership.
+   *  Authorization checks prefer userId match over ownerId match;
+   *  ownerId remains as a fallback for legacy / pre-login sessions. */
+  userId?: string;
   /** GitHub App installation that created this session (Commit 8+).
    *  Set only on sessions produced by the PR-bot pipeline. Used by
    *  installation.deleted to GC the right sessions when a user
@@ -313,6 +323,10 @@ export interface SessionSummary {
   /** Mirrors Session.ownerId so the landing page can filter without
    *  reading the full Session record. Undefined for legacy sessions. */
   ownerId?: string;
+  /** Mirrors Session.userId — same reason as ownerId mirror. Lets
+   *  the workspace listing filter by "is this mine via account?"
+   *  without loading every full Session record. v0.76+. */
+  userId?: string;
 }
 
 // ------------------- Jobs (v0.25) -------------------
@@ -336,6 +350,10 @@ export type JobInput =
        *  (v0.26+). Persisted on the resulting Session so future requests
        *  can be checked against it for soft ownership enforcement. */
       ownerId?: string;
+      /** Better Auth user id, set when the requester was logged in at
+       *  enqueue time (v0.76+). Persisted on the resulting Session as
+       *  the strong ownership claim. */
+      userId?: string;
     }
   | {
       kind: "refresh-session";

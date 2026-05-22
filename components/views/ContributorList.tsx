@@ -7,15 +7,20 @@ export function ContributorList({ contributors }: { contributors: Contributor[] 
   const total = contributors.reduce((s, c) => s + c.contributions, 0) || 1;
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-xl p-5"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${TOK.border}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <h3
-        className="text-[11px] font-semibold uppercase tracking-[0.18em] mb-3"
-        style={{ color: TOK.textSecondary }}
+        className="text-base font-semibold tracking-tight mb-3"
+        style={{
+          color: TOK.textPrimary,
+          letterSpacing: "-0.01em",
+        }}
       >
         Top contributors
       </h3>

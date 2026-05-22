@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { z } from "zod";
+import { auth } from "@/lib/auth";
 import { extractOrgOrUserFromUrl, parseRepoUrl } from "@/lib/github";
 import { validateSubdir } from "@/lib/graph";
 import { createJob, processJob } from "@/lib/jobs";
@@ -54,6 +55,23 @@ export async function POST(req: Request) {
     );
   }
 
+  // Auth gate (v0.76+): session creation is logged-in only. Anonymous
+  // visitors see the marketing landing with demo sessions; they need
+  // to sign up before analyzing their own repos. This is the single
+  // most important rule in the post-platform-pivot model — without
+  // it, sessions accumulate without ownership and pile up on disk.
+  //
+  // We check auth BEFORE input parsing so a malformed payload from a
+  // logged-out caller still returns 401 (the actionable error) rather
+  // than 400 ("fix your JSON") which would mask the real problem.
+  const authSession = await auth.api.getSession({ headers: req.headers });
+  if (!authSession) {
+    return NextResponse.json(
+      { error: "Sign in to analyze repositories." },
+      { status: 401 }
+    );
+  }
+
   const body = await req.json().catch(() => null);
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) {
@@ -74,7 +92,7 @@ export async function POST(req: Request) {
     if (orgOrUser) {
       return NextResponse.json(
         {
-          error: `That looks like a GitHub organization or user URL (${orgOrUser}), not a specific repository. GitVision analyzes one repo at a time — pick a repo from https://github.com/${orgOrUser}?tab=repositories and paste its URL.`,
+          error: `That looks like a GitHub organization or user URL (${orgOrUser}), not a specific repository. RepoBaron analyzes one repo at a time — pick a repo from https://github.com/${orgOrUser}?tab=repositories and paste its URL.`,
         },
         { status: 400 }
       );
@@ -94,11 +112,12 @@ export async function POST(req: Request) {
     );
   }
 
-  // Read the anonymous owner-id from the X-Owner-Id header (v0.26+).
-  // The client populates this from localStorage; absent header means an
-  // older client or a direct curl call — we accept it and the resulting
-  // session has no owner (legacy treatment, visible to anyone).
+  // Optional cookie ownerId — kept on new sessions as a historical
+  // breadcrumb (which browser created this) but no longer used for
+  // ownership decisions. authSession.user.id is the only thing the
+  // workspace listing and authorization checks look at.
   const ownerId = req.headers.get(OWNER_ID_HEADER) ?? undefined;
+  const userId = authSession.user.id;
 
   // Enqueue the job. processJob runs detached via after() — the HTTP
   // request returns in <1s regardless of how long the actual analysis
@@ -109,6 +128,7 @@ export async function POST(req: Request) {
     sessionName: parsed.data.name,
     subdir,
     ownerId,
+    userId,
   });
   after(() => processJob(job.id));
   return NextResponse.json({ jobId: job.id });

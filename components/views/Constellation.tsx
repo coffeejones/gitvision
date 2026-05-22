@@ -19,7 +19,7 @@ import {
   Position,
 } from "@xyflow/react";
 import * as d3 from "d3";
-import { Pause, Play, Users } from "lucide-react";
+import { Activity, Pause, Play, Users } from "lucide-react";
 import type { AnalysisSnapshot, FileHotspot, CoChangeEdge } from "@/lib/types";
 import { TOK } from "@/lib/theme";
 import { FileDetailsPanel } from "./FileDetailsPanel";
@@ -1030,11 +1030,36 @@ function ConstellationInner({ snapshot }: Props) {
       )}
 
       {allHotspots.length === 0 && (
-        <div
-          className="absolute inset-0 flex items-center justify-center text-sm"
-          style={{ color: TOK.textSecondary }}
-        >
-          No hotspot data yet — try Refresh to fetch fresh commits.
+        // Boxed empty-state overlay — matches the EmptyPanel pattern
+        // used elsewhere in the app (icon + headline + actionable
+        // hint), but inline-styled rather than wrapped in EmptyPanel
+        // because the canvas needs an absolute overlay that doesn't
+        // block clicks on whatever's underneath.
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div
+            className="rounded-xl border border-dashed px-7 py-6 text-center flex flex-col items-center gap-2"
+            style={{
+              borderColor: TOK.border,
+              background: "rgba(10, 10, 12, 0.6)",
+              backdropFilter: "blur(4px)",
+              WebkitBackdropFilter: "blur(4px)",
+              color: TOK.textMuted,
+            }}
+          >
+            <Activity
+              size={20}
+              style={{ color: TOK.textSecondary }}
+            />
+            <p
+              className="text-sm font-medium"
+              style={{ color: TOK.textSecondary }}
+            >
+              No hotspot data yet
+            </p>
+            <p className="text-xs">
+              Click Refresh in the topbar to fetch fresh commits.
+            </p>
+          </div>
         </div>
       )}
 

@@ -1,9 +1,9 @@
 {
-  "name": "gitvision",
+  "name": "repobaron",
   "version": "0.1.0",
   "private": true,
   "bin": {
-    "gitvision-mcp": "./mcp/dist/mcp/server.js"
+    "repobaron-mcp": "./mcp/dist/mcp/server.js"
   },
   "scripts": {
     "dev": "next dev",
@@ -13,6 +13,10 @@
     "test": "vitest",
     "test:run": "vitest run",
     "analyze": "tsx lib/codeAnalysis/cli.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "auth:schema": "better-auth generate --output lib/db/schema.ts -y",
     "mcp:build": "tsc -p mcp/tsconfig.json",
     "mcp:test": "vitest run mcp/__tests__",
     "mcp:validate": "npm run mcp:build && npm run mcp:test",
@@ -26,8 +30,11 @@
     "@types/d3-sankey": "^0.12.5",
     "@vscode/tree-sitter-wasm": "^0.3.1",
     "@xyflow/react": "^12.10.2",
+    "better-auth": "^1.6.11",
+    "better-sqlite3": "^12.10.0",
     "d3": "^7.9.0",
     "d3-sankey": "^0.12.3",
+    "drizzle-orm": "^0.45.2",
     "html-to-image": "^1.11.13",
     "lucide-react": "^1.9.0",
     "nanoid": "^5.1.9",
@@ -35,17 +42,20 @@
     "octokit": "^5.0.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "resend": "^6.12.3",
     "tar": "^7.5.13",
     "web-tree-sitter": "^0.26.8",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/d3": "^7.4.3",
     "@types/iarna__toml": "^2.0.5",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",

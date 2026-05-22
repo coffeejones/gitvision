@@ -51,7 +51,7 @@ function okResult(overrides: OkResultOverrides = {}): PipelineResult {
   };
 }
 
-const CTX = { workspaceBaseUrl: "https://gitvision.net" };
+const CTX = { workspaceBaseUrl: "https://repobaron.com" };
 
 describe("formatPrComment — failed pipeline", () => {
   it("returns null when pipeline failed", () => {
@@ -89,9 +89,9 @@ describe("formatPrComment — happy path", () => {
     expect(out!.startsWith(COMMENT_MARKER)).toBe(true);
   });
 
-  it("includes the GitVision Review heading", () => {
+  it("includes the RepoBaron Review heading", () => {
     const out = formatPrComment(okResult(), CTX);
-    expect(out).toContain("## GitVision Review");
+    expect(out).toContain("## RepoBaron Review");
   });
 
   it("renders all three suggestions with correct severity emoji", () => {
@@ -119,7 +119,7 @@ describe("formatPrComment — happy path", () => {
       CTX,
     )!;
     expect(out).toContain(
-      "[Full analysis ↗](https://gitvision.net/session/abc123def)",
+      "[Full analysis ↗](https://repobaron.com/session/abc123def)",
     );
   });
 
@@ -132,10 +132,10 @@ describe("formatPrComment — happy path", () => {
   it("normalizes trailing slash on workspaceBaseUrl", () => {
     const out = formatPrComment(
       okResult({ headSessionId: "x" }),
-      { workspaceBaseUrl: "https://gitvision.net///" },
+      { workspaceBaseUrl: "https://repobaron.com///" },
     )!;
-    expect(out).toContain("https://gitvision.net/session/x");
-    expect(out).not.toContain("https://gitvision.net///session/x");
+    expect(out).toContain("https://repobaron.com/session/x");
+    expect(out).not.toContain("https://repobaron.com///session/x");
   });
 });
 

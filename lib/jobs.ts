@@ -29,12 +29,12 @@ import {
 } from "./storage";
 import type { Job, JobInput, JobStatus } from "./types";
 
-// Read env lazily on each storage call so tests can swap GITVISION_DATA_DIR
+// Read env lazily on each storage call so tests can swap REPOBARON_DATA_DIR
 // per-test without module-import timing dances. Negligible perf hit
 // (couple of path.join calls per operation).
 function jobsDir(): string {
   const dataDir =
-    process.env.GITVISION_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
+    process.env.REPOBARON_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
   return path.join(dataDir, "jobs");
 }
 
@@ -151,6 +151,7 @@ async function runCreateSession(job: Job): Promise<void> {
     name: job.input.sessionName || snapshot.repo.fullName,
     initialSnapshot: snapshot,
     ownerId: job.input.ownerId,
+    userId: job.input.userId,
   });
   await patchJob(job.id, { status: "done", sessionId: session.id });
 }

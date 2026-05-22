@@ -1,10 +1,10 @@
-// Logo mockup gallery — 6 concept directions for GitVision's visual
+// Logo mockup gallery — 6 concept directions for RepoBaron's visual
 // identity (v0.74-polish). Each concept is rendered as inline SVG so
 // you can see them at multiple sizes (favicon, small, large) and on
 // both dark + light backgrounds in one scroll.
 //
 // How to use:
-//   - Pick the concept that feels closest to GitVision's voice
+//   - Pick the concept that feels closest to RepoBaron's voice
 //   - Open the SVG source in this file, copy it into Figma to refine
 //   - Tweak proportions, color, or replace strokes with your own
 //     once you've picked a direction
@@ -19,7 +19,7 @@ import { ArrowLeft } from "lucide-react";
 import { TOK } from "@/lib/theme";
 
 export const metadata = {
-  title: "Logo mockups — GitVision",
+  title: "Logo mockups — RepoBaron",
 };
 
 const ACCENT = "#10b981";
@@ -49,7 +49,7 @@ export default function LogoMockupsPage() {
           className="text-sm leading-relaxed max-w-2xl"
           style={{ color: TOK.textSecondary }}
         >
-          Six directions for GitVision&apos;s visual identity. Each shows the
+          Six directions for RepoBaron&apos;s visual identity. Each shows the
           icon at three sizes plus an icon-with-wordmark lockup, on both
           dark and light backgrounds. Pick the one that lands closest, then
           take it into Figma to refine.
@@ -208,7 +208,7 @@ function PreviewPanel({
           className="text-xl font-semibold tracking-tight"
           style={{ color: fg, letterSpacing: "-0.02em" }}
         >
-          GitVision
+          RepoBaron
         </span>
       </div>
     </div>

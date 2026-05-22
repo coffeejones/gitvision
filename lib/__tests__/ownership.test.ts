@@ -1,79 +1,118 @@
-// Regression tests for lib/ownership.ts. The shared helper guards three
-// mutating endpoint families (session DELETE/PATCH, AI summary, AI health).
-// Two of those — summary and health — were the audit-flagged holes: they
-// had no ownership check at all, leaving the Anthropic budget exposed to
-// anyone who knew a session id. This file pins the contract so a future
-// extraction or rename can't quietly drop the check from any caller.
+// Regression tests for lib/ownership.ts. The shared helper guards four
+// mutating endpoint families (session DELETE/PATCH, AI summary, AI
+// health, refresh). Two of those — summary and health — were the
+// audit-flagged holes: they had no ownership check at all, leaving the
+// Anthropic budget exposed to anyone who knew a session id. This file
+// pins the contract so a future extraction or rename can't quietly
+// drop the check from any caller.
+//
+// We test the pure `checkSessionOwnership` function rather than the
+// request-bound wrapper so the tests don't need to mock Better Auth.
+// `requireSessionOwnership` is a thin two-line composition over the
+// pure function; if the pure function is right and the composition
+// compiles, the wrapper is right.
 
 import { describe, it, expect } from "vitest";
-import { requireSessionOwnership } from "../ownership";
-import type { Session, AnalysisSnapshot } from "../types";
+import { checkSessionOwnership } from "../ownership";
 
-function makeSession(ownerId?: string): Session {
-  return {
-    id: "abc123",
-    name: "test",
-    repoUrl: "https://github.com/foo/bar",
-    ownerId,
-    createdAt: "2026-05-13T00:00:00.000Z",
-    updatedAt: "2026-05-13T00:00:00.000Z",
-    snapshots: [] as unknown as AnalysisSnapshot[],
-  };
-}
+describe("checkSessionOwnership", () => {
+  // ─── Legacy / ownerId path ──────────────────────────────────────
 
-function makeRequest(headers: Record<string, string> = {}): Request {
-  return new Request("http://x/api/sessions/abc123", { headers });
-}
-
-describe("requireSessionOwnership", () => {
-  it("returns null (allow) when caller header matches stored ownerId", () => {
-    const session = makeSession("owner-uuid-123");
-    const req = makeRequest({ "X-Owner-Id": "owner-uuid-123" });
-    expect(requireSessionOwnership(session, req)).toBeNull();
+  it("allows when callerOwnerId matches session.ownerId", () => {
+    expect(
+      checkSessionOwnership({ ownerId: "owner-uuid-123" }, null, "owner-uuid-123")
+    ).toBe("allowed");
   });
 
-  it("returns null (allow) for legacy sessions with no ownerId set", () => {
-    // Pre-v0.26 sessions don't have an ownerId and remain open as
-    // documented in the helper's comment. If we ever tighten this, the
-    // test needs to be updated AND a migration plan written.
-    const session = makeSession(undefined);
-    const req = makeRequest({});
-    expect(requireSessionOwnership(session, req)).toBeNull();
+  it("allows legacy sessions with no ownerId AND no userId", () => {
+    // Pre-v0.26 sessions had neither field. Documented as "open" so
+    // existing-anonymous sessions don't break after upgrades. If we
+    // ever tighten this, the test needs an update AND a migration plan.
+    expect(checkSessionOwnership({}, null, null)).toBe("allowed");
+    expect(checkSessionOwnership({}, null, "any-cookie")).toBe("allowed");
   });
 
-  it("returns 403 when caller header is missing entirely", async () => {
-    const session = makeSession("owner-uuid-123");
-    const req = makeRequest({});
-    const denied = requireSessionOwnership(session, req);
-    expect(denied).not.toBeNull();
-    expect(denied!.status).toBe(403);
-    const body = await denied!.json();
-    expect(body.error).toMatch(/different browser/i);
+  it("denies when callerOwnerId is missing on an owned session", () => {
+    expect(
+      checkSessionOwnership({ ownerId: "owner-uuid-123" }, null, null)
+    ).toBe("denied");
   });
 
-  it("returns 403 when caller header is empty string", async () => {
-    const session = makeSession("owner-uuid-123");
-    const req = makeRequest({ "X-Owner-Id": "" });
-    const denied = requireSessionOwnership(session, req);
-    // Empty string is not a match — explicit check, defends against the
-    // case where a client sends the header but with no value.
-    expect(denied!.status).toBe(403);
+  it("denies when callerOwnerId is empty string", () => {
+    // Defends the case where a client sends the header but with no
+    // value. Empty string ≠ stored ownerId.
+    expect(
+      checkSessionOwnership({ ownerId: "owner-uuid-123" }, null, "")
+    ).toBe("denied");
   });
 
-  it("returns 403 when caller header does not match stored ownerId", async () => {
-    const session = makeSession("owner-uuid-123");
-    const req = makeRequest({ "X-Owner-Id": "different-uuid-xyz" });
-    const denied = requireSessionOwnership(session, req);
-    expect(denied!.status).toBe(403);
+  it("denies when callerOwnerId doesn't match", () => {
+    expect(
+      checkSessionOwnership(
+        { ownerId: "owner-uuid-123" },
+        null,
+        "different-uuid-xyz"
+      )
+    ).toBe("denied");
   });
 
-  it("comparison is case-sensitive (UUIDs are normalized lowercase)", async () => {
-    // crypto.randomUUID produces lowercase hex. A case-sensitive compare
-    // protects against accidental case-confusion attacks where an
-    // attacker uppercases the UUID.
-    const session = makeSession("abc-def-123");
-    const req = makeRequest({ "X-Owner-Id": "ABC-DEF-123" });
-    const denied = requireSessionOwnership(session, req);
-    expect(denied).not.toBeNull(); // case mismatch → denied
+  it("is case-sensitive on the ownerId comparison", () => {
+    // crypto.randomUUID produces lowercase hex. A case-sensitive
+    // compare protects against accidental case-confusion attacks.
+    expect(
+      checkSessionOwnership({ ownerId: "abc-def-123" }, null, "ABC-DEF-123")
+    ).toBe("denied");
+  });
+
+  // ─── Strong claim / userId path (v0.76+) ────────────────────────
+
+  it("allows when callerUserId matches session.userId", () => {
+    expect(
+      checkSessionOwnership({ userId: "user_123" }, "user_123", null)
+    ).toBe("allowed");
+  });
+
+  it("denies when callerUserId doesn't match userId, even if ownerId would have matched", () => {
+    // Once a session is bound to a user, the cookie no longer overrides.
+    // The original cookie creator can't modify the session anymore via
+    // ownerId alone — they have to be signed in as the user. Otherwise
+    // a shared / inherited browser session could mutate account-owned
+    // sessions.
+    expect(
+      checkSessionOwnership(
+        { userId: "user_123", ownerId: "owner-uuid-original" },
+        null,
+        "owner-uuid-original"
+      )
+    ).toBe("denied");
+  });
+
+  it("denies when callerUserId is null on a user-owned session", () => {
+    // Not logged in, but the session has a userId → denied.
+    expect(
+      checkSessionOwnership({ userId: "user_123" }, null, "any-cookie")
+    ).toBe("denied");
+  });
+
+  it("allows the rightful user when both ids match", () => {
+    expect(
+      checkSessionOwnership(
+        { userId: "user_123", ownerId: "owner-uuid-original" },
+        "user_123",
+        "owner-uuid-original"
+      )
+    ).toBe("allowed");
+  });
+
+  it("allows the rightful user even when the cookie differs", () => {
+    // Same user, different machine (different cookie) → still allowed.
+    // The account-level claim is what matters.
+    expect(
+      checkSessionOwnership(
+        { userId: "user_123", ownerId: "owner-uuid-original" },
+        "user_123",
+        "different-cookie-on-laptop"
+      )
+    ).toBe("allowed");
   });
 });

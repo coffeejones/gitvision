@@ -15,9 +15,9 @@ import { ArrowLeft } from "lucide-react";
 import { STYLE, TOK } from "@/lib/theme";
 
 export const metadata = {
-  title: "Privacy & Terms — GitVision",
+  title: "Privacy & Terms — RepoBaron",
   description:
-    "What GitVision stores, what it doesn't, and the terms you accept by using it.",
+    "What RepoBaron stores, what it doesn't, and the terms you accept by using it.",
 };
 
 export default function LegalPage() {
@@ -30,7 +30,7 @@ export default function LegalPage() {
           style={{ color: TOK.textSecondary }}
         >
           <ArrowLeft size={12} />
-          Back to GitVision
+          Back to RepoBaron
         </Link>
       </div>
 
@@ -45,17 +45,17 @@ export default function LegalPage() {
           className="text-4xl font-semibold tracking-tight"
           style={{ letterSpacing: "-0.02em" }}
         >
-          What we store, and what you accept by using GitVision.
+          What we store, and what you accept by using RepoBaron.
         </h1>
         <p
           className="text-base leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          GitVision is in alpha. This page is short on purpose — we want
+          RepoBaron is in alpha. This page is short on purpose — we want
           you to actually read it. If anything is unclear, open an issue
           on{" "}
           <a
-            href="https://github.com/coffeejones/gitvision/issues"
+            href="https://github.com/coffeejones/repobaron/issues"
             target="_blank"
             rel="noopener"
             className="underline underline-offset-2"
@@ -68,7 +68,7 @@ export default function LegalPage() {
 
       <Section title="Privacy">
         <P>
-          <strong>No accounts.</strong> GitVision has no sign-up, no
+          <strong>No accounts.</strong> RepoBaron has no sign-up, no
           login, no password, no email collection. You don&apos;t create
           a profile to use it.
         </P>
@@ -122,7 +122,7 @@ export default function LegalPage() {
 
       <Section title="Terms">
         <P>
-          <strong>Alpha software, no warranty.</strong> GitVision is
+          <strong>Alpha software, no warranty.</strong> RepoBaron is
           provided as-is. Analysis results may be incomplete, wrong, or
           out of date — verify anything important against the source.
         </P>
@@ -134,9 +134,9 @@ export default function LegalPage() {
           being blocked at the Railway edge.
         </P>
         <P>
-          <strong>License.</strong> The GitVision source code is{" "}
+          <strong>License.</strong> The RepoBaron source code is{" "}
           <a
-            href="https://github.com/coffeejones/gitvision/blob/main/LICENSE"
+            href="https://github.com/coffeejones/repobaron/blob/main/LICENSE"
             target="_blank"
             rel="noopener"
             className="underline underline-offset-2"
@@ -153,7 +153,7 @@ export default function LegalPage() {
           <strong>Service availability.</strong> We may pause or shut
           down the public deploy at any time, with or without notice.
           Sessions on the public deploy are not guaranteed durable — for
-          anything you actually care about, run GitVision locally and
+          anything you actually care about, run RepoBaron locally and
           keep your own session files.
         </P>
         <P>
@@ -161,7 +161,7 @@ export default function LegalPage() {
           updated version replaces this one. The git history of this
           file is the source of truth — see{" "}
           <a
-            href="https://github.com/coffeejones/gitvision/commits/main/app/legal/page.tsx"
+            href="https://github.com/coffeejones/repobaron/commits/main/app/legal/page.tsx"
             target="_blank"
             rel="noopener"
             className="underline underline-offset-2"
@@ -177,7 +177,7 @@ export default function LegalPage() {
         className="pt-8 text-xs border-t"
         style={{ borderColor: TOK.border, color: TOK.textMuted }}
       >
-        Last updated: 2026-04-29 · GitVision is made by{" "}
+        Last updated: 2026-04-29 · RepoBaron is made by{" "}
         <a
           href="https://github.com/coffeejones"
           target="_blank"

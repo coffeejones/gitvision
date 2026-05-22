@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// GitVision MCP server entry point (v0.64 / C1.1, expanded v0.65 / C1.2,
+// RepoBaron MCP server entry point (v0.64 / C1.1, expanded v0.65 / C1.2,
 // refactored v0.66 / C1.3 to share a buildServer() with tests).
 //
-// Exposes the GitVision analysis pipeline as Model Context Protocol
+// Exposes the RepoBaron analysis pipeline as Model Context Protocol
 // tools so AI coding agents (Claude Code, Cursor, Cline, etc.) can
 // query deterministic structural information about a GitHub repo
 // without hallucinating cross-file relationships.
 //
 // Transport: stdio. Standard MCP install path is:
 //
-//   $ npm install -g gitvision-mcp
-//   $ claude mcp add gitvision npx gitvision-mcp
+//   $ npm install -g repobaron-mcp
+//   $ claude mcp add repobaron npx repobaron-mcp
 //
 // The server runs as a child process of the MCP client. Sessions are
 // cached in-memory (10-min TTL, 8 entries) AND on-disk at
@@ -45,6 +45,6 @@ main().catch((err) => {
   // Stderr is the only safe place to log fatal errors during stdio
   // protocol operation. The MCP client will surface this in its own
   // error UI.
-  console.error("gitvision-mcp fatal:", err);
+  console.error("repobaron-mcp fatal:", err);
   process.exit(1);
 });

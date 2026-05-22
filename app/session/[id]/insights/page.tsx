@@ -16,9 +16,8 @@
 // state explaining that AI features are off.
 
 import { notFound } from "next/navigation";
-import { Sparkles } from "lucide-react";
 import { getSession } from "@/lib/storage";
-import { STYLE, TOK } from "@/lib/theme";
+import { TOK } from "@/lib/theme";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
 import { HealthPanel } from "@/components/HealthPanel";
 
@@ -35,17 +34,35 @@ export default async function InsightsRoute({
   const current = session.snapshots[session.snapshots.length - 1];
 
   return (
-    <main className="px-8 py-8 flex flex-col gap-6 max-w-7xl mx-auto w-full">
-      <div id="screenshot-target" className="flex flex-col gap-6">
-        <header className="flex items-baseline justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Sparkles size={14} style={{ color: TOK.accent }} />
-            <span className={STYLE.eyebrow} style={{ color: TOK.textMuted }}>
-              Insights · AI commentary on deterministic signals
-            </span>
-          </div>
-        </header>
-
+    <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-7xl mx-auto w-full">
+      <header className="flex flex-col gap-4">
+        <span
+          className="text-[10px] uppercase tracking-[0.18em] font-medium"
+          style={{ color: TOK.textMuted }}
+        >
+          Insights
+        </span>
+        <h1
+          className="text-3xl sm:text-4xl font-semibold tracking-tight"
+          style={{
+            color: TOK.textPrimary,
+            letterSpacing: "-0.025em",
+            lineHeight: 1.1,
+          }}
+        >
+          AI commentary on grounded signals.
+        </h1>
+        <p
+          className="text-sm sm:text-base max-w-2xl leading-relaxed"
+          style={{ color: TOK.textSecondary }}
+        >
+          A 150-word repo briefing plus the three-column health
+          verdict. Every claim is anchored to a deterministic signal
+          from the analysis pipeline — no LLM guesses, no
+          hallucinations.
+        </p>
+      </header>
+      <div id="screenshot-target" className="flex flex-col gap-8">
         <AiSummaryPanel sessionId={session.id} snapshot={current} />
         <HealthPanel sessionId={session.id} snapshot={current} />
       </div>

@@ -41,9 +41,9 @@ describe("parseRepoUrl", () => {
   });
 
   it("accepts owner/repo shorthand", () => {
-    expect(parseRepoUrl("coffeejones/gitvision")).toEqual({
+    expect(parseRepoUrl("coffeejones/repobaron")).toEqual({
       owner: "coffeejones",
-      repo: "gitvision",
+      repo: "repobaron",
     });
   });
 
@@ -103,7 +103,7 @@ describe("extractOrgOrUserFromUrl", () => {
 
   it("returns null for shorthand owner/repo", () => {
     // The owner/repo shorthand isn't an org URL — parseRepoUrl handles it.
-    expect(extractOrgOrUserFromUrl("coffeejones/gitvision")).toBeNull();
+    expect(extractOrgOrUserFromUrl("coffeejones/repobaron")).toBeNull();
   });
 });
 

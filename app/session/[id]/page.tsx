@@ -184,10 +184,36 @@ export default async function OverviewPage({
   const base = `/session/${session.id}`;
 
   return (
-    <main className="px-8 py-10 flex flex-col gap-10 max-w-7xl mx-auto w-full">
+    <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-7xl mx-auto w-full">
       <div id="screenshot-target" className="flex flex-col gap-10">
-        {/* Hero */}
-        <section className="flex flex-col gap-4">
+        {/* Hero — editorial framing matching the other sub-page heros
+         *  (Code / Packages / Insights). Eyebrow holds the session/repo
+         *  identity, h1 is the editable session name, supporting meta
+         *  (repo URL + scope chip) sits as a subtitle. Description and
+         *  StatGrid follow as supporting copy. */}
+        <header className="flex flex-col gap-5">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span
+              className="text-[10px] uppercase tracking-[0.18em] font-medium"
+              style={{ color: TOK.textMuted }}
+            >
+              Overview
+            </span>
+            {current.analyzedSubdir && (
+              <span
+                className="text-[10px] font-mono inline-flex items-center gap-1 px-2 py-0.5 rounded"
+                style={{
+                  background: TOK.accentSoft,
+                  color: TOK.accent,
+                  border: `1px solid ${TOK.accent}33`,
+                }}
+                title={`Analysis was scoped to this subdirectory. Refresh re-analyzes the same scope. Whole-repo signals (contributors, PRs, language mix) still come from the full repo.`}
+              >
+                <FolderTree size={11} />
+                scope: {current.analyzedSubdir}
+              </span>
+            )}
+          </div>
           <div className="flex items-baseline gap-3 flex-wrap">
             <SessionNameEditor
               sessionId={session.id}
@@ -203,20 +229,6 @@ export default async function OverviewPage({
               <span>{current.repo.fullName}</span>
               <ExternalLink size={11} />
             </a>
-            {current.analyzedSubdir && (
-              <span
-                className="text-xs font-mono inline-flex items-center gap-1 px-2 py-0.5 rounded"
-                style={{
-                  background: TOK.accentSoft,
-                  color: TOK.accent,
-                  border: `1px solid ${TOK.accent}33`,
-                }}
-                title={`Analysis was scoped to this subdirectory. Refresh re-analyzes the same scope. Whole-repo signals (contributors, PRs, language mix) still come from the full repo.`}
-              >
-                <FolderTree size={11} />
-                scope: {current.analyzedSubdir}
-              </span>
-            )}
           </div>
 
           {current.repo.description && (
@@ -228,12 +240,10 @@ export default async function OverviewPage({
             </p>
           )}
 
-          <div className="pt-1">
-            <StatGrid snap={current} />
-          </div>
+          <StatGrid snap={current} />
 
           {current.repo.topics.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-1">
+            <div className="flex flex-wrap gap-1.5">
               {current.repo.topics.slice(0, 12).map((t) => (
                 <span
                   key={t}
@@ -249,7 +259,7 @@ export default async function OverviewPage({
               ))}
             </div>
           )}
-        </section>
+        </header>
 
         {/* Since last visit — only when there's a diff */}
         {diff && (
@@ -305,7 +315,7 @@ export default async function OverviewPage({
               Workspace
             </span>
             <span className="text-xs" style={{ color: TOK.textMuted }}>
-              · click any card to dive in
+              · click any card to open
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -417,19 +427,20 @@ export default async function OverviewPage({
           </div>
         </section>
 
-        {/* Footer */}
+        {/* Footer — in-product surface, so kept compact. Repo path
+         *  is intentionally NOT repeated here (it lives in the hero
+         *  + the SessionToolbar's top strip, so a third copy is
+         *  redundant noise). Same © / license footer copy as the
+         *  marketing landing for cross-surface consistency. */}
         <footer
-          className="pt-6 text-xs flex items-center justify-between border-t flex-wrap gap-3"
+          className="pt-6 text-[11px] flex items-center justify-between border-t flex-wrap gap-3"
           style={{ borderColor: TOK.border, color: TOK.textMuted }}
         >
-          <span>
-            GitVision ·{" "}
-            <span className="font-mono">{current.repo.fullName}</span>
-          </span>
-          <div className="flex items-center gap-3">
+          <span>© 2026 RepoBaron</span>
+          <div className="flex items-center gap-4">
             {current.rateLimitInfo && (
-              <span>
-                Rate limit:{" "}
+              <span className="font-mono tabular-nums">
+                Rate limit{" "}
                 {current.rateLimitInfo.remaining.toLocaleString()}/
                 {current.rateLimitInfo.limit.toLocaleString()}
               </span>
@@ -437,6 +448,7 @@ export default async function OverviewPage({
             <a href="/legal" className="transition hover:underline">
               Privacy &amp; terms
             </a>
+            <span>PolyForm Noncommercial 1.0.0</span>
           </div>
         </footer>
       </div>
@@ -489,10 +501,16 @@ function QuickLookCard({
   return (
     <Link
       href={href}
-      className="group flex flex-col gap-2 p-4 rounded-xl transition"
+      // Material card recipe (diagonal gradient + 1px ambient shadow)
+      // matching WorkspaceCard / StatTile across the rest of the app.
+      // Hover-lift via translate-y so the cursor's path is rewarded
+      // with motion — same pattern as WorkspaceCard.
+      className="group flex flex-col gap-2 p-5 rounded-xl transition-all duration-300 hover:-translate-y-0.5"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${borderColor}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-center gap-2">

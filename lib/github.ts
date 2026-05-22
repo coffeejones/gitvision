@@ -38,7 +38,7 @@ import type { SecretScanResult } from "./security/types";
 
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN || undefined,
-  userAgent: "GitVision/0.1",
+  userAgent: "RepoBaron/0.1",
 });
 
 /**

@@ -53,7 +53,7 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
-  const denied = requireSessionOwnership(session, req);
+  const denied = await requireSessionOwnership(session, req);
   if (denied) return denied;
 
   // Daily AI budget kill-switch (global, ALL callers combined).

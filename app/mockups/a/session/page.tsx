@@ -414,7 +414,7 @@ export default function MockupASession() {
           className="pt-6 text-xs flex items-center justify-between border-t"
           style={{ borderColor: TOK.border, color: TOK.textMuted }}
         >
-          <span>GitVision · vercel/next.js</span>
+          <span>RepoBaron · vercel/next.js</span>
           <span>Rate limit: 4,997/5,000 · resets in 41 min</span>
         </footer>
       </main>

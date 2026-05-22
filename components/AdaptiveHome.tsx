@@ -1,32 +1,33 @@
 "use client";
 
-// Adaptive home (v0.69 / C3 polish).
+// Adaptive home (v0.69 / C3 polish + v0.76 login-required model).
 //
-// Reads ownerId from localStorage and decides which top-level
-// layout to render:
+// Decides which top-level layout to render based on the caller's
+// account state:
 //
-//   - 0 owned sessions → MarketingHome (hero + form + demos +
-//     feature grid + footer). What HN/Reddit first-timers see.
-//   - 1+ owned sessions → WorkspaceHome (input bar + ranked
-//     dashboard cards). What returning power-users see.
+//   - Logged-out OR logged-in with 0 owned sessions → MarketingHome
+//     (hero + demo cards as the headline lead-in + feature grid +
+//      footer). The pitch surface that converts new visitors.
+//   - Logged-in with 1+ owned sessions → WorkspaceHome (input bar
+//     + ranked dashboard cards). Returning users' home.
 //
-// Pre-hydration we render MarketingHome — it matches what the
-// server pre-renders so there's no flash. Once localStorage is
-// readable, we swap to WorkspaceHome if applicable.
+// Pre-hydration we trust the server-decided `initialLayout`, so the
+// first paint matches what the user will see (no flash).
 //
-// Why one switcher (vs. just enhancing LandingPanel): the two
-// layouts have entirely different page chrome (hero / no hero,
-// feature grid / no feature grid, footer / no footer). Co-locating
-// the switch keeps each layout component focused on its own job
-// and makes the "marketing vs power-user" decision visible in one
-// place.
+// Anonymous session creation was removed in v0.76. Sessions are
+// always bound to a user account; the cookie ownerId is no longer
+// used as a soft-ownership claim. Legacy sessions on disk that pre-
+// date this remain reachable by direct URL but don't surface in
+// workspace listings.
 
 import { useEffect, useState } from "react";
-import { filterSessionsByOwner, getOrCreateOwnerId } from "@/lib/ownerId";
+import { filterSessionsByUser } from "@/lib/ownerId";
+import { authClient } from "@/lib/authClient";
 import {
   sortWorkspaceByPriority,
   type WorkspaceSummary,
 } from "@/lib/intelligence/workspaceTypes";
+import type { DemoCard } from "@/lib/intelligence/demoCard";
 import type { SessionSummary } from "@/lib/types";
 import { type DemoRepo } from "@/components/RepoInputForm";
 import { MarketingHome } from "@/components/MarketingHome";
@@ -36,41 +37,51 @@ import { WorkspaceHome } from "@/components/WorkspaceHome";
 interface Props {
   demoRepos: DemoRepo[];
   demoSessions: Record<string, string>;
+  /** Rich DemoCard payload (WorkspaceSummary + scale stats) for each
+   *  pre-built demo session, keyed by repoFullName. Lets the demo
+   *  cards on the landing show real headline findings AND the scale
+   *  of analysis (files, functions, hotspots) — D4 Pass 2 polish. */
+  demoCards: Record<string, DemoCard>;
   initialSessions: SessionSummary[];
   workspaceSummaries: WorkspaceSummary[];
-  /** Total session count on disk (>= workspaceSummaries.length when
-   *  the cap kicked in). Used by WorkspaceHome's "showing N of M"
-   *  truncation hint. */
+  /** Total session count on disk owned by the caller. Used by
+   *  WorkspaceHome's "showing N of M" truncation hint. */
   totalOnDisk: number;
-  /** Server-decided initial layout based on the gv_owner_id cookie.
-   *  When the cookie matches a session in `initialSessions`, server
-   *  passes "workspace" so we skip the marketing-flash on hydration.
-   *  Defaults to "marketing" for first-time visitors and legacy
-   *  users without the cookie populated yet. */
+  /** Server-decided initial layout — "workspace" when the caller is
+   *  logged in and owns sessions, "marketing" otherwise. Server reads
+   *  the Better Auth session so the first paint matches what the
+   *  client computes post-hydration. */
   initialLayout: "marketing" | "workspace";
+  /** Server-decided auth state. Forwarded to MarketingHome so its
+   *  hero variant (demos vs LandingPanel) matches the first paint.
+   *  Post-hydration we recompute via useSession() in case the user
+   *  has signed in/out since the page loaded. */
+  initialLoggedIn: boolean;
 }
 
 export function AdaptiveHome({
   demoRepos,
   demoSessions,
+  demoCards,
   initialSessions,
   workspaceSummaries,
   totalOnDisk,
   initialLayout,
+  initialLoggedIn,
 }: Props) {
-  const [ownerId, setOwnerId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const { data: session } = authClient.useSession();
+  const userId = session?.user.id ?? null;
 
   useEffect(() => {
-    setOwnerId(getOrCreateOwnerId());
     setHydrated(true);
   }, []);
 
   // ⌘K / Ctrl+K opens the session-search palette. Listener lives at
-  // the AdaptiveHome level so it's active on both the marketing and
-  // workspace layouts — the palette itself short-circuits to a
-  // helpful empty state if the visitor has no sessions to search.
+  // the AdaptiveHome level so it's active on both layouts — the
+  // palette short-circuits to a helpful empty state if the visitor
+  // has no sessions to search.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -82,11 +93,15 @@ export function AdaptiveHome({
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  // The palette renders on top of whichever layout is active. We
-  // build the searchable session list before branching so the
-  // shortcut works identically on marketing and workspace surfaces.
+  // Recompute owned client-side once hydrated. The server already
+  // filtered `initialSessions` to the caller's own sessions (so the
+  // pre-hydration paint of WorkspaceHome doesn't flash other users'
+  // data — bug fixed v0.76 polish). This re-filter exists as a
+  // defensive net in case the client's auth state diverges from
+  // the server's (e.g. user just logged in via a popup); on the
+  // happy path it's a no-op.
   const visibleSessions = hydrated
-    ? filterSessionsByOwner(initialSessions, ownerId)
+    ? filterSessionsByUser(initialSessions, userId)
     : [];
 
   const palette = (
@@ -97,19 +112,9 @@ export function AdaptiveHome({
     />
   );
 
-  // Pre-hydration: trust the server-decided layout. The server read
-  // gv_owner_id from cookies and matched it against the loaded
-  // sessions — when that produced "workspace" we render the workspace
-  // shell directly, no marketing flash. Legacy users without the
-  // cookie (pre-v0.69) still see one flash on first visit while
-  // getOrCreateOwnerId populates the cookie; subsequent visits are
-  // silent.
+  // Pre-hydration: trust the server-decided layout.
   if (!hydrated) {
     if (initialLayout === "workspace") {
-      // Pre-sort here too — same logic the post-hydration path uses
-      // below — so the server-rendered shell shows cards in the
-      // same order they'll appear after hydration. Avoids a re-sort
-      // shuffle when the client takes over.
       const sorted = sortWorkspaceByPriority(workspaceSummaries);
       return (
         <>
@@ -123,20 +128,23 @@ export function AdaptiveHome({
         <MarketingHome
           demoRepos={demoRepos}
           demoSessions={demoSessions}
-          initialSessions={initialSessions}
+          demoCards={demoCards}
+          loggedIn={hydrated ? userId !== null : initialLoggedIn}
         />
         {palette}
       </>
     );
   }
 
+  // Post-hydration: client-state drives layout.
   if (visibleSessions.length === 0) {
     return (
       <>
         <MarketingHome
           demoRepos={demoRepos}
           demoSessions={demoSessions}
-          initialSessions={initialSessions}
+          demoCards={demoCards}
+          loggedIn={hydrated ? userId !== null : initialLoggedIn}
         />
         {palette}
       </>
@@ -161,17 +169,14 @@ export function AdaptiveHome({
         <MarketingHome
           demoRepos={demoRepos}
           demoSessions={demoSessions}
-          initialSessions={initialSessions}
+          demoCards={demoCards}
+          loggedIn={hydrated ? userId !== null : initialLoggedIn}
         />
         {palette}
       </>
     );
   }
 
-  // Post-hydration: override the server's totalOnDisk with the
-  // precise client-side filtered count. Server can only see what's
-  // in the cookie; client knows the authoritative owner-id from
-  // localStorage and may have a different (newer / corrected) view.
   return (
     <>
       <WorkspaceHome

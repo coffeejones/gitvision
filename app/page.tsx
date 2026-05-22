@@ -19,10 +19,12 @@
 // switch is instant and either path renders without an additional
 // fetch.
 
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { listSessions } from "@/lib/storage";
-import { DEMO_OWNER_ID, filterSessionsByOwner } from "@/lib/ownerId";
-import { getOwnerIdFromCookies } from "@/lib/ownerIdServer";
+import { DEMO_OWNER_ID, filterSessionsByUser } from "@/lib/ownerId";
 import { getWorkspaceSummaries } from "@/lib/intelligence/workspaceSummary";
+import { getDemoCard, type DemoCard } from "@/lib/intelligence/demoCard";
 import { type DemoRepo } from "@/components/RepoInputForm";
 import { AdaptiveHome } from "@/components/AdaptiveHome";
 
@@ -54,6 +56,10 @@ export default async function Home() {
   // direct navigation instead of triggering a fresh 20-second
   // analysis. Falls back to the prior pre-fill behaviour when a
   // demo button has no pre-analyzed counterpart on disk.
+  //
+  // Built from the unfiltered `sessions` list because demo sessions
+  // have ownerId === "demo" — they don't belong to any user, but
+  // every user should be able to open them.
   const demoSessions: Record<string, string> = {};
   for (const s of sessions) {
     if (s.ownerId !== DEMO_OWNER_ID) continue;
@@ -69,25 +75,50 @@ export default async function Home() {
     }
   }
 
-  // Workspace summaries — projected for the most-recent N sessions.
-  // AdaptiveHome filters this client-side via ownerId before deciding
-  // whether to render WorkspaceHome.
-  const summaryIds = sessions
+  // v0.76 D4: rich demo cards — each pre-built session gets both a
+  // WorkspaceSummary (for the headline/severity) AND a scale-stats
+  // payload (stars, files, functions, hotspots). Single JSON parse
+  // per session via getDemoCard. Bounded to the four DEMO_REPOS
+  // entries so cost is fixed.
+  const demoCards: Record<string, DemoCard> = {};
+  await Promise.all(
+    Object.entries(demoSessions).map(async ([repoFullName, sessionId]) => {
+      const card = await getDemoCard(sessionId);
+      if (card) demoCards[repoFullName] = card;
+    }),
+  );
+
+  // v0.76: login-required model. The workspace listing is gated
+  // behind sign-in; anonymous visitors see the marketing landing
+  // with demo sessions as the lead-in. Read the Better Auth session
+  // server-side so the initial paint matches what the user will see
+  // post-hydration (no flash between marketing and workspace).
+  const authSession = await auth.api.getSession({
+    headers: await headers(),
+  });
+  const userId = authSession?.user.id ?? null;
+
+  // Filter to the caller's own sessions ONCE on the server. Both
+  // `initialSessions` (sent to the client) and `workspaceSummaries`
+  // (the rich projection for the dashboard cards) are derived from
+  // this filtered list. Two things this fixes:
+  //   1. Privacy: we never ship other users' session metadata down
+  //      the wire just for the client to filter it back out.
+  //   2. Hydration flash: the initial server paint of WorkspaceHome
+  //      used to render with ALL workspaceSummaries until client
+  //      hydration filtered them down to the user's own. That
+  //      "wrong sessions flash for a split second, then mine appear"
+  //      bug is gone now that the server sends only the right set.
+  const userOwnedSessions = filterSessionsByUser(sessions, userId);
+
+  // Workspace summaries — projected for the caller's own most-recent
+  // sessions only. Cap bounds TTFB on users with many sessions; the
+  // rest stay on disk and are reachable via direct URL.
+  const summaryIds = userOwnedSessions
     .slice(0, WORKSPACE_SUMMARY_CAP)
     .map((s) => s.id);
   const workspaceSummaries = await getWorkspaceSummaries(summaryIds);
 
-  // v0.69: read ownerId from cookie (mirrored from localStorage by
-  // getOrCreateOwnerId on the client) so we can pre-decide the
-  // initial layout server-side. Without this the server always
-  // renders marketing — power-users then get a visible flash on
-  // hydration when the swap to WorkspaceHome happens. With the
-  // cookie present, server picks the right layout up front and
-  // hydration is silent.
-  const ownerIdFromCookie = await getOwnerIdFromCookies();
-  const userOwnedSessions = ownerIdFromCookie
-    ? filterSessionsByOwner(sessions, ownerIdFromCookie)
-    : [];
   const initialLayout: "marketing" | "workspace" =
     userOwnedSessions.length > 0 ? "workspace" : "marketing";
 
@@ -95,17 +126,22 @@ export default async function Home() {
     <AdaptiveHome
       demoRepos={DEMO_REPOS}
       demoSessions={demoSessions}
-      initialSessions={sessions}
+      demoCards={demoCards}
+      // Already filtered to the caller's own sessions (incl. legacy
+      // open ones, excl. demo + other users'). AdaptiveHome still
+      // re-runs filterSessionsByUser as a defensive net in case the
+      // client's auth state diverges from the server's, but the
+      // happy path is a no-op now.
+      initialSessions={userOwnedSessions}
       workspaceSummaries={workspaceSummaries}
-      // Bug fix (2026-05-16): was sessions.length — that counted ALL
-      // sessions on disk (including other users' sessions), so the
-      // "Showing N of M" hint in WorkspaceHome showed inflated totals
-      // like "1 of 68" when the caller only owns 1 session. Filter
-      // by cookie first so M represents the caller's actual total.
-      // AdaptiveHome may further override post-hydration if the
-      // client-side cookie state differs from the server's view.
       totalOnDisk={userOwnedSessions.length}
       initialLayout={initialLayout}
+      // Pass auth state explicitly. MarketingHome can't read
+      // next/headers itself — it gets pulled into the client bundle
+      // through AdaptiveHome — so we thread the server-decided value
+      // through. AdaptiveHome overrides this with useSession() once
+      // hydrated.
+      initialLoggedIn={userId !== null}
     />
   );
 }

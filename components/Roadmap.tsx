@@ -29,7 +29,13 @@ interface RoadmapItem {
 const SHIPPED: RoadmapItem[] = [
   {
     tag: "May 2026",
-    title: "GitVision PR-bot",
+    title: "Accounts + workspace",
+    description:
+      "Sign up with email or GitHub. Sessions tied to your account, accessible from any device. Connect GitHub from /account to link both sign-in methods.",
+  },
+  {
+    tag: "May 2026",
+    title: "RepoBaron PR-bot",
     description:
       "One grounded review comment on every PR. Same signal layer as the workspace, zero LLM cost.",
   },
@@ -45,17 +51,17 @@ const SHIPPED: RoadmapItem[] = [
     description:
       "AST-hash structural matching. Caught 36 ARM-rewrite copies in golang/go src/cmd.",
   },
-  {
-    tag: "Apr 2026",
-    title: "Untested hotspots",
-    description:
-      "Most-complex production functions with zero test caller, computed from the call graph.",
-  },
 ];
 
 const COMING: RoadmapItem[] = [
   {
     tag: "Next",
+    title: "Email verification",
+    description:
+      "Verify your email + recover forgotten passwords via Resend. GitHub OAuth currently works as the recovery path.",
+  },
+  {
+    tag: "Soon",
     title: "Pre-PR self-review",
     description:
       "Same signals, on your local branch, before the diff goes public. \"Check this before you push.\"",
@@ -68,15 +74,9 @@ const COMING: RoadmapItem[] = [
   },
   {
     tag: "Planned",
-    title: "More dep ecosystems",
+    title: "Private repos",
     description:
-      "Maven, NuGet, Go modules, Gradle — joining npm / Cargo / PyPI.",
-  },
-  {
-    tag: "Future",
-    title: "Private repos + OAuth",
-    description:
-      "PR-bot for private repos with proper auth and a per-team permission model.",
+      "Analyze private repos via per-account GitHub permissions. Auth layer is in place; permission model is the missing piece.",
   },
 ];
 
@@ -90,14 +90,18 @@ export function Roadmap() {
         </div>
       </div>
 
-      <div
-        className="grid grid-cols-1 md:grid-cols-2 gap-px overflow-hidden rounded-xl"
-        style={{ background: TOK.border }}
-      >
+      {/* Two columns as discrete cards (not gap-px table cells) — same
+       *  recipe as the "What you'll find" grid on MarketingHome so the
+       *  whole page reads as one design system. Each column carries
+       *  its own border + rounded corners, with `gap-4` between them. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* What's new — accent eyebrow signals "shipped" */}
         <div
-          className="p-6 flex flex-col gap-4"
-          style={{ background: TOK.bg }}
+          className="p-6 flex flex-col gap-4 rounded-xl"
+          style={{
+            background: TOK.bg,
+            border: `1px solid ${TOK.border}`,
+          }}
         >
           <div className="flex items-center gap-2">
             <Sparkles size={14} style={{ color: TOK.accent }} />
@@ -141,8 +145,11 @@ export function Roadmap() {
 
         {/* What's coming — muted eyebrow signals "future" */}
         <div
-          className="p-6 flex flex-col gap-4"
-          style={{ background: TOK.bg }}
+          className="p-6 flex flex-col gap-4 rounded-xl"
+          style={{
+            background: TOK.bg,
+            border: `1px solid ${TOK.border}`,
+          }}
         >
           <div className="flex items-center gap-2">
             <Calendar size={14} style={{ color: TOK.textSecondary }} />

@@ -76,17 +76,40 @@ export function WorkspaceCard({ summary }: Props) {
   return (
     <Link
       href={`/session/${summary.id}`}
-      className="group flex flex-col gap-3 p-4 rounded-xl transition"
+      // Apple-style material card:
+      //   - Subtle diagonal gradient (surfaceElevated → surface) gives
+      //     the card a "real material" feel rather than flat-colored.
+      //   - Hover-lift via translate-y plus a soft layered shadow that
+      //     intensifies under hover; the rest-state shadow is a near-
+      //     invisible 1px ambient so the card sits *on* the page, not
+      //     glued to it.
+      //   - 300ms ease so the hover feels deliberate, not flicker-y.
+      className="group flex flex-col gap-3.5 p-5 rounded-xl transition-all duration-300 hover:-translate-y-0.5"
       style={{
-        background: TOK.surface,
+        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
         border: `1px solid ${TOK.border}`,
+        boxShadow:
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow =
+          "0 1px 2px rgba(0, 0, 0, 0.2), 0 16px 40px -12px rgba(0, 0, 0, 0.5)";
+        e.currentTarget.style.borderColor = TOK.borderStrong;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow =
+          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)";
+        e.currentTarget.style.borderColor = TOK.border;
       }}
     >
-      {/* Identity row — repo + name on left, snapshot count + age on right */}
+      {/* Identity row — repo name leads (slightly heavier weight for
+       *  hierarchy), custom name is inline secondary, meta (snaps +
+       *  age) lives on the right at tertiary weight with tabular nums
+       *  so columns align cleanly across stacked cards. */}
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <div className="flex items-baseline gap-2 min-w-0">
           <span
-            className="font-mono text-sm truncate"
+            className="font-mono text-sm font-medium truncate"
             style={{ color: TOK.textPrimary }}
             title={summary.repoFullName}
           >
@@ -96,14 +119,14 @@ export function WorkspaceCard({ summary }: Props) {
             summary.name !== summary.repoFullName && (
               <span
                 className="text-xs truncate"
-                style={{ color: TOK.textSecondary }}
+                style={{ color: TOK.textMuted }}
               >
                 · {summary.name}
               </span>
             )}
         </div>
         <div
-          className="flex items-center gap-2 text-[11px] font-mono shrink-0"
+          className="flex items-center gap-2 text-[11px] font-mono tabular-nums shrink-0"
           style={{ color: TOK.textMuted }}
         >
           <span title={`${summary.snapshotCount} snapshots stored`}>
