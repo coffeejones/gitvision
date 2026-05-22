@@ -55,6 +55,21 @@ export const user = sqliteTable("user", {
   cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" })
     .notNull()
     .default(false),
+  // Daily refresh quota counter for Scout-tier rate-limiting (5/day).
+  // Reset whenever dailyRefreshDate changes (i.e. new day). Knight+
+  // tiers have unlimited refreshes — the counter is still updated
+  // but never enforced for them.
+  //
+  // Stored on user row rather than a separate refresh_log table for
+  // simplicity: we don't need historical analytics on refreshes, just
+  // "how many today". Single UPDATE per refresh, no joins.
+  dailyRefreshCount: integer("daily_refresh_count").notNull().default(0),
+  // ISO date string (YYYY-MM-DD) of the day the counter was last
+  // updated. When the request date != this value, we reset count to 1
+  // before checking the quota. Storing as text not timestamp because
+  // we only care about calendar-day granularity, and YYYY-MM-DD
+  // sorts/compares lexicographically.
+  dailyRefreshDate: text("daily_refresh_date"),
 });
 
 export const session = sqliteTable("session", {

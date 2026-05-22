@@ -15,6 +15,13 @@
       "when": 1779465373270,
       "tag": "0001_add_subscription_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1779476417622,
+      "tag": "0002_add_daily_refresh_counter",
+      "breakpoints": true
     }
   ]
 }

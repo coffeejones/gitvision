@@ -5,6 +5,9 @@
 
 import { NextResponse } from "next/server";
 import { after } from "next/server";
+import { headers as nextHeaders } from "next/headers";
+import { auth } from "@/lib/auth";
+import { checkAndIncrementRefresh } from "@/lib/billing/refreshQuota";
 import { parseRepoUrl } from "@/lib/github";
 import { createJob, processJob } from "@/lib/jobs";
 import { requireSessionOwnership } from "@/lib/ownership";
@@ -49,6 +52,27 @@ export async function POST(req: Request, ctx: Ctx) {
   // from the legitimate account owner on user-owned sessions (v0.76+).
   const denied = await requireSessionOwnership(session, req);
   if (denied) return denied;
+
+  // Tier gate: Scout users get 5 refreshes per day. Knight + Baron are
+  // unlimited (the helper still updates the counter for observability
+  // but doesn't reject). We check + increment AFTER ownership has been
+  // verified — wouldn't want a rate-limited "you're not the owner"
+  // error to consume one of the user's daily refreshes.
+  const authSession = await auth.api.getSession({
+    headers: await nextHeaders(),
+  });
+  if (authSession?.user) {
+    const quota = await checkAndIncrementRefresh(authSession.user.id);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: quota.reason ?? "Daily refresh limit reached",
+          quota: { used: quota.used, max: quota.max },
+        },
+        { status: 429 },
+      );
+    }
+  }
 
   const parsed = parseRepoUrl(session.repoUrl);
   if (!parsed) {

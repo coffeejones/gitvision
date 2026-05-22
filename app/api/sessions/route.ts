@@ -7,16 +7,18 @@ import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { getUserTier } from "@/lib/billing/gates";
+import { TIER_CONFIG } from "@/lib/pricing";
 import { extractOrgOrUserFromUrl, parseRepoUrl } from "@/lib/github";
 import { validateSubdir } from "@/lib/graph";
 import { createJob, processJob } from "@/lib/jobs";
-import { OWNER_ID_HEADER } from "@/lib/ownerId";
+import { filterSessionsByUser, OWNER_ID_HEADER } from "@/lib/ownerId";
 import {
   RATE_LIMITS,
   checkRateLimit,
   getClientIp,
 } from "@/lib/rateLimit";
-import { listSessions } from "@/lib/storage";
+import { deleteSession, listSessions } from "@/lib/storage";
 
 const CreateSchema = z.object({
   repoUrl: z.string().min(1),
@@ -118,6 +120,33 @@ export async function POST(req: Request) {
   // workspace listing and authorization checks look at.
   const ownerId = req.headers.get(OWNER_ID_HEADER) ?? undefined;
   const userId = authSession.user.id;
+
+  // Tier gate: Scout users get 1 saved session at a time. When they
+  // create a new one, auto-delete their oldest existing session
+  // (matches the "1 session at a time" wording on /pricing — it's
+  // not "you can't make new ones", it's "the new one replaces the
+  // old one"). Knight + Baron have unlimited saved sessions.
+  const userTier = await getUserTier(userId);
+  const savedSessionsCap = TIER_CONFIG[userTier].limits.savedSessions;
+  if (savedSessionsCap !== -1) {
+    const allSessions = await listSessions();
+    const userSessions = filterSessionsByUser(allSessions, userId);
+    if (userSessions.length >= savedSessionsCap) {
+      // Delete oldest first to bring count below the cap. Sort by
+      // updatedAt ascending → oldest first. We delete one at a time
+      // to keep the operation idempotent if it partially fails.
+      const sorted = [...userSessions].sort((a, b) =>
+        a.updatedAt.localeCompare(b.updatedAt),
+      );
+      const toDelete = sorted.slice(
+        0,
+        userSessions.length - savedSessionsCap + 1,
+      );
+      for (const s of toDelete) {
+        await deleteSession(s.id);
+      }
+    }
+  }
 
   // Enqueue the job. processJob runs detached via after() — the HTTP
   // request returns in <1s regardless of how long the actual analysis
