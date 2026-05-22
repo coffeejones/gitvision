@@ -66,9 +66,25 @@ export async function POST(req: Request) {
     event = validateEvent(rawBody, headers, secret);
   } catch (err) {
     if (err instanceof WebhookVerificationError) {
+      // Detailed debug logging to diagnose signature mismatches.
+      // Logs the headers Polar sent + secret length (NOT the secret
+      // itself) so we can spot misconfiguration without leaking
+      // credentials.
+      const headerKeys = Object.keys(headers).filter(
+        (k) =>
+          k.startsWith("webhook-") ||
+          k.startsWith("polar-") ||
+          k === "content-type",
+      );
       console.warn(
-        "[polar/webhook] Signature verification failed — rejecting",
+        "[polar/webhook] Signature verification failed:",
         err.message,
+        "\n  Webhook headers received:",
+        headerKeys.map((k) => `${k}=${headers[k].slice(0, 12)}...`).join(", "),
+        "\n  POLAR_WEBHOOK_SECRET length:",
+        secret.length,
+        "\n  Secret prefix:",
+        secret.slice(0, 6) + "...",
       );
       return NextResponse.json(
         { error: "Invalid signature" },
