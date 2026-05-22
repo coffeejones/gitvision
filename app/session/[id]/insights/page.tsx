@@ -17,9 +17,12 @@
 
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
+import { getAuthSession } from "@/lib/authSession";
+import { canAccess } from "@/lib/billing/gates";
 import { TOK } from "@/lib/theme";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
 import { HealthPanel } from "@/components/HealthPanel";
+import { UpgradePrompt } from "@/components/billing/UpgradePrompt";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +35,15 @@ export default async function InsightsRoute({
   const session = await getSession(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
+
+  // Tier gate: AI Insights is unlocked from Knight tier up. Scout
+  // users land on the upgrade prompt instead of the panels — we
+  // don't want to spend Anthropic tokens on free users + this is
+  // the strongest conversion hook in the product
+  const authSession = await getAuthSession();
+  const hasAiInsights = authSession
+    ? await canAccess(authSession.user.id, "aiInsights")
+    : false;
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-7xl mx-auto w-full">
@@ -63,8 +75,25 @@ export default async function InsightsRoute({
         </p>
       </header>
       <div id="screenshot-target" className="flex flex-col gap-8">
-        <AiSummaryPanel sessionId={session.id} snapshot={current} />
-        <HealthPanel sessionId={session.id} snapshot={current} />
+        {hasAiInsights ? (
+          <>
+            <AiSummaryPanel sessionId={session.id} snapshot={current} />
+            <HealthPanel sessionId={session.id} snapshot={current} />
+          </>
+        ) : (
+          <UpgradePrompt
+            featureName="AI Insights"
+            requiredTier="knight"
+            context="The deterministic Health Summary on your Overview page is free forever. AI Briefing + Health Check verdict — the prose layer that explains the signals in plain English — needs Knight."
+            unlockedFeatures={[
+              "AI Briefing — 150-word repo profile generated from your codebase",
+              "Health Check verdict — three-column \"what works / dig deeper / open questions\" grounded in 17 signals",
+              "Structural diff between snapshots (see what changed semantically)",
+              "Auto-extracted Architecture diagrams",
+              "Unlimited saved sessions + private repos",
+            ]}
+          />
+        )}
       </div>
     </main>
   );

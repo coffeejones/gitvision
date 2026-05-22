@@ -19,12 +19,15 @@
 
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
+import { getAuthSession } from "@/lib/authSession";
+import { canAccess } from "@/lib/billing/gates";
 import {
   computeScopeOptions,
   generateClassDiagram,
 } from "@/lib/intelligence/classDiagram";
 import { TOK } from "@/lib/theme";
 import { ArchitecturePanel } from "@/components/views/ArchitecturePanel";
+import { UpgradePrompt } from "@/components/billing/UpgradePrompt";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +43,14 @@ export default async function ArchitectureRoute({
   const session = await getSession(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
+
+  // Tier gate: Architecture diagrams unlock from Knight tier up.
+  // Scout still gets the editorial hero (so the upgrade prompt has
+  // context), but the actual diagram is hidden.
+  const authSession = await getAuthSession();
+  const hasArchitecture = authSession
+    ? await canAccess(authSession.user.id, "architectureDiagrams")
+    : false;
 
   const codeGraph = current.codeGraph;
 
@@ -106,13 +117,28 @@ export default async function ArchitectureRoute({
         </p>
       </header>
       <div id="screenshot-target" className="flex flex-col gap-4">
-        <ArchitecturePanel
-          diagram={diagram}
-          codeGraph={codeGraph}
-          codeGraphSkipReason={current.codeGraphSkipReason}
-          scopeOptions={scopeOptions}
-          currentScope={currentScope}
-        />
+        {hasArchitecture ? (
+          <ArchitecturePanel
+            diagram={diagram}
+            codeGraph={codeGraph}
+            codeGraphSkipReason={current.codeGraphSkipReason}
+            scopeOptions={scopeOptions}
+            currentScope={currentScope}
+          />
+        ) : (
+          <UpgradePrompt
+            featureName="Architecture diagrams"
+            requiredTier="knight"
+            context="Auto-extracted class diagrams from your codebase's AST — classes, interfaces, method relationships, ready to paste into mermaid.live or your README."
+            unlockedFeatures={[
+              "Class diagrams rendered automatically from your codebase",
+              "Scope-filter to focus on one folder at a time",
+              "Copy as Mermaid source — paste anywhere",
+              "AI Briefing + Health Check verdict",
+              "Unlimited saved sessions + private repos",
+            ]}
+          />
+        )}
       </div>
     </main>
   );

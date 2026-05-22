@@ -39,6 +39,8 @@
 
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
+import { getAuthSession } from "@/lib/authSession";
+import { canAccess } from "@/lib/billing/gates";
 import {
   ArrowRight,
   Boxes,
@@ -177,9 +179,17 @@ export default async function OverviewPage({
   // v0.67: per-function / per-file structural diff. Computed only
   // when there's a previous snapshot AND there's actual content to
   // show — small refreshes that touched no code don't need a panel.
+  // v0.78: gated to Knight+ — Scout sees the SinceLastVisit aggregate
+  // diff but not the per-function semantic deltas.
+  const authSession = await getAuthSession();
+  const hasStructuralDiff = authSession
+    ? await canAccess(authSession.user.id, "structuralDiff")
+    : false;
   const structDiff = previous ? structuralDiff(previous, current) : null;
   const showStructuralDiff =
-    structDiff !== null && structuralDiffHasContent(structDiff);
+    hasStructuralDiff &&
+    structDiff !== null &&
+    structuralDiffHasContent(structDiff);
 
   const base = `/session/${session.id}`;
 

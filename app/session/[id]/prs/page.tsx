@@ -13,6 +13,8 @@
 
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
+import { getAuthSession } from "@/lib/authSession";
+import { getUserTier } from "@/lib/billing/gates";
 import { PRFlow } from "@/components/views/PRFlow";
 import { PRBotCallout } from "@/components/views/PRBotCallout";
 
@@ -28,12 +30,20 @@ export default async function PRsRoute({
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 
+  // The PR-flow historical analysis is free for all tiers. The
+  // PR-bot installation callout below is tier-gated — Scout sees
+  // "Upgrade to install" instead of the Install CTA.
+  const authSession = await getAuthSession();
+  const userTier = authSession
+    ? await getUserTier(authSession.user.id)
+    : "scout";
+
   return (
     <main className="px-8 py-8 flex flex-col gap-4 max-w-7xl mx-auto w-full">
       <div id="screenshot-target" className="flex flex-col gap-4">
         <PRFlow prs={current.pullRequests ?? []} />
       </div>
-      <PRBotCallout />
+      <PRBotCallout userTier={userTier} />
     </main>
   );
 }

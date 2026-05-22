@@ -11,14 +11,30 @@
 // privacy + limits one-liner. Anything deeper (FAQ, troubleshooting,
 // configuration) belongs on the README or a future dedicated page.
 
-import { ArrowUpRight, GitPullRequest, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  GitPullRequest,
+  Lock,
+  ShieldCheck,
+} from "lucide-react";
 import { TOK } from "@/lib/theme";
+import type { Tier } from "@/components/TierIcon";
 
 const INSTALL_URL = "https://github.com/apps/repobaron-pr";
 const LEARN_MORE_URL =
   "https://github.com/coffeejones/repobaron#pr-bot-github-app";
 
-export function PRBotCallout() {
+interface Props {
+  /** Subscription tier of the viewing user. Scout sees an upgrade
+   *  prompt instead of the Install CTA — bot install is a Knight+
+   *  feature. */
+  userTier: Tier;
+}
+
+export function PRBotCallout({ userTier }: Props) {
+  const canInstall = userTier !== "scout";
   return (
     <section
       className="flex flex-col gap-5 pt-8 mt-2"
@@ -130,21 +146,37 @@ export function PRBotCallout() {
             </ol>
           </div>
 
-          {/* CTA row — primary install + secondary learn-more */}
+          {/* CTA row — primary install for Knight+ / upgrade-prompt
+           *  for Scout. Secondary learn-more link is the same for both. */}
           <div className="flex items-center gap-3 flex-wrap pt-1">
-            <a
-              href={INSTALL_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition"
-              style={{
-                background: TOK.accent,
-                color: TOK.accentOn,
-              }}
-            >
-              Install RepoBaron-PR
-              <ArrowUpRight size={14} />
-            </a>
+            {canInstall ? (
+              <a
+                href={INSTALL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition"
+                style={{
+                  background: TOK.accent,
+                  color: TOK.accentOn,
+                }}
+              >
+                Install RepoBaron-PR
+                <ArrowUpRight size={14} />
+              </a>
+            ) : (
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition hover:opacity-90"
+                style={{
+                  background: TOK.textPrimary,
+                  color: TOK.bg,
+                }}
+              >
+                <Lock size={13} />
+                Upgrade to install
+                <ArrowRight size={13} />
+              </Link>
+            )}
             <a
               href={LEARN_MORE_URL}
               target="_blank"
