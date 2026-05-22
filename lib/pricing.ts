@@ -112,8 +112,8 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
     tagline: "Capable analysis for serious work.",
     monthlyPriceUsd: 14.99,
     annualPriceUsd: 149.99,
-    polarProductIdMonthly: "",
-    polarProductIdAnnual: "",
+    polarProductIdMonthly: "e4a98280-2920-41b9-af24-f713841b22f6",
+    polarProductIdAnnual: "4ebaff71-30bb-46da-ba0a-a8df457fd277",
     limits: {
       savedSessions: -1,
       refreshesPerDay: -1,
@@ -144,8 +144,8 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
     tagline: "Master every repo you touch.",
     monthlyPriceUsd: 39,
     annualPriceUsd: 390,
-    polarProductIdMonthly: "",
-    polarProductIdAnnual: "",
+    polarProductIdMonthly: "feabdb6f-55e1-4e3a-94a5-bd0c3ae609a3",
+    polarProductIdAnnual: "424ec832-e69b-49f0-8eda-417fc845a909",
     limits: {
       savedSessions: -1,
       refreshesPerDay: -1,

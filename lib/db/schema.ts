@@ -32,6 +32,29 @@ export const user = sqliteTable("user", {
   // without an extra API roundtrip. `input: false` in auth.ts config
   // prevents clients from setting it via the signup payload.
   githubLogin: text("github_login"),
+  // Subscription tier — drives feature gating across the app. Default
+  // "scout" for new signups; flipped to "knight" / "baron" by the
+  // Polar webhook handler when checkout completes or status changes.
+  tier: text("tier").notNull().default("scout"),
+  // Polar's identifier for the active subscription. Nullable for
+  // Scout (no subscription) and for users who cancelled.
+  polarSubscriptionId: text("polar_subscription_id"),
+  // Subscription lifecycle status from Polar:
+  //   "active"   — billing OK, full access
+  //   "trialing" — inside 14-day trial, full access
+  //   "canceled" — user cancelled, access until currentPeriodEnd
+  //   "revoked"  — payment failed, immediate downgrade
+  //   "past_due" — last invoice failed but still in grace period
+  // Null when tier === "scout" (no subscription).
+  subscriptionStatus: text("subscription_status"),
+  // End of the current billing period. After this, the user either
+  // re-bills (active) or drops to scout (canceled / revoked).
+  currentPeriodEnd: integer("current_period_end", { mode: "timestamp" }),
+  // True when user has scheduled cancellation but is still in the
+  // paid period. UI shows "Plan ends on X" instead of "Renews on X".
+  cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" })
+    .notNull()
+    .default(false),
 });
 
 export const session = sqliteTable("session", {

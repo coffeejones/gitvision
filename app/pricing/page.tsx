@@ -8,7 +8,9 @@
 // sync with auth-gating + Polar webhook handler.
 
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Check, X } from "lucide-react";
+import { auth } from "@/lib/auth";
 import { MarketingNav } from "@/components/MarketingNav";
 import { TierIcon } from "@/components/TierIcon";
 import { TOK } from "@/lib/theme";
@@ -21,6 +23,7 @@ import {
   formatPrice,
 } from "@/lib/pricing";
 import { PricingBillingToggle } from "@/components/pricing/PricingBillingToggle";
+import { CheckoutCTA } from "@/components/pricing/CheckoutCTA";
 
 export const metadata: Metadata = {
   title: "Pricing — RepoBaron",
@@ -43,6 +46,15 @@ export default async function PricingPage({
   const sp = await searchParams;
   const initialBilling: "monthly" | "annual" =
     sp.billing === "monthly" ? "monthly" : "annual";
+
+  // Read auth state server-side so the CheckoutCTA knows whether to
+  // POST directly to /api/billing/checkout (logged-in) or redirect to
+  // /signup with intent preserved (logged-out). Avoids a flash of the
+  // wrong CTA-state on hydration.
+  const authSession = await auth.api.getSession({
+    headers: await headers(),
+  });
+  const loggedIn = !!authSession?.user;
 
   return (
     <div
@@ -92,7 +104,7 @@ export default async function PricingPage({
           <PricingBillingToggle initial={initialBilling} />
         </div>
 
-        <PricingCards billing={initialBilling} />
+        <PricingCards billing={initialBilling} loggedIn={loggedIn} />
 
         <FeatureComparisonTable />
       </main>
@@ -100,7 +112,13 @@ export default async function PricingPage({
   );
 }
 
-function PricingCards({ billing }: { billing: "monthly" | "annual" }) {
+function PricingCards({
+  billing,
+  loggedIn,
+}: {
+  billing: "monthly" | "annual";
+  loggedIn: boolean;
+}) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
       {TIER_ORDER.map((tierId) => {
@@ -212,11 +230,13 @@ function PricingCards({ billing }: { billing: "monthly" | "annual" }) {
             </div>
 
             {/* CTA */}
-            <CheckoutButton
+            <CheckoutCTA
               tierId={tier.id}
               billing={billing}
               isPaid={isPaid}
               isRecommended={tier.isRecommended}
+              loggedIn={loggedIn}
+              trialDays={TRIAL_DAYS}
             />
 
             {/* Feature bullets */}
@@ -244,46 +264,6 @@ function PricingCards({ billing }: { billing: "monthly" | "annual" }) {
         );
       })}
     </div>
-  );
-}
-
-function CheckoutButton({
-  tierId,
-  billing,
-  isPaid,
-  isRecommended,
-}: {
-  tierId: string;
-  billing: "monthly" | "annual";
-  isPaid: boolean;
-  isRecommended: boolean;
-}) {
-  // P3 will wire this to Polar.sh checkout. For now it links to /signup
-  // for paid tiers (where we'll later inject the upgrade flow) and
-  // straight to / for Scout (sign up + start using).
-  const href = isPaid
-    ? `/signup?tier=${tierId}&billing=${billing}`
-    : "/signup?tier=scout";
-
-  const isPrimary = isRecommended;
-  const label = isPaid ? `Start ${TRIAL_DAYS}-day trial` : "Start free";
-
-  return (
-    <a
-      href={href}
-      className="inline-flex items-center justify-center h-11 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 mt-1"
-      style={{
-        background: isPrimary
-          ? TOK.textPrimary
-          : "rgba(255, 255, 255, 0.04)",
-        color: isPrimary ? TOK.bg : TOK.textPrimary,
-        border: isPrimary
-          ? "none"
-          : `1px solid rgba(255, 255, 255, 0.1)`,
-      }}
-    >
-      {label}
-    </a>
   );
 }
 
