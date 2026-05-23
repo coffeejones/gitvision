@@ -43,6 +43,8 @@ import { FeedbackLink } from "@/components/FeedbackLink";
 import { MarketingNav } from "@/components/MarketingNav";
 import { Logo } from "@/components/Logo";
 import { Roadmap } from "@/components/Roadmap";
+import { TierIcon, type Tier } from "@/components/TierIcon";
+import { TIER_CONFIG } from "@/lib/pricing";
 import type { DemoCard } from "@/lib/intelligence/demoCard";
 import { ScrollReveal } from "@/components/ScrollReveal";
 
@@ -93,8 +95,25 @@ export function MarketingHome({
         {/* Hero — tight, Linear-style. Single solid color (no
          *  gradient-clipped text — that pattern reads ChatGPT-y).
          *  Title sits at text-4xl/5xl max so it doesn't dominate
-         *  the viewport. */}
+         *  the viewport.
+         *
+         *  v0.79 hero surgery: pivoted from a generic "Know your code
+         *  before you touch it" slogan — which CodeRabbit, Sourcegraph,
+         *  or Greptile could ship verbatim — to a competitor-anchored
+         *  wedge that names the only word the rest of the field
+         *  literally cannot claim: "deterministic". LLM-core competitors
+         *  (CodeRabbit, Greptile, Cody, Cursor) cannot pivot to "no LLM"
+         *  without invalidating their own product narrative, so owning
+         *  this framing is structurally defensible. The `git blame`
+         *  reference signals "we know what auditing actually means" to
+         *  a senior dev in three words. */}
         <section className="flex flex-col gap-5">
+          <span
+            className="text-[10px] uppercase tracking-[0.18em] font-medium"
+            style={{ color: TOK.accent }}
+          >
+            Deterministic · No LLM
+          </span>
           <h1
             className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight"
             style={{
@@ -103,16 +122,31 @@ export function MarketingHome({
               lineHeight: 1.1,
             }}
           >
-            Know your code before you touch it.
+            The codebase tool that doesn&apos;t guess.
           </h1>
 
           <p
             className="text-base sm:text-lg max-w-2xl leading-relaxed"
             style={{ color: TOK.textSecondary }}
           >
-            Paste any GitHub repo. Get a deterministic map of risk,
-            complexity, and structural debt — in under a minute. No LLM
-            guesses, just 17 grounded signals across 7 languages.
+            Every finding is a deterministic AST signal you can verify
+            in{" "}
+            <code
+              style={{
+                fontFamily:
+                  "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: "0.92em",
+                padding: "1px 5px",
+                background: "rgba(255,255,255,0.06)",
+                border: `1px solid ${TOK.border}`,
+                borderRadius: 4,
+                color: TOK.textPrimary,
+              }}
+            >
+              git blame
+            </code>
+            . No prompts, no hallucinations, no LLM bill — just 17
+            grounded signals across 7 languages.
           </p>
 
           {loggedIn ? (
@@ -139,10 +173,255 @@ export function MarketingHome({
           )}
         </section>
 
-      {/* What you'll find — feature-specific cards. ScrollReveal
-       *  triggers a 12px slide + fade when the section enters the
-       *  viewport. Once revealed, the observer disconnects so it
-       *  doesn't re-animate on scroll-back. */}
+      {/* Findings from real repos — concrete proof, promoted to lead
+       *  section (v0.79 polish). The page's most defensible content is
+       *  the four falsifiable, numerical findings on famous repos —
+       *  burying them under a generic feature-grid was backwards rhythm
+       *  ("category → benefits → proof" instead of "proof → category").
+       *  Swapped order: findings now hit the eye SECOND (after hero),
+       *  feature catalog demoted to third. Eyebrow lists the repos
+       *  directly so a dev recognises the proof set before reading any
+       *  body copy. */}
+      <ScrollReveal>
+      <section className="flex flex-col gap-5">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <h2 className={STYLE.sectionTitle}>Findings from real repos</h2>
+          <div
+            className="text-xs font-mono"
+            style={{ color: TOK.textMuted }}
+          >
+            golang/go · django/django · pallets/flask · spring-petclinic
+          </div>
+        </div>
+
+        {/* 2-col grid of finding cards. Drops the prior tabular layout
+         *  (fixed-width left column + stacked rows) which read as
+         *  "spreadsheet of evidence". New layout: repo + signal as
+         *  inline meta header, finding text below as the body. Same
+         *  card recipe as the feature grid below so the page reads as
+         *  one design system. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {[
+            {
+              repo: "golang/go",
+              finding:
+                "Near-duplicates found 36 copies of one ARM register-shift rewrite pattern across src/cmd/compile — canonical SSA-rewrite family.",
+              signal: "Near-duplicates",
+            },
+            {
+              repo: "django/django",
+              finding:
+                "_alter_field has cyclomatic complexity 91 — the schema migration's most complex single method. Two test callers, zero direct tests.",
+              signal: "Untested hotspots",
+            },
+            {
+              repo: "pallets/flask",
+              finding:
+                "load_dotenv grew +4 cyclomatic complexity between 3.0.3 and 3.1.0 — no tests changed in the same module. Caught at PR time by our rules engine.",
+              signal: "PR-bot · complexity delta",
+            },
+            {
+              repo: "spring-projects/spring-petclinic",
+              finding:
+                "Type-aware call resolution resolved 8 ambiguous validate() call-sites to the right overload. Unresolved list is now exclusively stdlib + Spring.",
+              signal: "Call graph",
+            },
+          ].map((f) => (
+            <div
+              key={f.repo}
+              className="flex flex-col gap-3 p-5 rounded-xl transition-all duration-200 hover:-translate-y-0.5"
+              style={{
+                background: TOK.bg,
+                border: `1px solid ${TOK.border}`,
+              }}
+            >
+              <div className="flex items-center gap-2 text-xs">
+                <span
+                  className="font-mono"
+                  style={{ color: TOK.textPrimary }}
+                >
+                  {f.repo}
+                </span>
+                <span style={{ color: TOK.textMuted }}>·</span>
+                <span style={{ color: TOK.accent }}>{f.signal}</span>
+              </div>
+              <p
+                className="text-sm leading-relaxed"
+                style={{ color: TOK.textSecondary }}
+              >
+                {f.finding}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+      </ScrollReveal>
+
+      {/* Auditable pipeline — embed the real source of one signal
+       *  detector right on the landing. v0.79 polish: this is the
+       *  single claim LLM-core competitors (CodeRabbit, Greptile,
+       *  Cursor, Cody) structurally cannot follow — their prompts
+       *  and weights ARE the moat, opening them lets competitors
+       *  copy the system. RepoBaron's noncommercial license lets us
+       *  be source-available without losing pricing power, so this
+       *  becomes a defensible moat-claim, not just marketing copy.
+       *
+       *  Snippet is the actual untested-hotspots detector verbatim
+       *  from lib/signals.ts (31 lines as of v0.79). Show, don't
+       *  tell — dev sees the rule, reads it in 30 seconds, internal
+       *  trust meter ticks up. The hairline window-chrome at the top
+       *  signals "this is a real file you can navigate to", not
+       *  "marketing mockup with code-themed decoration". */}
+      <ScrollReveal>
+      <section className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-8 lg:gap-10 items-center">
+        {/* Left: real source code from lib/signals.ts. Plain mono,
+         *  no syntax highlighting — the rawness IS the claim. */}
+        <div
+          className="rounded-xl overflow-hidden flex flex-col"
+          style={{
+            background: TOK.bgDeep,
+            border: `1px solid ${TOK.border}`,
+            boxShadow: [
+              "0 1px 2px rgba(0, 0, 0, 0.2)",
+              "0 8px 24px -4px rgba(0, 0, 0, 0.3)",
+              "0 32px 64px -16px rgba(0, 0, 0, 0.45)",
+            ].join(", "),
+          }}
+        >
+          {/* File chrome — mimics an editor tab strip. The path is
+           *  clickable through to the live source on GitHub. */}
+          <div
+            className="flex items-center justify-between px-4 py-2.5"
+            style={{
+              borderBottom: `1px solid ${TOK.border}`,
+              background: "rgba(255,255,255,0.02)",
+            }}
+          >
+            <span
+              className="text-[11px] font-mono"
+              style={{ color: TOK.textMuted }}
+            >
+              lib/signals.ts · detectUntestedHotspots
+            </span>
+            <a
+              href="https://github.com/coffeejones/repobaron/blob/main/lib/signals.ts"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] font-medium hover:opacity-80 transition"
+              style={{ color: TOK.accent }}
+            >
+              View on GitHub
+              <ArrowUpRight size={10} />
+            </a>
+          </div>
+          <pre
+            className="text-[11px] sm:text-[12px] leading-relaxed overflow-x-auto p-4 sm:p-5"
+            style={{
+              fontFamily:
+                "ui-monospace, SFMono-Regular, Menlo, monospace",
+              color: TOK.textSecondary,
+              margin: 0,
+            }}
+          >
+{`function detectUntestedHotspots(snap: AnalysisSnapshot): HealthSignal[] {
+  const { allPaths, allTests, codeFileCount } = collectPathIndices(snap);
+
+  const codeHotspots = snap.hotspots
+    .slice(0, 25)
+    .filter((h) => isCodeFile(h.path));
+  if (codeHotspots.length < 5) return [];
+
+  // Global sanity gate — plenty of tests exist, we just can't connect them.
+  if (allTests.size >= 30) return [];
+  if (codeFileCount > 0 && allTests.size / codeFileCount >= 0.25) return [];
+
+  const untested = codeHotspots.filter(
+    (h) => !hasTestCoverage(h, allPaths, allTests, snap.fileGraph)
+  );
+  const pct = Math.round((untested.length / codeHotspots.length) * 100);
+  if (pct < 50) return [];
+
+  return [{
+    id: "untested-hotspots",
+    title: "Hot files lack visible tests",
+    detail: \`\${pct}% of top-churn files have no discoverable test.\`,
+    severity: pct > 80 ? "high" : "medium",
+  }];
+}`}
+          </pre>
+        </div>
+
+        {/* Right: the pitch. Brief — the snippet IS the argument; copy
+         *  just frames it. */}
+        <div className="flex flex-col gap-4">
+          <span
+            className="text-[10px] uppercase tracking-[0.18em] font-medium"
+            style={{ color: TOK.accent }}
+          >
+            Auditable pipeline
+          </span>
+          <h2
+            className="text-2xl sm:text-3xl font-semibold tracking-tight"
+            style={{ color: TOK.textPrimary, letterSpacing: "-0.02em" }}
+          >
+            Every detector. Plain TypeScript. On GitHub.
+          </h2>
+          <p
+            className="text-sm sm:text-base leading-relaxed"
+            style={{ color: TOK.textSecondary }}
+          >
+            No prompts. No weights. No proprietary scoring. When
+            RepoBaron flags a hotspot, the rule that produced the
+            verdict is a few dozen lines you can read, fork, and file
+            an issue against.
+          </p>
+          <ul
+            className="flex flex-col gap-2 text-sm mt-1"
+            style={{ color: TOK.textSecondary }}
+          >
+            <li className="flex items-start gap-2">
+              <span
+                className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0"
+                style={{ background: TOK.accent }}
+              />
+              <span>17 detectors, all pure functions over the same snapshot</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span
+                className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0"
+                style={{ background: TOK.accent }}
+              />
+              <span>No black-box ranking — every severity is a deterministic threshold</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span
+                className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0"
+                style={{ background: TOK.accent }}
+              />
+              <span>Source-available under PolyForm Noncommercial</span>
+            </li>
+          </ul>
+          <a
+            href="https://github.com/coffeejones/repobaron/blob/main/lib/signals.ts"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm font-medium mt-2 hover:underline transition w-fit"
+            style={{ color: TOK.accent }}
+          >
+            See all 17 signal definitions on GitHub
+            <ArrowUpRight size={14} />
+          </a>
+        </div>
+      </section>
+      </ScrollReveal>
+
+      {/* What you'll find — feature catalog (demoted to third section
+       *  in v0.79 polish, after the proof rail above). Stays as the
+       *  feature reference grid: visitors who want the full capability
+       *  taxonomy find it here, but they no longer encounter it before
+       *  the evidence. ScrollReveal triggers a 12px slide + fade when
+       *  the section enters the viewport. Once revealed, the observer
+       *  disconnects so it doesn't re-animate on scroll-back. */}
       <ScrollReveal>
       <section className="flex flex-col gap-5">
         <div className="flex items-baseline justify-between">
@@ -235,79 +514,6 @@ export function MarketingHome({
       </section>
       </ScrollReveal>
 
-      {/* Real findings — concrete proof. */}
-      <ScrollReveal>
-      <section className="flex flex-col gap-5">
-        <div className="flex items-baseline justify-between">
-          <h2 className={STYLE.sectionTitle}>Real findings</h2>
-          <div className="text-xs" style={{ color: TOK.textMuted }}>
-            actual signals from our analysis of famous repos
-          </div>
-        </div>
-
-        {/* 2-col grid of finding cards. Drops the prior tabular layout
-         *  (fixed-width left column + stacked rows) which read as
-         *  "spreadsheet of evidence". New layout: repo + signal as
-         *  inline meta header, finding text below as the body. Same
-         *  card recipe as the feature grid above so the page reads as
-         *  one design system. */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {[
-            {
-              repo: "golang/go",
-              finding:
-                "Near-duplicates found 36 copies of one ARM register-shift rewrite pattern across src/cmd/compile — canonical SSA-rewrite family.",
-              signal: "Near-duplicates",
-            },
-            {
-              repo: "django/django",
-              finding:
-                "_alter_field has cyclomatic complexity 91 — the schema migration's most complex single method. Two test callers, zero direct tests.",
-              signal: "Untested hotspots",
-            },
-            {
-              repo: "pallets/flask",
-              finding:
-                "load_dotenv grew +4 cyclomatic complexity between 3.0.3 and 3.1.0 — no tests changed in the same module. Caught at PR time by our rules engine.",
-              signal: "PR-bot · complexity delta",
-            },
-            {
-              repo: "spring-projects/spring-petclinic",
-              finding:
-                "Type-aware call resolution resolved 8 ambiguous validate() call-sites to the right overload. Unresolved list is now exclusively stdlib + Spring.",
-              signal: "Call graph",
-            },
-          ].map((f) => (
-            <div
-              key={f.repo}
-              className="flex flex-col gap-3 p-5 rounded-xl transition-all duration-200 hover:-translate-y-0.5"
-              style={{
-                background: TOK.bg,
-                border: `1px solid ${TOK.border}`,
-              }}
-            >
-              <div className="flex items-center gap-2 text-xs">
-                <span
-                  className="font-mono"
-                  style={{ color: TOK.textPrimary }}
-                >
-                  {f.repo}
-                </span>
-                <span style={{ color: TOK.textMuted }}>·</span>
-                <span style={{ color: TOK.accent }}>{f.signal}</span>
-              </div>
-              <p
-                className="text-sm leading-relaxed"
-                style={{ color: TOK.textSecondary }}
-              >
-                {f.finding}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-      </ScrollReveal>
-
       {/* Two surfaces — side-by-side cards. Each card has a visual
        *  element specific to its surface: Workspace shows a compact
        *  "health dimensions" grid mockup, PR-bot shows a compact PR
@@ -326,19 +532,108 @@ export function MarketingHome({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SurfaceCard
-            eyebrow="Workspace · repobaron.com"
-            title="Map an entire repo"
+            eyebrow="Workspace"
+            title="One repo, all 17 signals"
             body="Paste a URL. Get an explorable canvas, blast radius, untested hotspots, near-duplicates, dependency health, and a red / yellow / green verdict grounded in 17 deterministic signals — all under one workspace."
-            footer="Free account · public repos · sessions saved as JSON · works on monorepo subdirectories"
+            footer="Public repos, free. Sessions saved as JSON. Scope to a subdirectory via deep-link."
             visual={<WorkspaceDimensionsMockup />}
           />
           <SurfaceCard
             eyebrow="PR-bot · GitHub App"
             title="Review every PR"
             body="Install the GitHub App on a public repo. On every PR, get one grounded review comment with the top verification signals from the diff — linked back to the workspace for the deep dive."
-            footer="Private beta · zero LLM cost · find-or-update on every synchronize"
+            footer={
+              <>
+                Private beta. Updates the same comment on every{" "}
+                <code
+                  style={{
+                    fontFamily:
+                      "ui-monospace, SFMono-Regular, Menlo, monospace",
+                    fontSize: "0.92em",
+                    padding: "0 4px",
+                    background: "rgba(255,255,255,0.04)",
+                    border: `1px solid ${TOK.border}`,
+                    borderRadius: 3,
+                  }}
+                >
+                  synchronize
+                </code>{" "}
+                event. No tokens spent per PR.
+              </>
+            }
             visual={<PRBotCompactMockup />}
           />
+        </div>
+      </section>
+      </ScrollReveal>
+
+      {/* Tier ribbon — Scout / Knight / Baron with capability verbs.
+       *  v0.79 polish: the Scout/Knight/Baron brand world lived only
+       *  on /pricing before this — a visitor reading the landing top-
+       *  to-bottom never met the tiers as story, so by the time they
+       *  hit pricing the names felt arbitrary instead of inevitable.
+       *  One quiet row — no checkmarks, no prices, no CTA-button —
+       *  just "see / read / own" as the three-step capability ladder.
+       *
+       *  The TierIcon slot is mascot-ready: when Jonas's custom Scout
+       *  / Knight / Baron illustrations are finished, they drop into
+       *  the existing TierIcon component with zero markup changes
+       *  here. The 32px frame holds either a lucide icon or an image.
+       *
+       *  Per gamification critique: this is the GitHub language-stat
+       *  bar pattern, not a feature card. Subtraction is the point —
+       *  any decoration here turns the section into Duolingo-cringe. */}
+      <ScrollReveal>
+      <section className="flex flex-col gap-5">
+        <div className="flex items-baseline justify-between">
+          <h2 className={STYLE.sectionTitle}>Three tiers</h2>
+          <Link
+            href="/pricing"
+            className="text-xs hover:underline transition"
+            style={{ color: TOK.textMuted }}
+          >
+            See pricing →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {(
+            [
+              { id: "scout", verb: "see the map" },
+              { id: "knight", verb: "read the verdict" },
+              { id: "baron", verb: "own the repo" },
+            ] as const
+          ).map((t) => {
+            const cfg = TIER_CONFIG[t.id as Tier];
+            return (
+              <div
+                key={t.id}
+                className="flex items-center gap-4 p-5 rounded-xl"
+                style={{
+                  background: TOK.bg,
+                  border: `1px solid ${TOK.border}`,
+                }}
+              >
+                <TierIcon tier={t.id} size={32} />
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <span
+                    className="text-[10px] uppercase tracking-[0.18em] font-medium"
+                    style={{ color: TOK.textMuted }}
+                  >
+                    {cfg.name}
+                  </span>
+                  <span
+                    className="text-base font-semibold tracking-tight"
+                    style={{
+                      color: TOK.textPrimary,
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {t.verb}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
       </ScrollReveal>
@@ -758,7 +1053,10 @@ function SurfaceCard({
   title: string;
   body: string;
   visual: React.ReactNode;
-  footer: string;
+  /** ReactNode (not just string) so callers can inline-embed code
+   *  tags or other formatting — e.g. the PR-bot footer renders the
+   *  literal `synchronize` GitHub webhook event in inline-code. */
+  footer: React.ReactNode;
 }) {
   return (
     <div
