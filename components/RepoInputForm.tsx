@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowUpRight,
   Check,
   ChevronDown,
   ChevronRight,
@@ -13,6 +15,34 @@ import { parseDeepLinkSubdir } from "@/lib/githubUrl";
 import { pollJob } from "@/lib/jobsClient";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { TOK } from "@/lib/theme";
+
+/** Parse a GitHub-access error message emitted by lib/github.ts via
+ *  the [gh:<code>] wire-format prefix. Used to decide whether to
+ *  render an action button (e.g. "Open GitHub settings") next to the
+ *  error message — instead of a flat string the user can't act on.
+ *  Returns null for non-GitHub errors (timeouts, parse errors, etc.). */
+function parseGithubError(
+  error: string | null,
+): {
+  code: "repo-not-found" | "unauthorized" | "rate-limit";
+  message: string;
+} | null {
+  if (!error) return null;
+  // No `s` flag — keeps tsconfig target compatibility. Our error
+  // messages don't contain newlines (single-line by design), so `.+`
+  // captures everything after the prefix without needing dotall.
+  const match = error.match(/^\[gh:([^\]]+)\]\s*(.+)$/);
+  if (!match) return null;
+  const code = match[1];
+  if (
+    code !== "repo-not-found" &&
+    code !== "unauthorized" &&
+    code !== "rate-limit"
+  ) {
+    return null;
+  }
+  return { code, message: match[2] };
+}
 
 // Stage labels + rough durations (ms) used to drive the indeterminate loading UI.
 // Real server progress isn't streamed (yet) — we cycle through these as a UX
@@ -309,11 +339,47 @@ export function RepoInputForm({
        *  card next to "Your sessions". The first-visit nudge ("First
        *  time? Click any of these…") also lives in LandingPanel now. */}
 
-      {error && (
-        <p className="text-sm px-1" style={{ color: TOK.rose }}>
-          {error}
-        </p>
-      )}
+      {error &&
+        (() => {
+          // GitHub-access errors emitted by lib/github.ts carry a
+          // [gh:<code>] prefix. When detected, surface a clean message
+          // + an "Open GitHub settings" action so the user can re-
+          // authorize or connect their account in one click. Plain
+          // errors (timeouts, parse failures, etc.) keep the original
+          // single-line treatment. v0.81+.
+          const gh = parseGithubError(error);
+          if (!gh) {
+            return (
+              <p className="text-sm px-1" style={{ color: TOK.rose }}>
+                {error}
+              </p>
+            );
+          }
+          const actionable =
+            gh.code === "repo-not-found" || gh.code === "unauthorized";
+          return (
+            <div
+              className="flex flex-col gap-2 px-3 py-2.5 rounded-md text-sm"
+              style={{
+                background: `${TOK.rose}0d`,
+                border: `1px solid ${TOK.rose}33`,
+                color: TOK.rose,
+              }}
+            >
+              <span>{gh.message}</span>
+              {actionable && (
+                <Link
+                  href="/account/connections"
+                  className="inline-flex items-center gap-1 text-xs font-medium w-fit hover:underline transition"
+                  style={{ color: TOK.rose }}
+                >
+                  Open GitHub settings
+                  <ArrowUpRight size={12} />
+                </Link>
+              )}
+            </div>
+          );
+        })()}
 
       {pending && (
         <div className="flex flex-col gap-2 mt-1 px-1">

@@ -13,6 +13,7 @@ import { extractOrgOrUserFromUrl, parseRepoUrl } from "@/lib/github";
 import { validateSubdir } from "@/lib/graph";
 import { createJob, processJob } from "@/lib/jobs";
 import { filterSessionsByUser, OWNER_ID_HEADER } from "@/lib/ownerId";
+import { checkSessionOwnership } from "@/lib/ownership";
 import {
   RATE_LIMITS,
   checkRateLimit,
@@ -29,9 +30,25 @@ const CreateSchema = z.object({
   subdir: z.string().optional(),
 });
 
-export async function GET() {
+export async function GET(req: Request) {
   const sessions = await listSessions();
-  return NextResponse.json({ sessions });
+  // v0.81: filter private-repo sessions to ones the caller can read.
+  // Public-repo sessions stay visible to everyone (matches the
+  // "anyone with the URL can view" rule for public analyses); private
+  // ones are owner-only, so non-owners shouldn't even see them listed.
+  const authSession = await auth.api.getSession({ headers: req.headers });
+  const callerUserId = authSession?.user.id ?? null;
+  const callerOwnerId = req.headers.get(OWNER_ID_HEADER);
+  const visible = sessions.filter((s) => {
+    if (!s.private) return true;
+    const decision = checkSessionOwnership(
+      { userId: s.userId, ownerId: s.ownerId },
+      callerUserId,
+      callerOwnerId,
+    );
+    return decision === "allowed";
+  });
+  return NextResponse.json({ sessions: visible });
 }
 
 export async function POST(req: Request) {

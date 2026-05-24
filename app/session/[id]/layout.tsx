@@ -19,6 +19,7 @@
 
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
+import { requireSessionReadAccess } from "@/lib/ownership";
 import { SessionToolbar } from "@/components/SessionToolbar";
 import { SessionShell } from "@/components/SessionShell";
 import { HideOnMarketing } from "@/components/MarketingModeWrapper";
@@ -35,6 +36,20 @@ export default async function SessionLayout({
   const { id } = await params;
   const session = await getSession(id);
   if (!session) notFound();
+
+  // v0.81 read-side access gate: sessions analyzed from a PRIVATE repo
+  // are owner-only. Anyone else hitting the URL gets a generic 404,
+  // identical to "session doesn't exist" — we deliberately don't reveal
+  // existence + visibility separately, so a leaked URL gives away
+  // nothing more than a random guess would.
+  //
+  // Public-repo sessions short-circuit (no auth lookup needed). This is
+  // the single chokepoint for ALL /session/[id]/* sub-routes (canvas,
+  // architecture, code, insights, packages, imports, prs) — Next.js
+  // runs the layout before any nested page renders, so adding the
+  // check here covers every read path with one edit.
+  const allowed = await requireSessionReadAccess(session);
+  if (!allowed) notFound();
 
   const current = session.snapshots[session.snapshots.length - 1];
 

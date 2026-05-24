@@ -7,6 +7,7 @@ import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { AccountShell } from "@/components/AccountShell";
 import { ConnectionsPanel } from "@/components/account/ConnectionsPanel";
+import { userHasRepoScope } from "@/lib/githubUserToken";
 
 export const metadata = {
   title: "Connections — Account — RepoBaron",
@@ -41,6 +42,16 @@ export default async function ConnectionsPage() {
   const signInMethodCount = (hasPassword ? 1 : 0) + (githubAccount ? 1 : 0);
   const user = userFromSession(session);
 
+  // v0.81: probe GitHub for the granted scopes on the user's stored
+  // token so ConnectionsPanel can decide whether to show the "Re-
+  // authorize for private repos" CTA. We only probe when an account
+  // is actually linked — avoids a network call for users who have no
+  // GitHub link to inspect. The helper caches the response for 60s
+  // server-side, so page reloads don't re-hit GitHub.
+  const hasRepoScope = githubAccount
+    ? await userHasRepoScope(session.user.id)
+    : false;
+
   return (
     <AccountShell
       user={user}
@@ -51,6 +62,7 @@ export default async function ConnectionsPage() {
         githubAccount={githubAccount}
         githubLogin={user.githubLogin ?? null}
         signInMethodCount={signInMethodCount}
+        hasRepoScope={hasRepoScope}
       />
     </AccountShell>
   );

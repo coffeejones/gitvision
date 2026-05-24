@@ -140,6 +140,24 @@ export const auth = betterAuth({
         github: {
           clientId: githubClientId!,
           clientSecret: githubClientSecret!,
+          // Scopes requested at OAuth authorize time (v0.81+).
+          //   - `read:user`   — fetch profile (login, avatar) to populate
+          //                     user record + githubLogin custom field.
+          //   - `user:email`  — read primary verified email so account
+          //                     linking works (we require email-verified
+          //                     identity for trustedProviders).
+          //   - `repo`        — read repository contents, including PRIVATE
+          //                     repos the user owns or has access to.
+          //                     Needed for analyzeRepo to fetch metadata,
+          //                     commits, languages, README, tarballs for
+          //                     a user's private GitHub repos. Without
+          //                     this, the user-token only sees public
+          //                     repos (same as the server-PAT fallback).
+          // Existing users keep their pre-v0.81 token (no `repo` scope)
+          // until they re-authorize. The lib/github.ts fallback chain
+          // handles the legacy-scope case by deferring to the server
+          // PAT for public-only access.
+          scope: ["read:user", "user:email", "repo"],
         },
       }
     : undefined,

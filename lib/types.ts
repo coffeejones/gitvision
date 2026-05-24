@@ -19,6 +19,16 @@ export interface RepoMeta {
   license: string | null;
   homepage: string | null;
   topics: string[];
+  /** Visibility flag from GitHub: true when the repo is private and
+   *  required the analyzer's token to read. Drives read-side access
+   *  control on /session/[id]/* — sessions where this is true are
+   *  gated to the owner only (anyone else gets 404). v0.81+.
+   *
+   *  Optional for backward-compat with sessions created before this
+   *  field existed. `undefined` is treated as "public" (the safe
+   *  default for legacy data, which was all public-repo analyses
+   *  before per-user OAuth landed). */
+  private?: boolean;
 }
 
 export interface Contributor {
@@ -327,6 +337,12 @@ export interface SessionSummary {
    *  the workspace listing filter by "is this mine via account?"
    *  without loading every full Session record. v0.76+. */
   userId?: string;
+  /** Mirrors latest snapshot's repo.private. Persisted here so the
+   *  workspace listing + /api/sessions GET can filter out private
+   *  sessions belonging to other users without loading the full
+   *  snapshot for each. Undefined for legacy summaries — treated as
+   *  public (the safe default for pre-v0.81 data). */
+  private?: boolean;
 }
 
 // ------------------- Jobs (v0.25) -------------------

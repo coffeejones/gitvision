@@ -30,11 +30,23 @@
 // from "use client" components.
 
 import { NextResponse } from "next/server";
+import { cookies, headers as nextHeaders } from "next/headers";
 import { auth } from "./auth";
 import type { Session } from "./types";
-import { OWNER_ID_HEADER } from "./ownerId";
+import { OWNER_ID_COOKIE, OWNER_ID_HEADER } from "./ownerId";
 
 export type OwnershipDecision = "allowed" | "denied";
+
+/** Was the session's analyzed repo private at the time of the latest
+ *  snapshot? Private-repo sessions are gated to the owner on reads;
+ *  public-repo sessions (and demo sessions) are open to anyone with
+ *  the URL. Falls back to false for legacy snapshots that pre-date
+ *  the `private` field — those are all from public-repo analyses
+ *  done before per-user OAuth landed, so the default is safe. */
+export function isSessionPrivate(session: Session): boolean {
+  const latest = session.snapshots[session.snapshots.length - 1];
+  return latest?.repo?.private === true;
+}
 
 /** Pure ownership decision — given a session record and the caller's
  *  already-extracted user id + owner id, return whether they're
@@ -86,4 +98,95 @@ function forbidden(): Response {
     },
     { status: 403 }
   );
+}
+
+/** Pure read-access decision — given a session and the caller's
+ *  already-extracted identity, return whether they're allowed to view
+ *  the analysis.
+ *
+ *  Rules:
+ *    - Public-repo sessions: anyone with the URL can read (default).
+ *    - Private-repo sessions: only the owner can read (strong-claim
+ *      or legacy-cookie path, same ladder as mutations).
+ *
+ *  This separation lets us keep public-repo sharing frictionless
+ *  (paste the URL on Slack, anyone clicks through) while making the
+ *  private-repo URL "owner-only" — same data-classification model as
+ *  a Google Doc with sharing set to "specific people only". */
+export function checkSessionReadAccess(
+  session: Session,
+  callerUserId: string | null,
+  callerOwnerId: string | null,
+): OwnershipDecision {
+  if (!isSessionPrivate(session)) return "allowed";
+  return checkSessionOwnership(session, callerUserId, callerOwnerId);
+}
+
+/** Request-bound read-access enforcement for API route handlers
+ *  (where we have a Request object). Returns null when allowed —
+ *  call sites that get null should proceed with the handler. Returns
+ *  a 404 Response when denied — call sites should return it directly
+ *  to short-circuit.
+ *
+ *  404 (not 403) is deliberate: a private session URL leaked to a
+ *  non-owner shouldn't disclose that the session exists, only that
+ *  the path doesn't resolve. Same mental model as a Google Doc
+ *  shared with "specific people only" — non-allowed visitors get a
+ *  "not found" page, not an "access denied" page. */
+export async function requireSessionReadAccessFromRequest(
+  session: Session,
+  req: Request,
+): Promise<Response | null> {
+  if (!isSessionPrivate(session)) return null;
+  const callerUserId = session.userId
+    ? ((await auth.api.getSession({ headers: req.headers }))?.user.id ??
+      null)
+    : null;
+  const callerOwnerId = req.headers.get(OWNER_ID_HEADER);
+  const decision = checkSessionReadAccess(
+    session,
+    callerUserId,
+    callerOwnerId,
+  );
+  if (decision === "allowed") return null;
+  return NextResponse.json({ error: "Not found" }, { status: 404 });
+}
+
+/** Server-side read-access enforcement for use in React Server
+ *  Components (where we don't have a NextRequest, just `next/headers`
+ *  cookies + headers). Returns `true` when access is allowed; callers
+ *  who get `false` should call `notFound()` so non-owners see a generic
+ *  404 instead of being told "you don't have access to this session"
+ *  (which would leak the session's existence + its visibility status).
+ *
+ *  Async because it reads the Better Auth session cookie. Cheap when
+ *  the session isn't private — short-circuits before any I/O. */
+export async function requireSessionReadAccess(
+  session: Session,
+): Promise<boolean> {
+  // Fast path: public-repo sessions are open to everyone.
+  if (!isSessionPrivate(session)) return true;
+
+  // Private-repo path — fetch the caller's auth state. Better Auth's
+  // getSession() accepts a `headers` Headers iterable; we pass the
+  // server-component request headers.
+  const h = await nextHeaders();
+  const authSession = await auth.api.getSession({ headers: h });
+  const callerUserId = authSession?.user.id ?? null;
+
+  // Owner-id is stored both as a header (set by client fetch) and a
+  // cookie (set by getOrCreateOwnerId on first visit). Server
+  // components see cookies but rarely the X-Owner-Id header (browsers
+  // don't add it to navigations). Prefer cookie, fall back to header
+  // for completeness.
+  const c = await cookies();
+  const callerOwnerId =
+    c.get(OWNER_ID_COOKIE)?.value ?? h.get(OWNER_ID_HEADER) ?? null;
+
+  const decision = checkSessionReadAccess(
+    session,
+    callerUserId,
+    callerOwnerId,
+  );
+  return decision === "allowed";
 }

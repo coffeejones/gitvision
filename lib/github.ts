@@ -1,5 +1,24 @@
 // GitHub API client using Octokit.
-// Uses GITHUB_TOKEN from env if provided (5000 req/hr), otherwise unauthenticated (60 req/hr).
+//
+// Token resolution (v0.81 — per-user OAuth tokens):
+//   - Each helper function accepts an optional `client` argument so the
+//     caller can supply a user-scoped Octokit instance (built from the
+//     user's GitHub OAuth access token via getGithubTokenForUser).
+//   - When no client is passed, callers fall back to the module-level
+//     `octokit` instance, which uses GITHUB_TOKEN from env (5000 req/hr
+//     shared across all requests) or unauthenticated (60 req/hr) if
+//     the env var is missing.
+//   - analyzeRepo accepts opts.userToken — when set it constructs a
+//     user-scoped Octokit once at the top and passes it down to every
+//     subordinate helper. This isolates per-user rate limits (every
+//     authenticated user gets their own 5000 req/hr) and is the
+//     foundation for private-repo support (a token issued with the
+//     `repo` scope can fetch private metadata that the server-side
+//     PAT can't).
+//
+// Token never leaks out of this module — Octokit holds it in a closure;
+// it's not stored on the returned snapshot, not logged, and not exposed
+// to client code.
 
 import { Octokit } from "octokit";
 import type {
@@ -36,10 +55,121 @@ import {
 } from "./security/secretsScan";
 import type { SecretScanResult } from "./security/types";
 
-const octokit = new Octokit({
-  auth: process.env.GITHUB_TOKEN || undefined,
-  userAgent: "RepoBaron/0.1",
-});
+/** Build a new Octokit instance authenticated with the given token, or
+ *  unauthenticated if `null`/`undefined` is passed (60 req/hr). Used by
+ *  `analyzeRepo` when a user-token is provided, and by the module-level
+ *  default below for the env-PAT fallback path. */
+export function makeOctokit(token?: string | null): Octokit {
+  return new Octokit({
+    auth: token || undefined,
+    userAgent: "RepoBaron/0.1",
+  });
+}
+
+/** Module-level default — env GITHUB_TOKEN or unauthenticated. Used as
+ *  the fallback when a helper is called without an explicit client and
+ *  no user-token resolution is in progress. Demo session refreshes,
+ *  background-recovery jobs, and unauthenticated API routes all hit
+ *  this. */
+const octokit = makeOctokit(process.env.GITHUB_TOKEN);
+
+/** Structured error thrown by analyzeRepo when GitHub returns an
+ *  access-related failure (404 / 401 / 403). Callers can introspect
+ *  `.code` to render appropriate UX:
+ *
+ *    "repo-not-found"  — 404. Either the repo doesn't exist OR it
+ *                        exists but is private and the caller's token
+ *                        can't see it. Treat as "needs re-authorize
+ *                        or GitHub connection" — both are recoverable.
+ *    "unauthorized"    — 401. Token expired, revoked, or never valid.
+ *                        Action: re-authorize.
+ *    "rate-limit"      — 403 with rate-limit body. Action: wait, or
+ *                        sign in with GitHub for higher quota.
+ *
+ *  Job-error messages are prefixed with `[gh:<code>]` so the UI can
+ *  parse the code without parsing English text (see lib/jobs.ts +
+ *  components/RepoInputForm). */
+export class GithubAccessError extends Error {
+  constructor(
+    public readonly code:
+      | "repo-not-found"
+      | "unauthorized"
+      | "rate-limit",
+    message: string,
+    public readonly owner?: string,
+    public readonly repo?: string,
+  ) {
+    super(message);
+    this.name = "GithubAccessError";
+  }
+  /** Render to the wire-format used by jobs.ts → polled job-status →
+   *  UI. The `[gh:<code>]` prefix lets the client parse the code
+   *  reliably without depending on the exact English wording. */
+  toWireFormat(): string {
+    return `[gh:${this.code}] ${this.message}`;
+  }
+}
+
+/** Octokit's `RequestError` carries a numeric `.status`. We don't import
+ *  the concrete class because Octokit's typings change frequently —
+ *  a structural duck-type check is more stable. */
+interface OctokitLikeError {
+  status?: number;
+  message?: string;
+}
+
+function isOctokitError(err: unknown): err is OctokitLikeError {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "status" in (err as Record<string, unknown>) &&
+    typeof (err as { status: unknown }).status === "number"
+  );
+}
+
+/** Convert an Octokit error from `fetchRepoMeta` to a structured
+ *  GithubAccessError. Called only from analyzeRepo's gateway check —
+ *  if the repo-meta call succeeds, downstream errors usually aren't
+ *  access-related (graph extraction, code-analysis timeouts, etc.). */
+function coerceGithubAccessError(
+  err: unknown,
+  owner: string,
+  repo: string,
+  hasUserToken: boolean,
+): never {
+  if (isOctokitError(err)) {
+    if (err.status === 404) {
+      throw new GithubAccessError(
+        "repo-not-found",
+        hasUserToken
+          ? `Repository ${owner}/${repo} not found. Either it doesn't exist, or your GitHub link doesn't have access to it.`
+          : `Repository ${owner}/${repo} not found. If it's a private repo, sign in with GitHub to analyze it.`,
+        owner,
+        repo,
+      );
+    }
+    if (err.status === 401) {
+      throw new GithubAccessError(
+        "unauthorized",
+        `GitHub token is invalid or expired. Re-authorize GitHub from your account settings.`,
+        owner,
+        repo,
+      );
+    }
+    if (err.status === 403) {
+      throw new GithubAccessError(
+        "rate-limit",
+        hasUserToken
+          ? `GitHub rate limit reached on your account. Try again in a few minutes.`
+          : `GitHub rate limit reached. Sign in with GitHub for a higher per-user quota, or try again later.`,
+        owner,
+        repo,
+      );
+    }
+  }
+  // Not a recognised access error — bubble up unchanged.
+  throw err;
+}
 
 /**
  * Parse a GitHub repo URL/shorthand into { owner, repo }.
@@ -85,8 +215,12 @@ export function extractOrgOrUserFromUrl(input: string): string | null {
 // the browser bundle.
 export { parseDeepLinkSubdir } from "./githubUrl";
 
-export async function fetchRepoMeta(owner: string, repo: string): Promise<RepoMeta> {
-  const { data } = await octokit.rest.repos.get({ owner, repo });
+export async function fetchRepoMeta(
+  owner: string,
+  repo: string,
+  client: Octokit = octokit,
+): Promise<RepoMeta> {
+  const { data } = await client.rest.repos.get({ owner, repo });
   return {
     owner: data.owner.login,
     name: data.name,
@@ -104,12 +238,21 @@ export async function fetchRepoMeta(owner: string, repo: string): Promise<RepoMe
     license: data.license?.spdx_id ?? null,
     homepage: data.homepage,
     topics: data.topics ?? [],
+    // v0.81+: persist GitHub's visibility flag. The read-side access
+    // check on /session/[id]/* uses this to gate private-repo sessions
+    // to the owner only. Without it, anyone with the session URL could
+    // see private codebase metadata.
+    private: data.private,
   };
 }
 
-export async function fetchContributors(owner: string, repo: string): Promise<Contributor[]> {
+export async function fetchContributors(
+  owner: string,
+  repo: string,
+  client: Octokit = octokit,
+): Promise<Contributor[]> {
   // GitHub caps contributors endpoint at 500 by default; that's plenty for MVP.
-  const { data } = await octokit.rest.repos.listContributors({
+  const { data } = await client.rest.repos.listContributors({
     owner,
     repo,
     per_page: 100,
@@ -126,9 +269,10 @@ export async function fetchContributors(owner: string, repo: string): Promise<Co
 
 export async function fetchLanguages(
   owner: string,
-  repo: string
+  repo: string,
+  client: Octokit = octokit,
 ): Promise<LanguageBreakdown> {
-  const { data } = await octokit.rest.repos.listLanguages({ owner, repo });
+  const { data } = await client.rest.repos.listLanguages({ owner, repo });
   return data as LanguageBreakdown;
 }
 
@@ -139,11 +283,12 @@ export async function fetchLanguages(
 export async function fetchRecentCommits(
   owner: string,
   repo: string,
-  maxPages = 3
+  maxPages = 3,
+  client: Octokit = octokit,
 ): Promise<CommitSummary[]> {
   const commits: CommitSummary[] = [];
   for (let page = 1; page <= maxPages; page++) {
-    const { data } = await octokit.rest.repos.listCommits({
+    const { data } = await client.rest.repos.listCommits({
       owner,
       repo,
       per_page: 100,
@@ -172,13 +317,14 @@ export async function fetchRecentCommits(
 export async function fetchCommitFileChanges(
   owner: string,
   repo: string,
-  commitShas: string[]
+  commitShas: string[],
+  client: Octokit = octokit,
 ): Promise<Map<string, { files: string[]; authorLogin: string | null; date: string }>> {
   const result = new Map<string, { files: string[]; authorLogin: string | null; date: string }>();
   // Sequential to respect rate-limit; could parallelize with a concurrency cap later.
   for (const sha of commitShas) {
     try {
-      const { data } = await octokit.rest.repos.getCommit({ owner, repo, ref: sha });
+      const { data } = await client.rest.repos.getCommit({ owner, repo, ref: sha });
       result.set(sha, {
         files: (data.files ?? []).map((f) => f.filename),
         authorLogin: data.author?.login ?? null,
@@ -280,10 +426,11 @@ export function computeCoChange(
  */
 export async function fetchHasReadme(
   owner: string,
-  repo: string
+  repo: string,
+  client: Octokit = octokit,
 ): Promise<boolean> {
   try {
-    await octokit.rest.repos.getReadme({ owner, repo });
+    await client.rest.repos.getReadme({ owner, repo });
     return true;
   } catch {
     return false;
@@ -297,12 +444,13 @@ export async function fetchHasReadme(
 export async function fetchPullRequests(
   owner: string,
   repo: string,
-  maxPages = 2
+  maxPages = 2,
+  client: Octokit = octokit,
 ): Promise<PullRequestSummary[]> {
   const out: PullRequestSummary[] = [];
   try {
     for (let page = 1; page <= maxPages; page++) {
-      const { data } = await octokit.rest.pulls.list({
+      const { data } = await client.rest.pulls.list({
         owner,
         repo,
         state: "all",
@@ -399,6 +547,18 @@ export interface AnalyzeRepoOptions {
    *  tarball used for codeAnalysis + secret-scan + file-graph; repo
    *  metadata (stars, languages, etc.) is always whole-repo. v0.79+. */
   ref?: string | null;
+  /** GitHub OAuth access token for the calling user. When provided, all
+   *  GitHub API calls during this analysis are authenticated against
+   *  the user's token instead of the server-wide GITHUB_TOKEN env var.
+   *  Two consequences:
+   *    1. Rate limit isolation — each user gets their own 5000 req/hr
+   *       budget instead of sharing the server-wide one.
+   *    2. Private-repo access — a token issued with the `repo` scope
+   *       can fetch private repo metadata + tarballs that the server
+   *       PAT can't see.
+   *  When unset, falls back to the module-level `octokit` (env-PAT or
+   *  unauthenticated). v0.81+. */
+  userToken?: string | null;
 }
 
 export async function analyzeRepo(
@@ -408,8 +568,26 @@ export async function analyzeRepo(
 ): Promise<AnalysisSnapshot> {
   const subdir = opts.subdir ?? null;
   const explicitRef = opts.ref ?? null;
+  // Build a request-scoped Octokit if the caller supplied a user-token;
+  // otherwise reuse the module-level default. Threaded through every
+  // helper below so the entire analysis runs against a single token.
+  const client = opts.userToken ? makeOctokit(opts.userToken) : octokit;
+
+  // Gateway check — fail fast on repo-meta. If we can't reach the repo
+  // at all (404 / 401 / 403), every downstream call will fail too;
+  // surface a structured GithubAccessError now so the UI can render
+  // "re-authorize" / "connect GitHub" actions. Costs one sequential
+  // round-trip in the happy path, but the downstream Promise.all
+  // already serializes on this same data anyway. (v0.81 — paired with
+  // the per-user OAuth token threading above.)
+  let repoMeta: RepoMeta;
+  try {
+    repoMeta = await fetchRepoMeta(owner, repo, client);
+  } catch (err) {
+    coerceGithubAccessError(err, owner, repo, !!opts.userToken);
+  }
+
   const [
-    repoMeta,
     contributors,
     languages,
     restRecentCommits,
@@ -418,14 +596,13 @@ export async function analyzeRepo(
     hasReadme,
     dependencyHealths,
   ] = await Promise.all([
-    fetchRepoMeta(owner, repo),
-    fetchContributors(owner, repo),
-    fetchLanguages(owner, repo),
-    fetchRecentCommits(owner, repo, 3),
-    fetchPullRequests(owner, repo, 2),
+    fetchContributors(owner, repo, client),
+    fetchLanguages(owner, repo, client),
+    fetchRecentCommits(owner, repo, 3, client),
+    fetchPullRequests(owner, repo, 2, client),
     analyzeRepoHistory(owner, repo),
-    fetchHasReadme(owner, repo),
-    analyzeDependencyHealth(octokit, owner, repo, "HEAD"),
+    fetchHasReadme(owner, repo, client),
+    analyzeDependencyHealth(client, owner, repo, "HEAD"),
   ]);
 
   const usingGitLog = history.commits.length > 0;
@@ -464,7 +641,7 @@ export async function analyzeRepo(
     // Fallback: REST-based 80-commit sample (pre-gitLog behavior)
     recentCommits = restRecentCommits;
     const hotspotShas = recentCommits.slice(0, 80).map((c) => c.sha);
-    perCommitFiles = await fetchCommitFileChanges(owner, repo, hotspotShas);
+    perCommitFiles = await fetchCommitFileChanges(owner, repo, hotspotShas, client);
     historySource = {
       kind: "rest-sample",
       commitCount: recentCommits.length,
@@ -511,7 +688,7 @@ export async function analyzeRepo(
   let cleanup: (() => Promise<void>) | null = null;
   try {
     const extracted = await downloadAndExtract(
-      octokit,
+      client,
       owner,
       repo,
       explicitRef ?? repoMeta.defaultBranch,
@@ -601,7 +778,7 @@ export async function analyzeRepo(
     // buildFileGraph which has its own download + cleanup, and skip
     // codeGraph for this run.
     fileGraph = await buildFileGraph(
-      octokit,
+      client,
       owner,
       repo,
       explicitRef ?? repoMeta.defaultBranch
@@ -618,7 +795,7 @@ export async function analyzeRepo(
   // Rate limit snapshot (useful for UI)
   let rateLimitInfo: AnalysisSnapshot["rateLimitInfo"];
   try {
-    const { data } = await octokit.rest.rateLimit.get();
+    const { data } = await client.rest.rateLimit.get();
     rateLimitInfo = {
       limit: data.resources.core.limit,
       remaining: data.resources.core.remaining,

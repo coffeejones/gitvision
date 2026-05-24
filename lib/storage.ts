@@ -112,6 +112,11 @@ export async function listSessions(): Promise<SessionSummary[]> {
           snapshotCount: session.snapshots.length,
           ownerId: session.ownerId,
           userId: session.userId,
+          // v0.81: persist private-repo flag from the latest snapshot
+          // so list-endpoint callers can filter without loading every
+          // session JSON. Undefined when the latest snapshot is from
+          // a pre-v0.81 analysis (all of which were public-repo).
+          private: latest?.repo.private,
         });
       } catch {
         // skip corrupted session file

@@ -20,7 +20,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { nanoid } from "nanoid";
 import { atomicWriteJson } from "./atomicWrite";
-import { analyzeRepo, parseRepoUrl } from "./github";
+import { GithubAccessError, analyzeRepo, parseRepoUrl } from "./github";
+import { getGithubTokenForUser } from "./githubUserToken";
 import { SubdirNotFoundError } from "./graph";
 import {
   appendSnapshot,
@@ -124,12 +125,18 @@ export async function processJob(jobId: string): Promise<void> {
       throw new Error(`Unknown job kind: ${(initial.input as { kind: string }).kind}`);
     }
   } catch (err) {
+    // GithubAccessError uses a [gh:<code>] wire-format so the polled
+    // job-status response carries a machine-readable code the UI can
+    // parse to render structured actions (re-authorize / connect
+    // GitHub) instead of just a flat error string. v0.81+.
     const message =
-      err instanceof SubdirNotFoundError
-        ? err.message
-        : err instanceof Error
+      err instanceof GithubAccessError
+        ? err.toWireFormat()
+        : err instanceof SubdirNotFoundError
           ? err.message
-          : "Unknown error";
+          : err instanceof Error
+            ? err.message
+            : "Unknown error";
     await patchJob(jobId, { status: "failed", error: message });
     console.error(`[jobs] job ${jobId} failed:`, message);
   }
@@ -143,8 +150,15 @@ async function runCreateSession(job: Job): Promise<void> {
       "Could not parse GitHub URL. Expected e.g. https://github.com/owner/repo"
     );
   }
+  // v0.81: resolve the requester's GitHub OAuth token (if they signed
+  // up via GitHub) so the analysis runs against their own rate-limit
+  // budget instead of the shared server PAT. Returns null when the
+  // user signed up via email/password and never linked GitHub — that
+  // path falls through to the env-PAT inside analyzeRepo.
+  const userToken = await getGithubTokenForUser(job.input.userId);
   const snapshot = await analyzeRepo(parsed.owner, parsed.repo, {
     subdir: job.input.subdir,
+    userToken,
   });
   const session = await createSession({
     repoUrl: job.input.repoUrl,
@@ -170,8 +184,15 @@ async function runRefreshSession(job: Job): Promise<void> {
   if (!parsed) {
     throw new Error("Stored repoUrl is invalid");
   }
+  // v0.81: refresh uses the SESSION OWNER's token, not the requester's.
+  // The refresh API route already enforces ownership (only the owner
+  // can refresh), so session.userId is the only valid identity for
+  // this analysis. This matters for sessions of private repos: only
+  // the original creator's token has the right scope.
+  const userToken = await getGithubTokenForUser(session.userId);
   const snapshot = await analyzeRepo(parsed.owner, parsed.repo, {
     subdir: job.input.subdir,
+    userToken,
   });
   await appendSnapshot(sessionId, snapshot);
   await patchJob(job.id, { status: "done", sessionId });

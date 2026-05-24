@@ -9,18 +9,25 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireSessionOwnership } from "@/lib/ownership";
+import {
+  requireSessionOwnership,
+  requireSessionReadAccessFromRequest,
+} from "@/lib/ownership";
 import { getSession, deleteSession, renameSession } from "@/lib/storage";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const session = await getSession(id);
   if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  // GET intentionally has no ownership check: pasting a session URL into
-  // any browser should still render the analysis. Soft isolation only
-  // hides sessions from the LANDING-PAGE list, not from direct access.
+  // PUBLIC-repo sessions stay shareable — pasting a URL into any
+  // browser should still render the analysis. PRIVATE-repo sessions
+  // (v0.81+) are gated to the owner; non-owners get a 404 identical
+  // to "session doesn't exist" so the URL leak doesn't disclose that
+  // the session even exists.
+  const denied = await requireSessionReadAccessFromRequest(session, req);
+  if (denied) return denied;
   return NextResponse.json({ session });
 }
 
