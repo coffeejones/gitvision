@@ -478,6 +478,104 @@ function detectCrossBoundaryCoupling(snap: AnalysisSnapshot): HealthSignal[] {
   ];
 }
 
+// Deep import chains — walks the fileGraph for the longest path from
+// any entry-point (a node nothing imports) down through its
+// transitive imports. Returns a signal naming the depth + one example
+// chain when it exceeds a healthy threshold.
+//
+// Why: deep import trees mean changes near the top ripple wider than
+// they would in a shallow tree. A 12-level chain implies any refactor
+// at the top is going to touch a lot of downstream consumers.
+//
+// Implementation notes:
+//   - Reuses node.layer, which is already computed during fileGraph
+//     construction (BFS depth from roots, where "roots" are nodes
+//     nothing imports — entry points like pages, mains, exported
+//     barrel files). No re-traversal needed for the max-depth
+//     calculation.
+//   - Chain reconstruction is one-pass backwards from the deepest
+//     node, choosing each step's predecessor as a node at layer
+//     (current.layer - 1) that has an edge pointing to current.
+//     One predecessor is enough — we don't enumerate every chain,
+//     just show the visitor one example of how deep the tree goes.
+//   - Severity ladders with depth:
+//       < 6        no signal (typical for most apps)
+//       6-8        informational (no severity → questions bucket)
+//       9-11       medium severity (needsWork bucket)
+//       12+        high severity (needsWork bucket)
+//
+// (v0.81+, signal #18.)
+function detectDeepDependencyChains(snap: AnalysisSnapshot): HealthSignal[] {
+  const fileGraph = snap.fileGraph;
+  if (!fileGraph || fileGraph.nodes.length === 0) return [];
+
+  // Find the deepest node and its layer.
+  let maxLayer = 0;
+  let deepestNode: (typeof fileGraph.nodes)[number] | null = null;
+  for (const n of fileGraph.nodes) {
+    if (n.layer > maxLayer) {
+      maxLayer = n.layer;
+      deepestNode = n;
+    }
+  }
+
+  // Shallow trees get no signal — most apps land here.
+  if (maxLayer < 6 || !deepestNode) return [];
+
+  // Reconstruct one example chain by tracing edges backwards from the
+  // deepest node. At each step, look for a predecessor node whose layer
+  // is exactly (current.layer - 1). This guarantees we walk one valid
+  // BFS path back to a root; bail if no such predecessor exists (the
+  // graph would be malformed, but defensive code never hurts).
+  const nodeMap = new Map(fileGraph.nodes.map((n) => [n.path, n]));
+  const predecessorsByNode = new Map<string, string[]>();
+  for (const e of fileGraph.edges) {
+    const list = predecessorsByNode.get(e.to) ?? [];
+    list.push(e.from);
+    predecessorsByNode.set(e.to, list);
+  }
+
+  const chain: string[] = [deepestNode.path];
+  let current = deepestNode;
+  while (current.layer > 0) {
+    const preds = predecessorsByNode.get(current.path) ?? [];
+    let parent: (typeof fileGraph.nodes)[number] | null = null;
+    for (const p of preds) {
+      const n = nodeMap.get(p);
+      if (n && n.layer === current.layer - 1) {
+        parent = n;
+        break;
+      }
+    }
+    if (!parent) break;
+    chain.unshift(parent.path);
+    current = parent;
+  }
+
+  // Severity ladders with depth — the deeper, the wider the ripple.
+  // undefined severity = informational (caller buckets into questions).
+  let severity: "low" | "medium" | "high" | undefined;
+  if (maxLayer >= 12) severity = "high";
+  else if (maxLayer >= 9) severity = "medium";
+  else severity = undefined; // 6-8 = noteworthy but not a problem
+
+  return [
+    {
+      id: "deep-dependency-chains",
+      title:
+        maxLayer >= 12
+          ? "Very deep import chains"
+          : "Deep import chains",
+      detail: `The deepest import chain runs ${maxLayer} levels — a change near the top ripples down through every step.`,
+      evidence: {
+        paths: chain,
+        numbers: { maxDepth: maxLayer },
+      },
+      severity,
+    },
+  ];
+}
+
 // 6. Metadata dominance — is most of the visible "activity" just releases?
 function detectMetadataDominance(snap: AnalysisSnapshot): HealthSignal[] {
   const top = snap.hotspots.slice(0, 15);
@@ -823,6 +921,14 @@ export function extractHealthSignals(snap: AnalysisSnapshot): HealthSignals {
   needsWork.push(...detectUntestedHotspots(snap));
   needsWork.push(...detectCrossBoundaryCoupling(snap));
   questions.push(...detectMetadataDominance(snap));
+
+  // Deep import chains (v0.81+). The detector emits one signal max;
+  // we bucket it by severity — "deep but tolerable" (6-8 levels) is
+  // informational, "very deep" (9+ levels) is real refactoring risk.
+  for (const sig of detectDeepDependencyChains(snap)) {
+    if (sig.severity) needsWork.push(sig);
+    else questions.push(sig);
+  }
 
   const activity = detectActivityRecency(snap);
   working.push(...activity.working);

@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 import { extractHealthSignals } from "../signals";
 import type {
   AnalysisSnapshot,
+  FileGraph,
   FileHotspot,
   PullRequestSummary,
   DependencyHealth,
@@ -407,5 +408,106 @@ describe("Dependency-health signals", () => {
     const result = extractHealthSignals(mockSnapshot());
     const all = [...result.working, ...result.needsWork, ...result.questions];
     expect(all.some((s) => s.id.includes("deps") || s.id.includes("vulnerable"))).toBe(false);
+  });
+});
+
+// ------------------- Deep dependency chains -------------------
+
+/** Build a linear fileGraph: file0 → file1 → file2 → ... → fileN,
+ *  where each edge means "fileK imports fileK+1". `layers=N` produces
+ *  a chain of length N+1 nodes, with max layer = N. Used by the
+ *  deep-dependency-chains tests to drive the detector with a known
+ *  exact depth. */
+function makeLinearGraph(layers: number): FileGraph {
+  const nodes = [];
+  const edges = [];
+  for (let i = 0; i <= layers; i++) {
+    nodes.push({
+      path: `file${i}.ts`,
+      ext: "ts",
+      layer: i,
+      inDegree: i === 0 ? 0 : 1,
+      outDegree: i === layers ? 0 : 1,
+      x: 0,
+      y: 0,
+    });
+    if (i > 0) {
+      edges.push({
+        from: `file${i - 1}.ts`,
+        to: `file${i}.ts`,
+        kind: "import" as const,
+      });
+    }
+  }
+  return {
+    nodes,
+    edges,
+    stats: {
+      totalFiles: layers + 1,
+      filesByLanguage: { ts: layers + 1 },
+      edgesByKind: { import: layers },
+      skipped: 0,
+    },
+  };
+}
+
+describe("Deep dependency chains signal", () => {
+  it("no signal when fileGraph is absent", () => {
+    const { needsWork, questions } = extractHealthSignals(mockSnapshot());
+    expect(hasSignal(needsWork, "deep-dependency-chains")).toBe(false);
+    expect(hasSignal(questions, "deep-dependency-chains")).toBe(false);
+  });
+
+  it("no signal for shallow tree (max layer 3)", () => {
+    const fileGraph = makeLinearGraph(3);
+    const { needsWork, questions } = extractHealthSignals(
+      mockSnapshot({ fileGraph })
+    );
+    expect(hasSignal(needsWork, "deep-dependency-chains")).toBe(false);
+    expect(hasSignal(questions, "deep-dependency-chains")).toBe(false);
+  });
+
+  it("buckets medium depth (layer 7) into questions without severity", () => {
+    const fileGraph = makeLinearGraph(7);
+    const { questions } = extractHealthSignals(mockSnapshot({ fileGraph }));
+    const sig = questions.find((s) => s.id === "deep-dependency-chains");
+    expect(sig).toBeDefined();
+    expect(sig?.severity).toBeUndefined();
+    expect(sig?.evidence.numbers?.maxDepth).toBe(7);
+    expect(sig?.title).toBe("Deep import chains");
+  });
+
+  it("buckets deep tree (layer 10) into needsWork with medium severity", () => {
+    const fileGraph = makeLinearGraph(10);
+    const { needsWork } = extractHealthSignals(mockSnapshot({ fileGraph }));
+    const sig = needsWork.find((s) => s.id === "deep-dependency-chains");
+    expect(sig).toBeDefined();
+    expect(sig?.severity).toBe("medium");
+  });
+
+  it("buckets very deep tree (layer 15) into needsWork with high severity + 'Very deep' title", () => {
+    const fileGraph = makeLinearGraph(15);
+    const { needsWork } = extractHealthSignals(mockSnapshot({ fileGraph }));
+    const sig = needsWork.find((s) => s.id === "deep-dependency-chains");
+    expect(sig).toBeDefined();
+    expect(sig?.severity).toBe("high");
+    expect(sig?.title).toBe("Very deep import chains");
+  });
+
+  it("reconstructs the full chain from root to deepest node", () => {
+    const fileGraph = makeLinearGraph(8);
+    const { questions } = extractHealthSignals(mockSnapshot({ fileGraph }));
+    const sig = questions.find((s) => s.id === "deep-dependency-chains");
+    expect(sig?.evidence.paths).toEqual([
+      "file0.ts",
+      "file1.ts",
+      "file2.ts",
+      "file3.ts",
+      "file4.ts",
+      "file5.ts",
+      "file6.ts",
+      "file7.ts",
+      "file8.ts",
+    ]);
   });
 });
