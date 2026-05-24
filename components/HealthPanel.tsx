@@ -184,7 +184,7 @@ export function HealthPanel({ sessionId, snapshot }: Props) {
 
       {!analysis && !pending && (
         <p className="text-xs" style={{ color: TOK.textMuted }}>
-          Claude reads the 17 signals already computed for the Overview strip
+          Claude reads the 18 signals already computed for the Overview strip
           and writes a verdict you can act on — what works, where to dig
           deeper, and what needs human judgment.
         </p>

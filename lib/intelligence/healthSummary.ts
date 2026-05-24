@@ -73,6 +73,9 @@ const DIMENSION_SIGNAL_IDS: Record<DimensionId, readonly string[]> = {
     "untested-hotspots",
     "cross-boundary-coupling",
     "good-test-presence",
+    // v0.81+ signal #18 — pairs naturally with cross-boundary-coupling
+    // as another graph-structure code-health concern.
+    "deep-dependency-chains",
   ],
   "pr-flow": [
     "healthy-pr-throughput",

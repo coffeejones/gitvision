@@ -132,7 +132,7 @@ export function HealthSummary({
           <span
             className="text-xs"
             style={{ color: TOK.textMuted }}
-            title="These tiles are computed from 17 deterministic rule-based signals — no AI involved. The /insights page adds Claude's plain-English commentary on the same signals."
+            title="These tiles are computed from 18 deterministic rule-based signals — no AI involved. The /insights page adds Claude's plain-English commentary on the same signals."
           >
             · rule-based signals · no AI required
           </span>
