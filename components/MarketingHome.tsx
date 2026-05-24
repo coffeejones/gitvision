@@ -43,8 +43,6 @@ import { FeedbackLink } from "@/components/FeedbackLink";
 import { MarketingNav } from "@/components/MarketingNav";
 import { Logo } from "@/components/Logo";
 import { Roadmap } from "@/components/Roadmap";
-import { TierIcon, type Tier } from "@/components/TierIcon";
-import { TIER_CONFIG } from "@/lib/pricing";
 import type { DemoCard } from "@/lib/intelligence/demoCard";
 import { ScrollReveal } from "@/components/ScrollReveal";
 
@@ -92,21 +90,20 @@ export function MarketingHome({
     >
       <MarketingNav />
       <main className="max-w-7xl w-full mx-auto px-6 sm:px-10 lg:px-12 pt-10 pb-16 flex flex-col gap-14">
-        {/* Hero — tight, Linear-style. Single solid color (no
-         *  gradient-clipped text — that pattern reads ChatGPT-y).
-         *  Title sits at text-4xl/5xl max so it doesn't dominate
-         *  the viewport.
+        {/* Hero — sprint-1 copy-anchored wedge with the original
+         *  FeaturedHero composition restored (v0.80 reset). After
+         *  trying live-graph and integrated-bg experiments, the
+         *  founder's clear preference remained the two-image layered
+         *  FeaturedHero (workspace forground + Code-tab dimmed
+         *  background) that ships on main. Keep what works; refine
+         *  the rest of the page.
          *
-         *  v0.79 hero surgery: pivoted from a generic "Know your code
-         *  before you touch it" slogan — which CodeRabbit, Sourcegraph,
-         *  or Greptile could ship verbatim — to a competitor-anchored
-         *  wedge that names the only word the rest of the field
-         *  literally cannot claim: "deterministic". LLM-core competitors
-         *  (CodeRabbit, Greptile, Cody, Cursor) cannot pivot to "no LLM"
-         *  without invalidating their own product narrative, so owning
-         *  this framing is structurally defensible. The `git blame`
-         *  reference signals "we know what auditing actually means" to
-         *  a senior dev in three words. */}
+         *  The wedge stays: "deterministic / no LLM" is the only word
+         *  LLM-core competitors (CodeRabbit, Greptile, Cody, Cursor)
+         *  structurally cannot follow without invalidating their own
+         *  product narrative. The `git blame` reference signals "we
+         *  know what auditing actually means" to a senior dev in
+         *  three words. */}
         <section className="flex flex-col gap-5">
           <span
             className="text-[10px] uppercase tracking-[0.18em] font-medium"
@@ -257,171 +254,10 @@ export function MarketingHome({
       </section>
       </ScrollReveal>
 
-      {/* Auditable pipeline — embed the real source of one signal
-       *  detector right on the landing. v0.79 polish: this is the
-       *  single claim LLM-core competitors (CodeRabbit, Greptile,
-       *  Cursor, Cody) structurally cannot follow — their prompts
-       *  and weights ARE the moat, opening them lets competitors
-       *  copy the system. RepoBaron's noncommercial license lets us
-       *  be source-available without losing pricing power, so this
-       *  becomes a defensible moat-claim, not just marketing copy.
-       *
-       *  Snippet is the actual untested-hotspots detector verbatim
-       *  from lib/signals.ts (31 lines as of v0.79). Show, don't
-       *  tell — dev sees the rule, reads it in 30 seconds, internal
-       *  trust meter ticks up. The hairline window-chrome at the top
-       *  signals "this is a real file you can navigate to", not
-       *  "marketing mockup with code-themed decoration". */}
-      <ScrollReveal>
-      <section className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-8 lg:gap-10 items-center">
-        {/* Left: real source code from lib/signals.ts. Plain mono,
-         *  no syntax highlighting — the rawness IS the claim. */}
-        <div
-          className="rounded-xl overflow-hidden flex flex-col"
-          style={{
-            background: TOK.bgDeep,
-            border: `1px solid ${TOK.border}`,
-            boxShadow: [
-              "0 1px 2px rgba(0, 0, 0, 0.2)",
-              "0 8px 24px -4px rgba(0, 0, 0, 0.3)",
-              "0 32px 64px -16px rgba(0, 0, 0, 0.45)",
-            ].join(", "),
-          }}
-        >
-          {/* File chrome — mimics an editor tab strip. The path is
-           *  clickable through to the live source on GitHub. */}
-          <div
-            className="flex items-center justify-between px-4 py-2.5"
-            style={{
-              borderBottom: `1px solid ${TOK.border}`,
-              background: "rgba(255,255,255,0.02)",
-            }}
-          >
-            <span
-              className="text-[11px] font-mono"
-              style={{ color: TOK.textMuted }}
-            >
-              lib/signals.ts · detectUntestedHotspots
-            </span>
-            <a
-              href="https://github.com/coffeejones/repobaron/blob/main/lib/signals.ts"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] font-medium hover:opacity-80 transition"
-              style={{ color: TOK.accent }}
-            >
-              View on GitHub
-              <ArrowUpRight size={10} />
-            </a>
-          </div>
-          <pre
-            className="text-[11px] sm:text-[12px] leading-relaxed overflow-x-auto p-4 sm:p-5"
-            style={{
-              fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, monospace",
-              color: TOK.textSecondary,
-              margin: 0,
-            }}
-          >
-{`function detectUntestedHotspots(snap: AnalysisSnapshot): HealthSignal[] {
-  const { allPaths, allTests, codeFileCount } = collectPathIndices(snap);
-
-  const codeHotspots = snap.hotspots
-    .slice(0, 25)
-    .filter((h) => isCodeFile(h.path));
-  if (codeHotspots.length < 5) return [];
-
-  // Global sanity gate — plenty of tests exist, we just can't connect them.
-  if (allTests.size >= 30) return [];
-  if (codeFileCount > 0 && allTests.size / codeFileCount >= 0.25) return [];
-
-  const untested = codeHotspots.filter(
-    (h) => !hasTestCoverage(h, allPaths, allTests, snap.fileGraph)
-  );
-  const pct = Math.round((untested.length / codeHotspots.length) * 100);
-  if (pct < 50) return [];
-
-  return [{
-    id: "untested-hotspots",
-    title: "Hot files lack visible tests",
-    detail: \`\${pct}% of top-churn files have no discoverable test.\`,
-    severity: pct > 80 ? "high" : "medium",
-  }];
-}`}
-          </pre>
-        </div>
-
-        {/* Right: the pitch. Brief — the snippet IS the argument; copy
-         *  just frames it. */}
-        <div className="flex flex-col gap-4">
-          <span
-            className="text-[10px] uppercase tracking-[0.18em] font-medium"
-            style={{ color: TOK.accent }}
-          >
-            Auditable pipeline
-          </span>
-          <h2
-            className="text-2xl sm:text-3xl font-semibold tracking-tight"
-            style={{ color: TOK.textPrimary, letterSpacing: "-0.02em" }}
-          >
-            Every detector. Plain TypeScript. On GitHub.
-          </h2>
-          <p
-            className="text-sm sm:text-base leading-relaxed"
-            style={{ color: TOK.textSecondary }}
-          >
-            No prompts. No weights. No proprietary scoring. When
-            RepoBaron flags a hotspot, the rule that produced the
-            verdict is a few dozen lines you can read, fork, and file
-            an issue against.
-          </p>
-          <ul
-            className="flex flex-col gap-2 text-sm mt-1"
-            style={{ color: TOK.textSecondary }}
-          >
-            <li className="flex items-start gap-2">
-              <span
-                className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0"
-                style={{ background: TOK.accent }}
-              />
-              <span>17 detectors, all pure functions over the same snapshot</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span
-                className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0"
-                style={{ background: TOK.accent }}
-              />
-              <span>No black-box ranking — every severity is a deterministic threshold</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span
-                className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0"
-                style={{ background: TOK.accent }}
-              />
-              <span>Source-available under PolyForm Noncommercial</span>
-            </li>
-          </ul>
-          <a
-            href="https://github.com/coffeejones/repobaron/blob/main/lib/signals.ts"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm font-medium mt-2 hover:underline transition w-fit"
-            style={{ color: TOK.accent }}
-          >
-            See all 17 signal definitions on GitHub
-            <ArrowUpRight size={14} />
-          </a>
-        </div>
-      </section>
-      </ScrollReveal>
-
-      {/* What you'll find — feature catalog (demoted to third section
-       *  in v0.79 polish, after the proof rail above). Stays as the
-       *  feature reference grid: visitors who want the full capability
-       *  taxonomy find it here, but they no longer encounter it before
-       *  the evidence. ScrollReveal triggers a 12px slide + fade when
-       *  the section enters the viewport. Once revealed, the observer
-       *  disconnects so it doesn't re-animate on scroll-back. */}
+      {/* What you'll find — feature catalog. ScrollReveal triggers a
+       *  12px slide + fade when the section enters the viewport. Once
+       *  revealed, the observer disconnects so it doesn't re-animate
+       *  on scroll-back. */}
       <ScrollReveal>
       <section className="flex flex-col gap-5">
         <div className="flex items-baseline justify-between">
@@ -567,77 +403,6 @@ export function MarketingHome({
       </section>
       </ScrollReveal>
 
-      {/* Tier ribbon — Scout / Knight / Baron with capability verbs.
-       *  v0.79 polish: the Scout/Knight/Baron brand world lived only
-       *  on /pricing before this — a visitor reading the landing top-
-       *  to-bottom never met the tiers as story, so by the time they
-       *  hit pricing the names felt arbitrary instead of inevitable.
-       *  One quiet row — no checkmarks, no prices, no CTA-button —
-       *  just "see / read / own" as the three-step capability ladder.
-       *
-       *  The TierIcon slot is mascot-ready: when Jonas's custom Scout
-       *  / Knight / Baron illustrations are finished, they drop into
-       *  the existing TierIcon component with zero markup changes
-       *  here. The 32px frame holds either a lucide icon or an image.
-       *
-       *  Per gamification critique: this is the GitHub language-stat
-       *  bar pattern, not a feature card. Subtraction is the point —
-       *  any decoration here turns the section into Duolingo-cringe. */}
-      <ScrollReveal>
-      <section className="flex flex-col gap-5">
-        <div className="flex items-baseline justify-between">
-          <h2 className={STYLE.sectionTitle}>Three tiers</h2>
-          <Link
-            href="/pricing"
-            className="text-xs hover:underline transition"
-            style={{ color: TOK.textMuted }}
-          >
-            See pricing →
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {(
-            [
-              { id: "scout", verb: "see the map" },
-              { id: "knight", verb: "read the verdict" },
-              { id: "baron", verb: "own the repo" },
-            ] as const
-          ).map((t) => {
-            const cfg = TIER_CONFIG[t.id as Tier];
-            return (
-              <div
-                key={t.id}
-                className="flex items-center gap-4 p-5 rounded-xl"
-                style={{
-                  background: TOK.bg,
-                  border: `1px solid ${TOK.border}`,
-                }}
-              >
-                <TierIcon tier={t.id} size={32} />
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <span
-                    className="text-[10px] uppercase tracking-[0.18em] font-medium"
-                    style={{ color: TOK.textMuted }}
-                  >
-                    {cfg.name}
-                  </span>
-                  <span
-                    className="text-base font-semibold tracking-tight"
-                    style={{
-                      color: TOK.textPrimary,
-                      letterSpacing: "-0.01em",
-                    }}
-                  >
-                    {t.verb}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-      </ScrollReveal>
-
       {/* Architecture-diagram feature spotlight. Uses the same
        *  image-as-asset pattern as the hero — a real Mermaid class
        *  diagram from one of our analyzed sessions, framed with the
@@ -742,7 +507,7 @@ export function MarketingHome({
             href="/"
             className="flex items-center transition opacity-70 hover:opacity-100"
           >
-            <Logo size={20} wordmark />
+            <Logo size={28} wordmark />
           </Link>
           <nav className="flex items-center gap-5 text-xs flex-wrap">
             <a
@@ -863,7 +628,15 @@ function LoggedOutHero({
     }))
     .filter((d) => !!d.sessionId);
 
-  const featured = all.find((d) => d.repo === FEATURED_REPO) ?? all[0] ?? null;
+  // v0.80 reset: restored the original featured-demo composition
+  // (zod foreground + Code-tab dimmed background via FeaturedHero)
+  // after two abandoned hero experiments (live-graph + integrated-
+  // bg single-image). The two-image layered hero is what works —
+  // it has depth, shows real product UI, and reads as "here's a
+  // deep look at one finding, here are others to explore."
+
+  const featured =
+    all.find((d) => d.repo === FEATURED_REPO) ?? all[0] ?? null;
   const others = all.filter((d) => d.repo !== featured?.repo);
 
   return (
@@ -946,9 +719,6 @@ function LoggedOutHero({
 // ─── Featured demo hero — Linear-style message-thread card + ──────────
 //                          background hotspots panel for depth.
 
-/** Hand-curated code snippet for the code-preview inside the featured
- *  card. Trimmed to ~8 lines so the card stays compact, focuses the
- *  eye on the highlighted line, and reads as a "snippet preview"
 /** Featured-finding hero. Uses real product screenshots embedded as
  *  static images — same pattern Linear uses on their landing
  *  (foreground = focused screenshot of one product surface, background

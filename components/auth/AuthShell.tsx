@@ -64,7 +64,7 @@ function BrandPanel() {
         href="/"
         className="self-start opacity-90 hover:opacity-100 transition"
       >
-        <Logo size={28} wordmark />
+        <Logo size={40} wordmark />
       </Link>
 
       {/* Middle: brand-promise + feature bullets. Constrained to
@@ -138,7 +138,7 @@ function FormPanel({ children }: { children: React.ReactNode }) {
         href="/"
         className="md:hidden mb-8 opacity-90 hover:opacity-100 transition"
       >
-        <Logo size={26} wordmark />
+        <Logo size={36} wordmark />
       </Link>
       <div className="w-full max-w-md flex flex-col gap-4">{children}</div>
     </div>

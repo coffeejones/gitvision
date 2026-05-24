@@ -70,7 +70,7 @@ export function MarketingNav() {
           href="/"
           className="flex items-center transition opacity-90 hover:opacity-100"
         >
-          <Logo size={22} wordmark />
+          <Logo size={30} wordmark />
         </Link>
 
         {/* Right-hand nav cluster. Secondary links collapse on phone
