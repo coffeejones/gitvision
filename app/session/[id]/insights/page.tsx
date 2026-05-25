@@ -5,7 +5,7 @@
 // answers "what" — this page answers "why, in plain English". Two
 // panels:
 //   1. AI Briefing — what the repo is, in 150-200 words.
-//   2. Health Check — the three-column verdict grounded in 18 signals.
+//   2. Health Check — the three-column verdict grounded in 19 signals.
 //
 // v0.60 trim: the page header used to repeat what the panel headers
 // already say. Dropped the 4-line intro paragraph in favor of a single
@@ -87,7 +87,7 @@ export default async function InsightsRoute({
             context="The deterministic Health Summary on your Overview page is free forever. AI Briefing + Health Check verdict — the prose layer that explains the signals in plain English — needs Knight."
             unlockedFeatures={[
               "AI Briefing — 150-word repo profile generated from your codebase",
-              "Health Check verdict — three-column \"what works / dig deeper / open questions\" grounded in 18 signals",
+              "Health Check verdict — three-column \"what works / dig deeper / open questions\" grounded in 19 signals",
               "Structural diff between snapshots (see what changed semantically)",
               "Auto-extracted Architecture diagrams",
               "Unlimited saved sessions + private repos",

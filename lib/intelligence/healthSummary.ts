@@ -88,6 +88,10 @@ const DIMENSION_SIGNAL_IDS: Record<DimensionId, readonly string[]> = {
     "outdated-deps",
     "deprecated-deps",
     "fresh-deps",
+    // v0.81+ signal #19 — curated supply-chain incident matches.
+    // Always high-severity when present; drives the Dependencies
+    // tile to CRITICAL on any match.
+    "known-incident-match",
   ],
   hygiene: ["missing-hygiene", "metadata-dominance"],
 };

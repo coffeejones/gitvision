@@ -511,3 +511,153 @@ describe("Deep dependency chains signal", () => {
     ]);
   });
 });
+
+// ------------------- Known-incident matching (signal #19) -------------
+
+/** Local DependencyHealth factory mirroring the one used by the
+ *  dep-health tests above. Hoisted out of that describe block so the
+ *  known-incident tests can use it without depending on test ordering. */
+function depHealthForIncident(
+  overrides: Partial<DependencyHealth> = {},
+): DependencyHealth {
+  return {
+    ecosystem: "npm",
+    total: 5,
+    outdated: [],
+    vulnerable: [],
+    deprecated: [],
+    analyzedAt: "2026-04-23T00:00:00Z",
+    ...overrides,
+  };
+}
+
+describe("Known-incident signal (#19)", () => {
+  it("no signal when no dependency-health is present", () => {
+    const { needsWork } = extractHealthSignals(mockSnapshot());
+    expect(hasSignal(needsWork, "known-incident-match")).toBe(false);
+  });
+
+  it("no signal when all package versions are safe", () => {
+    const { needsWork } = extractHealthSignals(
+      mockSnapshot({
+        dependencyHealth: depHealthForIncident({
+          outdated: [
+            {
+              name: "eslint-config-prettier",
+              current: "9.0.0",
+              latest: "10.0.0",
+              ageMonths: 12,
+              lastPublished: "2024-01-01T00:00:00Z",
+            },
+          ],
+        }),
+      }),
+    );
+    expect(hasSignal(needsWork, "known-incident-match")).toBe(false);
+  });
+
+  it("flags an exact match in outdated list (eslint-config-prettier 10.1.7)", () => {
+    const { needsWork } = extractHealthSignals(
+      mockSnapshot({
+        dependencyHealth: depHealthForIncident({
+          outdated: [
+            {
+              name: "eslint-config-prettier",
+              current: "10.1.7",
+              latest: "10.2.0",
+              ageMonths: 1,
+              lastPublished: "2024-08-01T00:00:00Z",
+            },
+          ],
+        }),
+      }),
+    );
+    const sig = needsWork.find((s) => s.id === "known-incident-match");
+    expect(sig).toBeDefined();
+    expect(sig?.severity).toBe("high");
+    expect(sig?.evidence.paths).toContain(
+      "[npm] eslint-config-prettier@10.1.7",
+    );
+    expect(sig?.evidence.numbers?.incidents).toBe(1);
+    expect(sig?.evidence.numbers?.packages).toBe(1);
+  });
+
+  it("matches a compromised version embedded in a prefix string (==1.95.6)", () => {
+    const { needsWork } = extractHealthSignals(
+      mockSnapshot({
+        dependencyHealth: depHealthForIncident({
+          vulnerable: [
+            {
+              name: "@solana/web3.js",
+              current: "==1.95.6",
+              cves: ["GHSA-89mq-rj47-mfm9"],
+            },
+          ],
+        }),
+      }),
+    );
+    const sig = needsWork.find((s) => s.id === "known-incident-match");
+    expect(sig).toBeDefined();
+    expect(sig?.evidence.paths).toContain(
+      "[npm] @solana/web3.js@==1.95.6",
+    );
+  });
+
+  it("aggregates multiple incident matches into a single signal", () => {
+    const { needsWork } = extractHealthSignals(
+      mockSnapshot({
+        dependencyHealth: depHealthForIncident({
+          outdated: [
+            {
+              name: "colors",
+              current: "1.4.1",
+              latest: "1.5.0",
+              ageMonths: 36,
+              lastPublished: "2022-01-01T00:00:00Z",
+            },
+            {
+              name: "faker",
+              current: "6.6.6",
+              latest: "8.0.0",
+              ageMonths: 36,
+              lastPublished: "2022-01-01T00:00:00Z",
+            },
+            {
+              name: "@solana/web3.js",
+              current: "1.95.7",
+              latest: "2.0.0",
+              ageMonths: 6,
+              lastPublished: "2024-12-01T00:00:00Z",
+            },
+          ],
+        }),
+      }),
+    );
+    const sig = needsWork.find((s) => s.id === "known-incident-match");
+    expect(sig).toBeDefined();
+    // colors + faker are one incident (colors-faker-sabotage-2022),
+    // solana is another → 2 incidents, 3 packages total.
+    expect(sig?.evidence.numbers?.incidents).toBe(2);
+    expect(sig?.evidence.numbers?.packages).toBe(3);
+  });
+
+  it("does not match when ecosystem differs (npm name on pypi)", () => {
+    const { needsWork } = extractHealthSignals(
+      mockSnapshot({
+        dependencyHealth: depHealthForIncident({
+          ecosystem: "pypi",
+          outdated: [
+            {
+              name: "eslint-config-prettier",
+              current: "10.1.7",
+              latest: "10.2.0",
+              ageMonths: 1,
+              lastPublished: "2024-08-01T00:00:00Z",
+            },
+          ],
+        }),
+      }),
+    );
+    expect(hasSignal(needsWork, "known-incident-match")).toBe(false);
+  });
+});

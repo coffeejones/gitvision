@@ -1,0 +1,256 @@
+// Known supply-chain incident database (v0.81+, signal #19).
+//
+// Curated list of well-documented attacks where specific package
+// versions are KNOWN to be compromised. The detector here only
+// reports matches — it never claims "this code IS malicious", just
+// "this version matches a known incident; review manually". The
+// brand promise of zero false positives means we err strongly on
+// the side of "only ship patterns where ground truth is publicly
+// documented (CVE, security advisory, post-mortem blog post)".
+//
+// What we DON'T do here:
+//   - General-purpose backdoor detection (heuristic, high FP rate)
+//   - Behavioral analysis (computationally hard, low signal)
+//   - Matching against the broader CVE database (Snyk/GitHub Advisory
+//     already cover that; vulnerable-deps signal surfaces it)
+//
+// What this catches: the cases where a maintainer's account was
+// compromised or a maintainer themselves shipped malicious code —
+// supply-chain attacks where the package + version is the smoking
+// gun. These get missed by CVE scanners when the advisory comes
+// out late, and they get drowned out in "outdated-deps" lists.
+//
+// Curation guidelines for new entries:
+//   - Public advisory exists (GHSA, NVD, or reputable blog)
+//   - Specific version strings are documented as compromised
+//   - Incident was confirmed by maintainer or post-mortem
+//   - At least 6 months elapsed (we want documented, not breaking
+//     news where details may still shift)
+//
+// Review cadence: quarterly. When adding entries, link the
+// reference URL so future maintainers can verify the claim.
+
+import type {
+  AnalysisSnapshot,
+  Ecosystem,
+  HealthSignal,
+} from "@/lib/types";
+
+export interface KnownIncident {
+  /** Stable id, kebab-case. Used in evidence + future filtering. */
+  id: string;
+  /** Display name shown in card title. */
+  name: string;
+  /** One-sentence summary of what the attack did. Kept terse so it
+   *  reads in a card; full context lives at the reference URL. */
+  shortDescription: string;
+  /** Authoritative reference (GHSA advisory, CVE entry, or
+   *  maintainer post-mortem). Surfaced in the evidence note. */
+  reference: string;
+  /** ISO date the incident became public. Helps users decide
+   *  whether their lockfile predates discovery. */
+  discoveredAt: string;
+  affectedPackages: AffectedPackage[];
+}
+
+export interface AffectedPackage {
+  ecosystem: Ecosystem;
+  name: string;
+  /** Specific version strings known to be compromised. We match
+   *  with substring containment (not strict equality) so version
+   *  prefixes like "==", "^", "~" don't break detection. */
+  compromisedVersions: string[];
+}
+
+/** Curated database. Order doesn't matter; the detector iterates
+ *  all entries. Add new incidents at the end with a clear comment. */
+export const KNOWN_INCIDENTS: KnownIncident[] = [
+  {
+    id: "eslint-config-prettier-2024",
+    name: "eslint-config-prettier supply-chain (2024)",
+    shortDescription:
+      "Maintainer's npm token was phished; attacker published malicious versions that exfiltrate further npm tokens via postinstall scripts.",
+    reference:
+      "https://github.com/eslint/eslint-config-prettier/security/advisories",
+    discoveredAt: "2024-07-19",
+    affectedPackages: [
+      {
+        ecosystem: "npm",
+        name: "eslint-config-prettier",
+        compromisedVersions: ["8.10.1", "9.1.1", "10.1.6", "10.1.7"],
+      },
+    ],
+  },
+  {
+    id: "solana-web3-js-2024",
+    name: "@solana/web3.js supply-chain (December 2024)",
+    shortDescription:
+      "Compromised maintainer token led to two malicious releases that exfiltrate Solana private keys at runtime.",
+    reference: "https://github.com/advisories/GHSA-89mq-rj47-mfm9",
+    discoveredAt: "2024-12-03",
+    affectedPackages: [
+      {
+        ecosystem: "npm",
+        name: "@solana/web3.js",
+        compromisedVersions: ["1.95.6", "1.95.7"],
+      },
+    ],
+  },
+  {
+    id: "colors-faker-sabotage-2022",
+    name: "colors.js / faker.js maintainer sabotage (January 2022)",
+    shortDescription:
+      "Marak Squires intentionally pushed broken releases that print zalgo text and infinite-loop, breaking thousands of downstream builds.",
+    reference: "https://github.com/Marak/colors.js/issues/285",
+    discoveredAt: "2022-01-08",
+    affectedPackages: [
+      {
+        ecosystem: "npm",
+        name: "colors",
+        compromisedVersions: ["1.4.1", "1.4.2", "1.4.44-liberty-2"],
+      },
+      {
+        ecosystem: "npm",
+        name: "faker",
+        compromisedVersions: ["6.6.6"],
+      },
+    ],
+  },
+  {
+    id: "ua-parser-js-2021",
+    name: "ua-parser-js supply-chain (October 2021)",
+    shortDescription:
+      "Maintainer's npm credentials were compromised; published versions installed a crypto-miner plus a password-stealing payload on Windows hosts.",
+    reference: "https://github.com/faisalman/ua-parser-js/issues/536",
+    discoveredAt: "2021-10-22",
+    affectedPackages: [
+      {
+        ecosystem: "npm",
+        name: "ua-parser-js",
+        compromisedVersions: ["0.7.29", "0.8.0", "1.0.0"],
+      },
+    ],
+  },
+  {
+    id: "event-stream-2018",
+    name: "event-stream / flatmap-stream backdoor (November 2018)",
+    shortDescription:
+      "A new maintainer added 'flatmap-stream' as a nested dependency; it shipped a backdoor that exfiltrated Bitcoin wallet credentials from the Copay app.",
+    reference: "https://github.com/dominictarr/event-stream/issues/116",
+    discoveredAt: "2018-11-26",
+    affectedPackages: [
+      {
+        ecosystem: "npm",
+        name: "flatmap-stream",
+        compromisedVersions: ["0.1.1"],
+      },
+      {
+        ecosystem: "npm",
+        name: "event-stream",
+        // event-stream itself wasn't compromised, but 3.3.6 was the
+        // version that pulled the malicious flatmap-stream. Flag it
+        // so users who locked to 3.3.6 know to bump.
+        compromisedVersions: ["3.3.6"],
+      },
+    ],
+  },
+];
+
+/** Collect every (ecosystem, name, current-version) tuple visible in
+ *  the snapshot's dependencyHealths. Combines outdated + vulnerable +
+ *  deprecated arrays — compromised packages typically land in one of
+ *  these once the advisory drops. */
+function packagesFromSnapshot(snap: AnalysisSnapshot): Array<{
+  ecosystem: Ecosystem;
+  name: string;
+  current: string;
+}> {
+  const healths =
+    snap.dependencyHealths ??
+    (snap.dependencyHealth ? [snap.dependencyHealth] : []);
+  const out: Array<{ ecosystem: Ecosystem; name: string; current: string }> =
+    [];
+  for (const h of healths) {
+    for (const d of [...h.outdated, ...h.vulnerable, ...h.deprecated]) {
+      out.push({ ecosystem: h.ecosystem, name: d.name, current: d.current });
+    }
+  }
+  return out;
+}
+
+/** Walk the curated incident DB against the snapshot's packages.
+ *  Emits a single signal aggregating ALL matched incidents — easier
+ *  to read in the UI than one card per incident when multiple match.
+ *  Each incident's reference URL + discovery date lands in the
+ *  evidence.note so users can verify the claim before acting.
+ *
+ *  Always returns [] when no packages are scanned or no matches
+ *  occur — the signal only appears when we have something to say. */
+export function detectKnownIncidents(
+  snap: AnalysisSnapshot,
+): HealthSignal[] {
+  const pkgs = packagesFromSnapshot(snap);
+  if (pkgs.length === 0) return [];
+
+  const matchedIncidents: Array<{
+    incident: KnownIncident;
+    matches: string[];
+  }> = [];
+
+  for (const incident of KNOWN_INCIDENTS) {
+    const matches: string[] = [];
+    for (const pkg of pkgs) {
+      for (const affected of incident.affectedPackages) {
+        if (affected.ecosystem !== pkg.ecosystem) continue;
+        if (affected.name !== pkg.name) continue;
+        // Loose match — current may have version prefixes like "==",
+        // "^", "~" depending on ecosystem.
+        for (const ver of affected.compromisedVersions) {
+          if (pkg.current.includes(ver)) {
+            matches.push(`[${pkg.ecosystem}] ${pkg.name}@${pkg.current}`);
+            break;
+          }
+        }
+      }
+    }
+    if (matches.length > 0) {
+      matchedIncidents.push({ incident, matches });
+    }
+  }
+
+  if (matchedIncidents.length === 0) return [];
+
+  const totalPackages = matchedIncidents.reduce(
+    (sum, m) => sum + m.matches.length,
+    0,
+  );
+  const allPaths = matchedIncidents.flatMap((m) => m.matches);
+  const noteLines = matchedIncidents.map(
+    (m) =>
+      `${m.incident.name} — discovered ${m.incident.discoveredAt} — ${m.incident.reference}`,
+  );
+
+  // Conservative wording: "Possible match" not "Compromised". Users
+  // make the final call after reviewing the reference.
+  const isSingle = matchedIncidents.length === 1;
+  const titleSuffix = isSingle
+    ? matchedIncidents[0].incident.name
+    : `${matchedIncidents.length} known incidents`;
+
+  return [
+    {
+      id: "known-incident-match",
+      title: `Possible match — ${titleSuffix}`,
+      detail: `${totalPackages} dependenc${totalPackages === 1 ? "y" : "ies"} match version${totalPackages === 1 ? "" : "s"} from ${isSingle ? "a known supply-chain incident" : "known supply-chain incidents"}. Verify against the linked advisory before treating as a confirmed compromise.`,
+      evidence: {
+        paths: allPaths,
+        note: noteLines.join(" | "),
+        numbers: {
+          incidents: matchedIncidents.length,
+          packages: totalPackages,
+        },
+      },
+      severity: "high",
+    },
+  ];
+}

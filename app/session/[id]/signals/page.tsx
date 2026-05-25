@@ -1,6 +1,6 @@
 // /session/[id]/signals — the data behind Health at a Glance (v0.81+).
 //
-// Health at a Glance aggregates 18 deterministic signals into 6 dimension
+// Health at a Glance aggregates 19 deterministic signals into 6 dimension
 // tiles, picking ONE "lead" signal per tile based on severity priority.
 // That hides ~12 signals: they're computed and influence the tile status,
 // but their specific evidence (paths, numbers, notes) is invisible.

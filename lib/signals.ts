@@ -9,6 +9,7 @@
 // see both the AI prose AND the raw signals in the UI via an evidence toggle.
 
 import { isBotAuthor } from "./botDetection";
+import { detectKnownIncidents } from "./security/knownIncidents";
 import type {
   AnalysisSnapshot,
   HealthSignal,
@@ -940,6 +941,14 @@ export function extractHealthSignals(snap: AnalysisSnapshot): HealthSignals {
   needsWork.push(...detectVulnerableDeps(snap));
   needsWork.push(...detectOutdatedDeps(snap));
   needsWork.push(...detectDeprecatedDeps(snap));
+
+  // Known supply-chain incidents (v0.81+ signal #19). Curated DB of
+  // documented attacks where specific package versions are confirmed
+  // compromised. Always high severity when matched — these are
+  // documented attacks, not heuristics. Lives next to the rest of
+  // the dep-health detectors so the Health-at-a-Glance "deps" tile
+  // catches the signal automatically.
+  needsWork.push(...detectKnownIncidents(snap));
 
   // Solo-friendly positive detectors — these fire on team projects too, but
   // they're especially important for giving solo projects credit where due.
