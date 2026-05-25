@@ -29,6 +29,7 @@ import {
   FileCode,
   GitPullRequest,
   Home,
+  ListChecks,
   Network,
   Package,
   Search,
@@ -161,6 +162,15 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       hasNewFeatureBadge: true,
     },
     null, // separator
+    {
+      // v0.81+ Signals tab — the data behind Health at a Glance.
+      // Surfaces all 18 deterministic signals (working / needsWork /
+      // questions) so devs can drill into specific evidence beyond
+      // the 6 aggregated dimension tiles on the overview.
+      label: "Signals",
+      href: `${base}/signals`,
+      icon: <ListChecks size={14} />,
+    },
     {
       label: "Insights",
       href: `${base}/insights`,
