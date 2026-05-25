@@ -1,22 +1,37 @@
-// SignalsPanel — three-column render of all signals returned by
-// extractHealthSignals (v0.81+). Server-renderable (no client-only APIs
-// used) so it slots into the /session/[id]/signals route without a
-// "use client" boundary.
+"use client";
+
+// SignalsPanel — interactive three-column render of every signal
+// returned by extractHealthSignals (v0.81+). Now with filter/search
+// (v0.81 polish): instant fuzzy match on title/id/detail + severity
+// pills that hide cards without that severity.
 //
-// Composition mirrors the data shape:
+// Composition mirrors extractHealthSignals' return shape:
 //   Working       — green column, positive signals
 //   Needs Work    — rose column, risks/debt with severity badges
 //   Open Questions— amber column, observations to interpret
 //
-// Per-signal card surfaces title + detail + severity + evidence
-// (paths in mono, labeled numbers, optional note). The id is shown
-// as a small caps eyebrow so visitors can map a card back to the
-// detector in lib/signals.ts when curious.
+// Filtering is client-side, instant — there are max ~25 cards so we
+// don't need debouncing or virtualization. Filtered state is local
+// to this component; refreshing the page resets.
+//
+// Severity pills only meaningfully affect Needs Work (the bucket
+// where severity is set). Working and Open Questions cards have
+// no severity and pass the severity filter unconditionally — the
+// query text filter still applies to them.
 
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   HelpCircle,
+  Search,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { TOK } from "@/lib/theme";
@@ -26,33 +41,307 @@ interface Props {
   signals: HealthSignals;
 }
 
+type Severity = "high" | "medium" | "low";
+const ALL_SEVERITIES: ReadonlyArray<Severity> = ["high", "medium", "low"];
+
 export function SignalsPanel({ signals }: Props) {
+  const [query, setQuery] = useState("");
+  const [activeSeverities, setActiveSeverities] = useState<Set<Severity>>(
+    () => new Set(ALL_SEVERITIES),
+  );
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // '/' focuses the search box (dev convention — works in GitHub,
+  // Linear, Slack, etc.). We bail when the user is already typing
+  // in an input so '/' inside text fields isn't intercepted.
+  useEffect(() => {
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (e.key !== "/") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const isEditable = target?.getAttribute("contenteditable") === "true";
+      if (tag === "INPUT" || tag === "TEXTAREA" || isEditable) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Apply filters. Memoize per (query, activeSeverities, signals)
+  // so re-renders triggered by other state (e.g. focus) don't redo
+  // the work. With ~25 signals it's cheap regardless, but the
+  // explicit useMemo also documents the dependency.
+  const filtered = useMemo(() => {
+    const lowerQuery = query.trim().toLowerCase();
+    const matches = (sig: HealthSignal): boolean => {
+      // Severity gate — only applies when the signal has one.
+      if (sig.severity && !activeSeverities.has(sig.severity)) return false;
+      // Text gate — empty query passes through.
+      if (!lowerQuery) return true;
+      return (
+        sig.title.toLowerCase().includes(lowerQuery) ||
+        sig.id.toLowerCase().includes(lowerQuery) ||
+        sig.detail.toLowerCase().includes(lowerQuery)
+      );
+    };
+    return {
+      working: signals.working.filter(matches),
+      needsWork: signals.needsWork.filter(matches),
+      questions: signals.questions.filter(matches),
+    };
+  }, [signals, query, activeSeverities]);
+
+  const totalOriginal =
+    signals.working.length +
+    signals.needsWork.length +
+    signals.questions.length;
+  const totalFiltered =
+    filtered.working.length +
+    filtered.needsWork.length +
+    filtered.questions.length;
+  const isFiltering =
+    query.length > 0 || activeSeverities.size < ALL_SEVERITIES.length;
+
+  function toggleSeverity(sev: Severity) {
+    setActiveSeverities((prev) => {
+      const next = new Set(prev);
+      if (next.has(sev)) next.delete(sev);
+      else next.add(sev);
+      return next;
+    });
+  }
+
+  function clearFilters() {
+    setQuery("");
+    setActiveSeverities(new Set(ALL_SEVERITIES));
+    searchRef.current?.focus();
+  }
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <Column
-        title="Working"
-        subtitle="positive signals — things going well"
-        signals={signals.working}
-        accent={TOK.accent}
-        Icon={CheckCircle2}
+    <div className="flex flex-col gap-6">
+      <FilterBar
+        query={query}
+        onQueryChange={setQuery}
+        activeSeverities={activeSeverities}
+        onToggleSeverity={toggleSeverity}
+        totalOriginal={totalOriginal}
+        totalFiltered={totalFiltered}
+        isFiltering={isFiltering}
+        onClear={clearFilters}
+        searchRef={searchRef}
       />
-      <Column
-        title="Needs Work"
-        subtitle="risks, debt, regressions"
-        signals={signals.needsWork}
-        accent={TOK.rose}
-        Icon={AlertTriangle}
-      />
-      <Column
-        title="Open Questions"
-        subtitle="observations needing human interpretation"
-        signals={signals.questions}
-        accent={TOK.amber}
-        Icon={HelpCircle}
-      />
+
+      {totalFiltered === 0 && isFiltering ? (
+        <EmptyFilterState query={query} onClear={clearFilters} />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Column
+            title="Working"
+            subtitle="positive signals — things going well"
+            signals={filtered.working}
+            accent={TOK.accent}
+            Icon={CheckCircle2}
+          />
+          <Column
+            title="Needs Work"
+            subtitle="risks, debt, regressions"
+            signals={filtered.needsWork}
+            accent={TOK.rose}
+            Icon={AlertTriangle}
+          />
+          <Column
+            title="Open Questions"
+            subtitle="observations needing human interpretation"
+            signals={filtered.questions}
+            accent={TOK.amber}
+            Icon={HelpCircle}
+          />
+        </div>
+      )}
     </div>
   );
 }
+
+// ─── Filter bar ──────────────────────────────────────────────────────
+
+interface FilterBarProps {
+  query: string;
+  onQueryChange: (q: string) => void;
+  activeSeverities: Set<Severity>;
+  onToggleSeverity: (s: Severity) => void;
+  totalOriginal: number;
+  totalFiltered: number;
+  isFiltering: boolean;
+  onClear: () => void;
+  searchRef: React.RefObject<HTMLInputElement | null>;
+}
+
+function FilterBar({
+  query,
+  onQueryChange,
+  activeSeverities,
+  onToggleSeverity,
+  totalOriginal,
+  totalFiltered,
+  isFiltering,
+  onClear,
+  searchRef,
+}: FilterBarProps) {
+  function onSearchKey(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      if (query) {
+        onQueryChange("");
+      } else {
+        (e.target as HTMLInputElement).blur();
+      }
+    }
+  }
+
+  return (
+    <div
+      className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-5"
+      style={{ borderBottom: `1px solid ${TOK.border}` }}
+    >
+      {/* Search input */}
+      <div className="relative flex-1 sm:max-w-md">
+        <Search
+          size={13}
+          className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+          style={{ color: TOK.textMuted }}
+        />
+        <input
+          ref={searchRef}
+          type="text"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onKeyDown={onSearchKey}
+          placeholder="Search signals…  (press /)"
+          aria-label="Search signals"
+          className="w-full h-9 pl-9 pr-3 rounded-md text-sm focus:outline-none transition"
+          style={{
+            background: TOK.surface,
+            border: `1px solid ${TOK.border}`,
+            color: TOK.textPrimary,
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = TOK.borderStrong;
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = TOK.border;
+          }}
+        />
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Severity toggle pills */}
+        <span
+          className="text-[10px] uppercase tracking-[0.14em] font-medium"
+          style={{ color: TOK.textMuted }}
+        >
+          Severity
+        </span>
+        {ALL_SEVERITIES.map((sev) => (
+          <SeverityPill
+            key={sev}
+            severity={sev}
+            active={activeSeverities.has(sev)}
+            onClick={() => onToggleSeverity(sev)}
+          />
+        ))}
+
+        {/* Counter */}
+        <span
+          className="text-xs ml-2 font-mono"
+          style={{ color: TOK.textMuted }}
+        >
+          {isFiltering
+            ? `${totalFiltered} / ${totalOriginal}`
+            : `${totalOriginal} signals`}
+        </span>
+
+        {/* Clear button — only when filtering */}
+        {isFiltering && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="inline-flex items-center gap-1 text-xs hover:underline transition"
+            style={{ color: TOK.textMuted }}
+          >
+            <X size={11} />
+            Clear
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SeverityPill({
+  severity,
+  active,
+  onClick,
+}: {
+  severity: Severity;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const palette = severityPalette(severity);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className="text-[9px] uppercase tracking-[0.14em] font-semibold px-1.5 py-0.5 rounded transition"
+      style={{
+        background: active ? palette.bg : "transparent",
+        color: active ? palette.text : TOK.textMuted,
+        border: `1px solid ${active ? palette.border : TOK.border}`,
+        opacity: active ? 1 : 0.6,
+      }}
+    >
+      {severity}
+    </button>
+  );
+}
+
+// ─── Empty state when filters yield no matches ───────────────────────
+
+function EmptyFilterState({
+  query,
+  onClear,
+}: {
+  query: string;
+  onClear: () => void;
+}) {
+  return (
+    <div
+      className="flex flex-col items-center gap-3 py-16 px-4 text-center rounded-lg"
+      style={{
+        background: "rgba(255, 255, 255, 0.02)",
+        border: `1px dashed ${TOK.border}`,
+      }}
+    >
+      <p className="text-sm" style={{ color: TOK.textSecondary }}>
+        {query
+          ? `No signals match "${query}".`
+          : "No signals match the current filters."}
+      </p>
+      <button
+        type="button"
+        onClick={onClear}
+        className="text-xs hover:underline transition"
+        style={{ color: TOK.accent }}
+      >
+        Clear filters
+      </button>
+    </div>
+  );
+}
+
+// ─── Column + cards ──────────────────────────────────────────────────
 
 interface ColumnProps {
   title: string;
@@ -104,7 +393,7 @@ function Column({ title, subtitle, signals, accent, Icon }: ColumnProps) {
           }}
         >
           <p className="text-xs" style={{ color: TOK.textMuted }}>
-            No signals in this category for this snapshot.
+            No signals in this category.
           </p>
         </div>
       ) : (
@@ -161,24 +450,8 @@ function SignalCard({ signal, columnAccent }: SignalCardProps) {
   );
 }
 
-function SeverityBadge({
-  severity,
-}: {
-  severity: "low" | "medium" | "high";
-}) {
-  // Map severity to the existing TOK palette. high = rose, medium = amber,
-  // low = muted neutral. Keeps colors in sync with the rest of the app
-  // without introducing new tokens.
-  const palette =
-    severity === "high"
-      ? { bg: `${TOK.rose}1a`, text: TOK.rose, border: `${TOK.rose}40` }
-      : severity === "medium"
-        ? { bg: `${TOK.amber}1a`, text: TOK.amber, border: `${TOK.amber}40` }
-        : {
-            bg: "rgba(255,255,255,0.04)",
-            text: TOK.textMuted,
-            border: TOK.border,
-          };
+function SeverityBadge({ severity }: { severity: Severity }) {
+  const palette = severityPalette(severity);
   return (
     <span
       className="text-[9px] uppercase tracking-[0.14em] font-semibold px-1.5 py-0.5 rounded"
@@ -191,6 +464,27 @@ function SeverityBadge({
       {severity}
     </span>
   );
+}
+
+/** Shared severity → color palette used by both the inert SeverityBadge
+ *  on cards and the interactive SeverityPill in the filter bar. Keeps
+ *  the two visually identical so users learn the color mapping once. */
+function severityPalette(severity: Severity): {
+  bg: string;
+  text: string;
+  border: string;
+} {
+  if (severity === "high") {
+    return { bg: `${TOK.rose}1a`, text: TOK.rose, border: `${TOK.rose}40` };
+  }
+  if (severity === "medium") {
+    return { bg: `${TOK.amber}1a`, text: TOK.amber, border: `${TOK.amber}40` };
+  }
+  return {
+    bg: "rgba(255,255,255,0.04)",
+    text: TOK.textMuted,
+    border: TOK.border,
+  };
 }
 
 interface EvidenceProps {
