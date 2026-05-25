@@ -66,15 +66,13 @@ export interface AffectedPackage {
  *  all entries. Add new incidents at the end with a clear comment. */
 export const KNOWN_INCIDENTS: KnownIncident[] = [
   {
-    id: "eslint-config-prettier-2024",
-    name: "eslint-config-prettier supply-chain (2024)",
+    id: "eslint-config-prettier-2025",
+    name: "eslint-config-prettier supply-chain (2025)",
     shortDescription:
-      "Maintainer's npm token was phished; attacker published malicious versions that exfiltrate further npm tokens via postinstall scripts.",
-    // Repo lives under the prettier org, not eslint (commonly confused).
-    // Direct advisory page on the upstream repo.
-    reference:
-      "https://github.com/prettier/eslint-config-prettier/security/advisories",
-    discoveredAt: "2024-07-19",
+      "Maintainer's npm token was phished; malicious versions executed an install.js that dropped a node-gyp.dll malware payload on Windows installs.",
+    // Specific GitHub Advisory — durable and informative. CVE-2025-54313.
+    reference: "https://github.com/advisories/GHSA-f29h-pxvx-f335",
+    discoveredAt: "2025-07-19",
     affectedPackages: [
       {
         ecosystem: "npm",
@@ -88,10 +86,9 @@ export const KNOWN_INCIDENTS: KnownIncident[] = [
     name: "@solana/web3.js supply-chain (December 2024)",
     shortDescription:
       "Compromised maintainer token led to two malicious releases that exfiltrate Solana private keys at runtime.",
-    // Specific GHSA id we initially listed was withdrawn/renamed; the
-    // GitHub Advisory Database search is the durable reference.
-    reference:
-      "https://github.com/advisories?query=%40solana%2Fweb3.js",
+    // Snyk advisory page — durable + informative. Tracks the
+    // SNYK-JS-SOLANAWEB3JS-8453984 entry covering versions 1.95.6-1.95.7.
+    reference: "https://security.snyk.io/package/npm/%40solana%2Fweb3.js",
     discoveredAt: "2024-12-03",
     affectedPackages: [
       {
@@ -194,8 +191,9 @@ export const KNOWN_INCIDENTS: KnownIncident[] = [
     name: "ctx (PyPI) takeover (May 2022)",
     shortDescription:
       "Attacker took over the abandoned 'ctx' package on PyPI and published versions that exfiltrate environment variables (AWS keys, tokens) on import.",
-    reference: "https://pypi.org/project/ctx/",
-    discoveredAt: "2022-05-21",
+    // Specific GitHub Advisory — "Malware in ctx" entry.
+    reference: "https://github.com/advisories/GHSA-4g82-3jcr-q52w",
+    discoveredAt: "2022-05-24",
     affectedPackages: [
       {
         ecosystem: "pypi",
@@ -229,10 +227,10 @@ export const KNOWN_INCIDENTS: KnownIncident[] = [
     name: "@lottiefiles/lottie-player supply-chain (October 2024)",
     shortDescription:
       "Maintainer's npm credentials compromised; attackers published versions injecting a Web3 wallet-drainer into thousands of downstream sites.",
-    // Specific GHSA id we initially listed was withdrawn/renamed; the
-    // GitHub Advisory Database search is the durable reference.
+    // Independent news coverage with verifiable detail — the LottieFiles
+    // incident wasn't routed through GitHub Advisory Database.
     reference:
-      "https://github.com/advisories?query=%40lottiefiles%2Flottie-player",
+      "https://www.bleepingcomputer.com/news/security/lottiefiles-hacked-in-supply-chain-attack-to-steal-users-crypto/",
     discoveredAt: "2024-10-30",
     affectedPackages: [
       {
