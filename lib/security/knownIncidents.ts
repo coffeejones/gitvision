@@ -154,6 +154,85 @@ export const KNOWN_INCIDENTS: KnownIncident[] = [
       },
     ],
   },
+  {
+    id: "rc-2021",
+    name: "rc supply-chain (November 2021)",
+    shortDescription:
+      "Maintainer's npm token was compromised; attacker published malicious versions that ran a credential-stealing payload during install.",
+    reference: "https://github.com/advisories/GHSA-g2q5-5433-rhrf",
+    discoveredAt: "2021-11-25",
+    affectedPackages: [
+      {
+        ecosystem: "npm",
+        name: "rc",
+        compromisedVersions: ["1.2.9", "1.3.9", "2.3.9"],
+      },
+    ],
+  },
+  {
+    id: "node-ipc-protestware-2022",
+    name: "node-ipc protestware / wiper (March 2022)",
+    shortDescription:
+      "Maintainer Brandon Nozaki Miller shipped versions that overwrite filesystem contents with heart emoji on machines geolocating to Russia or Belarus.",
+    reference: "https://github.com/advisories/GHSA-97m3-w2cp-4xx6",
+    discoveredAt: "2022-03-15",
+    affectedPackages: [
+      {
+        ecosystem: "npm",
+        name: "node-ipc",
+        compromisedVersions: ["10.1.1", "10.1.2"],
+      },
+    ],
+  },
+  {
+    id: "ctx-pypi-2022",
+    name: "ctx (PyPI) takeover (May 2022)",
+    shortDescription:
+      "Attacker took over the abandoned 'ctx' package on PyPI and published versions that exfiltrate environment variables (AWS keys, tokens) on import.",
+    reference: "https://pypi.org/project/ctx/",
+    discoveredAt: "2022-05-21",
+    affectedPackages: [
+      {
+        ecosystem: "pypi",
+        name: "ctx",
+        compromisedVersions: ["0.2.2", "0.2.6", "0.2.7", "0.2.8"],
+      },
+    ],
+  },
+  {
+    id: "rustdecimal-typosquat-2022",
+    name: "rustdecimal typosquat (May 2022)",
+    shortDescription:
+      "Typosquat of the legitimate 'rust_decimal' crate. Published to crates.io with a malicious binary payload that downloads + executes second-stage code.",
+    reference:
+      "https://www.sentinelone.com/blog/rust-decimal-typosquat-malicious-crate-on-crates-io/",
+    discoveredAt: "2022-05-10",
+    affectedPackages: [
+      {
+        ecosystem: "cargo",
+        // No underscore — this is the typosquat. The legitimate crate
+        // is `rust_decimal` (with underscore). Any version of the
+        // un-underscored name is the malicious one.
+        name: "rustdecimal",
+        compromisedVersions: ["1.23.1"],
+      },
+    ],
+  },
+  {
+    id: "lottiefiles-lottie-player-2024",
+    name: "@lottiefiles/lottie-player supply-chain (October 2024)",
+    shortDescription:
+      "Maintainer's npm credentials compromised; attackers published versions injecting a Web3 wallet-drainer into thousands of downstream sites.",
+    reference: "https://github.com/advisories/GHSA-rj63-x8mq-9rwm",
+    discoveredAt: "2024-10-30",
+    affectedPackages: [
+      {
+        ecosystem: "npm",
+        name: "@lottiefiles/lottie-player",
+        compromisedVersions: ["2.0.5", "2.0.6", "2.0.7"],
+      },
+    ],
+  },
 ];
 
 /** Collect every (ecosystem, name, current-version) tuple visible in

@@ -660,4 +660,49 @@ describe("Known-incident signal (#19)", () => {
     );
     expect(hasSignal(needsWork, "known-incident-match")).toBe(false);
   });
+
+  it("flags a pypi takeover (ctx@0.2.2)", () => {
+    const { needsWork } = extractHealthSignals(
+      mockSnapshot({
+        dependencyHealth: depHealthForIncident({
+          ecosystem: "pypi",
+          outdated: [
+            {
+              name: "ctx",
+              current: "==0.2.2",
+              latest: "0.1.2",
+              ageMonths: 36,
+              lastPublished: "2022-05-21T00:00:00Z",
+            },
+          ],
+        }),
+      }),
+    );
+    const sig = needsWork.find((s) => s.id === "known-incident-match");
+    expect(sig).toBeDefined();
+    expect(sig?.severity).toBe("high");
+    expect(sig?.evidence.paths).toContain("[pypi] ctx@==0.2.2");
+  });
+
+  it("flags a cargo typosquat (rustdecimal@1.23.1)", () => {
+    const { needsWork } = extractHealthSignals(
+      mockSnapshot({
+        dependencyHealth: depHealthForIncident({
+          ecosystem: "cargo",
+          outdated: [
+            {
+              name: "rustdecimal",
+              current: "1.23.1",
+              latest: "1.23.1",
+              ageMonths: 36,
+              lastPublished: "2022-05-01T00:00:00Z",
+            },
+          ],
+        }),
+      }),
+    );
+    const sig = needsWork.find((s) => s.id === "known-incident-match");
+    expect(sig).toBeDefined();
+    expect(sig?.evidence.paths).toContain("[cargo] rustdecimal@1.23.1");
+  });
 });
