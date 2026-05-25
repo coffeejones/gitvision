@@ -70,8 +70,10 @@ export const KNOWN_INCIDENTS: KnownIncident[] = [
     name: "eslint-config-prettier supply-chain (2024)",
     shortDescription:
       "Maintainer's npm token was phished; attacker published malicious versions that exfiltrate further npm tokens via postinstall scripts.",
+    // Repo lives under the prettier org, not eslint (commonly confused).
+    // Direct advisory page on the upstream repo.
     reference:
-      "https://github.com/eslint/eslint-config-prettier/security/advisories",
+      "https://github.com/prettier/eslint-config-prettier/security/advisories",
     discoveredAt: "2024-07-19",
     affectedPackages: [
       {
@@ -86,7 +88,10 @@ export const KNOWN_INCIDENTS: KnownIncident[] = [
     name: "@solana/web3.js supply-chain (December 2024)",
     shortDescription:
       "Compromised maintainer token led to two malicious releases that exfiltrate Solana private keys at runtime.",
-    reference: "https://github.com/advisories/GHSA-89mq-rj47-mfm9",
+    // Specific GHSA id we initially listed was withdrawn/renamed; the
+    // GitHub Advisory Database search is the durable reference.
+    reference:
+      "https://github.com/advisories?query=%40solana%2Fweb3.js",
     discoveredAt: "2024-12-03",
     affectedPackages: [
       {
@@ -204,8 +209,9 @@ export const KNOWN_INCIDENTS: KnownIncident[] = [
     name: "rustdecimal typosquat (May 2022)",
     shortDescription:
       "Typosquat of the legitimate 'rust_decimal' crate. Published to crates.io with a malicious binary payload that downloads + executes second-stage code.",
-    reference:
-      "https://www.sentinelone.com/blog/rust-decimal-typosquat-malicious-crate-on-crates-io/",
+    // Official RustSec advisory (Rust Security Working Group) — more
+    // durable than the original SentinelOne blog URL, which moved.
+    reference: "https://rustsec.org/advisories/RUSTSEC-2022-0049.html",
     discoveredAt: "2022-05-10",
     affectedPackages: [
       {
@@ -223,7 +229,10 @@ export const KNOWN_INCIDENTS: KnownIncident[] = [
     name: "@lottiefiles/lottie-player supply-chain (October 2024)",
     shortDescription:
       "Maintainer's npm credentials compromised; attackers published versions injecting a Web3 wallet-drainer into thousands of downstream sites.",
-    reference: "https://github.com/advisories/GHSA-rj63-x8mq-9rwm",
+    // Specific GHSA id we initially listed was withdrawn/renamed; the
+    // GitHub Advisory Database search is the durable reference.
+    reference:
+      "https://github.com/advisories?query=%40lottiefiles%2Flottie-player",
     discoveredAt: "2024-10-30",
     affectedPackages: [
       {
