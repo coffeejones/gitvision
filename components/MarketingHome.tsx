@@ -142,7 +142,7 @@ export function MarketingHome({
             >
               git blame
             </code>
-            . No prompts, no hallucinations, no LLM bill — just 19
+            . No prompts, no hallucinations, no LLM bill — just 20
             grounded signals across 7 languages.
           </p>
 
@@ -281,7 +281,7 @@ export function MarketingHome({
             },
             {
               t: "Repo health",
-              d: "Red / yellow / green verdict grounded in 19 deterministic signals — complexity, churn, coverage, dependencies. No AI hallucination.",
+              d: "Red / yellow / green verdict grounded in 20 deterministic signals — complexity, churn, coverage, dependencies. No AI hallucination.",
               icon: Activity,
             },
             {
@@ -369,8 +369,8 @@ export function MarketingHome({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SurfaceCard
             eyebrow="Workspace"
-            title="One repo, all 19 signals"
-            body="Paste a URL. Get an explorable canvas, blast radius, untested hotspots, near-duplicates, dependency health, and a red / yellow / green verdict grounded in 19 deterministic signals — all under one workspace."
+            title="One repo, all 20 signals"
+            body="Paste a URL. Get an explorable canvas, blast radius, untested hotspots, near-duplicates, dependency health, and a red / yellow / green verdict grounded in 20 deterministic signals — all under one workspace."
             footer="Public repos, free. Sessions saved as JSON. Scope to a subdirectory via deep-link."
             visual={<WorkspaceDimensionsMockup />}
           />
@@ -889,7 +889,7 @@ function WorkspaceDimensionsMockup() {
         className="text-[10px] uppercase tracking-[0.12em] font-medium"
         style={{ color: TOK.textMuted }}
       >
-        19 signals · scored across 6 dimensions
+        20 signals · scored across 6 dimensions
       </span>
       <div className="grid grid-cols-3 gap-x-4 gap-y-2">
         {tiles.map((t) => {

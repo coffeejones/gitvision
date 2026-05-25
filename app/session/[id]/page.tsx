@@ -412,7 +412,7 @@ export default async function OverviewPage({
               icon={<Sparkles size={15} />}
               label="Insights"
               stat="AI summary + health verdict"
-              description="Grounded in 19 deterministic signals · zero hallucination"
+              description="Grounded in 20 deterministic signals · zero hallucination"
             />
           </div>
         </section>

@@ -285,6 +285,16 @@ export interface AnalysisSnapshot {
    *  hits disk. Absent on pre-v0.61 snapshots; the UI hides the panel
    *  when the field is missing or `findings` is empty. */
   secretFindings?: import("./security/types").SecretScanResult;
+  /** Risky dynamic-code patterns (eval, new Function, exec) detected
+   *  by scanning extracted source files (v0.81+, signal #20). Absent
+   *  on pre-v0.81 snapshots and on analyses where the source walk
+   *  was skipped. The detector buckets the finding count into the
+   *  "questions" category — we trust the human to decide which
+   *  patterns are legitimate (templating, REPLs, sandboxes) and
+   *  which warrant action. */
+  riskyPatternFindings?: import(
+    "./security/riskyPatterns"
+  ).RiskyPatternScanResult;
   rateLimitInfo?: {
     limit: number;
     remaining: number;

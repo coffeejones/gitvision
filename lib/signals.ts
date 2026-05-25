@@ -479,6 +479,60 @@ function detectCrossBoundaryCoupling(snap: AnalysisSnapshot): HealthSignal[] {
   ];
 }
 
+// Risky dynamic-execution patterns (v0.81+ signal #20). Reports the
+// COUNT of eval / new Function / exec occurrences detected by the
+// scanForRiskyPatterns walker during analysis. We don't claim any
+// of them is malicious — we surface the count so a security review
+// can decide.
+//
+// Always bucketed as "questions" (no severity). The wording is
+// deliberately neutral: "N occurrences worth reviewing". A REPL or
+// template library will have many; an auth-handler shouldn't have
+// any.
+//
+// Below the surface threshold (MIN_FINDINGS), we emit no signal —
+// scattered eval/Function in build scripts or rare codegen edges
+// would generate noise without value.
+function detectRiskyPatterns(snap: AnalysisSnapshot): HealthSignal[] {
+  const result = snap.riskyPatternFindings;
+  if (!result || result.findings.length === 0) return [];
+
+  const MIN_FINDINGS = 1; // Surface even single occurrences — they're
+  // rare enough on real codebases (after our path/minified filters)
+  // that one match is interesting.
+  if (result.findings.length < MIN_FINDINGS) return [];
+
+  // Group by file for a compact evidence rendering: "src/eval.ts (3)".
+  // Caps at 5 file groups in the paths array — full count goes in
+  // evidence.numbers.
+  const byFile = new Map<string, number>();
+  for (const f of result.findings) {
+    byFile.set(f.filePath, (byFile.get(f.filePath) ?? 0) + 1);
+  }
+  const fileGroups = [...byFile.entries()].sort((a, b) => b[1] - a[1]);
+  const topGroups = fileGroups.slice(0, 5);
+  const evidencePaths = topGroups.map(([path, count]) =>
+    count > 1 ? `${path} (×${count})` : path,
+  );
+
+  return [
+    {
+      id: "risky-eval-patterns",
+      title: "Dynamic-execution patterns worth reviewing",
+      detail: `${result.findings.length} occurrence${result.findings.length === 1 ? "" : "s"} of eval / new Function / exec across ${byFile.size} file${byFile.size === 1 ? "" : "s"}. These execute strings as code at runtime — verify the input is trusted.`,
+      evidence: {
+        paths: evidencePaths,
+        numbers: {
+          occurrences: result.findings.length,
+          files: byFile.size,
+        },
+      },
+      // No severity — "questions" bucket. The detector can't tell
+      // legitimate codegen from sneaky payload without context.
+    },
+  ];
+}
+
 // Deep import chains — walks the fileGraph for the longest path from
 // any entry-point (a node nothing imports) down through its
 // transitive imports. Returns a signal naming the depth + one example
@@ -949,6 +1003,12 @@ export function extractHealthSignals(snap: AnalysisSnapshot): HealthSignals {
   // the dep-health detectors so the Health-at-a-Glance "deps" tile
   // catches the signal automatically.
   needsWork.push(...detectKnownIncidents(snap));
+
+  // Risky dynamic-execution patterns (v0.81+ signal #20). Bucketed
+  // into questions — we can't classify legitimate codegen vs sneaky
+  // payload without human context. Falls into "code" dimension on
+  // Health-at-a-Glance.
+  questions.push(...detectRiskyPatterns(snap));
 
   // Solo-friendly positive detectors — these fire on team projects too, but
   // they're especially important for giving solo projects credit where due.

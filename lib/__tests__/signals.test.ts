@@ -706,3 +706,86 @@ describe("Known-incident signal (#19)", () => {
     expect(sig?.evidence.paths).toContain("[cargo] rustdecimal@1.23.1");
   });
 });
+
+// ------------------- Risky dynamic-execution patterns (#20) -----------
+
+describe("Risky-pattern signal (#20)", () => {
+  it("no signal when riskyPatternFindings is absent", () => {
+    const result = extractHealthSignals(mockSnapshot());
+    const all = [
+      ...result.working,
+      ...result.needsWork,
+      ...result.questions,
+    ];
+    expect(all.some((s) => s.id === "risky-eval-patterns")).toBe(false);
+  });
+
+  it("no signal when findings array is empty", () => {
+    const { questions } = extractHealthSignals(
+      mockSnapshot({ riskyPatternFindings: { findings: [] } }),
+    );
+    expect(hasSignal(questions, "risky-eval-patterns")).toBe(false);
+  });
+
+  it("buckets into questions with no severity (single file)", () => {
+    const { questions, needsWork } = extractHealthSignals(
+      mockSnapshot({
+        riskyPatternFindings: {
+          findings: [
+            {
+              patternId: "js-eval",
+              patternName: "eval() call",
+              filePath: "src/runtime.js",
+              line: 12,
+              snippet: "eval(userInput);",
+            },
+          ],
+        },
+      }),
+    );
+    const sig = questions.find((s) => s.id === "risky-eval-patterns");
+    expect(sig).toBeDefined();
+    expect(sig?.severity).toBeUndefined();
+    // Crucially does NOT land in needsWork — we don't claim severity.
+    expect(hasSignal(needsWork, "risky-eval-patterns")).toBe(false);
+    expect(sig?.evidence.numbers?.occurrences).toBe(1);
+    expect(sig?.evidence.numbers?.files).toBe(1);
+    expect(sig?.evidence.paths).toContain("src/runtime.js");
+  });
+
+  it("groups multiple findings in the same file with a count suffix", () => {
+    const { questions } = extractHealthSignals(
+      mockSnapshot({
+        riskyPatternFindings: {
+          findings: [
+            {
+              patternId: "js-eval",
+              patternName: "eval()",
+              filePath: "src/runtime.js",
+              line: 5,
+              snippet: "eval(a);",
+            },
+            {
+              patternId: "js-eval",
+              patternName: "eval()",
+              filePath: "src/runtime.js",
+              line: 12,
+              snippet: "eval(b);",
+            },
+            {
+              patternId: "js-new-function",
+              patternName: "new Function()",
+              filePath: "src/runtime.js",
+              line: 20,
+              snippet: "new Function('return 1');",
+            },
+          ],
+        },
+      }),
+    );
+    const sig = questions.find((s) => s.id === "risky-eval-patterns");
+    expect(sig?.evidence.numbers?.occurrences).toBe(3);
+    expect(sig?.evidence.numbers?.files).toBe(1);
+    expect(sig?.evidence.paths).toEqual(["src/runtime.js (×3)"]);
+  });
+});

@@ -101,7 +101,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       "Public repos only",
       "5 refreshes per day",
       "Canvas, Code, Packages, Imports, PRs",
-      "Deterministic Health Summary (19 signals)",
+      "Deterministic Health Summary (20 signals)",
       "Browse all demo repos",
     ],
     isRecommended: false,

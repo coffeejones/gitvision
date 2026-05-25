@@ -164,7 +164,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
     null, // separator
     {
       // v0.81+ Signals tab — the data behind Health at a Glance.
-      // Surfaces all 19 deterministic signals (working / needsWork /
+      // Surfaces all 20 deterministic signals (working / needsWork /
       // questions) so devs can drill into specific evidence beyond
       // the 6 aggregated dimension tiles on the overview.
       label: "Signals",

@@ -76,6 +76,11 @@ const DIMENSION_SIGNAL_IDS: Record<DimensionId, readonly string[]> = {
     // v0.81+ signal #18 — pairs naturally with cross-boundary-coupling
     // as another graph-structure code-health concern.
     "deep-dependency-chains",
+    // v0.81+ signal #20 — dynamic-execution patterns (eval / new
+    // Function / exec). Always bucketed into questions, so it never
+    // drives the Code tile to NEEDS WORK alone — but it does show
+    // in the tile's contributing-signal count and on /signals.
+    "risky-eval-patterns",
   ],
   "pr-flow": [
     "healthy-pr-throughput",

@@ -53,6 +53,8 @@ import {
   scanForSecrets,
   walkRepoForSecrets,
 } from "./security/secretsScan";
+import { scanForRiskyPatterns } from "./security/riskyPatterns";
+import type { RiskyPatternScanResult } from "./security/riskyPatterns";
 import type { SecretScanResult } from "./security/types";
 
 /** Build a new Octokit instance authenticated with the given token, or
@@ -685,6 +687,7 @@ export async function analyzeRepo(
   let codeGraph: import("./types").CodeGraph | undefined;
   let codeGraphSkipReason: string | undefined;
   let secretFindings: SecretScanResult | undefined;
+  let riskyPatternFindings: RiskyPatternScanResult | undefined;
   let cleanup: (() => Promise<void>) | null = null;
   try {
     const extracted = await downloadAndExtract(
@@ -724,35 +727,43 @@ export async function analyzeRepo(
       setTimeout(() => resolve(TIMEOUT), CODE_ANALYSIS_TIMEOUT_MS)
     );
 
-    // Secret-scan pass — own walk so it sees .env / config files that
-    // analyze.ts skips. Runs in parallel with codeAnalysis + fileGraph
-    // since all three read from the same extracted tarball directory.
-    // .catch returns undefined so a scan failure doesn't tank the whole
-    // analysis (secrets are an additive signal, not a critical path).
-    const secretsPromise = walkRepoForSecrets(extracted.extractDir)
+    // Secret-scan + risky-pattern pass — single walk feeds both scans.
+    // Walks .env / config files (for secrets) AND source code (for
+    // risky-pattern detection). Both scans run in parallel with
+    // codeAnalysis + fileGraph since they all read from the same
+    // extracted tarball directory. `.catch returns undefined so a
+    // scan failure doesn't tank the whole analysis (these are
+    // additive signals, not critical-path data). (v0.81+ — added
+    // riskyPatternFindings alongside secretFindings.)
+    const securityPromise = walkRepoForSecrets(extracted.extractDir)
       .then(({ files, truncated }) => {
-        const result = scanForSecrets(files);
-        if (truncated && !result.truncated) {
-          result.truncated = `Walker hit file cap — repo may have additional secret-bearing files.`;
+        const secResult = scanForSecrets(files);
+        if (truncated && !secResult.truncated) {
+          secResult.truncated = `Walker hit file cap — repo may have additional secret-bearing files.`;
         }
-        return result;
+        const riskyResult = scanForRiskyPatterns(files);
+        if (truncated && !riskyResult.truncated) {
+          riskyResult.truncated = `Walker hit file cap — repo may have additional risky-pattern occurrences.`;
+        }
+        return { sec: secResult, risky: riskyResult };
       })
       .catch((err) => {
         console.error(
-          `secretScan failed for ${owner}/${repo}:`,
+          `securityScan failed for ${owner}/${repo}:`,
           err instanceof Error ? err.message : err
         );
         return undefined;
       });
 
-    const [fg, cgResult, secResult] = await Promise.all([
+    const [fg, cgResult, secAndRisky] = await Promise.all([
       buildFileGraphFromDir(extracted.extractDir),
       Promise.race([codeAnalysisPromise, timeoutPromise]),
-      secretsPromise,
+      securityPromise,
     ]);
 
     fileGraph = fg;
-    secretFindings = secResult;
+    secretFindings = secAndRisky?.sec;
+    riskyPatternFindings = secAndRisky?.risky;
     if (cgResult === TIMEOUT) {
       codeGraph = undefined;
       codeGraphSkipReason = `Code analysis exceeded ${
@@ -825,6 +836,7 @@ export async function analyzeRepo(
     analyzedSubdir: subdir ?? undefined,
     analyzedRef: explicitRef ?? undefined,
     secretFindings,
+    riskyPatternFindings,
     rateLimitInfo,
   };
 }
