@@ -235,6 +235,19 @@ export const KNOWN_INCIDENTS: KnownIncident[] = [
   },
 ];
 
+/** Per-incident match payload used by the Security page (#19 +
+ *  /security route, v0.81+). The detector in lib/signals.ts aggregates
+ *  ALL matches into a single signal for the Health-at-a-Glance + Signals
+ *  tab — that's the right unit there. The Security tab wants per-
+ *  incident cards with full metadata (advisory URL, discovery date),
+ *  which is what this richer shape carries. */
+export interface IncidentMatch {
+  incident: KnownIncident;
+  /** The actual packages in the snapshot that matched. Each entry is
+   *  the same wire-format used in signal evidence: [ecosystem] name@version. */
+  matchedPackages: string[];
+}
+
 /** Collect every (ecosystem, name, current-version) tuple visible in
  *  the snapshot's dependencyHealths. Combines outdated + vulnerable +
  *  deprecated arrays — compromised packages typically land in one of
@@ -257,64 +270,72 @@ function packagesFromSnapshot(snap: AnalysisSnapshot): Array<{
   return out;
 }
 
-/** Walk the curated incident DB against the snapshot's packages.
- *  Emits a single signal aggregating ALL matched incidents — easier
- *  to read in the UI than one card per incident when multiple match.
- *  Each incident's reference URL + discovery date lands in the
- *  evidence.note so users can verify the claim before acting.
+/** Pure match walker — returns per-incident matches without
+ *  wrapping them in signal shape. Used by:
+ *    - detectKnownIncidents (wraps result into a single aggregated
+ *      HealthSignal for the Signals tab + Health-at-a-Glance)
+ *    - /session/[id]/security page (renders per-incident cards with
+ *      full metadata)
  *
- *  Always returns [] when no packages are scanned or no matches
- *  occur — the signal only appears when we have something to say. */
-export function detectKnownIncidents(
-  snap: AnalysisSnapshot,
-): HealthSignal[] {
+ *  Returns [] when there's nothing to scan or no matches found. */
+export function findIncidentMatches(snap: AnalysisSnapshot): IncidentMatch[] {
   const pkgs = packagesFromSnapshot(snap);
   if (pkgs.length === 0) return [];
 
-  const matchedIncidents: Array<{
-    incident: KnownIncident;
-    matches: string[];
-  }> = [];
-
+  const out: IncidentMatch[] = [];
   for (const incident of KNOWN_INCIDENTS) {
-    const matches: string[] = [];
+    const matchedPackages: string[] = [];
     for (const pkg of pkgs) {
       for (const affected of incident.affectedPackages) {
         if (affected.ecosystem !== pkg.ecosystem) continue;
         if (affected.name !== pkg.name) continue;
-        // Loose match — current may have version prefixes like "==",
-        // "^", "~" depending on ecosystem.
         for (const ver of affected.compromisedVersions) {
           if (pkg.current.includes(ver)) {
-            matches.push(`[${pkg.ecosystem}] ${pkg.name}@${pkg.current}`);
+            matchedPackages.push(
+              `[${pkg.ecosystem}] ${pkg.name}@${pkg.current}`,
+            );
             break;
           }
         }
       }
     }
-    if (matches.length > 0) {
-      matchedIncidents.push({ incident, matches });
+    if (matchedPackages.length > 0) {
+      out.push({ incident, matchedPackages });
     }
   }
+  return out;
+}
 
-  if (matchedIncidents.length === 0) return [];
+/** Walk the curated incident DB against the snapshot's packages and
+ *  emit a single aggregated signal for the Signals tab + Health-at-a-
+ *  Glance. The richer per-incident shape is available via
+ *  findIncidentMatches; this function exists to satisfy the
+ *  HealthSignal contract that extractHealthSignals iterates.
+ *
+ *  Always returns [] when no matches occur — the signal only appears
+ *  when we have something to say. */
+export function detectKnownIncidents(
+  snap: AnalysisSnapshot,
+): HealthSignal[] {
+  const matches = findIncidentMatches(snap);
+  if (matches.length === 0) return [];
 
-  const totalPackages = matchedIncidents.reduce(
-    (sum, m) => sum + m.matches.length,
+  const totalPackages = matches.reduce(
+    (sum, m) => sum + m.matchedPackages.length,
     0,
   );
-  const allPaths = matchedIncidents.flatMap((m) => m.matches);
-  const noteLines = matchedIncidents.map(
+  const allPaths = matches.flatMap((m) => m.matchedPackages);
+  const noteLines = matches.map(
     (m) =>
       `${m.incident.name} — discovered ${m.incident.discoveredAt} — ${m.incident.reference}`,
   );
 
   // Conservative wording: "Possible match" not "Compromised". Users
   // make the final call after reviewing the reference.
-  const isSingle = matchedIncidents.length === 1;
+  const isSingle = matches.length === 1;
   const titleSuffix = isSingle
-    ? matchedIncidents[0].incident.name
-    : `${matchedIncidents.length} known incidents`;
+    ? matches[0].incident.name
+    : `${matches.length} known incidents`;
 
   return [
     {
@@ -325,7 +346,7 @@ export function detectKnownIncidents(
         paths: allPaths,
         note: noteLines.join(" | "),
         numbers: {
-          incidents: matchedIncidents.length,
+          incidents: matches.length,
           packages: totalPackages,
         },
       },

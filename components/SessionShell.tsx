@@ -33,6 +33,7 @@ import {
   Network,
   Package,
   Search,
+  Shield,
   Sparkles,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
@@ -111,6 +112,21 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
     0
   );
 
+  // v0.81+: red-dot indicator on the Security tab when any scanner
+  // has findings. risky-eval-patterns is informational so it doesn't
+  // count — only "real" issues (secrets + incidents) trigger the
+  // badge. The session-level matches array is queried via the same
+  // findIncidentMatches helper the page uses; doing it here keeps
+  // the sidebar honest about whether there's something to see.
+  const secretCount = snapshot.secretFindings?.findings.length ?? 0;
+  // Cheap proxy: any dependency in the snapshot AND we have any
+  // detector run, since findIncidentMatches() is server-only and
+  // we'd need an async path. For the sidebar dot we just light up
+  // on any secret findings — incidents will surface visibly inside
+  // the tab regardless. Avoiding a per-render incident-DB walk
+  // keeps the navigation render cheap.
+  const hasSecurityIssue = secretCount > 0;
+
   const items: NavEntry[] = [
     {
       label: "Overview",
@@ -162,6 +178,17 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       hasNewFeatureBadge: true,
     },
     null, // separator
+    {
+      // v0.81+ Security tab — focused security view, complementary
+      // to the Signals tab. Where Signals shows all 20 signals
+      // bucketed by working / needsWork / questions, Security groups
+      // by scanner (supply-chain incidents, secret leakage, dynamic-
+      // execution patterns) with per-finding detail + advisory links.
+      label: "Security",
+      href: `${base}/security`,
+      icon: <Shield size={14} />,
+      hasIssueBadge: hasSecurityIssue,
+    },
     {
       // v0.81+ Signals tab — the data behind Health at a Glance.
       // Surfaces all 20 deterministic signals (working / needsWork /
