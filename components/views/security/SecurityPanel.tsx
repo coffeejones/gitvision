@@ -1,26 +1,23 @@
 // SecurityPanel — top-level orchestrator for /session/[id]/security
-// (v0.81+). Composes three focused sub-sections, one per scanner:
+// (v0.81+, Design A redesign).
 //
-//   IncidentsSection  — known-incident-match (#19): curated supply-
-//                       chain DB. HIGH severity always when matched.
-//   SecretsSection    — secretFindings: regex-based scan of source
-//                       + config files for committed credentials.
-//   PatternsSection   — risky-eval-patterns (#20): dynamic-execution
-//                       primitives (eval / new Function / exec).
-//                       Informational — questions bucket equivalent.
+// Replaces the original three-stacked-sections layout with a two-
+// part composition: a compact status grid at the top (one tile per
+// scanner) followed by a unified, severity-sorted findings list.
 //
-// Ordering: highest stakes first (incidents → secrets → patterns).
-// A "clean" section is still rendered so visitors see the full
-// scope of what we scan even when there's nothing to flag — that's
-// the brand promise of "deterministic, here's the audit trail".
+// Why the redesign: three sections of the same rhythm made the page
+// repetitive — clean sessions had three near-identical "Clean"
+// boxes stacked vertically; sessions with findings buried severity
+// inside per-scanner groupings. The status grid lets visitors read
+// "overall security posture" in 2 seconds; the unified list puts
+// HIGH-severity findings on top regardless of which scanner emitted
+// them. Matches the pattern Snyk + GitHub Dependabot use.
 
-import { Shield } from "lucide-react";
-import { TOK } from "@/lib/theme";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { findIncidentMatches } from "@/lib/security/knownIncidents";
-import { IncidentsSection } from "./IncidentsSection";
-import { SecretsSection } from "./SecretsSection";
-import { PatternsSection } from "./PatternsSection";
+import { KNOWN_INCIDENTS } from "@/lib/security/knownIncidents";
+import { StatusGrid } from "./StatusGrid";
+import { FindingsList } from "./FindingsList";
 
 interface Props {
   snapshot: AnalysisSnapshot;
@@ -31,62 +28,65 @@ export function SecurityPanel({ snapshot }: Props) {
   const secretFindings = snapshot.secretFindings?.findings ?? [];
   const patternFindings = snapshot.riskyPatternFindings?.findings ?? [];
 
-  const hasAnyFindings =
-    incidentMatches.length > 0 ||
-    secretFindings.length > 0 ||
-    patternFindings.length > 0;
+  // Per-scanner status state derivation. "Not scanned" only applies
+  // to scanners that NEED a data field that's missing from the
+  // snapshot (pre-v0.81 / scan-failed cases). Incidents always have
+  // a "scanned" state — they only depend on the deps data which
+  // every modern snapshot carries.
+  const incidentsState = incidentMatches.length > 0 ? "findings" : "clean";
+  const secretsState =
+    snapshot.secretFindings === undefined
+      ? "not-scanned"
+      : secretFindings.length > 0
+        ? "findings"
+        : "clean";
+  const patternsState =
+    snapshot.riskyPatternFindings === undefined
+      ? "not-scanned"
+      : patternFindings.length > 0
+        ? "findings"
+        : "clean";
+
+  const patternsFileCount = new Set(
+    patternFindings.map((f) => f.filePath),
+  ).size;
 
   return (
-    <div className="flex flex-col gap-10">
-      {/* Top summary strip — single-line verdict so visitors can
-       *  scan the page status in one glance before diving into
-       *  individual sections. */}
-      <div
-        className="flex items-start gap-3 px-4 py-3 rounded-lg"
-        style={{
-          background: hasAnyFindings ? `${TOK.rose}0a` : `${TOK.accent}0a`,
-          border: `1px solid ${
-            hasAnyFindings ? `${TOK.rose}33` : `${TOK.accent}33`
-          }`,
+    <div className="flex flex-col gap-8">
+      <StatusGrid
+        incidents={{
+          title: "Incidents",
+          subtitle: `${KNOWN_INCIDENTS.length} curated supply-chain attacks`,
+          state: incidentsState,
+          countLabel:
+            incidentMatches.length === 1
+              ? "1 match"
+              : `${incidentMatches.length} matches`,
         }}
-      >
-        <Shield
-          size={16}
-          style={{
-            color: hasAnyFindings ? TOK.rose : TOK.accent,
-            flexShrink: 0,
-            marginTop: 2,
-          }}
-        />
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <p
-            className="text-sm font-semibold"
-            style={{
-              color: hasAnyFindings ? TOK.rose : TOK.accent,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {hasAnyFindings
-              ? "Findings worth reviewing across one or more scanners"
-              : "Clean across all three scanners"}
-          </p>
-          <p className="text-xs" style={{ color: TOK.textMuted }}>
-            Supply-chain incidents · secret leakage · dynamic-execution
-            patterns. All results are deterministic — no AI involved.
-          </p>
-        </div>
-      </div>
-
-      <IncidentsSection matches={incidentMatches} />
-      <SecretsSection
-        findings={secretFindings}
-        truncated={snapshot.secretFindings?.truncated}
-        hasScanData={!!snapshot.secretFindings}
+        secrets={{
+          title: "Secrets",
+          subtitle: "Regex scan of source + config files",
+          state: secretsState,
+          countLabel:
+            secretFindings.length === 1
+              ? "1 finding"
+              : `${secretFindings.length} findings`,
+        }}
+        patterns={{
+          title: "Patterns",
+          subtitle: "eval / new Function / exec scanner",
+          state: patternsState,
+          countLabel:
+            patternFindings.length === 1
+              ? `1 in ${patternsFileCount} file`
+              : `${patternFindings.length} in ${patternsFileCount} files`,
+        }}
       />
-      <PatternsSection
-        findings={patternFindings}
-        truncated={snapshot.riskyPatternFindings?.truncated}
-        hasScanData={!!snapshot.riskyPatternFindings}
+
+      <FindingsList
+        incidentMatches={incidentMatches}
+        secretFindings={secretFindings}
+        patternFindings={patternFindings}
       />
     </div>
   );
