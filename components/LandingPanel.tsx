@@ -6,7 +6,7 @@
 // but hasn't analyzed anything yet. Two action surfaces:
 //
 //   • URL paste form (RepoInputForm) — primary action.
-//   • Demo chips — secondary, "click to see RepoBaron on a real repo
+//   • Demo chips — secondary, "click to see RepoJury on a real repo
 //     instantly without waiting for analysis".
 //
 // What's NOT here anymore (removed v0.76 polish):
@@ -110,7 +110,7 @@ export function LandingPanel({ demoRepos, demoSessions }: Props) {
             style={{ color: TOK.textSecondary }}
           >
             <ArrowDown size={11} style={{ color: TOK.accent }} />
-            First time? Click any of these to see RepoBaron on a real
+            First time? Click any of these to see RepoJury on a real
             codebase.
           </div>
         )}

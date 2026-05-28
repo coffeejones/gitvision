@@ -16,29 +16,29 @@ const geistMono = Geist_Mono({
 // Site-wide metadata. Per-page exports (in app/help/page.tsx,
 // app/legal/page.tsx, etc.) override title + description but
 // inherit OpenGraph + Twitter card config from here, so a deep-link
-// to /help shares with the RepoBaron brand image instead of a
+// to /help shares with the RepoJury brand image instead of a
 // blank preview. The `metadataBase` makes relative og:image URLs
 // resolve against the current host — important for Railway preview
 // deploys where the URL changes per branch.
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://repobaron.com"
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://repojury.com"
   ),
-  title: "RepoBaron — map any GitHub repo",
+  title: "RepoJury — map any GitHub repo",
   description:
     "Find what's risky, duplicated, or untested in any GitHub repo. Blast radius, structural duplicates, untested hotspots, and an AI health verdict — across 7 languages.",
   openGraph: {
-    title: "RepoBaron — map any GitHub repo",
+    title: "RepoJury — map any GitHub repo",
     description:
       "Blast radius, structural duplicates, untested hotspots, and an AI health verdict — across 7 languages. Paste a public GitHub URL to see your repo at a glance.",
     type: "website",
-    siteName: "RepoBaron",
+    siteName: "RepoJury",
     // Auto-discovered by Next.js: app/opengraph-image.tsx generates
     // the image at /opengraph-image and sets og:image automatically.
   },
   twitter: {
     card: "summary_large_image",
-    title: "RepoBaron — map any GitHub repo",
+    title: "RepoJury — map any GitHub repo",
     description:
       "Blast radius, structural duplicates, untested hotspots, and an AI health verdict — across 7 languages.",
     // Same convention: app/twitter-image.tsx populates twitter:image.
@@ -51,7 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   // Analytics is opt-in via env: set NEXT_PUBLIC_PLAUSIBLE_DOMAIN to the
-  // domain you've configured in your Plausible dashboard (e.g. repobaron.com
+  // domain you've configured in your Plausible dashboard (e.g. repojury.com
   // or a self-hosted equivalent). Unset → no analytics, no script tag, no
   // tracking. Keeps the local-dev experience analytics-free without code
   // changes.

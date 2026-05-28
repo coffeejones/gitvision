@@ -1,4 +1,4 @@
-// /help — long-form documentation for RepoBaron's mental models
+// /help — long-form documentation for RepoJury's mental models
 // (v0.73). Scrollable single page with anchor-linkable sections so
 // in-app <HelpHint anchor="..." /> icons can deep-link to the
 // concept the user just asked about.
@@ -11,7 +11,7 @@
 //   - Easier to maintain — one file, one table of contents
 //
 // What this page is NOT for:
-//   - Marketing copy ("Welcome to RepoBaron!"). The home page
+//   - Marketing copy ("Welcome to RepoJury!"). The home page
 //     already does that.
 //   - API reference. We don't expose a public API.
 //   - Tutorials. Walk-through content lives in blog posts (TBD).
@@ -28,9 +28,9 @@ import { ArrowLeft } from "lucide-react";
 import { STYLE, TOK } from "@/lib/theme";
 
 export const metadata = {
-  title: "Help — RepoBaron",
+  title: "Help — RepoJury",
   description:
-    "How the panels, signals, and diagrams in RepoBaron work — the mental models behind the UI.",
+    "How the panels, signals, and diagrams in RepoJury work — the mental models behind the UI.",
 };
 
 interface SectionMeta {
@@ -87,7 +87,7 @@ export default function HelpPage() {
           style={{ color: TOK.textSecondary }}
         >
           <ArrowLeft size={12} />
-          Back to RepoBaron
+          Back to RepoJury
         </Link>
       </div>
 
@@ -105,7 +105,7 @@ export default function HelpPage() {
           className="text-base leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          RepoBaron packs a lot into each tab. This page explains the
+          RepoJury packs a lot into each tab. This page explains the
           mental models — what the numbers mean, why the diagrams look
           the way they do, and the edge cases that trip people up. Click
           a section in the table of contents to jump straight there.
@@ -123,7 +123,7 @@ export default function HelpPage() {
         </P>
         <P>
           A <strong>snapshot</strong> is a point-in-time slice of that
-          session. Every time you click <strong>Refresh</strong>, RepoBaron
+          session. Every time you click <strong>Refresh</strong>, RepoJury
           re-fetches the repo, re-runs the full analysis pipeline, and
           stores the result as a new snapshot inside the same session.
           Old snapshots aren&apos;t deleted — they&apos;re kept so we can
@@ -446,7 +446,7 @@ export default function HelpPage() {
               rel="noopener"
               className="underline underline-offset-2"
             >
-              RepoBaron Discord
+              RepoJury Discord
             </a>{" "}
             — community-sized, low-traffic, mostly questions and feature
             ideas.

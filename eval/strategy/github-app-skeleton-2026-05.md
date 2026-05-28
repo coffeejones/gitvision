@@ -1,13 +1,13 @@
 # GitHub App skeleton — design-skitse 2026-05-15
 
-_The contract for RepoBaron's PR-bot. Captured before any GitHub App code is
+_The contract for RepoJury's PR-bot. Captured before any GitHub App code is
 written so we agree on scope, architecture, and failure modes upfront.
 References `pr-comment-format-v1.md` for the comment spec and
 `scope-and-sequence-2026-05.md` for the product context._
 
 ## What we're building
 
-A GitHub App named **RepoBaron** that listens for `pull_request` events on
+A GitHub App named **RepoJury** that listens for `pull_request` events on
 installed repos, runs our existing analysis pipeline against base + head refs,
 and posts a comment with prioritized verification suggestions from
 `evaluateVerificationRules`.
@@ -35,10 +35,10 @@ single grounded review comment within ~60 seconds."
 - LLM-summarized author narrative (Option Y in comment spec)
 - Blast-radius signal in comment (the data is in `lib/`, the orchestration
   isn't — v1.1)
-- Webhook-driven workspace refresh (still snapshot-based on repobaron.com)
+- Webhook-driven workspace refresh (still snapshot-based on repojury.com)
 - Marketplace listing (separate go-to-market step after we have ≥5
   friendly-user installs)
-- OAuth flow for end-users on repobaron.com (still localStorage-uuid
+- OAuth flow for end-users on repojury.com (still localStorage-uuid
   ownership; OAuth is its own migration)
 
 ## Architecture: same-repo, direct function calls
@@ -75,8 +75,8 @@ Three new App-Router routes:
 | Route | Method | Purpose |
 |---|---|---|
 | `/api/github/webhook` | POST | Webhook receiver. Verifies HMAC signature, dispatches by event type. |
-| `/api/github/install` | GET | Post-install redirect target. Shows "RepoBaron is now installed on X repos — visit repobaron.com to configure." |
-| `/api/github/setup` | GET | Optional welcome page after first install. Skippable in v1; redirect straight to repobaron.com. |
+| `/api/github/install` | GET | Post-install redirect target. Shows "RepoJury is now installed on X repos — visit repojury.com to configure." |
+| `/api/github/setup` | GET | Optional welcome page after first install. Skippable in v1; redirect straight to repojury.com. |
 
 No new MCP tools. No new public API endpoints for end-users.
 
@@ -100,7 +100,7 @@ For `pull_request.opened` and `pull_request.synchronize`:
 11. **Run computeDiff(base, head)** → `DiffResult`
 12. **Run evaluateVerificationRules** with default `maxResults=3` → suggestions
 13. **Format comment** (see "Comment format" below)
-14. **Find existing RepoBaron comment** on the PR (search by comment author = our app + marker string in body). If found, update it. If not, create new.
+14. **Find existing RepoJury comment** on the PR (search by comment author = our app + marker string in body). If found, update it. If not, create new.
 15. **POST comment** via installation token
 16. **Return 200** to GitHub. Whole flow target: < 60s for medium repos.
 
@@ -111,7 +111,7 @@ If any step 7-15 fails: log the error, return 200 to GitHub anyway (so they don'
 ### App credentials
 
 GitHub App registration generates three secrets we need:
-- **App ID** — public-ish integer, identifies "RepoBaron" to GitHub
+- **App ID** — public-ish integer, identifies "RepoJury" to GitHub
 - **Private key** — RSA key for signing JWTs. Critical secret.
 - **Webhook secret** — HMAC secret for verifying incoming webhook payloads.
 
@@ -147,7 +147,7 @@ What we DO need to guard:
 | Guardrail | Threshold | Why |
 |---|---|---|
 | PRs per installation per hour | 10 | One repo opening 50 PRs in a flood = analysis storm. Soft-fail (skip + log). |
-| Repo size at clone time | 100 MB | Mega-repos eat bandwidth + clone time + disk. Reject with friendly comment ("RepoBaron currently supports repos under 100 MB — reach out if you'd like enterprise tier"). |
+| Repo size at clone time | 100 MB | Mega-repos eat bandwidth + clone time + disk. Reject with friendly comment ("RepoJury currently supports repos under 100 MB — reach out if you'd like enterprise tier"). |
 | Concurrent analyses per installation | 2 | Same-installation back-to-back PRs shouldn't OOM Railway. Queue / skip the third. |
 | Total active installations | 50 (soft cap for v1 beta) | At 50 installs we re-evaluate cost trajectory before opening to public. Manual cap, no code enforcement v1; we just track and decide. |
 | Session storage per installation | 1 GB | Old sessions are GC'd after 30 days anyway. Cap is mostly belt-and-suspenders. |
@@ -190,7 +190,7 @@ untested_hotspots calls per touched function).
 ### v1 comment (thin)
 
 ```markdown
-## RepoBaron Review
+## RepoJury Review
 
 **Diff summary:** 3 files changed · 5 functions added · 2 removed · 7 modified · net complexity +4
 
@@ -201,7 +201,7 @@ untested_hotspots calls per touched function).
 3. 🟢 **INFO** — Sizeable PR — touches 23 files with 109 function-level changes. Worth a holistic read; not just patch-by-patch review.
 
 ---
-[Full analysis ↗](https://repobaron.com/...) · _Signals computed deterministically — no LLM in this comment_ · [How to silence ↗](https://repobaron.com/docs/config)
+[Full analysis ↗](https://repojury.com/...) · _Signals computed deterministically — no LLM in this comment_ · [How to silence ↗](https://repojury.com/docs/config)
 ```
 
 Mapping:
@@ -213,7 +213,7 @@ Mapping:
 
 | Scenario | v1 behavior |
 |---|---|
-| `review_changes` returns 0 suggestions | Comment: "RepoBaron Review: nothing notable on this PR ✅" — short, no false alarms |
+| `review_changes` returns 0 suggestions | Comment: "RepoJury Review: nothing notable on this PR ✅" — short, no false alarms |
 | `analyzeRepo` fails at base or head | Skip comment, log error (we don't want to ship a half-broken comment) |
 | Force-push / `pull_request.synchronize` | Re-run pipeline, edit existing comment via stored comment-id |
 | Bot-authored PR | Skip entirely (filter at step 4) |
@@ -224,8 +224,8 @@ Mapping:
 
 ### Q1: Where do GitHub-App-created sessions live?
 
-If a PR posts a comment with link `repobaron.com/sessions/<id>`, that session
-needs to exist on repobaron.com. Two options:
+If a PR posts a comment with link `repojury.com/sessions/<id>`, that session
+needs to exist on repojury.com. Two options:
 
 **A.** PR-bot writes sessions to the **same `.gitvision/sessions/` dir** as
 workspace sessions. Public-by-default for now (anyone with the link can view).
@@ -239,16 +239,16 @@ forces B's permission model.
 ### Q2: How do we authenticate the "Full analysis ↗" link?
 
 Workspace already has localStorage-uuid ownership. A user clicking the link
-from a PR has no RepoBaron account or session-cookie yet. Three options:
+from a PR has no RepoJury account or session-cookie yet. Three options:
 
 **A.** Link goes to a public read-only view of the session — no auth.
 **B.** Link goes through a one-time-token flow: webhook generates a short
-token, repobaron.com trades it for ownership transfer.
+token, repojury.com trades it for ownership transfer.
 **C.** Defer: the link points to a "Sign in to view" page that requires
 GitHub OAuth (which we don't have v1).
 
 **Recommendation:** A. Public read-only sessions for public repos is a
-feature, not a bug — it's a marketing asset ("here's what RepoBaron found
+feature, not a bug — it's a marketing asset ("here's what RepoJury found
 on this PR"). When OAuth lands, upgrade to B/C selectively for private
 repos.
 
@@ -267,10 +267,10 @@ their analysis. We comply.
 
 When Jonas creates the app on github.com/settings/apps, we need to specify:
 
-- **Name:** "RepoBaron"
-- **Homepage URL:** `https://repobaron.com`
-- **User authorization callback URL:** `https://repobaron.com/api/github/install` (not used in v1 — but required field)
-- **Webhook URL:** `https://repobaron.com/api/github/webhook`
+- **Name:** "RepoJury"
+- **Homepage URL:** `https://repojury.com`
+- **User authorization callback URL:** `https://repojury.com/api/github/install` (not used in v1 — but required field)
+- **Webhook URL:** `https://repojury.com/api/github/webhook`
 - **Webhook secret:** generate strong random, store in Railway
 - **Permissions:**
   - Repository → Contents: **Read** (for clone access)
@@ -320,7 +320,7 @@ Total realistic timeline: **6-10 weeks** of evenings/weekends. Matches the
 
 ## What we'd need to add to ship to private repos (v2 preview)
 
-- OAuth flow on repobaron.com (already on v2 roadmap)
+- OAuth flow on repojury.com (already on v2 roadmap)
 - Per-installation access model on session storage (Q1 option B)
 - "Visible to installation members only" link auth (Q2 option B or C)
 - Enterprise-cloud and -server URL support in webhook config
@@ -331,5 +331,5 @@ Not v1. Logging the dependencies here so v2 design has a starting list.
 
 _Next steps after this doc:_
 1. Jonas reviews + approves (this can wait until next session — async)
-2. Jonas registers "RepoBaron" on github.com/settings/apps (10 min, one-time)
+2. Jonas registers "RepoJury" on github.com/settings/apps (10 min, one-time)
 3. We implement commits 1-9 above, in order, each with green tests

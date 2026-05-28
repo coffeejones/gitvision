@@ -1,7 +1,7 @@
 // Reusable empty-state shell (v0.75 polish track).
 //
 // Empty states are first-impression UX. A blank tab with one line of
-// "No data" prose tells a new user nothing about what RepoBaron is
+// "No data" prose tells a new user nothing about what RepoJury is
 // supposed to show. A consistent shell with an icon, a heading, and a
 // short helper paragraph sets expectations: "this panel WOULD show X
 // if your repo had Y — here's why it's empty for you specifically".
@@ -11,7 +11,7 @@
 //   <EmptyPanel
 //     icon={<Network size={22} />}
 //     title="No file-to-file imports detected"
-//     body="RepoBaron builds the import graph for JS/TS, Python, ..."
+//     body="RepoJury builds the import graph for JS/TS, Python, ..."
 //     hint="Click Refresh in the topbar to regenerate."
 //   />
 //

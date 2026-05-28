@@ -12,8 +12,8 @@
   Fill is off-white (TOK.textPrimary #E8E8EE) to match the rest of
   the brand mark after the move away from emerald.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="RepoBaron — Baron favicon">
-  <title>RepoBaron favicon</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="RepoJury — Baron favicon">
+  <title>RepoJury favicon</title>
   <!-- Dark rounded-square background. Without this, Safari's light-grey
        active-tab background blends with the off-white Baron fill, making
        the favicon look like a white square when the tab is active. The

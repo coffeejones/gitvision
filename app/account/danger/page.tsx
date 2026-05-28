@@ -13,7 +13,7 @@ import { AccountShell } from "@/components/AccountShell";
 import { DangerPanel } from "@/components/account/DangerPanel";
 
 export const metadata = {
-  title: "Danger zone — Account — RepoBaron",
+  title: "Danger zone — Account — RepoJury",
   description: "Permanent account actions.",
 };
 

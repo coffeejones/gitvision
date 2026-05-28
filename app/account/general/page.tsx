@@ -13,7 +13,7 @@ import { AccountShell } from "@/components/AccountShell";
 import { GeneralPanel } from "@/components/account/GeneralPanel";
 
 export const metadata = {
-  title: "General — Account — RepoBaron",
+  title: "General — Account — RepoJury",
   description: "Your profile basics.",
 };
 

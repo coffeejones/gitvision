@@ -1,4 +1,4 @@
-# RepoBaron — Progress & Design Notes
+# RepoJury — Progress & Design Notes
 
 > Living document — update as the project evolves. Picks up where the first collab session ended.
 
@@ -20,7 +20,7 @@ A desktop-grade repo visualizer that feels like a Figma canvas — paste a GitHu
 
 ## Strategy & current focus (post-v0.30)
 
-RepoBaron deliberately delayed public launch until the core experience covered most languages, most repos, and three actionable insight surfaces (refresh-banner, untested hotspots, near-duplicates). Decision logged end of session 6: rather invest the time polishing than risk a bad first impression on a broader audience.
+RepoJury deliberately delayed public launch until the core experience covered most languages, most repos, and three actionable insight surfaces (refresh-banner, untested hotspots, near-duplicates). Decision logged end of session 6: rather invest the time polishing than risk a bad first impression on a broader audience.
 
 **Phase 1 + 2 + 3 are now COMPLETE** (end of session 8). Five releases shipped in Phase 3: v0.26 anonymous owner-id session isolation, v0.27 refresh-banner narrative, v0.28 CallEdge.toContainerType overload disambiguation, v0.29 test-to-code mapping with coverage badges + Untested Hotspots panel, v0.30 AST duplicate detection with Near-Duplicates panel.
 
@@ -341,7 +341,7 @@ exceeds Railway's ~60s budget because it does substantially more work
 - Frontend surfaces the actual server error (Railway's 502, our
   internal errors, etc.) instead of "Something went wrong".
 
-**Long-term plan** — primary use-case for RepoBaron is *exactly* the
+**Long-term plan** — primary use-case for RepoJury is *exactly* the
 big repos (golang/go, kubernetes, microsoft/typescript), so the timeout
 guard is a stopgap. Real fix is moving codeAnalysis off the request
 path:
@@ -490,7 +490,7 @@ Ranked "bang per buck". ✅ = shipped.
 - ✅ v0.24 — **Subset analysis.** `downloadAndExtract` filter callback keeps only entries inside the subdir + a curated list of root-level manifest files. `validateSubdir` + `SubdirNotFoundError` for clean error handling. UI: collapsed disclosure with auto-fill from `https://github.com/owner/repo/tree/branch/path` deep-links. Live: golang/go src/cmd → 1909 files, 22,041 functions, 203,558 call-sites (previously hit 25s codeAnalysis timeout).
 - ✅ v0.25 — **Job queue + async (Phase 2 complete).** `POST /api/sessions` enqueues a job via Next.js's `after()` hook and returns `{ jobId }` in <1s; the analysis runs detached from the HTTP request. Frontend polls `GET /api/jobs/:id` every 2s until terminal state. File-based job storage with atomic writes (temp+rename), survives Railway redeploys. Orphan-recovery sweep on first request after a fresh server boot. Same flow used by Refresh.
 - ✅ v0.26 — **Anonymous owner-id session isolation (Phase 3 step 1).** UUID written to localStorage on first visit, attached to every session-create + list call as `X-Owner-Id` header. Landing page filters its session list to "yours" — no "47 random people's sessions" first-impression on a public deploy. NOT OAuth: no sign-up flow, no server-side identity, no PII. Backward-compat: pre-v0.26 sessions stay accessible by direct URL but don't show on someone else's landing page.
-- ✅ v0.27 — **Refresh-banner narrative.** Replaces metadata-diff banner ("3 commits, 2 stars") with story-driven framing. `pickHeadline` priority logic surfaces the most-interesting change per snapshot (code complexity grew/shrank, new functions added, big author shift, issues closed). Primary/secondary chip emphasis in green/orange. Brand line "RepoBaron · owner/repo" in textSecondary. Time on right as "1d ago" not "earlier" or "since". Screenshot-worthy alone (Guiding-Principle 2). Live-validated on golang/go: `Code complexity grew by 45 — new branching logic added across the codebase`.
+- ✅ v0.27 — **Refresh-banner narrative.** Replaces metadata-diff banner ("3 commits, 2 stars") with story-driven framing. `pickHeadline` priority logic surfaces the most-interesting change per snapshot (code complexity grew/shrank, new functions added, big author shift, issues closed). Primary/secondary chip emphasis in green/orange. Brand line "RepoJury · owner/repo" in textSecondary. Time on right as "1d ago" not "earlier" or "since". Screenshot-worthy alone (Guiding-Principle 2). Live-validated on golang/go: `Code complexity grew by 45 — new branching logic added across the codebase`.
 - ✅ v0.28 — **CallEdge.toContainerType — overload disambiguation in blast radius.** Resolved the v0.20 chip-dedup workaround (commit `2d4fede`). Plugins now emit `CallEdge.toContainerType` alongside `toFunction`; `computeFunctionBlastRadius` uses (file, name, containerType) as its target tuple. Live-validated on Flask: `Blueprint.add_url_rule` (3 callees) vs `BlueprintSetupState.add_url_rule` (0 callees) prove distinct overloads now produce distinct blast radii. Chip dedup logic deleted.
 - ✅ v0.29 — **Test-to-code mapping — coverage badges + Untested Hotspots panel.** `computeTestCoverage(cg)` classifies every function path/file into prod or test by convention heuristics (no external coverage data: looks at `__tests__/`, `*.test.*`, `*.spec.*`, `tests/`, `_test.go`, `_spec.rb`, etc.). Walks call edges to mark prod functions called by test files as "covered". UI: per-file coverage badge ("5/8" with color scaling 0% rose → 50% amber → 100% accent) on the heaviest-files list. Untested Hotspots panel: most-complex prod functions with zero test callers, ranked, click to zoom blast radius. Header stat: "X% prod fns covered". Panel hidden on repos with zero test files (no false-positive lecture).
 - ✅ v0.30 — **AST duplicate detection — bodyHash + Near-Duplicates panel (Phase 3 complete).** FNV-1a 64-bit hash over each function's tree-sitter subtree, walking named children + capturing binary/assignment/unary operator tokens but ignoring identifier names + literal values. All 7 AST plugins emit `bodyHash` per function. `findDuplicateGroups` filters by complexity ≥5, group size ≥2, sorts by `groupSize × maxComplexity` descending, caps at 15. Near-Duplicates panel: collapsible group rows, top group expanded by default, members clickable to zoom blast radius into that exact (file, name, containerType) copy. Live-validated on golang/go src/cmd: 15 groups · 118 functions · largest ×36. Caught canonical SSA-rewrite families: `OpAdd16/32/64/8` (×4 at complexity 176), `OpLsh<size>x<size>` (×36 across 4×4 grid + signed variants), ARM register-shift opcodes (×36). Hash invariance under literal/identifier changes proven: `OpAdd8` and `OpAdd64` share a hash despite different opcodes/literals, identical structure.
@@ -592,9 +592,9 @@ Sessions stored in `.gitvision/sessions/` — not committed, machine-local.
 
 ## Open questions / future thinking
 
-- **Where does RepoBaron live long-term?** Self-hosted open-source core + commercial hosted? Pure personal tool that happens to be public? Both are valid — decide when a real user base tells us.
+- **Where does RepoJury live long-term?** Self-hosted open-source core + commercial hosted? Pure personal tool that happens to be public? Both are valid — decide when a real user base tells us.
 - **When do we add auth/multi-user?** Currently single-user architecture. A multi-tenant move requires rethinking storage, session ownership, rate-limit pooling. Non-trivial but not urgent.
-- **Brand direction.** RepoBaron name is fine. No logo/wordmark yet — low priority until we have a reason.
+- **Brand direction.** RepoJury name is fine. No logo/wordmark yet — low priority until we have a reason.
 
 ---
 

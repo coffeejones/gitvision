@@ -1,4 +1,4 @@
-// Shared types for RepoBaron
+// Shared types for RepoJury
 
 import type { CodeGraph } from "./codeAnalysis/types";
 

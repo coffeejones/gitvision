@@ -84,7 +84,7 @@ export async function getGithubScopesForUser(
       headers: {
         Authorization: `token ${token}`,
         Accept: "application/vnd.github+json",
-        "User-Agent": "RepoBaron/0.1",
+        "User-Agent": "RepoJury/0.1",
       },
       // Cache for 60s — scope changes require user action (OAuth flow),
       // so even minute-stale data is fine for a UX hint. Avoids

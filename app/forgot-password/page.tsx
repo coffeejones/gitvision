@@ -11,7 +11,7 @@ import { ForgotPasswordForm } from "@/components/ForgotPasswordForm";
 import { AuthShell } from "@/components/auth/AuthShell";
 
 export const metadata = {
-  title: "Reset your password — RepoBaron",
+  title: "Reset your password — RepoJury",
   description: "Send yourself a password-reset link.",
 };
 

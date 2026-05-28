@@ -14,8 +14,8 @@ import { AuthForm } from "@/components/AuthForm";
 import { AuthShell } from "@/components/auth/AuthShell";
 
 export const metadata = {
-  title: "Sign up — RepoBaron",
-  description: "Create a free RepoBaron account.",
+  title: "Sign up — RepoJury",
+  description: "Create a free RepoJury account.",
 };
 
 interface SearchParams {

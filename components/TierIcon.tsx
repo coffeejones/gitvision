@@ -1,4 +1,4 @@
-// Tier signature icons for RepoBaron pricing — Scout (Free), Knight
+// Tier signature icons for RepoJury pricing — Scout (Free), Knight
 // (Plus), Baron (Pro). Uses lucide-react (Shield / Swords / Crown) so
 // the icons inherit production-grade vector quality and stay visually
 // consistent with the rest of the app's iconography (Sparkles,

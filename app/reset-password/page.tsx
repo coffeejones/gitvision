@@ -12,8 +12,8 @@ import { ResetPasswordForm } from "@/components/ResetPasswordForm";
 import { AuthShell } from "@/components/auth/AuthShell";
 
 export const metadata = {
-  title: "Set a new password — RepoBaron",
-  description: "Choose a new password for your RepoBaron account.",
+  title: "Set a new password — RepoJury",
+  description: "Choose a new password for your RepoJury account.",
 };
 
 interface SearchParams {

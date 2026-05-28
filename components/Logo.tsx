@@ -1,4 +1,4 @@
-// RepoBaron logo — Baron mascot (top-hat + handlebar moustache + beard)
+// RepoJury logo — Baron mascot (top-hat + handlebar moustache + beard)
 // shipped as the brand's visual identity (v0.80, replaces the v0.75
 // concentric-rings concept). Single combined path with fill-rule
 // evenodd produces the line-art "outline" effect via filled regions
@@ -6,7 +6,7 @@
 //
 // Single component, three usage modes:
 //   <Logo size={20} />                   icon only
-//   <Logo size={20} wordmark />          icon + RepoBaron text
+//   <Logo size={20} wordmark />          icon + RepoJury text
 //   <Logo size={20} wordmark href="/" /> icon + text wrapped in a Link
 //
 // SVG uses currentColor for fill so callers can re-tint via the
@@ -36,7 +36,7 @@ interface Props {
   /** Pixel size of the icon. Default 24 — works for topbar; scale up
    *  for hero placements (32-48), down for inline mentions (16). */
   size?: number;
-  /** Render the "RepoBaron" wordmark next to the icon. */
+  /** Render the "RepoJury" wordmark next to the icon. */
   wordmark?: boolean;
   /** Wrap the whole thing in a Link to `href`. Useful for clickable
    *  brand-as-home-link in topbars. */
@@ -75,7 +75,7 @@ export function Logo({
             letterSpacing: "-0.02em",
           }}
         >
-          Repo Baron
+          Repo Jury
         </span>
       )}
     </span>

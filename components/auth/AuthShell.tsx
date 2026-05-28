@@ -83,7 +83,7 @@ function BrandPanel() {
           className="text-sm leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          RepoBaron maps any GitHub repo in 20 seconds — blast radius,
+          RepoJury maps any GitHub repo in 20 seconds — blast radius,
           untested hotspots, structural duplicates, dependency health.
           Across 7 languages.
         </p>
@@ -105,7 +105,7 @@ function BrandPanel() {
        *  promise floats in the middle rather than tying it visually
        *  to the top. */}
       <p className="text-xs" style={{ color: TOK.textMuted }}>
-        RepoBaron &middot; made by coffeejones
+        RepoJury &middot; made by coffeejones
       </p>
     </aside>
   );

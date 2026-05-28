@@ -1,6 +1,6 @@
 # GitHub App end-to-end validation — 2026-05-15
 
-_Records the first real-world run of the RepoBaron PR-bot from webhook
+_Records the first real-world run of the RepoJury PR-bot from webhook
 delivery to posted comment. Captured immediately after the run so the
 trail is concrete, not reconstructed. Skitse:
 `github-app-skeleton-2026-05.md`._
@@ -11,10 +11,10 @@ After Commits 1-8 of the skeleton implementation shipped to production
 (branch `main`, commit `a2c6acc`), we registered the GitHub App on
 github.com and ran a single end-to-end test:
 
-- **App**: `RepoBaron-PR` (registered on `coffeejones` personal account)
+- **App**: `RepoJury-PR` (registered on `coffeejones` personal account)
 - **Permissions**: Contents: Read, Pull requests: Read & Write, Metadata: Read
 - **Events subscribed**: Pull request, Installation
-- **Webhook URL**: `https://repobaron.com/api/github/webhook`
+- **Webhook URL**: `https://repojury.com/api/github/webhook`
 - **Repo installed on**: `coffeejones/repobaronTest` (public, freshly created)
 - **Test PR**: branch `test-pr-1` → `main`, modified `hello.py::is_even`
   (complexity 1 → 4, Δ+3)
@@ -22,7 +22,7 @@ github.com and ran a single end-to-end test:
 ## Verifying the route was live before opening the PR
 
 ```
-curl -X POST https://repobaron.com/api/github/webhook
+curl -X POST https://repojury.com/api/github/webhook
 → HTTP 400 "Missing required webhook headers"
 ```
 
@@ -72,7 +72,7 @@ Total wall-clock from PR opened to comment posted: <60s on this small repo.
 ## Posted comment (as it appeared on the PR)
 
 ```markdown
-RepoBaron Review
+RepoJury Review
 
 Diff summary: 1 file changed · functions: 1 modified · net complexity +3
 
@@ -155,7 +155,7 @@ beta users.
 A small open question this run surfaced: the "Nothing notable ✅"
 comment is concise (3 lines + footer). On a small PR that's right.
 On a substantive PR where we LOOKED HARD and found nothing, we might
-want richer reassurance — e.g. "RepoBaron analyzed 47 functions
+want richer reassurance — e.g. "RepoJury analyzed 47 functions
 across 12 files. Top function complexity didn't change. No new
 untested branches. ✅"
 

@@ -28,7 +28,7 @@ import type { PipelineResult } from "./pipeline";
 export const COMMENT_MARKER = "<!-- repobaron:pr-review v2 -->";
 
 export interface FormatContext {
-  /** Base URL of the workspace (e.g. "https://repobaron.com"). Used
+  /** Base URL of the workspace (e.g. "https://repojury.com"). Used
    *  to build the "Full analysis" link. Trailing slash is normalized. */
   workspaceBaseUrl: string;
 }
@@ -56,7 +56,7 @@ export function formatPrComment(
   let body: string;
   if (result.suggestions.length === 0) {
     body = [
-      "## RepoBaron Review",
+      "## RepoJury Review",
       "",
       diffLine,
       "",
@@ -64,7 +64,7 @@ export function formatPrComment(
     ].join("\n");
   } else {
     const lines: string[] = [
-      "## RepoBaron Review",
+      "## RepoJury Review",
       "",
       diffLine,
       "",

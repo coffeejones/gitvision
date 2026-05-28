@@ -273,7 +273,7 @@ export function AuthForm({ mode, redirectTo = "/" }: Props) {
           </>
         ) : (
           <>
-            New to RepoBaron?{" "}
+            New to RepoJury?{" "}
             <Link
               href="/signup"
               className="font-medium hover:underline"

@@ -10,7 +10,7 @@ import { AccountShell } from "@/components/AccountShell";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 
 export const metadata = {
-  title: "Security — Account — RepoBaron",
+  title: "Security — Account — RepoJury",
   description: "Manage your password and sign-in security.",
 };
 

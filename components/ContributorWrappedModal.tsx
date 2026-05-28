@@ -255,7 +255,7 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
               letterSpacing: "-0.01em",
             }}
           >
-            RepoBaron · Wrapped
+            RepoJury · Wrapped
           </span>
         </div>
         <span
@@ -420,8 +420,8 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
           position: "relative",
         }}
       >
-        <span>repobaron.com</span>
-        <span>#RepoBaronWrapped</span>
+        <span>repojury.com</span>
+        <span>#RepoJuryWrapped</span>
       </div>
     </div>
   );

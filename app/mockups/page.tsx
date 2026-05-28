@@ -40,7 +40,7 @@ export default function MockupsIndex() {
       <div className="max-w-3xl w-full flex flex-col gap-10 py-12">
         <header className="flex flex-col gap-2">
           <div className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-            RepoBaron · UI exploration
+            RepoJury · UI exploration
           </div>
           <h1 className="text-3xl font-semibold tracking-tight">
             Linear-lighter family

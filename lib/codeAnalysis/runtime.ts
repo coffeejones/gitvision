@@ -12,7 +12,7 @@
 //   replaces the resolved string with a synthetic "[externals]/…" marker. By
 //   skipping the bundler's resolver entirely, dev (Turbopack) and build
 //   (Webpack) and Railway runtime all behave identically. Assumes flat
-//   node_modules at the project root, which is RepoBaron's convention.
+//   node_modules at the project root, which is RepoJury's convention.
 
 import { promises as fs } from "node:fs";
 import path from "node:path";

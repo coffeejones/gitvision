@@ -227,8 +227,8 @@ export function ConnectionsPanel({
                 </span>
                 <span className="text-[11px]" style={{ color: TOK.textMuted }}>
                   {hasRepoScope
-                    ? "RepoBaron can analyze your private repositories."
-                    : "Re-authorize GitHub to grant RepoBaron access to your private repositories."}
+                    ? "RepoJury can analyze your private repositories."
+                    : "Re-authorize GitHub to grant RepoJury access to your private repositories."}
                 </span>
               </div>
             </div>

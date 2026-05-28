@@ -35,7 +35,7 @@ _Captured 2026-05-11. Sources at bottom._
 - **MCP:** Native integration with Claude Code + Cursor
 - **Killer feature:** Beyond-the-diff iterative analysis. References related files, configs, tests, docs, git history. *"Reads other engineers' comments to understand your coding standards"*.
 - **Weakness:** Independent benchmark suggests ~60% nitpick/false-positive rate. Greptile's own positioning says "never verbose, signal-to-noise focused" — but users complain about false alarms.
-- **Competitive note:** Closest to RepoBaron's "codebase graph" thesis. They have more depth, less polish on signal-to-noise.
+- **Competitive note:** Closest to RepoJury's "codebase graph" thesis. They have more depth, less polish on signal-to-noise.
 
 ### Codacy — *Enterprise compliance + security legacy*
 
@@ -51,7 +51,7 @@ _Captured 2026-05-11. Sources at bottom._
 
 - **Architecture:** *Identical pattern to ours.* Deterministic static analysis pass (5000+ rules, 30+ languages) → AI agent on top with codebase context, dataflow graphs, taint analysis
 - **Positioning:** *"The reliability of static analysis and the intelligence of AI review in a single pass"*
-- **Implication:** RepoBaron's signals.ts + healthAnalysis.ts pattern is not architecturally unique. We need to either differentiate on signal quality, output quality, or surface.
+- **Implication:** RepoJury's signals.ts + healthAnalysis.ts pattern is not architecturally unique. We need to either differentiate on signal quality, output quality, or surface.
 
 ### Anthropic Code Review (the elephant)
 
@@ -62,7 +62,7 @@ _Captured 2026-05-11. Sources at bottom._
 - **Focus:** Logic errors over style. Light security analysis (deeper analysis in Claude Code Security).
 - **Coverage shift:** Reviews moved from 16% to 54% of PRs getting substantive comments
 - **Integration:** GitHub native, runs in cloud when PR opens on enabled repos
-- **Implication:** Anthropic owns Claude Code distribution + model economics. Pure "MCP + Claude Code" RepoBaron positioning is now eaten by them natively.
+- **Implication:** Anthropic owns Claude Code distribution + model economics. Pure "MCP + Claude Code" RepoJury positioning is now eaten by them natively.
 
 ---
 
@@ -89,7 +89,7 @@ _Captured 2026-05-11. Sources at bottom._
 
 ---
 
-## RepoBaron positioning options
+## RepoJury positioning options
 
 **Vej A — Pure PR-bot wedge (me-too).**
 - Compete head-on with CodeRabbit/Greptile/Anthropic on price + noise + UX
@@ -113,7 +113,7 @@ _Captured 2026-05-11. Sources at bottom._
 
 **Vej B with sequenced trajectory toward C.** Not pure PR-bot, but a PR-bot explicitly positioned for AI-augmented development, with workspace + pre-PR as natural progression. Narrative:
 
-> *"RepoBaron is the codebase intelligence layer for teams where AI generates code at scale. Before you open a PR: we tell you what your AI-generated change collides with. After PR opens: we show reviewers the structural facts AI PR-bots miss. We're not another LLM-on-diff — we're the deterministic-signals layer that makes AI-augmented development reviewable."*
+> *"RepoJury is the codebase intelligence layer for teams where AI generates code at scale. Before you open a PR: we tell you what your AI-generated change collides with. After PR opens: we show reviewers the structural facts AI PR-bots miss. We're not another LLM-on-diff — we're the deterministic-signals layer that makes AI-augmented development reviewable."*
 
 ---
 

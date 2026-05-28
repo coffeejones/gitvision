@@ -1,6 +1,6 @@
 # repobaron-eval
 
-A/B evaluation harness for RepoBaron's MCP server. Same prompt, same model,
+A/B evaluation harness for RepoJury's MCP server. Same prompt, same model,
 same target repo — the only variable is whether the MCP is connected.
 
 The output isn't a marketing artifact. It's **internal roadmap input**:

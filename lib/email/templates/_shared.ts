@@ -16,10 +16,10 @@
 // unpredictable ways (Gmail's auto-darken), so a light email is
 // safest for cross-client consistency. We lean on a single accent
 // color (emerald, matching the brand) for the CTA button and the
-// "RepoBaron" wordmark so the visual identity carries through.
+// "RepoJury" wordmark so the visual identity carries through.
 
 export interface EmailLayoutOptions {
-  /** The bold accented brand line at the top — usually "RepoBaron". */
+  /** The bold accented brand line at the top — usually "RepoJury". */
   brand?: string;
   /** Main heading inside the card. */
   heading: string;
@@ -46,7 +46,7 @@ const BORDER = "#e5e5ea";
  *  matches what Gmail / Apple Mail render comfortably on desktop without
  *  feeling cramped on phones. */
 export function renderEmailLayout(opts: EmailLayoutOptions): string {
-  const brand = opts.brand ?? "RepoBaron";
+  const brand = opts.brand ?? "RepoJury";
   const paragraphsHtml = opts.paragraphs
     .map(
       (p) =>
@@ -96,8 +96,8 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
       ${footnoteHtml}
     </div>
     <p style="margin: 16px 0 0; text-align: center; color: ${TEXT_MUTED}; font-size: 11px; line-height: 1.5;">
-      RepoBaron &middot; made by coffeejones &middot;
-      <a href="https://repobaron.com" style="color: ${TEXT_MUTED}; text-decoration: underline;">repobaron.com</a>
+      RepoJury &middot; made by coffeejones &middot;
+      <a href="https://repojury.com" style="color: ${TEXT_MUTED}; text-decoration: underline;">repojury.com</a>
     </p>
   </div>
 </body>
@@ -109,7 +109,7 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
  *  and Slack / Outlook 2007 / accessibility tools all benefit. */
 export function renderEmailText(opts: EmailLayoutOptions): string {
   const lines: string[] = [];
-  lines.push(opts.brand ?? "RepoBaron");
+  lines.push(opts.brand ?? "RepoJury");
   lines.push("");
   lines.push(opts.heading);
   lines.push("");

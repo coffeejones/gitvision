@@ -35,7 +35,7 @@ const SHIPPED: RoadmapItem[] = [
   },
   {
     tag: "May 2026",
-    title: "RepoBaron PR-bot",
+    title: "RepoJury PR-bot",
     description:
       "One grounded review comment on every PR. Same signal layer as the workspace, zero LLM cost.",
   },

@@ -48,7 +48,7 @@ export function PRBotCallout({ userTier }: Props) {
             className="text-xs uppercase tracking-[0.18em] font-medium"
             style={{ color: TOK.textMuted }}
           >
-            RepoBaron PR-bot · GitHub App · private beta
+            RepoJury PR-bot · GitHub App · private beta
           </span>
         </div>
         <h2
@@ -61,7 +61,7 @@ export function PRBotCallout({ userTier }: Props) {
           className="text-sm sm:text-base max-w-3xl leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          RepoBaron-PR is a GitHub App that runs the same signal layer
+          RepoJury-PR is a GitHub App that runs the same signal layer
           as the analysis above — but on every new pull request,
           automatically. One grounded review comment per PR. No LLM
           in the comment, no token cost, no surprise bills.
@@ -88,7 +88,7 @@ export function PRBotCallout({ userTier }: Props) {
             Sample comment on a PR
           </div>
           <div style={{ color: TOK.textPrimary }}>
-            <strong>RepoBaron Review</strong>
+            <strong>RepoJury Review</strong>
           </div>
           <div>
             Diff summary: 3 files changed · functions: 5 added, 2
@@ -160,7 +160,7 @@ export function PRBotCallout({ userTier }: Props) {
                   color: TOK.accentOn,
                 }}
               >
-                Install RepoBaron-PR
+                Install RepoJury-PR
                 <ArrowUpRight size={14} />
               </a>
             ) : (

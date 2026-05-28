@@ -63,7 +63,7 @@ export default async function ImportsPage({
             title="No file-to-file imports detected"
             body={
               <>
-                RepoBaron builds the import graph for JS/TS, Python, Go,
+                RepoJury builds the import graph for JS/TS, Python, Go,
                 Java, C#, PHP, and Ruby. Tiny repos, single-file projects,
                 or snapshots created before the import-graph feature
                 shipped will land here.

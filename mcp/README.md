@@ -1,6 +1,6 @@
-# repobaron-mcp
+# repojury-mcp
 
-MCP server that exposes the RepoBaron code-analysis pipeline as
+MCP server that exposes the RepoJury code-analysis pipeline as
 Model Context Protocol tools — so AI coding agents (Claude Code,
 Cursor, Cline, Aider, anything that speaks MCP) can query
 deterministic structural information about a GitHub repo without
@@ -29,10 +29,10 @@ runs in milliseconds against a cached snapshot.
 ## Install
 
 > **Status:** v0.66 (C1.3). Pre-npm-publish — install from source.
-> A standalone npm package (`repobaron-mcp`) will follow once we
+> A standalone npm package (`repojury-mcp`) will follow once we
 > have a few external integrations validating the surface.
 
-Clone the RepoBaron repo and build locally:
+Clone the RepoJury repo and build locally:
 
 ```sh
 git clone https://github.com/coffeejones/repobaron.git
@@ -54,13 +54,13 @@ npm run mcp:validate     # build + run the MCP-layer test suite
 ### Claude Code (current install path)
 
 ```sh
-claude mcp add repobaron node /absolute/path/to/repobaron/mcp/dist/mcp/server.js
+claude mcp add repojury node /absolute/path/to/repobaron/mcp/dist/mcp/server.js
 ```
 
-Once `repobaron-mcp` is published to npm, this will become:
+Once `repojury-mcp` is published to npm, this will become:
 
 ```sh
-claude mcp add repobaron npx repobaron-mcp
+claude mcp add repojury npx repojury-mcp
 ```
 
 ### Cursor / Cline / others
@@ -70,7 +70,7 @@ Most MCP clients accept a JSON config of the same shape. Example:
 ```json
 {
   "mcpServers": {
-    "repobaron": {
+    "repojury": {
       "command": "node",
       "args": ["/absolute/path/to/repobaron/mcp/dist/mcp/server.js"]
     }
@@ -132,7 +132,7 @@ in `analyze_repo`'s summary but won't appear in `blast_radius` or
 ## Privacy
 
 The MCP server runs as a child process of your MCP client. Repo
-analysis happens on your machine. No RepoBaron-controlled server
+analysis happens on your machine. No RepoJury-controlled server
 sees the repos you analyze. Cache stays in `~/.gitvision/cache` on
 your filesystem.
 

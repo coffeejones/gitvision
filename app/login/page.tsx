@@ -20,7 +20,7 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { TOK } from "@/lib/theme";
 
 export const metadata = {
-  title: "Log in — RepoBaron",
+  title: "Log in — RepoJury",
   description: "Log in to access your saved sessions.",
 };
 

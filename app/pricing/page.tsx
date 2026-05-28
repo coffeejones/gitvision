@@ -26,7 +26,7 @@ import { PricingBillingToggle } from "@/components/pricing/PricingBillingToggle"
 import { CheckoutCTA } from "@/components/pricing/CheckoutCTA";
 
 export const metadata: Metadata = {
-  title: "Pricing — RepoBaron",
+  title: "Pricing — RepoJury",
   description:
     "Three tiers built for the spectrum of code work. Try Knight or Baron free for 14 days, no card required.",
 };

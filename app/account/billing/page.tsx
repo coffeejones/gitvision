@@ -18,7 +18,7 @@ import { BillingPanel } from "@/components/account/BillingPanel";
 import type { Tier } from "@/components/TierIcon";
 
 export const metadata = {
-  title: "Billing — Account — RepoBaron",
+  title: "Billing — Account — RepoJury",
   description: "Your subscription tier and billing settings.",
 };
 

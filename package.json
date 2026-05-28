@@ -1,9 +1,9 @@
 {
-  "name": "repobaron",
+  "name": "repojury",
   "version": "0.1.0",
   "private": true,
   "bin": {
-    "repobaron-mcp": "./mcp/dist/mcp/server.js"
+    "repojury-mcp": "./mcp/dist/mcp/server.js"
   },
   "scripts": {
     "dev": "next dev",

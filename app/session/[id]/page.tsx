@@ -446,7 +446,7 @@ export default async function OverviewPage({
           className="pt-6 text-[11px] flex items-center justify-between border-t flex-wrap gap-3"
           style={{ borderColor: TOK.border, color: TOK.textMuted }}
         >
-          <span>© 2026 RepoBaron</span>
+          <span>© 2026 RepoJury</span>
           <div className="flex items-center gap-4">
             {current.rateLimitInfo && (
               <span className="font-mono tabular-nums">

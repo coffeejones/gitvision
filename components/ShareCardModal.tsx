@@ -56,7 +56,7 @@ export function ShareCardModal({
         style: { transform: "none" }, // override preview scaling
       });
       const link = document.createElement("a");
-      link.download = `repobaron-${sessionName
+      link.download = `repojury-${sessionName
         .replace(/\s+/g, "-")
         .toLowerCase()}-${variant}.png`;
       link.href = dataUrl;

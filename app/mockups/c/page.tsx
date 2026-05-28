@@ -94,7 +94,7 @@ export default function MockupC() {
             className="text-lg max-w-xl leading-relaxed"
             style={{ color: TOK.textSecondary }}
           >
-            RepoBaron reads the history, the imports, and the review flow of
+            RepoJury reads the history, the imports, and the review flow of
             any GitHub repository. Twenty seconds later, you have a map, a
             verdict, and a clear list of what to look at next.
           </p>
@@ -321,7 +321,7 @@ export default function MockupC() {
           style={{ borderColor: TOK.rule, color: TOK.textMuted }}
         >
           <div className="flex flex-col gap-0.5">
-            <span style={{ color: TOK.textSecondary }}>RepoBaron</span>
+            <span style={{ color: TOK.textSecondary }}>RepoJury</span>
             <span>A field tool for reading codebases · v0.6</span>
           </div>
           <div className="flex items-center gap-6">

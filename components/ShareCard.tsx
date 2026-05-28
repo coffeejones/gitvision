@@ -210,7 +210,7 @@ export function ShareCard({ snapshot, variant }: Props) {
               letterSpacing: "-0.01em",
             }}
           >
-            RepoBaron
+            RepoJury
           </span>
         </div>
         <span
@@ -530,7 +530,7 @@ export function ShareCard({ snapshot, variant }: Props) {
             day: "numeric",
           })}
         </span>
-        <span>repobaron.com · paste a repo URL, get a constellation</span>
+        <span>repojury.com · paste a repo URL, get a constellation</span>
       </div>
     </div>
   );

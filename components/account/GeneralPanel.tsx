@@ -116,7 +116,7 @@ function NameRow({
   return (
     <Row
       label="Display name"
-      description="How you appear inside RepoBaron."
+      description="How you appear inside RepoJury."
       value={!editing ? user.name || "—" : undefined}
       action={
         !editing && (

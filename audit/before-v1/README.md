@@ -10,7 +10,7 @@ batched into focused sessions.
 
 Triaged 2026-05-14. The audit framed this as "fix together with HMAC
 tokens" but reading the actual ownership code revealed nuance the agents
-missed: RepoBaron's session-GET is intentionally open (the share-by-URL
+missed: RepoJury's session-GET is intentionally open (the share-by-URL
 feature). The only real exploit was AI budget exposure — the other
 findings are cosmetic-leak / privacy concerns that are mostly throwaway
 work under the OAuth migration on the v2 roadmap.

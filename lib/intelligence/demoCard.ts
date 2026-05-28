@@ -1,6 +1,6 @@
 // Pre-built demo session → rich card data (v0.76 / D4 polish).
 //
-// The marketing landing's "See what RepoBaron found" row needs more
+// The marketing landing's "See what RepoJury found" row needs more
 // than just the WorkspaceSummary — visitors look at the cards to
 // gauge the *scale* of analysis too (star count, files, functions,
 // hotspots). This helper does a single session-load and emits both

@@ -80,7 +80,7 @@ function makeDeps(
   const body =
     "commentBody" in overrides
       ? overrides.commentBody
-      : "## RepoBaron Review\nhi";
+      : "## RepoJury Review\nhi";
   return {
     runAnalysisPipeline: vi.fn(
       async () => overrides.pipelineResult ?? makeOkPipelineResult(),
@@ -104,7 +104,7 @@ function makeDeps(
       releaseConcurrencySlot:
         vi.fn() as RunReviewDeps["concurrency"]["releaseConcurrencySlot"],
     },
-    workspaceBaseUrl: "https://repobaron.com",
+    workspaceBaseUrl: "https://repojury.com",
   };
 }
 
@@ -133,7 +133,7 @@ describe("runReview — happy path", () => {
 
   it("passes the rendered body + parsed owner/repo/pr to postPrComment", async () => {
     const deps = makeDeps({
-      commentBody: "## RepoBaron Review\nbody",
+      commentBody: "## RepoJury Review\nbody",
       postResult: { action: "created", commentId: 5 },
     });
     await runReview(
@@ -147,7 +147,7 @@ describe("runReview — happy path", () => {
       owner: "octocat",
       repo: "hello-world",
       prNumber: 42,
-      body: "## RepoBaron Review\nbody",
+      body: "## RepoJury Review\nbody",
     });
   });
 
@@ -157,7 +157,7 @@ describe("runReview — happy path", () => {
 
     const fmtMock = deps.formatPrComment as unknown as ReturnType<typeof vi.fn>;
     expect(fmtMock.mock.calls[0]?.[1]).toEqual({
-      workspaceBaseUrl: "https://repobaron.com",
+      workspaceBaseUrl: "https://repojury.com",
     });
   });
 });
@@ -287,7 +287,7 @@ describe("runReview — composition fidelity", () => {
     const deps = makeDeps({
       pipelineResult: makeOkPipelineResult(),
       commentBody:
-        "## RepoBaron Review\n\nNothing notable on this PR ✅",
+        "## RepoJury Review\n\nNothing notable on this PR ✅",
     });
     await runReview(makeEvent(), deps);
 

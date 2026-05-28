@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="512" height="512">
-  <title>RepoBaron logo — Baron mascot (top hat, handlebar moustache, beard)</title>
+  <title>RepoJury logo — Baron mascot (top hat, handlebar moustache, beard)</title>
   <!-- Single combined path with fill-rule="evenodd" produces the line-art
        "outline" effect via filled regions + interior holes. Keep this
        file in sync with public/brand/logo.svg (the source-of-truth

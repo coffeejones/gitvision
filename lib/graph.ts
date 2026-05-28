@@ -222,7 +222,7 @@ export async function downloadAndExtract(
   opts: DownloadAndExtractOptions = {}
 ): Promise<{ extractDir: string; cleanup: () => Promise<void> }> {
   const subdir = opts.subdir ?? null;
-  const tmpRoot = path.join(os.tmpdir(), `repobaron-${nanoid(8)}`);
+  const tmpRoot = path.join(os.tmpdir(), `repojury-${nanoid(8)}`);
   await fs.mkdir(tmpRoot, { recursive: true });
 
   // Octokit returns a Response-like object for binary endpoints

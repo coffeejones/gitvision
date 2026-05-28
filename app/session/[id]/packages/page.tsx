@@ -41,7 +41,7 @@ export default async function PackagesRoute({
           style={{ color: TOK.textSecondary }}
         >
           Vulnerable, outdated, and deprecated packages across every
-          manifest RepoBaron detected. Click any CVE for the full
+          manifest RepoJury detected. Click any CVE for the full
           advisory, any package name for its registry page.
         </p>
       </header>

@@ -1,4 +1,4 @@
-// Session cache for the RepoBaron MCP server (v0.64 / C1.1, on-disk
+// Session cache for the RepoJury MCP server (v0.64 / C1.1, on-disk
 // layer added in v0.65 / C1.2).
 //
 // AI agents call repeatedly: analyze_repo → blast_radius →
@@ -105,7 +105,7 @@ async function getFromDisk(
     entry = JSON.parse(raw);
   } catch (err) {
     console.error(
-      `repobaron-mcp: corrupt cache file ${filePath}, evicting:`,
+      `repojury-mcp: corrupt cache file ${filePath}, evicting:`,
       err instanceof Error ? err.message : err
     );
     await fs.unlink(filePath).catch(() => {});
@@ -138,7 +138,7 @@ async function setOnDisk(
   } catch (err) {
     // Disk failures degrade to memory-only — never block the tool call.
     console.error(
-      `repobaron-mcp: failed to write disk cache for ${sessionId}:`,
+      `repojury-mcp: failed to write disk cache for ${sessionId}:`,
       err instanceof Error ? err.message : err
     );
   }

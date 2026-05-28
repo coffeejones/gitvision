@@ -25,7 +25,7 @@ export function passwordResetEmail(args: Args): {
   const opts: EmailLayoutOptions = {
     heading: "Reset your password",
     paragraphs: [
-      `Hi ${greet} — we got a request to reset your RepoBaron password.`,
+      `Hi ${greet} — we got a request to reset your RepoJury password.`,
       `Click the button below to set a new one. The link is valid for 1 hour.`,
     ],
     cta: { label: "Reset password", href: args.link },
@@ -33,7 +33,7 @@ export function passwordResetEmail(args: Args): {
       "If you didn't ask to reset your password, you can ignore this email — your current password stays unchanged. If you keep seeing reset emails you didn't request, reach out via the feedback form so we can investigate.",
   };
   return {
-    subject: "Reset your RepoBaron password",
+    subject: "Reset your RepoJury password",
     html: renderEmailLayout(opts),
     text: renderEmailText(opts),
   };

@@ -17,7 +17,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { buildServer, SERVER_NAME, SERVER_VERSION } from "../buildServer";
 
-/** Set up a Client connected in-process to a fresh RepoBaron MCP
+/** Set up a Client connected in-process to a fresh RepoJury MCP
  *  server. Returns the connected client + a cleanup function. */
 async function connectInMemory() {
   const server = buildServer();
@@ -25,7 +25,7 @@ async function connectInMemory() {
     InMemoryTransport.createLinkedPair();
 
   const client = new Client(
-    { name: "repobaron-mcp-tests", version: "0.0.0" },
+    { name: "repojury-mcp-tests", version: "0.0.0" },
     { capabilities: {} }
   );
 
@@ -67,7 +67,7 @@ describe("MCP server · initialization", () => {
 });
 
 describe("MCP server · tools/list", () => {
-  it("exposes all eight RepoBaron tools", async () => {
+  it("exposes all eight RepoJury tools", async () => {
     const { client, cleanup } = await connectInMemory();
     try {
       const result = await client.listTools();

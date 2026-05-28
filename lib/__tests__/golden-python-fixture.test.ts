@@ -71,7 +71,7 @@ def process(items):
 // Imports: main.py → helper.py (1 resolved import edge)
 // Calls in process: add(), safe_div() — both resolve to helper.py
 //
-// NOTE: If repobaron's complexity rules differ (e.g. counts boolean
+// NOTE: If repojury's complexity rules differ (e.g. counts boolean
 // operators or comprehensions), update EXPECTED and add a comment.
 
 const EXPECTED = {

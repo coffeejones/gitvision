@@ -4,7 +4,7 @@
 // payment processing, customer support refunds, and the actual
 // checkout UI. Our job is:
 //   1. Create checkout sessions (server-side, with userId metadata
-//      so the webhook can map the payment back to a RepoBaron user)
+//      so the webhook can map the payment back to a RepoJury user)
 //   2. Handle subscription lifecycle webhooks (created, updated,
 //      canceled, revoked) and mirror state into our user table
 //
@@ -36,7 +36,7 @@ interface CreateCheckoutInput {
   tier: Exclude<Tier, "scout">;
   /** Monthly or annual billing */
   billing: "monthly" | "annual";
-  /** Authenticated RepoBaron user id — flows to webhook via metadata */
+  /** Authenticated RepoJury user id — flows to webhook via metadata */
   userId: string;
   /** Pre-fill email on the Polar checkout form for lower friction */
   userEmail: string;

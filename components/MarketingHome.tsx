@@ -428,7 +428,7 @@ export function MarketingHome({
             className="text-sm sm:text-base leading-relaxed"
             style={{ color: TOK.textSecondary }}
           >
-            RepoBaron extracts classes, interfaces, and method
+            RepoJury extracts classes, interfaces, and method
             relationships from your repo&apos;s AST and renders them
             as a navigable Mermaid diagram. No manual UML, no plugins,
             no setup — just paste a URL and explore.
@@ -474,7 +474,7 @@ export function MarketingHome({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/marketing/classdiagram.png"
-            alt="Auto-generated class diagram from a RepoBaron analysis"
+            alt="Auto-generated class diagram from a RepoJury analysis"
             className="w-full h-auto block"
           />
         </div>
@@ -496,7 +496,7 @@ export function MarketingHome({
        *  dot-bullet separators between links — whitespace + the
        *  bottom-row visual break does the structuring work.
        *
-       *  Earlier "RepoBaron · made by coffeejones" signature read as
+       *  Earlier "RepoJury · made by coffeejones" signature read as
        *  "hobby project by one person" — removed in v0.76 polish. */}
       <footer
         className="mt-4 pt-8 border-t flex flex-col gap-6"
@@ -541,7 +541,7 @@ export function MarketingHome({
           className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-6 text-[11px]"
           style={{ borderTop: `1px solid ${TOK.border}` }}
         >
-          <span>© 2026 RepoBaron</span>
+          <span>© 2026 RepoJury</span>
           <span>PolyForm Noncommercial 1.0.0</span>
         </div>
       </footer>
@@ -645,7 +645,7 @@ function LoggedOutHero({
         className="text-[11px] uppercase tracking-[0.14em] font-medium"
         style={{ color: TOK.textMuted }}
       >
-        See what RepoBaron found
+        See what RepoJury found
       </span>
 
       {/* Featured hero — Linear-style composition: focused finding
@@ -787,7 +787,7 @@ function FeaturedHero({ featured }: { featured: NormalizedDemo }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/marketing/hero-zod-overview.png"
-          alt={`RepoBaron analysis of ${featured.repo}`}
+          alt={`RepoJury analysis of ${featured.repo}`}
           className="w-full h-auto block"
         />
         {/* Hover overlay — subtle black darken at the bottom on hover.
@@ -869,7 +869,7 @@ function SurfaceCard({
 }
 
 /** Visual for Workspace surface card — inline list of the 6 health
- *  dimensions RepoBaron scores. Borderless / boxless so it reads as
+ *  dimensions RepoJury scores. Borderless / boxless so it reads as
  *  a decorative content-element instead of a "cropped UI fragment"
  *  pasted into the card (the earlier boxed-mockup version felt
  *  detached from the surrounding card). */

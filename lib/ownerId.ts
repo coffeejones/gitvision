@@ -163,7 +163,7 @@ export function filterSessionsByOwner<T extends { ownerId?: string }>(
 
 /** User-aware session filter (v0.76 — login-required model).
  *
- *  RepoBaron moved to "login required to create sessions" in v0.76.
+ *  RepoJury moved to "login required to create sessions" in v0.76.
  *  Anonymous browsing of a workspace listing no longer makes sense —
  *  if you're not signed in, you have no sessions to list. The
  *  marketing landing shows demo sessions as the "lokkemad"; the
