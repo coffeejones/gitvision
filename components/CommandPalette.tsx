@@ -7,8 +7,10 @@
 // name. Linear / Raycast / Sublime CmdShift+P pattern.
 //
 // What's searchable:
-//   - Workspace pages (Overview, Canvas, Imports, Code, Packages, PRs,
-//     Insights) — always shown
+//   - Workspace pages — all 10 tabs across the four departments
+//     (Health: Overview/Insights/Signals · Security · Forensics:
+//     Architecture/Canvas/Code/Imports · Supply: Packages/PRs).
+//     Listed in sidebar order so muscle memory transfers.
 //   - Files in the snapshot's file-complexity index (Code tab data) —
 //     top 200 to keep the search index small; substring match on path
 //   - Functions from the codeGraph — top 200 by complexity; substring
@@ -30,14 +32,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Boxes,
   Code as CodeIcon,
   FileCode,
   GitPullRequest,
   Hash,
   Home,
+  ListChecks,
   Network,
   Package,
   Search,
+  Shield,
   Sparkles,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
@@ -79,13 +84,20 @@ export function CommandPalette({ sessionId, snapshot, open, onClose }: Props) {
   const allItems = useMemo<PaletteItem[]>(() => {
     const base = `/session/${sessionId}`;
     const pages: PaletteItem[] = [
+      // Health Department
       { id: "p:overview", group: "pages", label: "Overview", icon: <Home size={13} />, href: base },
+      { id: "p:insights", group: "pages", label: "Insights", icon: <Sparkles size={13} />, href: `${base}/insights` },
+      { id: "p:signals", group: "pages", label: "Signals", icon: <ListChecks size={13} />, href: `${base}/signals` },
+      // Security Bureau
+      { id: "p:security", group: "pages", label: "Security", icon: <Shield size={13} />, href: `${base}/security` },
+      // Forensics Lab
+      { id: "p:architecture", group: "pages", label: "Architecture", icon: <Boxes size={13} />, href: `${base}/architecture` },
       { id: "p:canvas", group: "pages", label: "Canvas", icon: <Network size={13} />, href: `${base}/canvas` },
-      { id: "p:imports", group: "pages", label: "Imports", icon: <FileCode size={13} />, href: `${base}/imports` },
       { id: "p:code", group: "pages", label: "Code", icon: <CodeIcon size={13} />, href: `${base}/code` },
+      { id: "p:imports", group: "pages", label: "Imports", icon: <FileCode size={13} />, href: `${base}/imports` },
+      // Supply Office
       { id: "p:packages", group: "pages", label: "Packages", icon: <Package size={13} />, href: `${base}/packages` },
       { id: "p:prs", group: "pages", label: "PRs", icon: <GitPullRequest size={13} />, href: `${base}/prs` },
-      { id: "p:insights", group: "pages", label: "Insights", icon: <Sparkles size={13} />, href: `${base}/insights` },
     ];
 
     const cg = snapshot.codeGraph;

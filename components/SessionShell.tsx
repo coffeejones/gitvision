@@ -27,14 +27,18 @@ import {
   Boxes,
   Code as CodeIcon,
   FileCode,
+  Fingerprint,
   GitPullRequest,
   Home,
   ListChecks,
+  Microscope,
   Network,
   Package,
   Search,
   Shield,
   Sparkles,
+  Stethoscope,
+  Truck,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { STYLE, TOK } from "@/lib/theme";
@@ -65,10 +69,23 @@ interface NavItem {
   hint?: string;
 }
 
-/** A null entry between groups marks a sidebar separator. Keeps the
- *  rendering loop simple: walk the array, render a separator on null,
- *  render a link otherwise. */
-type NavEntry = NavItem | null;
+/** v0.82+ Department model — the sidebar is grouped into the four
+ *  jury "offices" that produce the Final Verdict. Each department
+ *  owns a focused mandate, named for its specific institutional
+ *  archetype (medical Department, investigative Bureau, scientific
+ *  Lab, logistics Office) so each label evokes the work it does
+ *  rather than reading as a row of generic "Department" suffixes.
+ *  When we open a new sector later, it becomes a new Department
+ *  entry here — no other UI touches needed. */
+interface Department {
+  /** Title shown as a small uppercase header above the items. */
+  title: string;
+  /** Lucide icon paired with the title — chosen to evoke the
+   *  department's role distinctly from its child tab icons. */
+  icon: React.ReactNode;
+  /** Tabs that belong to this department. */
+  items: NavItem[];
+}
 
 export function SessionShell({ sessionId, snapshot, children }: Props) {
   const pathname = usePathname();
@@ -127,81 +144,114 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
   // keeps the navigation render cheap.
   const hasSecurityIssue = secretCount > 0;
 
-  const items: NavEntry[] = [
+  const departments: Department[] = [
     {
-      label: "Overview",
-      href: base,
-      icon: <Home size={14} />,
+      // The clinical read on the codebase — summary, AI commentary,
+      // and the raw signal evidence. Named "Department" because it's
+      // the holistic patient-chart view (vitals, physician's notes,
+      // lab results) rather than a specialized investigation.
+      title: "Health Department",
+      icon: <Stethoscope size={12} />,
+      items: [
+        {
+          label: "Overview",
+          href: base,
+          icon: <Home size={14} />,
+        },
+        {
+          label: "Insights",
+          href: `${base}/insights`,
+          icon: <Sparkles size={14} />,
+        },
+        {
+          // The data behind Health at a Glance — all 20 deterministic
+          // signals (working / needsWork / questions) so devs can drill
+          // into specific evidence beyond the 6 aggregated tiles.
+          label: "Signals",
+          href: `${base}/signals`,
+          icon: <ListChecks size={14} />,
+        },
+      ],
     },
     {
-      label: "Canvas",
-      href: `${base}/canvas`,
-      icon: <Network size={14} />,
+      // The investigative arm — supply-chain incidents, secret
+      // leakage, risky dynamic-execution patterns. "Bureau" because
+      // it's the FBI/CIA-style focused unit (one mandate, depth over
+      // breadth) rather than a hospital wing or a forensics bench.
+      title: "Security Bureau",
+      icon: <Fingerprint size={12} />,
+      items: [
+        {
+          label: "Security",
+          href: `${base}/security`,
+          icon: <Shield size={14} />,
+          hasIssueBadge: hasSecurityIssue,
+        },
+      ],
     },
     {
-      label: "Imports",
-      href: `${base}/imports`,
-      icon: <FileCode size={14} />,
-      count: hasGraph ? depCount : undefined,
-      hint: hasGraph ? undefined : "refresh",
+      // Deep structural inspection of the codebase — the part of the
+      // jury that takes the case apart under the microscope. "Lab"
+      // because Architecture / Canvas / Code / Imports are all
+      // examination instruments rather than administrative offices.
+      title: "Forensics Lab",
+      icon: <Microscope size={12} />,
+      items: [
+        {
+          // v0.70: Architecture tab — first beboer is class diagrams.
+          // Future deeper-intelligence themes (hidden coupling,
+          // knowledge ranking, pattern detection) land here too.
+          label: "Architecture",
+          href: `${base}/architecture`,
+          icon: <Boxes size={14} />,
+          count:
+            hasCodeGraph && classCount > 0 ? classCount : undefined,
+          hint: hasCodeGraph ? undefined : "refresh",
+        },
+        {
+          label: "Canvas",
+          href: `${base}/canvas`,
+          icon: <Network size={14} />,
+        },
+        {
+          label: "Code",
+          href: `${base}/code`,
+          icon: <CodeIcon size={14} />,
+          count: hasCodeGraph ? codeFunctionCount : undefined,
+          hint: hasCodeGraph ? undefined : "refresh",
+        },
+        {
+          label: "Imports",
+          href: `${base}/imports`,
+          icon: <FileCode size={14} />,
+          count: hasGraph ? depCount : undefined,
+          hint: hasGraph ? undefined : "refresh",
+        },
+      ],
     },
     {
-      label: "Code",
-      href: `${base}/code`,
-      icon: <CodeIcon size={14} />,
-      count: hasCodeGraph ? codeFunctionCount : undefined,
-      hint: hasCodeGraph ? undefined : "refresh",
-    },
-    {
-      // v0.70: Architecture tab — first beboer is class diagrams.
-      // Future deeper-intelligence themes (hidden coupling,
-      // knowledge ranking, pattern detection) land here too.
-      label: "Architecture",
-      href: `${base}/architecture`,
-      icon: <Boxes size={14} />,
-      count:
-        hasCodeGraph && classCount > 0 ? classCount : undefined,
-      hint: hasCodeGraph ? undefined : "refresh",
-    },
-    {
-      label: "Packages",
-      href: `${base}/packages`,
-      icon: <Package size={14} />,
-      count: packageCount > 0 ? packageCount : undefined,
-      hasIssueBadge: packageIssues > 0,
-    },
-    {
-      label: "PRs",
-      href: `${base}/prs`,
-      icon: <GitPullRequest size={14} />,
-      count: prCount > 0 ? prCount : undefined,
-      hasNewFeatureBadge: true,
-    },
-    null, // separator
-    {
-      // v0.81+ Security tab — focused security view, complementary
-      // to the Signals tab. Where Signals shows all 20 signals
-      // bucketed by working / needsWork / questions, Security groups
-      // by scanner (supply-chain incidents, secret leakage, dynamic-
-      // execution patterns) with per-finding detail + advisory links.
-      label: "Security",
-      href: `${base}/security`,
-      icon: <Shield size={14} />,
-      hasIssueBadge: hasSecurityIssue,
-    },
-    {
-      // v0.81+ Signals tab — the data behind Health at a Glance.
-      // Surfaces all 20 deterministic signals (working / needsWork /
-      // questions) so devs can drill into specific evidence beyond
-      // the 6 aggregated dimension tiles on the overview.
-      label: "Signals",
-      href: `${base}/signals`,
-      icon: <ListChecks size={14} />,
-    },
-    {
-      label: "Insights",
-      href: `${base}/insights`,
-      icon: <Sparkles size={14} />,
+      // Supply chain and delivery flow — dependencies coming in,
+      // pull requests going out. "Office" because it's the
+      // logistics desk (orders, shipments, paperwork) more than a
+      // bureau or a lab.
+      title: "Supply Office",
+      icon: <Truck size={12} />,
+      items: [
+        {
+          label: "Packages",
+          href: `${base}/packages`,
+          icon: <Package size={14} />,
+          count: packageCount > 0 ? packageCount : undefined,
+          hasIssueBadge: packageIssues > 0,
+        },
+        {
+          label: "PRs",
+          href: `${base}/prs`,
+          icon: <GitPullRequest size={14} />,
+          count: prCount > 0 ? prCount : undefined,
+          hasNewFeatureBadge: true,
+        },
+      ],
     },
   ];
 
@@ -263,40 +313,36 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
           </button>
         </div>
 
-        <span
-          className={`px-2 ${STYLE.eyebrow}`}
-          style={{ color: TOK.textMuted }}
-        >
-          Workspace
-        </span>
-
-        <nav className="flex flex-col gap-0.5 mt-1">
-          {items.map((item, idx) => {
-            if (item === null) {
-              return (
-                <div
-                  key={`sep-${idx}`}
-                  className="h-px my-2 mx-2"
-                  style={{ background: TOK.border }}
-                />
-              );
-            }
-            // Active = exact path match. Sub-routes (e.g. /code with
-            // future ?file=... params) all share the /code segment so
-            // exact-match keeps the Code item highlighted regardless
-            // of query state.
-            const active =
-              item.href === base
-                ? pathname === base
-                : pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <SidebarLink
-                key={item.href}
-                item={item}
-                active={active}
-              />
-            );
-          })}
+        <nav className="flex flex-col gap-3">
+          {departments.map((dept) => (
+            <div key={dept.title} className="flex flex-col gap-0.5">
+              <div
+                className={`flex items-center gap-1.5 px-2 ${STYLE.eyebrow}`}
+                style={{ color: TOK.textMuted }}
+              >
+                <span style={{ color: TOK.textMuted }}>{dept.icon}</span>
+                <span>{dept.title}</span>
+              </div>
+              {dept.items.map((item) => {
+                // Active = exact path match. Sub-routes (e.g. /code
+                // with future ?file=... params) all share the /code
+                // segment so exact-match keeps the item highlighted
+                // regardless of query state.
+                const active =
+                  item.href === base
+                    ? pathname === base
+                    : pathname === item.href ||
+                      pathname.startsWith(`${item.href}/`);
+                return (
+                  <SidebarLink
+                    key={item.href}
+                    item={item}
+                    active={active}
+                  />
+                );
+              })}
+            </div>
+          ))}
         </nav>
       </aside>
 
