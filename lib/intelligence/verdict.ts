@@ -70,6 +70,18 @@ export interface Verdict {
   /** Full label: "Cleared", "Conditional Approval", "Returned for
    *  Revision". */
   outcomeLabel: string;
+  /** 0-100 composite score, summed across the four departments
+   *  (pass = 25, conditional = 15, fail = 5). Designed so that
+   *    100  = all four pass
+   *    >=85 = three pass + one conditional/fail
+   *    60–80 = mixed; one or two flagged offices
+   *    <50  = multiple offices failed
+   *  Mirrors the score-ring + grade letter on the landing page's
+   *  VerdictDoc so the brand promise survives all the way through. */
+  score: number;
+  /** Letter grade derived from `score`. US-school style:
+   *  A / A- / B+ / B / B- / C+ / C / C- / D+ / D / F. */
+  grade: string;
   /** One-sentence deterministic summary, used both as the page lead
    *  when AI is off and as grounding-input for the AI narrative when
    *  ANTHROPIC_API_KEY is set. */
@@ -273,6 +285,50 @@ function rollupOutcome(rulings: DepartmentRuling[]): VerdictOutcome {
   return "conditional";
 }
 
+// ---------------- Score + grade ----------------
+
+/** Points each vote type contributes to the composite score. Chosen
+ *  so that:
+ *    4 × pass         = 100  (cleared, full marks)
+ *    3 × pass + cond  = 90   (still A territory, one office hedged)
+ *    2 × pass + 2c    = 80   (B+ — cracks showing but stable)
+ *    4 × conditional  = 60   (C — caution across the board)
+ *    1 × pass + 3f    = 40   (F — one office holding the line)
+ *    4 × fail         = 20   (deep F, basement floor isn't zero so
+ *                            the score never reads as "no analysis
+ *                            done") */
+const VOTE_POINTS: Record<Vote, number> = {
+  pass: 25,
+  conditional: 15,
+  fail: 5,
+};
+
+/** Sum the four department votes into a 0-100 composite score.
+ *  Range: 20 (all fail) – 100 (all pass). The 20 floor is deliberate:
+ *  a "0" would look like "no data" rather than "every office filed
+ *  serious findings", which is the message we actually want to land. */
+function computeScore(rulings: DepartmentRuling[]): number {
+  return rulings.reduce((sum, r) => sum + VOTE_POINTS[r.vote], 0);
+}
+
+/** Map score → letter grade. Cut-points calibrated against the actual
+ *  reachable score points (which come in 5-point steps since vote
+ *  weights are 25/15/5), so each band corresponds to a real vote
+ *  combination rather than abstract percentile thinking. */
+function scoreToGrade(score: number): string {
+  if (score >= 100) return "A";
+  if (score >= 90) return "A-";
+  if (score >= 80) return "B+";
+  if (score >= 75) return "B";
+  if (score >= 70) return "B-";
+  if (score >= 65) return "C+";
+  if (score >= 60) return "C";
+  if (score >= 55) return "C-";
+  if (score >= 50) return "D+";
+  if (score >= 45) return "D";
+  return "F";
+}
+
 /** Generate the deterministic one-sentence verdict summary. Used as
  *  the lead line when the AI narrative is unavailable and as part of
  *  the grounding payload for verdictNarrative.ts when it is. */
@@ -339,7 +395,9 @@ export function computeVerdict(snap: AnalysisSnapshot): Verdict {
 
   const outcome = rollupOutcome(rulings);
   const outcomeLabel = OUTCOME_LABELS[outcome];
+  const score = computeScore(rulings);
+  const grade = scoreToGrade(score);
   const summary = composeSummary(outcome, rulings);
 
-  return { outcome, outcomeLabel, summary, rulings };
+  return { outcome, outcomeLabel, score, grade, summary, rulings };
 }
