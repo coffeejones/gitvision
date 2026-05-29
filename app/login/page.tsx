@@ -17,7 +17,6 @@ import { CheckCircle2 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { AuthForm } from "@/components/AuthForm";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { TOK } from "@/lib/theme";
 
 export const metadata = {
   title: "Log in — RepoJury",
@@ -53,16 +52,8 @@ export default async function LoginPage({
   return (
     <AuthShell>
       {justReset && (
-        <div
-          className="flex items-center gap-2 rounded-md px-3 py-2 text-xs"
-          style={{
-            background: TOK.accentSoft,
-            border: `1px solid ${TOK.accent}55`,
-            color: TOK.accent,
-          }}
-          role="status"
-        >
-          <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
+        <div className="auth-banner" role="status">
+          <CheckCircle2 size={14} />
           <span>Password updated — sign in with your new password below.</span>
         </div>
       )}

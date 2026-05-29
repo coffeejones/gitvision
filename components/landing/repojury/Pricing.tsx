@@ -6,6 +6,7 @@
 // Server component (no "use client") — the TIER_CONFIG import is
 // safe to evaluate at render time.
 
+import Link from "next/link";
 import { Reveal } from "../Reveal";
 import {
   TIER_CONFIG,
@@ -69,13 +70,13 @@ export function Pricing() {
                     </li>
                   ))}
                 </ul>
-                <a
-                  href="#"
+                <Link
+                  href={`/signup?tier=${tier.id}`}
                   className={`btn ${featured ? "btn-primary" : "btn-ghost"}`}
                   style={{ justifyContent: "center" }}
                 >
                   {TIER_CTAS[tier.id]}
-                </a>
+                </Link>
               </div>
             );
           })}

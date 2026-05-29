@@ -13,7 +13,6 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import { TOK } from "@/lib/theme";
 
 interface Props {
   initial: "monthly" | "annual";
@@ -36,62 +35,22 @@ export function PricingBillingToggle({ initial }: Props) {
   }
 
   return (
-    <div
-      className="inline-flex items-center p-1 rounded-lg"
-      style={{
-        background: "rgba(255, 255, 255, 0.04)",
-        border: `1px solid ${TOK.border}`,
-      }}
-    >
-      <ToggleButton
-        active={billing === "monthly"}
+    <div className="price-toggle">
+      <button
+        type="button"
+        className={billing === "monthly" ? "on" : undefined}
         onClick={() => setMode("monthly")}
-        label="Monthly"
-      />
-      <ToggleButton
-        active={billing === "annual"}
+      >
+        Monthly
+      </button>
+      <button
+        type="button"
+        className={billing === "annual" ? "on" : undefined}
         onClick={() => setMode("annual")}
-        label="Annual"
-        badge="Save 17%"
-      />
+      >
+        Annual
+        <span className="tg-badge">Save 17%</span>
+      </button>
     </div>
-  );
-}
-
-function ToggleButton({
-  active,
-  onClick,
-  label,
-  badge,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  badge?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-2 px-4 h-9 rounded-md text-sm transition"
-      style={{
-        background: active ? TOK.textPrimary : "transparent",
-        color: active ? TOK.bg : TOK.textSecondary,
-        fontWeight: active ? 500 : 400,
-      }}
-    >
-      <span>{label}</span>
-      {badge && (
-        <span
-          className="text-[10px] uppercase tracking-[0.12em] font-medium px-1.5 py-0.5 rounded"
-          style={{
-            background: active ? TOK.bg : TOK.accentSoft,
-            color: active ? TOK.accent : TOK.accent,
-          }}
-        >
-          {badge}
-        </span>
-      )}
-    </button>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-// Reset-password form (v0.76 / Phase D3).
+// Reset-password form (v0.76 / Phase D3; restyled forensic-dossier
+// in Phase M).
 //
 // Receives a `token` query param from the email link. Posts the new
 // password + token to Better Auth's resetPassword endpoint. On success
@@ -10,12 +11,13 @@
 // The token validation lives entirely on Better Auth's side (signed,
 // single-use, 1h expiry). If it's invalid we surface the API error
 // and let the user click "Request a new link" to start over.
+//
+// Styling: `.rj auth-*` classes shared with AuthForm.
 
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle } from "lucide-react";
-import { TOK } from "@/lib/theme";
 import { authClient } from "@/lib/authClient";
 
 interface Props {
@@ -91,40 +93,21 @@ export function ResetPasswordForm({ token }: Props) {
   const submitting = status.kind === "submitting";
 
   return (
-    <div
-      className="w-full max-w-md rounded-2xl flex flex-col gap-5 p-7"
-      style={{
-        background: TOK.surface,
-        border: `1px solid ${TOK.border}`,
-      }}
-    >
-      <header className="flex flex-col gap-1">
-        <h1
-          className="text-xl font-semibold"
-          style={{ color: TOK.textPrimary }}
-        >
-          Set a new password
-        </h1>
-        <p className="text-xs" style={{ color: TOK.textMuted }}>
-          Choose a password you don&rsquo;t use elsewhere.
-        </p>
-      </header>
+    <div className="auth-card">
+      <div className="case-tag">
+        <span className="dot" /> New credentials
+      </div>
+      <h1>Set a new password</h1>
+      <p className="sub">Choose a password you don&rsquo;t use elsewhere.</p>
 
       {status.kind === "error" && (
-        <div
-          className="flex items-start gap-2 rounded-md px-3 py-2 text-xs"
-          style={{
-            background: `${TOK.rose}1a`,
-            border: `1px solid ${TOK.rose}55`,
-            color: TOK.rose,
-          }}
-        >
-          <AlertCircle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+        <div className="auth-err">
+          <AlertCircle size={14} />
           <span>{status.message}</span>
         </div>
       )}
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-3">
+      <form onSubmit={onSubmit}>
         <PasswordField
           label="New password"
           hint="At least 8 characters"
@@ -144,26 +127,15 @@ export function ResetPasswordForm({ token }: Props) {
         <button
           type="submit"
           disabled={submitting || !password || !confirmPassword}
-          className="mt-1 h-10 rounded-md text-sm font-medium transition flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer hover:brightness-110"
-          style={{
-            background: TOK.accent,
-            color: TOK.accentOn,
-          }}
+          className="auth-submit"
         >
-          {submitting && <Loader2 size={14} className="animate-spin" />}
+          {submitting && <Loader2 size={14} className="auth-spin" />}
           {submitting ? "Saving…" : "Update password"}
         </button>
       </form>
 
-      <p className="text-xs text-center" style={{ color: TOK.textMuted }}>
-        Don&rsquo;t want to reset?{" "}
-        <Link
-          href="/login"
-          className="font-medium hover:underline"
-          style={{ color: TOK.accent }}
-        >
-          Back to log in
-        </Link>
+      <p className="auth-switch">
+        Don&rsquo;t want to reset? <Link href="/login">Back to sign in</Link>
       </p>
     </div>
   );
@@ -185,19 +157,10 @@ function PasswordField({
   autoComplete: string;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between">
-        <label
-          className="text-[11px] uppercase tracking-[0.08em] font-semibold"
-          style={{ color: TOK.textMuted }}
-        >
-          {label}
-        </label>
-        {hint && (
-          <span className="text-[11px]" style={{ color: TOK.textMuted }}>
-            {hint}
-          </span>
-        )}
+    <div className="auth-field">
+      <div className="row">
+        <label className="auth-label">{label}</label>
+        {hint && <span className="auth-hint">{hint}</span>}
       </div>
       <input
         type="password"
@@ -207,12 +170,7 @@ function PasswordField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="w-full h-9 rounded-md px-3 text-sm outline-none"
-        style={{
-          background: TOK.surfaceElevated,
-          border: `1px solid ${TOK.border}`,
-          color: TOK.textPrimary,
-        }}
+        className="auth-input"
       />
     </div>
   );
@@ -220,30 +178,16 @@ function PasswordField({
 
 function MissingTokenState() {
   return (
-    <div
-      className="w-full max-w-md rounded-2xl flex flex-col gap-4 p-7"
-      style={{
-        background: TOK.surface,
-        border: `1px solid ${TOK.border}`,
-      }}
-    >
-      <h1
-        className="text-xl font-semibold"
-        style={{ color: TOK.textPrimary }}
-      >
-        This link is incomplete
-      </h1>
-      <p className="text-sm" style={{ color: TOK.textSecondary }}>
-        We need a valid reset token to update your password. Request a
-        fresh link from the forgot-password page.
+    <div className="auth-card">
+      <h1>This link is incomplete</h1>
+      <p className="sub">
+        We need a valid reset token to update your password. Request a fresh
+        link from the forgot-password page.
       </p>
       <Link
         href="/forgot-password"
-        className="mt-2 h-10 px-4 rounded-md text-sm font-medium transition flex items-center justify-center cursor-pointer hover:brightness-110"
-        style={{
-          background: TOK.accent,
-          color: TOK.accentOn,
-        }}
+        className="auth-submit"
+        style={{ textDecoration: "none" }}
       >
         Request a new reset link
       </Link>

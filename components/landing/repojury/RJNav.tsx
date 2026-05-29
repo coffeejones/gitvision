@@ -4,6 +4,7 @@
 // scrolled (same pattern as the old Codomap Nav, but scoped under .rj).
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { CrestSeal } from "./seals";
 
 export function RJNav() {
@@ -30,9 +31,9 @@ export function RJNav() {
         <a href="#custody">Chain of custody</a>
         <a href="#pricing">Pricing</a>
       </div>
-      <a href="#" className="btn btn-primary">
+      <Link href="/signup" className="btn btn-primary">
         Open a case
-      </a>
+      </Link>
     </nav>
   );
 }

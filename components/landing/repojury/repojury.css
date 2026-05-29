@@ -243,6 +243,112 @@
 .rj .tier li svg{flex:none;margin-top:3px;color:var(--brass)}
 .rj .feat-badge{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;color:var(--brass);text-transform:uppercase;margin-bottom:14px}
 
+/* PRICING PAGE (the standalone /pricing route — extends the landing's
+   tier cards with a billing toggle, savings note, CTA, and a feature
+   comparison table). */
+.rj .price-page{padding:118px 0 90px}
+.rj .price-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:18px;margin-bottom:42px}
+.rj .price-hero h1{font-family:var(--font-display);font-weight:600;font-size:clamp(34px,4.4vw,54px);
+  line-height:1.04;letter-spacing:-.025em;color:var(--bone);max-width:18ch}
+.rj .price-hero .lede{max-width:60ch}
+.rj .price-toggle{display:inline-flex;align-items:center;gap:4px;padding:5px;border-radius:12px;
+  background:rgba(233,229,216,.04);border:1px solid var(--line);margin:0 auto 38px}
+.rj .price-toggle button{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 18px;border:none;
+  border-radius:8px;cursor:pointer;font-family:var(--font-body);font-size:13.5px;background:transparent;
+  color:var(--bone-dim);transition:background .2s,color .2s}
+.rj .price-toggle button.on{background:var(--brass);color:#1a1407;font-weight:600}
+.rj .price-toggle .tg-badge{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:2px 6px;border-radius:5px;background:rgba(201,162,39,.16);color:var(--brass-lt)}
+.rj .price-toggle button.on .tg-badge{background:rgba(26,20,7,.22);color:#1a1407}
+.rj .price-note{font-size:11.5px;margin-top:2px}
+.rj .price-note.save{color:var(--cleared)}
+.rj .price-note.muted{color:var(--bone-faint)}
+.rj .tier .price span.per{font-size:14px;color:var(--bone-faint);font-family:var(--font-body);font-weight:400}
+.rj .tier-cta{margin:18px 0 4px}
+.rj .tier-cta .err{font-size:11.5px;color:var(--flagged);margin-top:7px}
+.rj .ribbon{position:absolute;top:-11px;left:30px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.14em;
+  text-transform:uppercase;padding:3px 9px;border-radius:5px;background:var(--brass);color:#1a1407;font-weight:600}
+.rj .tier{position:relative}
+
+/* FEATURE COMPARISON */
+.rj .cmp{margin-top:64px}
+.rj .cmp-head{margin-bottom:26px}
+.rj .cmp table{width:100%;border-collapse:collapse}
+.rj .cmp th,.rj .cmp td{text-align:center;padding:13px 10px;border-bottom:1px solid var(--line);font-size:13.5px}
+.rj .cmp th{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--bone-dim);font-weight:500}
+.rj .cmp td:first-child,.rj .cmp th:first-child{text-align:left;color:var(--bone-dim);width:42%}
+.rj .cmp .yes{color:var(--cleared)}
+.rj .cmp .no{color:var(--bone-faint)}
+.rj .cmp tr:last-child td{border-bottom:none}
+
+/* AUTH — split layout: brand tease (left, desktop) + focused form
+   (right). Form stays noir with brass accents so it reads as part
+   of the records office, not a generic SaaS login. */
+.rj .auth-wrap{min-height:100vh;display:grid;grid-template-columns:5fr 6fr}
+@media(max-width:860px){.rj .auth-wrap{grid-template-columns:1fr}}
+.rj .auth-brand{display:none;position:relative;padding:56px 56px 48px;border-right:1px solid var(--line);
+  flex-direction:column;justify-content:space-between}
+@media(min-width:861px){.rj .auth-brand{display:flex}}
+.rj .auth-brand .brand{font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--bone);
+  display:flex;align-items:center;gap:11px}
+.rj .auth-tease h2{font-family:var(--font-display);font-weight:600;font-size:clamp(28px,2.6vw,38px);
+  line-height:1.06;letter-spacing:-.02em;color:var(--bone);margin-bottom:18px;max-width:14ch}
+.rj .auth-tease p{color:var(--bone-dim);font-size:15px;line-height:1.6;max-width:42ch}
+.rj .auth-points{list-style:none;margin:26px 0 0;padding:0;display:flex;flex-direction:column;gap:13px}
+.rj .auth-points li{display:flex;align-items:flex-start;gap:11px;font-size:14px;color:var(--bone-dim)}
+.rj .auth-points li svg{flex:none;margin-top:2px;color:var(--brass)}
+.rj .auth-foot{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;color:var(--bone-faint)}
+.rj .auth-col{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;
+  background:var(--noir-850)}
+.rj .auth-col .brand-mobile{display:flex;align-items:center;gap:10px;font-family:var(--font-display);
+  font-weight:600;font-size:18px;color:var(--bone);margin-bottom:28px}
+@media(min-width:861px){.rj .auth-col .brand-mobile{display:none}}
+.rj .auth-card{width:100%;max-width:418px;border:1px solid var(--line);border-radius:16px;padding:30px;
+  background:linear-gradient(180deg,rgba(233,229,216,.04),transparent)}
+.rj .auth-card .case-tag{font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;color:var(--bone-faint);
+  text-transform:uppercase;display:flex;align-items:center;gap:9px;margin-bottom:14px}
+.rj .auth-card .case-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--cleared);box-shadow:0 0 9px var(--cleared)}
+.rj .auth-card h1{font-family:var(--font-display);font-weight:600;font-size:25px;letter-spacing:-.01em;
+  color:var(--bone);margin-bottom:6px}
+.rj .auth-card .sub{font-size:13.5px;color:var(--bone-dim);margin-bottom:22px;line-height:1.5}
+.rj .auth-oauth{width:100%;height:44px;display:flex;align-items:center;justify-content:center;gap:9px;
+  border-radius:11px;border:1px solid var(--line);background:rgba(233,229,216,.04);color:var(--bone);
+  font-family:var(--font-body);font-weight:600;font-size:14px;cursor:pointer;transition:border-color .2s,background .2s}
+.rj .auth-oauth:hover:not(:disabled){border-color:rgba(201,162,39,.45);background:rgba(201,162,39,.06)}
+.rj .auth-oauth:disabled{opacity:.5;cursor:default}
+.rj .auth-or{display:flex;align-items:center;gap:12px;margin:18px 0;
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--bone-faint)}
+.rj .auth-or::before,.rj .auth-or::after{content:"";flex:1;height:1px;background:var(--line)}
+.rj .auth-field{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
+.rj .auth-field .row{display:flex;align-items:baseline;justify-content:space-between}
+.rj .auth-label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--bone-faint)}
+.rj .auth-hint{font-size:11px;color:var(--bone-faint)}
+.rj .auth-hint a{color:var(--brass);text-decoration:none}
+.rj .auth-hint a:hover{text-decoration:underline}
+.rj .auth-input{width:100%;height:42px;border-radius:11px;padding:0 13px;
+  background:rgba(0,0,0,.25);border:1px solid var(--line);color:var(--bone);
+  font-family:var(--font-mono);font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
+.rj .auth-input::placeholder{color:var(--bone-faint)}
+.rj .auth-input:focus{border-color:rgba(16,185,129,.5);box-shadow:0 0 0 4px rgba(16,185,129,.1)}
+.rj .auth-submit{width:100%;height:44px;margin-top:6px;border:none;border-radius:11px;cursor:pointer;
+  font-family:var(--font-body);font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;
+  background:linear-gradient(180deg,#16d39a,#0fa97a);color:#04130d;
+  box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 10px 30px -12px rgba(16,185,129,.5);transition:transform .15s,box-shadow .2s}
+.rj .auth-submit:hover:not(:disabled){transform:translateY(-1px)}
+.rj .auth-submit:disabled{opacity:.4;cursor:default}
+.rj .auth-err{display:flex;align-items:flex-start;gap:8px;border-radius:10px;padding:10px 12px;margin-bottom:16px;
+  font-size:12.5px;color:#f0b3b5;background:rgba(229,72,77,.1);border:1px solid rgba(229,72,77,.4)}
+.rj .auth-err svg{flex:none;margin-top:1px}
+.rj .auth-switch{margin-top:18px;text-align:center;font-size:13px;color:var(--bone-dim)}
+.rj .auth-switch a{color:var(--brass);font-weight:500;text-decoration:none}
+.rj .auth-switch a:hover{text-decoration:underline}
+.rj .auth-banner{display:flex;align-items:flex-start;gap:9px;width:100%;max-width:418px;border-radius:11px;
+  padding:11px 13px;margin-bottom:16px;font-size:13px;color:var(--cleared);
+  background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.35)}
+.rj .auth-banner svg{flex:none;margin-top:1px}
+.rj .auth-spin{animation:rj-spin 1s linear infinite}
+@keyframes rj-spin{to{transform:rotate(360deg)}}
+
 /* FOOTER */
 .rj footer{border-top:1px solid var(--line);margin-top:40px;padding:50px 0 40px}
 .rj .foot{display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}

@@ -15,7 +15,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { TOK } from "@/lib/theme";
 
 interface Props {
   tierId: "open-case" | "standing-docket" | "full-bench";
@@ -45,7 +44,7 @@ export function CheckoutCTA({
 
     // Open case — straight to signup, no checkout needed
     if (!isPaid) {
-      router.push("/signup?tier=scout");
+      router.push("/signup?tier=open-case");
       return;
     }
 
@@ -91,30 +90,18 @@ export function CheckoutCTA({
       : "Start free";
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="tier-cta">
       <button
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className="inline-flex items-center justify-center h-11 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed mt-1"
-        style={{
-          background: isPrimary
-            ? TOK.textPrimary
-            : "rgba(255, 255, 255, 0.04)",
-          color: isPrimary ? TOK.bg : TOK.textPrimary,
-          border: isPrimary
-            ? "none"
-            : `1px solid rgba(255, 255, 255, 0.1)`,
-        }}
+        className={`btn ${isPrimary ? "btn-primary" : "btn-ghost"}`}
+        style={{ width: "100%", justifyContent: "center" }}
       >
         {label}
       </button>
       {error && (
-        <p
-          className="text-xs"
-          style={{ color: TOK.rose }}
-          role="alert"
-        >
+        <p className="err" role="alert">
           {error}
         </p>
       )}

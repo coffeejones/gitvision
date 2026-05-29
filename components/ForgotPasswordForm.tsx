@@ -1,6 +1,7 @@
 "use client";
 
-// Forgot-password form (v0.76 / Phase D3).
+// Forgot-password form (v0.76 / Phase D3; restyled forensic-dossier
+// in Phase M).
 //
 // One field (email) → POST through Better Auth's forgetPassword
 // endpoint → Better Auth fires our sendResetPassword callback →
@@ -12,11 +13,13 @@
 // are signed up. Better Auth handles this server-side too, but mirror-
 // ing the message client-side keeps the leak from happening even on
 // error responses.
+//
+// Styling: `.rj auth-*` classes (shared with AuthForm) so the page
+// matches the records-office aesthetic.
 
 import { useState } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, MailCheck } from "lucide-react";
-import { TOK } from "@/lib/theme";
 import { authClient } from "@/lib/authClient";
 
 type Status =
@@ -58,51 +61,37 @@ export function ForgotPasswordForm() {
 
   if (status.kind === "sent") {
     return (
-      <div
-        className="w-full max-w-md rounded-2xl flex flex-col gap-4 p-7 items-center text-center"
-        style={{
-          background: TOK.surface,
-          border: `1px solid ${TOK.border}`,
-        }}
-      >
+      <div className="auth-card" style={{ textAlign: "center" }}>
         <div
-          className="w-12 h-12 rounded-full flex items-center justify-center"
           style={{
-            background: TOK.accentSoft,
-            color: TOK.accent,
+            width: 48,
+            height: 48,
+            borderRadius: "50%",
+            margin: "0 auto 4px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(16,185,129,.1)",
+            color: "var(--cleared)",
           }}
         >
-          <MailCheck size={28} />
+          <MailCheck size={26} />
         </div>
-        <h1
-          className="text-xl font-semibold"
-          style={{ color: TOK.textPrimary }}
-        >
-          Check your inbox
-        </h1>
-        <p
-          className="text-sm leading-relaxed"
-          style={{ color: TOK.textSecondary }}
-        >
+        <h1>Check your inbox</h1>
+        <p className="sub">
           If an account exists for <strong>{email.trim()}</strong>, we&rsquo;ve
           sent a password-reset link. It&rsquo;s valid for 1 hour.
         </p>
-        <p className="text-xs" style={{ color: TOK.textMuted }}>
-          Didn&rsquo;t get it? Check your spam folder, or{" "}
-          <button
-            type="button"
+        <p className="auth-switch" style={{ marginTop: 0 }}>
+          Didn&rsquo;t get it? Check spam, or{" "}
+          <a
+            role="button"
+            tabIndex={0}
             onClick={() => setStatus({ kind: "idle" })}
-            className="font-medium hover:underline"
-            style={{
-              color: TOK.accent,
-              background: "transparent",
-              border: 0,
-              padding: 0,
-              cursor: "pointer",
-            }}
+            style={{ cursor: "pointer" }}
           >
             try a different email
-          </button>
+          </a>
           .
         </p>
       </div>
@@ -112,48 +101,28 @@ export function ForgotPasswordForm() {
   const submitting = status.kind === "submitting";
 
   return (
-    <div
-      className="w-full max-w-md rounded-2xl flex flex-col gap-5 p-7"
-      style={{
-        background: TOK.surface,
-        border: `1px solid ${TOK.border}`,
-      }}
-    >
-      <header className="flex flex-col gap-1">
-        <h1
-          className="text-xl font-semibold"
-          style={{ color: TOK.textPrimary }}
-        >
-          Reset your password
-        </h1>
-        <p className="text-xs" style={{ color: TOK.textMuted }}>
-          Enter the email you signed up with. We&rsquo;ll send a link to
-          set a new password.
-        </p>
-      </header>
+    <div className="auth-card">
+      <div className="case-tag">
+        <span className="dot" /> Case recovery
+      </div>
+      <h1>Reset your password</h1>
+      <p className="sub">
+        Enter the email you signed up with. We&rsquo;ll send a link to set a
+        new password.
+      </p>
 
       {status.kind === "error" && (
-        <div
-          className="flex items-start gap-2 rounded-md px-3 py-2 text-xs"
-          style={{
-            background: `${TOK.rose}1a`,
-            border: `1px solid ${TOK.rose}55`,
-            color: TOK.rose,
-          }}
-        >
-          <AlertCircle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+        <div className="auth-err">
+          <AlertCircle size={14} />
           <span>{status.message}</span>
         </div>
       )}
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1.5">
-          <label
-            className="text-[11px] uppercase tracking-[0.08em] font-semibold"
-            style={{ color: TOK.textMuted }}
-          >
-            Email
-          </label>
+      <form onSubmit={onSubmit}>
+        <div className="auth-field">
+          <div className="row">
+            <label className="auth-label">Email</label>
+          </div>
           <input
             type="email"
             required
@@ -162,38 +131,22 @@ export function ForgotPasswordForm() {
             onChange={(e) => setEmail(e.target.value)}
             disabled={submitting}
             placeholder="you@example.com"
-            className="w-full h-9 rounded-md px-3 text-sm outline-none"
-            style={{
-              background: TOK.surfaceElevated,
-              border: `1px solid ${TOK.border}`,
-              color: TOK.textPrimary,
-            }}
+            className="auth-input"
           />
         </div>
 
         <button
           type="submit"
           disabled={submitting || !email.trim()}
-          className="mt-1 h-10 rounded-md text-sm font-medium transition flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer hover:brightness-110"
-          style={{
-            background: TOK.accent,
-            color: TOK.accentOn,
-          }}
+          className="auth-submit"
         >
-          {submitting && <Loader2 size={14} className="animate-spin" />}
+          {submitting && <Loader2 size={14} className="auth-spin" />}
           {submitting ? "Sending…" : "Send reset link"}
         </button>
       </form>
 
-      <p className="text-xs text-center" style={{ color: TOK.textMuted }}>
-        Remembered it?{" "}
-        <Link
-          href="/login"
-          className="font-medium hover:underline"
-          style={{ color: TOK.accent }}
-        >
-          Back to log in
-        </Link>
+      <p className="auth-switch">
+        Remembered it? <Link href="/login">Back to sign in</Link>
       </p>
     </div>
   );
