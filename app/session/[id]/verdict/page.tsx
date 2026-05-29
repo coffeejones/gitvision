@@ -10,11 +10,11 @@
 // (DepartmentRulingCard) so the user can see what each office found
 // and where to dig deeper.
 //
-// Phase C-1 ships the deterministic path only. Phase C-2 will add an
-// AI judge's-statement narrative on top of the deterministic
-// summary, grounded in the same Verdict object so every claim is
-// auditable. Knight-tier gate identical to /insights — the
-// deterministic verdict stays free forever.
+// Phase C-2 layers an AI judge's bench statement (JudgeStatement)
+// between the hero and the department rulings, grounded entirely in
+// the deterministic Verdict object so every claim is auditable.
+// Knight-tier gate identical to /insights — the deterministic
+// verdict stays free forever; the bench statement requires Knight.
 //
 // Server-rendered. The verdict is a pure function of the snapshot
 // so server-rendering keeps the page fast + cache-friendly. No
@@ -24,10 +24,14 @@
 
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
+import { getAuthSession } from "@/lib/authSession";
+import { canAccess } from "@/lib/billing/gates";
 import { computeVerdict } from "@/lib/intelligence/verdict";
+import { generateVerdictNarrative } from "@/lib/intelligence/verdictNarrative";
 import { TOK } from "@/lib/theme";
 import { VerdictHero } from "@/components/views/verdict/VerdictHero";
 import { DepartmentRulingCard } from "@/components/views/verdict/DepartmentRulingCard";
+import { JudgeStatement } from "@/components/views/verdict/JudgeStatement";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +47,19 @@ export default async function VerdictRoute({
   const latest = session.snapshots[session.snapshots.length - 1];
   const verdict = computeVerdict(latest);
   const sessionBase = `/session/${session.id}`;
+
+  // Tier gate: AI bench statement is a Knight-tier feature (same gate
+  // as /insights). Scout users still see the deterministic verdict
+  // hero + department rulings — only the AI prose layer is hidden.
+  // Skip the Anthropic call entirely for free users so we don't
+  // burn tokens on impressions that won't see the output.
+  const authSession = await getAuthSession();
+  const hasAi = authSession
+    ? await canAccess(authSession.user.id, "aiInsights")
+    : false;
+  const narrative = hasAi
+    ? await generateVerdictNarrative(verdict, latest.repo.fullName)
+    : null;
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-5xl mx-auto w-full">
@@ -75,6 +92,15 @@ export default async function VerdictRoute({
       </header>
 
       <VerdictHero verdict={verdict} />
+
+      {/* AI bench statement, when available. Knight-tier gated +
+          conditional on ANTHROPIC_API_KEY being set. Renders nothing
+          for Scout users or when the AI feature is off — the
+          deterministic verdict on the hero above carries the page on
+          its own. */}
+      {narrative && (
+        <JudgeStatement text={narrative.text} model={narrative.model} />
+      )}
 
       <section className="flex flex-col gap-4">
         <span

@@ -227,16 +227,15 @@ describe("computeVerdict · Security Bureau", () => {
     const v = computeVerdict(
       snap({
         secretFindings: {
-          scannedAt: "2026-05-06T00:00:00Z",
-          scannedFileCount: 100,
+          filesScanned: 100,
           findings: [
             {
-              file: "src/config.ts",
+              filePath: "src/config.ts",
               line: 12,
-              ruleId: "aws-access-key",
-              ruleLabel: "AWS Access Key",
+              patternId: "aws-access-key",
+              patternLabel: "AWS Access Key",
               severity: "high",
-              snippet: "AKIA****",
+              preview: "AKIA****",
               confidence: 0.95,
             },
           ],
@@ -251,16 +250,15 @@ describe("computeVerdict · Security Bureau", () => {
     const v = computeVerdict(
       snap({
         secretFindings: {
-          scannedAt: "2026-05-06T00:00:00Z",
-          scannedFileCount: 100,
+          filesScanned: 100,
           findings: [
             {
-              file: "src/config.ts",
+              filePath: "src/config.ts",
               line: 12,
-              ruleId: "stripe-live-key",
-              ruleLabel: "Stripe Live Key",
+              patternId: "stripe-live-key",
+              patternLabel: "Stripe Live Key",
               severity: "critical",
-              snippet: "sk_live_****",
+              preview: "sk_live_****",
               confidence: 0.99,
             },
           ],
@@ -275,16 +273,15 @@ describe("computeVerdict · Security Bureau", () => {
     const v = computeVerdict(
       snap({
         secretFindings: {
-          scannedAt: "2026-05-06T00:00:00Z",
-          scannedFileCount: 100,
+          filesScanned: 100,
           findings: [
             {
-              file: "src/test.ts",
+              filePath: "src/test.ts",
               line: 4,
-              ruleId: "generic-token",
-              ruleLabel: "Generic Token",
+              patternId: "generic-token",
+              patternLabel: "Generic Token",
               severity: "medium",
-              snippet: "token=****",
+              preview: "token=****",
               confidence: 0.6,
             },
           ],
