@@ -28,6 +28,7 @@ import {
   Code as CodeIcon,
   FileCode,
   Fingerprint,
+  Gavel,
   GitPullRequest,
   Home,
   ListChecks,
@@ -344,6 +345,13 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
             </div>
           ))}
         </nav>
+
+        {/* Final Verdict — the climax button. Pinned to the bottom of
+            the sidebar (mt-auto) so it reads as the "submit your
+            findings" action after the user has visited the
+            departments. Styled as a primary action rather than a
+            sidebar link to differentiate it from the per-tab nav. */}
+        <VerdictPin base={base} pathname={pathname} />
       </aside>
 
       <main className="flex-1 min-w-0">{children}</main>
@@ -414,6 +422,53 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
         </span>
       )}
     </Link>
+  );
+}
+
+/** Final Verdict pin — the climax button at the bottom of the
+ *  sidebar (v0.82+, Phase C). Visually distinct from the per-tab
+ *  sidebar links: outlined card with gavel icon + bold label rather
+ *  than a thin nav row. Pinned to the bottom via `mt-auto` so it
+ *  reads as "submit your findings" after the user has walked through
+ *  the four departments. */
+function VerdictPin({
+  base,
+  pathname,
+}: {
+  base: string;
+  pathname: string;
+}) {
+  const href = `${base}/verdict`;
+  const active = pathname === href || pathname.startsWith(`${href}/`);
+
+  return (
+    <div className="mt-auto pt-4">
+      <Link
+        href={href}
+        className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition"
+        style={{
+          background: active ? TOK.accent : TOK.surface,
+          border: `1px solid ${active ? TOK.accent : TOK.border}`,
+          color: active ? TOK.accentOn : TOK.textPrimary,
+        }}
+        onMouseEnter={(e) => {
+          if (!active) {
+            e.currentTarget.style.borderColor = TOK.borderStrong;
+            e.currentTarget.style.background = TOK.surfaceElevated;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!active) {
+            e.currentTarget.style.borderColor = TOK.border;
+            e.currentTarget.style.background = TOK.surface;
+          }
+        }}
+        title="See the four departments' combined ruling"
+      >
+        <Gavel size={14} style={{ color: active ? TOK.accentOn : TOK.accent }} />
+        <span className="text-sm font-medium flex-1">Final Verdict</span>
+      </Link>
+    </div>
   );
 }
 

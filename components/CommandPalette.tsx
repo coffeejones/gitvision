@@ -35,6 +35,7 @@ import {
   Boxes,
   Code as CodeIcon,
   FileCode,
+  Gavel,
   GitPullRequest,
   Hash,
   Home,
@@ -98,6 +99,9 @@ export function CommandPalette({ sessionId, snapshot, open, onClose }: Props) {
       // Supply Office
       { id: "p:packages", group: "pages", label: "Packages", icon: <Package size={13} />, href: `${base}/packages` },
       { id: "p:prs", group: "pages", label: "PRs", icon: <GitPullRequest size={13} />, href: `${base}/prs` },
+      // Final Verdict — climax page; lives outside the departments
+      // grouping but is still a navigable workspace destination.
+      { id: "p:verdict", group: "pages", label: "Final Verdict", icon: <Gavel size={13} />, href: `${base}/verdict` },
     ];
 
     const cg = snapshot.codeGraph;
