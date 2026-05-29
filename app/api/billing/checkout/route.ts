@@ -14,7 +14,7 @@ import { auth } from "@/lib/auth";
 import { createCheckoutSession } from "@/lib/billing/polar";
 import type { Tier } from "@/components/TierIcon";
 
-const VALID_TIERS: Tier[] = ["knight", "baron"];
+const VALID_TIERS: Tier[] = ["standing-docket", "full-bench"];
 const VALID_BILLING = ["monthly", "annual"] as const;
 
 export async function POST(req: Request) {
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
 
   try {
     const checkout = await createCheckoutSession({
-      tier: tier as Exclude<Tier, "scout">,
+      tier: tier as Exclude<Tier, "open-case">,
       billing: billing as "monthly" | "annual",
       userId: session.user.id,
       userEmail: session.user.email,

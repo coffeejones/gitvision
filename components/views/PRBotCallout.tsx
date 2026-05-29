@@ -27,14 +27,14 @@ const LEARN_MORE_URL =
   "https://github.com/coffeejones/repobaron#pr-bot-github-app";
 
 interface Props {
-  /** Subscription tier of the viewing user. Scout sees an upgrade
-   *  prompt instead of the Install CTA — bot install is a Knight+
+  /** Subscription tier of the viewing user. Open case sees an upgrade
+   *  prompt instead of the Install CTA — bot install is a Standing docket+
    *  feature. */
   userTier: Tier;
 }
 
 export function PRBotCallout({ userTier }: Props) {
-  const canInstall = userTier !== "scout";
+  const canInstall = userTier !== "open-case";
   return (
     <section
       className="flex flex-col gap-5 pt-8 mt-2"
@@ -146,8 +146,8 @@ export function PRBotCallout({ userTier }: Props) {
             </ol>
           </div>
 
-          {/* CTA row — primary install for Knight+ / upgrade-prompt
-           *  for Scout. Secondary learn-more link is the same for both. */}
+          {/* CTA row — primary install for Standing docket+ / upgrade-prompt
+           *  for Open case. Secondary learn-more link is the same for both. */}
           <div className="flex items-center gap-3 flex-wrap pt-1">
             {canInstall ? (
               <a

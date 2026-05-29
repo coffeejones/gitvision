@@ -11,7 +11,8 @@
 //   2. Mirror the change in Polar.sh dashboard (product + price)
 //   3. Re-deploy — no other code changes required
 //
-// To add a new tier (e.g. "Earl" or "Duke"):
+// To add a new tier (e.g. "Daily docket" between Open case and
+// Standing docket):
 //   1. Add it to the Tier union type in components/TierIcon.tsx
 //   2. Add a lucide-react icon mapping in TierIcon.tsx
 //   3. Add an entry to TIER_CONFIG here
@@ -75,10 +76,10 @@ export interface TierConfig {
 export const TRIAL_DAYS = 14;
 
 export const TIER_CONFIG: Record<Tier, TierConfig> = {
-  scout: {
-    id: "scout",
-    name: "Scout",
-    tagline: "Try it on a public repo. No card required.",
+  "open-case": {
+    id: "open-case",
+    name: "Open case",
+    tagline: "For a one-off look. No card required.",
     monthlyPriceUsd: 0,
     annualPriceUsd: 0,
     polarProductIdMonthly: "",
@@ -97,19 +98,19 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       apiAccess: false,
     },
     featureBullets: [
-      "1 saved session at a time",
+      "One case at a time",
       "Public repos only",
       "5 refreshes per day",
-      "Canvas, Code, Packages, Imports, PRs",
+      "Full verdict + all exhibits",
       "Deterministic Health Summary (20 signals)",
       "Browse all demo repos",
     ],
     isRecommended: false,
   },
-  knight: {
-    id: "knight",
-    name: "Knight",
-    tagline: "Capable analysis for serious work.",
+  "standing-docket": {
+    id: "standing-docket",
+    name: "Standing docket",
+    tagline: "For repos you live in.",
     monthlyPriceUsd: 14.99,
     annualPriceUsd: 149.99,
     polarProductIdMonthly: "e4a98280-2920-41b9-af24-f713841b22f6",
@@ -128,20 +129,19 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       apiAccess: false,
     },
     featureBullets: [
-      "Unlimited saved sessions",
-      "Public + private repos",
-      "Unlimited refreshes",
-      "AI Briefing + Health Check verdict",
+      "Unlimited private repos",
+      "Re-runs + “since last visit” diffs",
+      "AI Briefing + bench statement",
       "Architecture diagrams (auto class extraction)",
       "Structural diff between snapshots",
-      "PR-bot on 5 repos",
+      "Verdict watch on every PR (5 repos)",
     ],
     isRecommended: true,
   },
-  baron: {
-    id: "baron",
-    name: "Baron",
-    tagline: "Master every repo you touch.",
+  "full-bench": {
+    id: "full-bench",
+    name: "Full bench",
+    tagline: "For the whole org.",
     monthlyPriceUsd: 39,
     annualPriceUsd: 390,
     polarProductIdMonthly: "feabdb6f-55e1-4e3a-94a5-bd0c3ae609a3",
@@ -160,8 +160,8 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       apiAccess: true,
     },
     featureBullets: [
-      "Everything in Knight",
-      "PR-bot on unlimited repos",
+      "Everything in Standing docket",
+      "Verdict watch on unlimited repos",
       "Team workspaces (multi-user)",
       "Priority support",
       "Early access to new features",
@@ -171,8 +171,8 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
   },
 };
 
-/** Ordered list for rendering — Scout first, then up through Baron. */
-export const TIER_ORDER: Tier[] = ["scout", "knight", "baron"];
+/** Ordered list for rendering — Open case first, then up through Full bench. */
+export const TIER_ORDER: Tier[] = ["open-case", "standing-docket", "full-bench"];
 
 /** Convenience helper for annual savings display. Returns absolute
  *  savings in USD when paying annually vs 12 × monthly. */
@@ -196,9 +196,9 @@ export function formatPrice(usd: number): string {
   return `$${usd.toFixed(2)}`;
 }
 
-/** Resolve a tier config by id with type-safe defaulting to Scout
- *  for unknown / unauthenticated callers. Used by gating helpers. */
+/** Resolve a tier config by id with type-safe defaulting to Open
+ *  case for unknown / unauthenticated callers. Used by gating helpers. */
 export function tierFor(tierId: Tier | null | undefined): TierConfig {
-  if (!tierId) return TIER_CONFIG.scout;
-  return TIER_CONFIG[tierId] ?? TIER_CONFIG.scout;
+  if (!tierId) return TIER_CONFIG["open-case"];
+  return TIER_CONFIG[tierId] ?? TIER_CONFIG["open-case"];
 }

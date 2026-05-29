@@ -8,7 +8,7 @@
 // healthAnalysis.ts: deterministic data → constrained AI prose.
 //
 // Returns null when ANTHROPIC_API_KEY is unset so the UI can hide
-// the panel without special-casing. Knight-tier billing gate lives
+// the panel without special-casing. Standing docket tier billing gate lives
 // on the caller (the verdict page); this module is unconcerned with
 // who can see it.
 
@@ -31,20 +31,23 @@ You receive a JSON payload describing:
 - each department's vote (pass / conditional / fail), the reason, the count of signals considered
 - the top contributing signals per department with their titles and severity
 
-Write a 50-80 word bench statement in plain spoken English, as a judge would address the court.
+Write a 50-80 word bench statement in plain spoken English. Court-flavored but modern — a judge in 2026 addressing a code-review docket, not a 19th-century melodrama.
 
 HARD RULES (non-negotiable):
 1. 50-80 words. Count before you finish. Not longer.
-2. Open by stating the outcome plainly. No flourish.
-3. Name the specific departments that drove the outcome, by their full title.
-4. Cite at most ONE concrete signal title from the payload as supporting evidence. Don't list everything — pick the most consequential.
-5. No corporate-speak, no melodrama, no court-room cliché ("hereby", "verily", "let it be known"). A modern judge talking to a modern courtroom.
+2. Open with a verdict-stamp sentence using one of these patterns and only these:
+   - cleared      → "The case is cleared." / "This codebase is cleared on all four counts."
+   - conditional  → "Caution is advised." / "The bench grants conditional approval."
+   - returned     → "This codebase is returned for revision." / "The bench cannot clear this."
+3. Name the specific departments that drove the outcome by their full title (Health Department / Security Bureau / Forensics Lab / Supply Office). Don't shorten to "Health" or "Forensics" alone.
+4. Cite at most ONE concrete signal title from the payload as supporting evidence. Pick the most consequential — don't list.
+5. No corporate-speak. No melodrama. No court-room cliché ("hereby", "verily", "let it be known", "wherefore", "the defendant"). The codebase is the subject, not a defendant.
 6. No markdown. No headings, no bullets, no bold. Plain prose only.
 7. Output the statement text only. No preamble, no sign-off.
 8. Do NOT invent signals, votes, or details not in the JSON. Stick to what's given.
 
 EXAMPLE TONE (different repo, match the cadence not the content):
-"This codebase receives conditional approval. The Health Department and Forensics Lab found no major concerns, but the Supply Office flagged eight outdated packages clustering around the test toolchain. The Security Bureau noted one medium-severity secret pattern in a config file. The court recommends addressing these before the next review window."
+"Caution is advised. The Health Department and Forensics Lab found no major concerns, but the Supply Office flagged eight outdated packages clustering around the test toolchain. The Security Bureau noted one medium-severity secret pattern in a config file. The bench recommends an owner address these before the next review window."
 
 Now write the bench statement for the verdict below.`;
 

@@ -33,11 +33,11 @@ export const user = sqliteTable("user", {
   // prevents clients from setting it via the signup payload.
   githubLogin: text("github_login"),
   // Subscription tier — drives feature gating across the app. Default
-  // "scout" for new signups; flipped to "knight" / "baron" by the
+  // "open-case" for new signups; flipped to "standing-docket" / "full-bench" by the
   // Polar webhook handler when checkout completes or status changes.
-  tier: text("tier").notNull().default("scout"),
+  tier: text("tier").notNull().default("open-case"),
   // Polar's identifier for the active subscription. Nullable for
-  // Scout (no subscription) and for users who cancelled.
+  // Open case (no subscription) and for users who cancelled.
   polarSubscriptionId: text("polar_subscription_id"),
   // Subscription lifecycle status from Polar:
   //   "active"   — billing OK, full access
@@ -45,7 +45,7 @@ export const user = sqliteTable("user", {
   //   "canceled" — user cancelled, access until currentPeriodEnd
   //   "revoked"  — payment failed, immediate downgrade
   //   "past_due" — last invoice failed but still in grace period
-  // Null when tier === "scout" (no subscription).
+  // Null when tier === "open-case" (no subscription).
   subscriptionStatus: text("subscription_status"),
   // End of the current billing period. After this, the user either
   // re-bills (active) or drops to scout (canceled / revoked).
@@ -55,8 +55,8 @@ export const user = sqliteTable("user", {
   cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" })
     .notNull()
     .default(false),
-  // Daily refresh quota counter for Scout-tier rate-limiting (5/day).
-  // Reset whenever dailyRefreshDate changes (i.e. new day). Knight+
+  // Daily refresh quota counter for Open case tier rate-limiting (5/day).
+  // Reset whenever dailyRefreshDate changes (i.e. new day). Standing docket+
   // tiers have unlimited refreshes — the counter is still updated
   // but never enforced for them.
   //

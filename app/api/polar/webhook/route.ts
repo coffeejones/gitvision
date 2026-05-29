@@ -140,22 +140,22 @@ export async function POST(req: Request) {
 
   if (event.type === "subscription.revoked") {
     // Payment failed irrecoverably — immediate downgrade to scout
-    tierToSet = "scout";
+    tierToSet = "open-case";
     statusToSet = "revoked";
   } else if (event.type === "subscription.canceled") {
     // User canceled but still in paid period — keep tier, mark status
-    tierToSet = (tierInfo?.tier ?? "scout") as Tier;
+    tierToSet = (tierInfo?.tier ?? "open-case") as Tier;
     statusToSet = "canceled";
   } else if (event.type === "subscription.past_due") {
     // Grace period after failed invoice — keep tier, mark status
-    tierToSet = (tierInfo?.tier ?? "scout") as Tier;
+    tierToSet = (tierInfo?.tier ?? "open-case") as Tier;
     statusToSet = "past_due";
   } else if (sub.status === "trialing") {
     // Inside 14-day trial — full access
-    tierToSet = (tierInfo?.tier ?? "scout") as Tier;
+    tierToSet = (tierInfo?.tier ?? "open-case") as Tier;
     statusToSet = "trialing";
   } else if (sub.status === "active") {
-    tierToSet = (tierInfo?.tier ?? "scout") as Tier;
+    tierToSet = (tierInfo?.tier ?? "open-case") as Tier;
     statusToSet = "active";
   } else {
     // Unknown / unexpected status — log and skip update

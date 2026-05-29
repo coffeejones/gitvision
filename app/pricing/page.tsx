@@ -28,7 +28,7 @@ import { CheckoutCTA } from "@/components/pricing/CheckoutCTA";
 export const metadata: Metadata = {
   title: "Pricing — RepoJury",
   description:
-    "Three tiers built for the spectrum of code work. Try Knight or Baron free for 14 days, no card required.",
+    "Three tiers built for the spectrum of code work. Try Standing docket or Full bench free for 14 days, no card required.",
 };
 
 export const dynamic = "force-dynamic";

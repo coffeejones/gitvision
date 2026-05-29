@@ -9,7 +9,7 @@
 // caller can hide AI when ANTHROPIC_API_KEY is unset without an
 // extra conditional.
 //
-// Tier gating happens on the verdict page, not here — Scout users
+// Tier gating happens on the verdict page, not here — Open case users
 // never reach this component since the page short-circuits before
 // the AI call.
 

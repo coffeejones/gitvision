@@ -42,7 +42,7 @@ export default async function BillingPage() {
     .limit(1);
 
   const subscription = rows[0];
-  const tier = (subscription?.tier ?? "scout") as Tier;
+  const tier = (subscription?.tier ?? "open-case") as Tier;
 
   // Pull the accounts list for the AccountShell hero badges
   const accountRows = await db

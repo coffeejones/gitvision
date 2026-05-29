@@ -1,8 +1,10 @@
-// Tier signature icons for RepoJury pricing — Scout (Free), Knight
-// (Plus), Baron (Pro). Uses lucide-react (Shield / Swords / Crown) so
-// the icons inherit production-grade vector quality and stay visually
-// consistent with the rest of the app's iconography (Sparkles,
-// Activity, Network, etc. are all from the same library).
+// Tier signature icons for RepoJury pricing (v0.82+ case rebrand).
+//
+// Tiers are case-flavoured now: Open case (free) / Standing docket
+// (subscription) / Full bench (org). Icons reflect the metaphor:
+//   - Open case       → FolderOpen — first folder pulled off the shelf
+//   - Standing docket → ScrollText — the ongoing case list you live in
+//   - Full bench      → Landmark   — the whole courthouse, every seat
 //
 // Why lucide instead of bespoke SVG: scaling-friendly vector,
 // stroke-weight matches the rest of the UI automatically, and we
@@ -16,13 +18,13 @@
 // prompts, textMuted for inactive tiers, etc.).
 //
 // Usage:
-//   <TierIcon tier="scout" size={32} />
-//   <TierIcon tier="baron" size={128} color={TOK.textMuted} />
+//   <TierIcon tier="open-case" size={32} />
+//   <TierIcon tier="full-bench" size={128} color={TOK.textMuted} />
 
-import { Crown, Shield, Swords } from "lucide-react";
+import { FolderOpen, Landmark, ScrollText } from "lucide-react";
 import type { CSSProperties } from "react";
 
-export type Tier = "scout" | "knight" | "baron";
+export type Tier = "open-case" | "standing-docket" | "full-bench";
 
 interface Props {
   tier: Tier;
@@ -37,9 +39,9 @@ interface Props {
 }
 
 const TIER_LABELS: Record<Tier, string> = {
-  scout: "Scout tier — exploration",
-  knight: "Knight tier — capable",
-  baron: "Baron tier — mastered",
+  "open-case": "Open case tier — try it free",
+  "standing-docket": "Standing docket tier — repos you live in",
+  "full-bench": "Full bench tier — for the whole org",
 };
 
 export function TierIcon({
@@ -60,11 +62,11 @@ export function TierIcon({
   } as const;
 
   switch (tier) {
-    case "scout":
-      return <Shield {...commonProps} />;
-    case "knight":
-      return <Swords {...commonProps} />;
-    case "baron":
-      return <Crown {...commonProps} />;
+    case "open-case":
+      return <FolderOpen {...commonProps} />;
+    case "standing-docket":
+      return <ScrollText {...commonProps} />;
+    case "full-bench":
+      return <Landmark {...commonProps} />;
   }
 }

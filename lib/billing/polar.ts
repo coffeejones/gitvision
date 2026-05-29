@@ -33,7 +33,7 @@ function polarClient(): Polar {
 
 interface CreateCheckoutInput {
   /** Tier the user is upgrading to */
-  tier: Exclude<Tier, "scout">;
+  tier: Exclude<Tier, "open-case">;
   /** Monthly or annual billing */
   billing: "monthly" | "annual";
   /** Authenticated RepoJury user id — flows to webhook via metadata */
@@ -56,7 +56,7 @@ interface CreateCheckoutResult {
  *  been configured yet (defensive — prevents accidentally sending
  *  users to an empty checkout). */
 function productIdFor(
-  tier: Exclude<Tier, "scout">,
+  tier: Exclude<Tier, "open-case">,
   billing: "monthly" | "annual",
 ): string {
   const config = TIER_CONFIG[tier];

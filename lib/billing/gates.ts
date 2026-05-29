@@ -5,9 +5,9 @@
 // Single point of truth so we can iterate tier strategy in lib/
 // pricing.ts and the gates pick it up automatically.
 //
-// "scout" is the fallback for any unknown / unauthenticated caller.
+// "open-case" is the fallback for any unknown / unauthenticated caller.
 // Gates that require login should check session before calling these
-// (otherwise an anonymous request lands on Scout limits, which is the
+// (otherwise an anonymous request lands on Open case limits, which is the
 // strictest available — safe default).
 //
 // Server-only. Never import from a Client Component.
@@ -22,7 +22,7 @@ import {
 import type { Tier } from "@/components/TierIcon";
 
 /** Resolve a user's current subscription tier from the database.
- *  Defaults to "scout" for any user without a tier set (covers
+ *  Defaults to "open-case" for any user without a tier set (covers
  *  legacy rows from before P3 schema migration, plus the case where
  *  Polar webhook hasn't fired yet for a brand-new signup). */
 export async function getUserTier(userId: string): Promise<Tier> {
@@ -32,8 +32,8 @@ export async function getUserTier(userId: string): Promise<Tier> {
     .where(eq(schema.user.id, userId))
     .limit(1);
   const raw = rows[0]?.tier;
-  if (raw === "knight" || raw === "baron") return raw;
-  return "scout";
+  if (raw === "standing-docket" || raw === "full-bench") return raw;
+  return "open-case";
 }
 
 /** Get the limits object for a user's current tier. Useful for
@@ -103,12 +103,12 @@ export function tierDisplayName(tier: Tier): string {
 }
 
 /** Lowest tier that grants a given boolean feature. Used by
- *  UpgradePrompt to render "Upgrade to Knight" or "Upgrade to
- *  Baron" depending on what's needed. */
+ *  UpgradePrompt to render "Upgrade to Standing docket" or "Upgrade
+ *  to Full bench" depending on what's needed. */
 export function minimumTierFor(feature: BooleanFeature): Tier {
-  if (TIER_CONFIG.knight.limits[feature]) return "knight";
-  if (TIER_CONFIG.baron.limits[feature]) return "baron";
+  if (TIER_CONFIG["standing-docket"].limits[feature]) return "standing-docket";
+  if (TIER_CONFIG["full-bench"].limits[feature]) return "full-bench";
   // Shouldn't happen in practice — every feature flag should be
-  // unlocked at some tier. Fallback to Baron as the safest answer.
-  return "baron";
+  // unlocked at some tier. Fallback to Full bench as the safest answer.
+  return "full-bench";
 }

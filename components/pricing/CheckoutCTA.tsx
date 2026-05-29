@@ -5,7 +5,7 @@
 //
 //   1. Logged out  → redirect to /signup?tier=X&billing=Y (we'll
 //      come back through the upgrade flow after signup completes)
-//   2. Logged in + Scout tier  → POST to /api/billing/checkout,
+//   2. Logged in + Open case tier  → POST to /api/billing/checkout,
 //      follow the returned Polar URL
 //   3. Already on the same tier → button says "Current plan" and
 //      is disabled (P5 will wire this up properly; for now we just
@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { TOK } from "@/lib/theme";
 
 interface Props {
-  tierId: "scout" | "knight" | "baron";
+  tierId: "open-case" | "standing-docket" | "full-bench";
   billing: "monthly" | "annual";
   isPaid: boolean;
   isRecommended: boolean;
@@ -43,7 +43,7 @@ export function CheckoutCTA({
   async function handleClick(e: React.MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
 
-    // Scout — straight to signup, no checkout needed
+    // Open case — straight to signup, no checkout needed
     if (!isPaid) {
       router.push("/signup?tier=scout");
       return;

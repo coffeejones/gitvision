@@ -6,7 +6,7 @@
 // just hand the user off.
 //
 // Auth-gated: only logged-in users with an active Polar customer can
-// hit this. Users on Scout (no Polar customer yet) get a 400.
+// hit this. Users on Open case (no Polar customer yet) get a 400.
 
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "No active subscription. Upgrade to Knight or Baron to access the portal.",
+          "No active subscription. Upgrade to Standing docket or Full bench to access the portal.",
       },
       { status: 400 },
     );

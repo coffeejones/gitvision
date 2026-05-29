@@ -5,7 +5,7 @@
 // button for subscription management.
 //
 // Three rendering modes based on tier + status:
-//   1. Scout (no subscription) — promotional card: "Upgrade to unlock"
+//   1. Open case (no subscription) — promotional card: "Upgrade to unlock"
 //   2. Paid + active/trialing — current plan card + manage button
 //   3. Paid + canceled — "Plan ends on X" warning + reactivate hint
 //
@@ -56,7 +56,7 @@ export function BillingPanel({
   });
 
   const tierConfig = TIER_CONFIG[tier];
-  const isPaid = tier !== "scout";
+  const isPaid = tier !== "open-case";
 
   async function openPortal() {
     setPortalLoading(true);
@@ -195,11 +195,11 @@ export function BillingPanel({
         </SectionCard>
       )}
 
-      {/* Upgrade card for Scout users */}
+      {/* Upgrade card for Open case users */}
       {!isPaid && (
         <SectionCard
           title="Unlock more"
-          description="Upgrade to Knight for unlimited sessions, AI Insights, and the PR-bot. Or jump straight to Baron for team workspaces and priority support."
+          description="Upgrade to Standing docket for unlimited sessions, AI Insights, and the PR-bot. Or jump straight to Full bench for team workspaces and priority support."
         >
           <div className="pt-2">
             <Link

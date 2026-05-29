@@ -44,8 +44,8 @@ export default async function ArchitectureRoute({
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 
-  // Tier gate: Architecture diagrams unlock from Knight tier up.
-  // Scout still gets the editorial hero (so the upgrade prompt has
+  // Tier gate: Architecture diagrams unlock from Standing docket tier up.
+  // Open case still gets the editorial hero (so the upgrade prompt has
   // context), but the actual diagram is hidden.
   const authSession = await getAuthSession();
   const hasArchitecture = authSession
@@ -128,7 +128,7 @@ export default async function ArchitectureRoute({
         ) : (
           <UpgradePrompt
             featureName="Architecture diagrams"
-            requiredTier="knight"
+            requiredTier="standing-docket"
             context="Auto-extracted class diagrams from your codebase's AST — classes, interfaces, method relationships, ready to paste into mermaid.live or your README."
             unlockedFeatures={[
               "Class diagrams rendered automatically from your codebase",

@@ -13,8 +13,8 @@
 // Phase C-2 layers an AI judge's bench statement (JudgeStatement)
 // between the hero and the department rulings, grounded entirely in
 // the deterministic Verdict object so every claim is auditable.
-// Knight-tier gate identical to /insights — the deterministic
-// verdict stays free forever; the bench statement requires Knight.
+// Standing docket tier gate identical to /insights — the deterministic
+// verdict stays free forever; the bench statement requires Standing docket.
 //
 // Server-rendered. The verdict is a pure function of the snapshot
 // so server-rendering keeps the page fast + cache-friendly. No
@@ -48,8 +48,8 @@ export default async function VerdictRoute({
   const verdict = computeVerdict(latest);
   const sessionBase = `/session/${session.id}`;
 
-  // Tier gate: AI bench statement is a Knight-tier feature (same gate
-  // as /insights). Scout users still see the deterministic verdict
+  // Tier gate: AI bench statement is a Standing docket tier feature (same gate
+  // as /insights). Open case users still see the deterministic verdict
   // hero + department rulings — only the AI prose layer is hidden.
   // Skip the Anthropic call entirely for free users so we don't
   // burn tokens on impressions that won't see the output.
@@ -93,9 +93,9 @@ export default async function VerdictRoute({
 
       <VerdictHero verdict={verdict} />
 
-      {/* AI bench statement, when available. Knight-tier gated +
+      {/* AI bench statement, when available. Standing docket tier gated +
           conditional on ANTHROPIC_API_KEY being set. Renders nothing
-          for Scout users or when the AI feature is off — the
+          for Open case users or when the AI feature is off — the
           deterministic verdict on the hero above carries the page on
           its own. */}
       {narrative && (

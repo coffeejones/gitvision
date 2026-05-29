@@ -11,19 +11,19 @@ import { TierIcon, type Tier } from "@/components/TierIcon";
 
 const TIERS: Array<{ id: Tier; label: string; price: string; tagline: string }> = [
   {
-    id: "scout",
+    id: "open-case",
     label: "Scout",
     price: "Free",
     tagline: "Explore your codebase. No card required.",
   },
   {
-    id: "knight",
+    id: "standing-docket",
     label: "Knight",
     price: "$12/mo",
     tagline: "Capable analysis for serious work.",
   },
   {
-    id: "baron",
+    id: "full-bench",
     label: "Baron",
     price: "$48/mo",
     tagline: "Master every repo you touch.",
@@ -141,25 +141,25 @@ export default function TierIconsPreview() {
               label="Default (textPrimary)"
               hex={TOK.textPrimary}
             >
-              <TierIcon tier="baron" size={64} />
+              <TierIcon tier="full-bench" size={64} />
             </ColorSwatch>
             <ColorSwatch
               label="textSecondary (current tier dim)"
               hex={TOK.textSecondary}
             >
-              <TierIcon tier="baron" size={64} color={TOK.textSecondary} />
+              <TierIcon tier="full-bench" size={64} color={TOK.textSecondary} />
             </ColorSwatch>
             <ColorSwatch
               label="textMuted (inactive)"
               hex={TOK.textMuted}
             >
-              <TierIcon tier="baron" size={64} color={TOK.textMuted} />
+              <TierIcon tier="full-bench" size={64} color={TOK.textMuted} />
             </ColorSwatch>
             <ColorSwatch label="accent (upgrade CTA)" hex={TOK.accent}>
-              <TierIcon tier="baron" size={64} color={TOK.accent} />
+              <TierIcon tier="full-bench" size={64} color={TOK.accent} />
             </ColorSwatch>
             <ColorSwatch label="rose (warning)" hex={TOK.rose}>
-              <TierIcon tier="baron" size={64} color={TOK.rose} />
+              <TierIcon tier="full-bench" size={64} color={TOK.rose} />
             </ColorSwatch>
           </div>
         </section>

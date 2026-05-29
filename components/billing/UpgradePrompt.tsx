@@ -1,7 +1,7 @@
 // Reusable upgrade prompt for locked features.
 //
 // Renders inside a route where the user has navigated to a feature
-// their current tier doesn't unlock — e.g. Scout user opens
+// their current tier doesn't unlock — e.g. Open case user opens
 // /session/{id}/insights, sees this prompt instead of AI Briefing.
 //
 // Visual language: same material card recipe as everything else
@@ -24,7 +24,7 @@ interface Props {
   /** What the user tried to access — appears in the headline. */
   featureName: string;
   /** Lowest tier that unlocks this feature. */
-  requiredTier: Exclude<Tier, "scout">;
+  requiredTier: Exclude<Tier, "open-case">;
   /** Optional sub-feature bullets that tease what's behind the lock.
    *  Default: pulls the required tier's feature bullets from
    *  TIER_CONFIG so we don't have to duplicate the list. */
