@@ -21,6 +21,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { pollJob } from "@/lib/jobsClient";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
+import { hasFunctionalConsent } from "@/lib/cookieConsent";
 import { authClient } from "@/lib/authClient";
 
 const PENDING_REPO_KEY = "rj:pending-repo";
@@ -55,7 +56,10 @@ export function HeroIntake() {
     setError(null);
     startTransition(async () => {
       try {
-        const ownerId = getOrCreateOwnerId();
+        // owner-id is a functional cookie — only set it if the visitor
+        // accepted. Without it the analysis still works (sessions bind
+        // to the account); we just skip the anonymous breadcrumb header.
+        const ownerId = hasFunctionalConsent() ? getOrCreateOwnerId() : null;
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: {

@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDown, Zap } from "lucide-react";
 import { STYLE, TOK } from "@/lib/theme";
 import { RepoInputForm, type DemoRepo } from "./RepoInputForm";
+import { hasFunctionalConsent } from "@/lib/cookieConsent";
 
 interface Props {
   demoRepos: DemoRepo[];
@@ -59,6 +60,9 @@ export function LandingPanel({ demoRepos, demoSessions }: Props) {
   }, []);
   function dismissHint() {
     setShowHint(false);
+    // has-visited is a functional cookie — only persist it if the
+    // visitor accepted. On decline the hint simply reappears next time.
+    if (!hasFunctionalConsent()) return;
     try {
       localStorage.setItem(HAS_VISITED_KEY, "1");
     } catch {

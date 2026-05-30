@@ -411,13 +411,16 @@
   padding:16px 18px;backdrop-filter:blur(14px);box-shadow:0 20px 50px -20px rgba(0,0,0,.7);
   font-family:var(--font-hanken),system-ui,sans-serif}
 @media(max-width:520px){.rj-cookie{left:12px;right:12px;bottom:12px;max-width:none}}
-.rj-cookie p{font-size:13px;line-height:1.6;color:#9b978a;margin:0 0 12px}
+.rj-cookie p{font-size:13px;line-height:1.6;color:#9b978a;margin:0 0 14px}
 .rj-cookie a{color:#ecd488;text-decoration:none;border-bottom:1px solid rgba(201,162,39,.3)}
 .rj-cookie a:hover{border-bottom-color:#ecd488}
-.rj-cookie .row{display:flex;gap:9px;align-items:center}
-.rj-cookie button{font-family:inherit;font-weight:600;font-size:13px;border:none;cursor:pointer;
-  border-radius:9px;padding:8px 16px;background:linear-gradient(180deg,#16d39a,#0fa97a);color:#04130d;transition:transform .15s}
+.rj-cookie .row{display:flex;gap:9px;align-items:center;justify-content:flex-end}
+.rj-cookie button{font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;
+  border-radius:9px;padding:8px 18px;transition:transform .15s,border-color .2s,background .2s}
 .rj-cookie button:hover{transform:translateY(-1px)}
+.rj-cookie-decline{background:transparent;border:1px solid rgba(233,229,216,.16);color:#cfcabd}
+.rj-cookie-decline:hover{border-color:rgba(233,229,216,.32)}
+.rj-cookie-accept{border:1px solid transparent;background:linear-gradient(180deg,#16d39a,#0fa97a);color:#04130d}
 
 /* FOOTER */
 .rj footer{border-top:1px solid var(--line);margin-top:40px;padding:50px 0 40px}
@@ -427,10 +430,9 @@
 .rj .foot-links a{color:inherit;text-decoration:none}
 .rj .foot-links a:hover{color:var(--bone)}
 .rj .foot .copy{font-family:var(--font-mono);font-size:11px;color:var(--bone-faint);letter-spacing:.08em}
-.rj .foot-legal{display:flex;gap:20px;margin-top:22px;padding-top:20px;border-top:1px solid var(--line-soft)}
-.rj .foot-legal a{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.06em;color:var(--bone-faint);
-  text-decoration:none;transition:color .2s}
-.rj .foot-legal a:hover{color:var(--bone-dim)}
+.rj .foot-legal{display:flex;gap:22px;margin-top:18px;padding-top:18px;border-top:1px solid var(--line-soft)}
+.rj .foot-legal a{font-size:13.5px;color:var(--bone-dim);text-decoration:none;transition:color .2s}
+.rj .foot-legal a:hover{color:var(--bone)}
 
 /* HERO ENTRANCE (immediate, orchestrated load) */
 .rj .hero h1,.rj .hero .case-tag,.rj .hero p.lede,.rj .hero .intake,.rj .hero .samples{opacity:0;animation:rj-up .9s cubic-bezier(.2,.7,.2,1) forwards}

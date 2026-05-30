@@ -1,59 +1,60 @@
 "use client";
 
-// CookieNotice — lightweight, dismissable cookie bar (Phase P).
+// CookieNotice — accept/decline consent banner (Phase P follow-up).
 //
-// NOT a consent wall. RepoJury only uses strictly-necessary (session)
-// and functional (owner-id, has-visited, pending-repo) storage today —
-// no analytics or tracking — so under the ePrivacy rules a blocking
-// consent gate isn't required. This is a transparency notice: tell the
-// visitor what's stored, link to the full Cookie Policy, let them
-// dismiss it. Dismissal persists in localStorage so it shows once.
+// RepoJury uses essential storage (always on — you can't sign in
+// without the session cookie) plus optional functional storage (small
+// conveniences). This banner lets the visitor accept or decline the
+// optional bucket. The choice is stored via lib/cookieConsent and
+// honoured at the functional-storage call sites, so "Decline" actually
+// suppresses those writes rather than being decorative.
 //
-// If tracking/analytics is ever added, this must be upgraded to a real
-// consent mechanism (granular opt-in, stored before any non-essential
-// storage runs).
-//
-// Rendered inside RJSurface so it appears on the public marketing +
-// auth + pricing + legal surfaces. Returns null until mounted to avoid
-// a hydration mismatch (localStorage isn't readable on the server).
+// Not a hard modal wall — there's no tracking to block before paint —
+// but it does require an explicit choice (the banner stays until the
+// visitor picks one). Rendered inside RJSurface so it shows on every
+// public surface. Returns null until mounted (localStorage isn't
+// readable on the server) and once a choice exists.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-
-const DISMISS_KEY = "rj:cookie-notice";
+import { getConsent, setConsent } from "@/lib/cookieConsent";
 
 export function CookieNotice() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    try {
-      if (!localStorage.getItem(DISMISS_KEY)) setShow(true);
-    } catch {
-      /* localStorage blocked (private mode) — just don't show it */
-    }
+    if (getConsent() === null) setShow(true);
   }, []);
 
-  function dismiss() {
+  function choose(state: "accepted" | "declined") {
+    setConsent(state);
     setShow(false);
-    try {
-      localStorage.setItem(DISMISS_KEY, "1");
-    } catch {
-      /* no-op */
-    }
   }
 
   if (!show) return null;
 
   return (
-    <div className="rj-cookie" role="region" aria-label="Cookie notice">
+    <div className="rj-cookie" role="dialog" aria-label="Cookie consent">
       <p>
-        RepoJury uses essential and functional cookies to keep you signed in and
-        remember small preferences. No tracking or ads. See our{" "}
+        RepoJury uses essential cookies to keep you signed in. We&rsquo;d also
+        like to use functional storage for small conveniences (like remembering
+        your workspace). No tracking or ads. See our{" "}
         <Link href="/cookies">Cookie Policy</Link>.
       </p>
       <div className="row">
-        <button type="button" onClick={dismiss}>
-          Got it
+        <button
+          type="button"
+          className="rj-cookie-decline"
+          onClick={() => choose("declined")}
+        >
+          Decline
+        </button>
+        <button
+          type="button"
+          className="rj-cookie-accept"
+          onClick={() => choose("accepted")}
+        >
+          Accept
         </button>
       </div>
     </div>
