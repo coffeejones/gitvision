@@ -55,7 +55,7 @@ export function RJNav() {
           </a>
         ) : (
           <>
-            <Link href="/login" className="nav-signin">
+            <Link href="/login" className="btn btn-ghost">
               Sign in
             </Link>
             <Link href="/signup" className="btn btn-primary">

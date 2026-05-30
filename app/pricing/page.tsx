@@ -91,7 +91,7 @@ function PricingNav({ loggedIn }: { loggedIn: boolean }) {
       </div>
       <div className="nav-right">
         {!loggedIn && (
-          <Link href="/login" className="nav-signin">
+          <Link href="/login" className="btn btn-ghost">
             Sign in
           </Link>
         )}
