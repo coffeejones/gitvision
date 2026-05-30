@@ -14,7 +14,6 @@ import {
   P,
   UL,
   LI,
-  Placeholder,
 } from "@/components/legal/LegalShell";
 
 export const metadata: Metadata = {
@@ -66,7 +65,9 @@ export default function RefundsPage() {
       <Section id="cancel" num="2." title="Cancelling">
         <P>
           You can cancel any time from your account billing settings, or by
-          emailing <Placeholder>CONTACT_EMAIL</Placeholder>. When you cancel:
+          emailing{" "}
+          <a href="mailto:support@repojury.com">support@repojury.com</a>. When
+          you cancel:
         </P>
         <UL>
           <LI>
@@ -122,7 +123,7 @@ export default function RefundsPage() {
       <Section id="contact" num="5." title="Contact">
         <P>
           For cancellations, refunds, or billing questions, email{" "}
-          <Placeholder>CONTACT_EMAIL</Placeholder>.
+          <a href="mailto:support@repojury.com">support@repojury.com</a>.
         </P>
       </Section>
     </LegalShell>

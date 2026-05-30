@@ -186,10 +186,9 @@ export default function TermsPage() {
 
       <Section id="law" num="10." title="Governing law">
         <P>
-          These terms are governed by the laws of{" "}
-          <Placeholder>JURISDICTION</Placeholder>, and disputes are subject to
-          its courts, without affecting any mandatory consumer-protection rights
-          you have where you live.
+          These terms are governed by the laws of Denmark, and disputes are
+          subject to its courts, without affecting any mandatory
+          consumer-protection rights you have where you live.
         </P>
       </Section>
 
@@ -205,7 +204,7 @@ export default function TermsPage() {
       <Section id="contact" num="12." title="Contact">
         <P>
           Questions about these terms? Email{" "}
-          <Placeholder>CONTACT_EMAIL</Placeholder>.
+          <a href="mailto:support@repojury.com">support@repojury.com</a>.
         </P>
       </Section>
     </LegalShell>

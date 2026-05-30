@@ -56,12 +56,11 @@ export default function PrivacyPage() {
       <Section id="controller" num="1." title="Who we are">
         <P>
           RepoJury (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is operated by{" "}
-          <Placeholder>CONTROLLER_NAME</Placeholder>, located in{" "}
-          <Placeholder>COUNTRY</Placeholder>. For the purposes of the EU General
-          Data Protection Regulation (GDPR), we are the{" "}
-          <strong>data controller</strong> for the personal data described
-          below. You can reach us at{" "}
-          <Placeholder>CONTACT_EMAIL</Placeholder>.
+          <Placeholder>CONTROLLER_NAME</Placeholder>, an individual based in
+          Denmark. For the purposes of the EU General Data Protection
+          Regulation (GDPR), we are the <strong>data controller</strong> for
+          the personal data described below. You can reach us at{" "}
+          <a href="mailto:support@repojury.com">support@repojury.com</a>.
         </P>
       </Section>
 
@@ -245,15 +244,16 @@ export default function PrivacyPage() {
             withdraw consent at any time, where we rely on consent;
           </LI>
           <LI>
-            lodge a complaint with your local data protection authority (in{" "}
-            <Placeholder>COUNTRY</Placeholder>, this is{" "}
-            <Placeholder>SUPERVISORY_AUTHORITY</Placeholder>).
+            lodge a complaint with your local data protection authority. In
+            Denmark this is Datatilsynet (the Danish Data Protection Agency); if
+            you&rsquo;re elsewhere in the EU/EEA, your national authority can
+            also help.
           </LI>
         </UL>
         <P>
           To exercise any of these, email{" "}
-          <Placeholder>CONTACT_EMAIL</Placeholder>. We&rsquo;ll respond within
-          the timeframe the law requires.
+          <a href="mailto:support@repojury.com">support@repojury.com</a>.
+          We&rsquo;ll respond within the timeframe the law requires.
         </P>
       </Section>
 
@@ -288,9 +288,8 @@ export default function PrivacyPage() {
       <Section id="contact" num="11." title="Contact">
         <P>
           Questions about this policy or your data? Email{" "}
-          <Placeholder>CONTACT_EMAIL</Placeholder>, or write to{" "}
-          <Placeholder>CONTROLLER_NAME</Placeholder>,{" "}
-          <Placeholder>POSTAL_ADDRESS</Placeholder>.
+          <a href="mailto:support@repojury.com">support@repojury.com</a> and
+          we&rsquo;ll get back to you.
         </P>
       </Section>
     </LegalShell>
