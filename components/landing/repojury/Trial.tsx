@@ -25,8 +25,8 @@ const STEPS: Step[] = [
   },
   {
     no: "MOVE 03",
-    title: "The verdict",
-    body: "Evidence aggregates into a single score with every exhibit attached. Re-runnable, diffed since last visit.",
+    title: "The verdict opens the case",
+    body: "Evidence aggregates into a verdict — then the case file opens. Trace every finding, walk the architecture, fix what's flagged, and re-run to see what changed since last visit.",
     glyph: <path d="M12 3v18M5 7h14M7 7l-3 7h6z M17 7l-3 7h6z" />,
   },
 ];
@@ -36,7 +36,7 @@ export function Trial() {
     <section className="section-pad spot brass" id="trial">
       <div className="wrap">
         <Reveal className="sec-head">
-          <span className="eyebrow">How the trial works · intake to verdict</span>
+          <span className="eyebrow">How the trial works · intake to investigation</span>
           <h2 className="display">
             From URL to verdict
             <br />

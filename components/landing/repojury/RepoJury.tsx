@@ -14,6 +14,7 @@ import { Hero } from "./Hero";
 import { Departments } from "./Departments";
 import { Trial } from "./Trial";
 import { VerdictFull } from "./VerdictFull";
+import { Investigation } from "./Investigation";
 import { Custody } from "./Custody";
 import { Pricing } from "./Pricing";
 import { RJFooter } from "./Footer";
@@ -27,6 +28,7 @@ export function RepoJury() {
         <Departments />
         <Trial />
         <VerdictFull />
+        <Investigation />
         <Custody />
         <Pricing />
       </main>

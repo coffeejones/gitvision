@@ -1,6 +1,11 @@
-// Hero — "Every repo has a verdict." Hook + case-intake field + the
-// verdict-document centerpiece. Entrance animations are immediate
-// (CSS, see repojury.css) rather than scroll-triggered.
+// Hero — the verdict is the hook, the investigation is the promise.
+//
+// Phase N narrative rebalance: the page used to read as a one-shot
+// "paste URL → get a score → leave" tool (10/10 persona testers said
+// so). The verdict stays — it's the sharp, shareable hook — but the
+// headline + lede now lead with what you do AFTER: open the case
+// file, see why each finding landed, fix what's flagged, and explore
+// the evidence until you understand your codebase, not just its grade.
 //
 // The intake field + sample chips live in HeroIntake (client) so they
 // can route into the real analysis flow; the rest of the hero stays a
@@ -18,13 +23,16 @@ export function Hero() {
             <span className="dot" /> Case intake · open 24/7
           </div>
           <h1>
-            Every repo
+            Every repo has a verdict.
             <br />
-            has a <em>verdict.</em>
+            Then you open the <em>case file.</em>
           </h1>
           <p className="lede">
-            Four departments examine your codebase — health, security, forensics, supply — and return a score you
-            can defend. Bus factor, untested hotspots, blast radius, dependency risk. From one URL, in seconds.
+            Four departments investigate your codebase — health,
+            security, forensics, supply — and hand down a verdict. Then
+            you dig in: see why each finding landed, what to fix first,
+            and trace every signal to the evidence. Understand your
+            code, not just its grade.
           </p>
           <HeroIntake />
         </div>
