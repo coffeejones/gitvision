@@ -76,10 +76,12 @@ export function Investigation() {
             key={f.no}
             className={`feature-row${i % 2 === 1 ? " flip" : ""}`}
           >
-            <figure className="feature-shot">
+            <div className="feature-shot-wrap">
               <span className="feature-exhibit">{f.no}</span>
-              <img src={f.src} alt={f.alt} loading="lazy" />
-            </figure>
+              <figure className="feature-shot">
+                <img src={f.src} alt={f.alt} loading="lazy" />
+              </figure>
+            </div>
             <div className="feature-copy">
               <span className="feature-tag">{f.tag}</span>
               <h3>{f.title}</h3>

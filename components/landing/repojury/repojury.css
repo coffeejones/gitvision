@@ -188,17 +188,22 @@
    legible, tagged with a small brass exhibit label. */
 .rj .feature-row{display:grid;grid-template-columns:1.12fr .88fr;gap:50px;align-items:center;margin-bottom:56px}
 .rj .feature-row:last-child{margin-bottom:0}
-.rj .feature-row.flip .feature-shot{order:2}
+.rj .feature-row.flip .feature-shot-wrap{order:2}
 @media(max-width:820px){
   .rj .feature-row{grid-template-columns:1fr;gap:24px;margin-bottom:44px}
-  .rj .feature-row.flip .feature-shot{order:0}
+  .rj .feature-row.flip .feature-shot-wrap{order:0}
 }
-.rj .feature-shot{position:relative;border:1px solid var(--line);border-radius:13px;overflow:hidden;
-  background:var(--noir-800);box-shadow:0 34px 64px -32px rgba(0,0,0,.82),0 14px 28px -20px rgba(0,0,0,.5)}
-.rj .feature-shot img{display:block;width:100%;height:auto}
-.rj .feature-exhibit{position:absolute;top:12px;left:12px;z-index:2;font-family:var(--font-mono);font-size:9px;
-  letter-spacing:.14em;text-transform:uppercase;color:var(--brass-lt);background:rgba(8,10,14,.8);
-  border:1px solid rgba(201,162,39,.42);border-radius:6px;padding:5px 9px;backdrop-filter:blur(4px)}
+/* Exhibit label sits ABOVE the framed photo, not over the image */
+.rj .feature-exhibit{display:inline-flex;align-items:center;gap:9px;font-family:var(--font-mono);font-size:10px;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--brass);margin-bottom:13px}
+.rj .feature-exhibit::before{content:"";width:24px;height:1px;background:linear-gradient(90deg,var(--brass),transparent)}
+/* The screenshot, mounted like a physical evidence photo: cream matte
+   board + inner print border + drop shadow. */
+.rj .feature-shot{margin:0;background:linear-gradient(168deg,#ece4d1,#e2d9c2);padding:11px 11px 13px;border-radius:5px;
+  box-shadow:0 2px 0 rgba(255,255,255,.45) inset,0 34px 64px -30px rgba(0,0,0,.82),0 12px 26px -18px rgba(0,0,0,.55);
+  transition:transform .25s,box-shadow .25s}
+.rj .feature-shot:hover{transform:translateY(-3px);box-shadow:0 2px 0 rgba(255,255,255,.45) inset,0 42px 72px -28px rgba(0,0,0,.85)}
+.rj .feature-shot img{display:block;width:100%;height:auto;border-radius:2px;border:1px solid rgba(40,30,12,.28)}
 .rj .feature-tag{font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
   color:var(--brass);display:block;margin-bottom:14px}
 .rj .feature-copy h3{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,2.3vw,29px);
