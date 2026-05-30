@@ -19,7 +19,6 @@ import {
   H3,
   UL,
   LI,
-  Placeholder,
 } from "@/components/legal/LegalShell";
 
 export const metadata: Metadata = {
@@ -55,12 +54,13 @@ export default function PrivacyPage() {
 
       <Section id="controller" num="1." title="Who we are">
         <P>
-          RepoJury (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is operated by{" "}
-          <Placeholder>CONTROLLER_NAME</Placeholder>, an individual based in
-          Denmark. For the purposes of the EU General Data Protection
-          Regulation (GDPR), we are the <strong>data controller</strong> for
-          the personal data described below. You can reach us at{" "}
-          <a href="mailto:support@repojury.com">support@repojury.com</a>.
+          RepoJury (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is an early proof of
+          concept, not yet run by a registered company. For the personal data
+          described below, the operator of RepoJury acts as the{" "}
+          <strong>data controller</strong> under the EU General Data Protection
+          Regulation (GDPR). We&rsquo;ll name that operator, and where it&rsquo;s
+          registered, once RepoJury launches commercially. Until then, reach us
+          at <a href="mailto:support@repojury.com">support@repojury.com</a>.
         </P>
       </Section>
 
@@ -244,10 +244,8 @@ export default function PrivacyPage() {
             withdraw consent at any time, where we rely on consent;
           </LI>
           <LI>
-            lodge a complaint with your local data protection authority. In
-            Denmark this is Datatilsynet (the Danish Data Protection Agency); if
-            you&rsquo;re elsewhere in the EU/EEA, your national authority can
-            also help.
+            lodge a complaint with your local data protection authority — in
+            the EU/EEA, every country has one.
           </LI>
         </UL>
         <P>

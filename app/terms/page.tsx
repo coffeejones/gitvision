@@ -15,7 +15,6 @@ import {
   P,
   UL,
   LI,
-  Placeholder,
 } from "@/components/legal/LegalShell";
 
 export const metadata: Metadata = {
@@ -51,10 +50,10 @@ export default function TermsPage() {
 
       <Section id="accept" num="1." title="Agreement">
         <P>
-          RepoJury is operated by <Placeholder>CONTROLLER_NAME</Placeholder>{" "}
-          (&ldquo;we&rdquo;, &ldquo;us&rdquo;). These Terms of Service form a
-          binding agreement between you and us. Our{" "}
-          <a href="/privacy">Privacy Policy</a> and{" "}
+          RepoJury (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is an early proof of
+          concept, not yet run by a registered company. These Terms of Service
+          still form an agreement between you and us covering how you use the
+          service. Our <a href="/privacy">Privacy Policy</a> and{" "}
           <a href="/cookies">Cookie Policy</a> are part of these terms.
         </P>
       </Section>
@@ -186,9 +185,10 @@ export default function TermsPage() {
 
       <Section id="law" num="10." title="Governing law">
         <P>
-          These terms are governed by the laws of Denmark, and disputes are
-          subject to its courts, without affecting any mandatory
-          consumer-protection rights you have where you live.
+          As a pre-launch project, RepoJury hasn&rsquo;t set a governing
+          jurisdiction yet — that will be specified, along with the registered
+          operator, before any commercial launch. Whatever is chosen, your
+          mandatory local consumer-protection rights always apply.
         </P>
       </Section>
 

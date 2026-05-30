@@ -28,16 +28,21 @@ interface ShellProps {
   children: ReactNode;
 }
 
-/** Standard draft/advice notice shared by every document. The product
- *  is pre-launch and these are templates, not lawyer-reviewed text —
- *  say so plainly. */
+/** Pre-launch notice shared by every document. RepoJury is an early
+ *  proof of concept with no registered business behind it yet, so we
+ *  say so plainly here rather than naming an operator/address/
+ *  jurisdiction we don't have. When it launches commercially, a
+ *  registered entity + lawyer-reviewed policy replaces all of this. */
 export function DraftNotice() {
   return (
     <div className="legal-note">
-      <b>Draft notice.</b> RepoJury is preparing for launch. These terms are
-      written to reflect how the service actually works, but they have not yet
-      been reviewed by a lawyer. If anything here is unclear, contact us before
-      relying on it.
+      <b>Pre-launch notice.</b> RepoJury is an early proof of concept, not yet
+      a registered business. This page describes honestly how the service
+      handles data today — but there&rsquo;s no named operator, registered
+      address, or chosen jurisdiction yet, and it hasn&rsquo;t been reviewed by
+      a lawyer. Once RepoJury launches commercially, a registered entity and a
+      proper policy will replace this. Questions:{" "}
+      <a href="mailto:support@repojury.com">support@repojury.com</a>.
     </div>
   );
 }
@@ -67,7 +72,7 @@ export function LegalShell({ title, updated, toc, children }: ShellProps) {
               style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
             >
               <CrestSeal size={16} />
-              RepoJury · <Placeholder>CONTROLLER_NAME</Placeholder>
+              RepoJury · pre-launch proof of concept
             </span>
           </footer>
         </main>
