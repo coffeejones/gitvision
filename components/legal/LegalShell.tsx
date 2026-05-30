@@ -45,42 +45,46 @@ export function DraftNotice() {
 export function LegalShell({ title, updated, toc, children }: ShellProps) {
   return (
     <RJSurface>
-      <main className="legal-page">
-        <Link href="/" className="legal-back">
-          <ArrowLeft size={13} />
-          Back to RepoJury
-        </Link>
+      <div className="legal-shell">
+        <main className="legal-main">
+          <Link href="/" className="legal-back">
+            <ArrowLeft size={13} />
+            Back to RepoJury
+          </Link>
 
-        <header className="legal-head">
-          <h1>{title}</h1>
-        </header>
-        <div className="legal-meta">Last updated: {updated}</div>
+          <header className="legal-head">
+            <h1>{title}</h1>
+          </header>
+          <div className="legal-meta">Last updated: {updated}</div>
+
+          {children}
+
+          <footer
+            className="legal-meta"
+            style={{ marginTop: 48, marginBottom: 0, borderBottom: "none" }}
+          >
+            <span
+              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+            >
+              <CrestSeal size={16} />
+              RepoJury · <Placeholder>CONTROLLER_NAME</Placeholder>
+            </span>
+          </footer>
+        </main>
 
         {toc && (
-          <nav className="legal-toc">
-            <span className="legal-toc-title">Contents</span>
-            {toc.map(([id, label]) => (
-              <a key={id} href={`#${id}`}>
-                {label}
-              </a>
-            ))}
-          </nav>
+          <aside className="legal-toc-rail" aria-label="On this page">
+            <span className="legal-toc-title">On this page</span>
+            <div className="legal-toc-links">
+              {toc.map(([id, label]) => (
+                <a key={id} href={`#${id}`}>
+                  {label}
+                </a>
+              ))}
+            </div>
+          </aside>
         )}
-
-        {children}
-
-        <footer
-          className="legal-meta"
-          style={{ marginTop: 48, marginBottom: 0, borderBottom: "none" }}
-        >
-          <span
-            style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
-          >
-            <CrestSeal size={16} />
-            RepoJury · <Placeholder>CONTROLLER_NAME</Placeholder>
-          </span>
-        </footer>
-      </main>
+      </div>
     </RJSurface>
   );
 }

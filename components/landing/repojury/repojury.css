@@ -361,7 +361,10 @@
 /* LEGAL PAGES — readable long-form documents (privacy, terms,
    cookies, refunds). Constrained measure, generous line height,
    brass section markers. */
-.rj .legal-page{max-width:760px;margin:0 auto;padding:120px 28px 80px}
+.rj .legal-shell{max-width:1040px;margin:0 auto;padding:116px 28px 80px;
+  display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:54px;align-items:start}
+@media(max-width:920px){.rj .legal-shell{grid-template-columns:1fr;gap:0}}
+.rj .legal-main{min-width:0;max-width:720px}
 .rj .legal-back{font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;color:var(--bone-faint);
   text-decoration:none;display:inline-flex;align-items:center;gap:7px;transition:color .2s;margin-bottom:34px}
 .rj .legal-back:hover{color:var(--bone)}
@@ -374,13 +377,17 @@
 .rj .legal-note{font-size:13.5px;line-height:1.65;color:var(--ink-faint);background:rgba(201,162,39,.06);
   border:1px solid rgba(201,162,39,.22);border-radius:11px;padding:14px 16px;margin-bottom:36px;color:var(--bone-dim)}
 .rj .legal-note b{color:var(--brass-lt);font-weight:600}
-.rj .legal-toc{display:flex;flex-direction:column;gap:7px;margin-bottom:44px;padding:18px 20px;
-  border:1px solid var(--line);border-radius:12px;background:rgba(233,229,216,.02)}
-.rj .legal-toc-title{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--bone-faint);margin-bottom:4px}
-.rj .legal-toc a{font-size:14px;color:var(--bone-dim);text-decoration:none;transition:color .2s}
-.rj .legal-toc a:hover{color:var(--brass-lt)}
-.rj .legal-section{margin-bottom:38px;scroll-margin-top:90px}
+/* Sticky table-of-contents rail (desktop only) */
+.rj .legal-toc-rail{position:sticky;top:104px;display:flex;flex-direction:column;gap:9px;padding-top:54px}
+@media(max-width:920px){.rj .legal-toc-rail{display:none}}
+.rj .legal-toc-rail .legal-toc-title{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--bone-faint)}
+.rj .legal-toc-rail .legal-toc-links{display:flex;flex-direction:column;gap:3px;
+  border-left:1px solid var(--line);padding-left:14px}
+.rj .legal-toc-rail a{font-size:12.5px;line-height:1.4;color:var(--bone-faint);text-decoration:none;
+  transition:color .2s;padding:3px 0}
+.rj .legal-toc-rail a:hover{color:var(--brass-lt)}
+.rj .legal-section{margin-bottom:38px;scroll-margin-top:104px}
 .rj .legal-section h2{font-family:var(--font-display);font-weight:600;font-size:22px;letter-spacing:-.01em;
   color:var(--bone);margin-bottom:14px;display:flex;align-items:baseline;gap:11px}
 .rj .legal-section h2 .num{font-family:var(--font-mono);font-size:13px;color:var(--brass);font-weight:500}
