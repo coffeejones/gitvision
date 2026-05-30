@@ -182,52 +182,28 @@
 .rj .estamp.warn{color:#9a6a18;border-color:rgba(154,106,24,.5);background:rgba(224,162,58,.1)}
 .rj .estamp.ok{color:#0c7a59;border-color:rgba(12,122,89,.5);background:rgba(16,185,129,.08)}
 
-/* INVESTIGATION ("the verdict is where you start") */
-/* Evidence exhibits as photos laid on a manila case file — as if the
-   prosecution set the folder on the bench. The folder is kraft/manila
-   paper; the screenshots are warm-toned polaroids fanned on top. */
-.rj .case-folder{position:relative;max-width:820px;margin:8px auto 54px;
-  background:linear-gradient(166deg,#d9c8a2 0%,#cdb98f 100%);
-  border-radius:5px 5px 7px 7px;padding:58px 44px 50px;
-  background-image:linear-gradient(166deg,#d9c8a2,#cdb98f),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='0.4'/%3E%3C/svg%3E");
-  background-blend-mode:normal,multiply;
-  box-shadow:0 2px 0 rgba(255,255,255,.3) inset,0 44px 90px -34px rgba(0,0,0,.82),0 16px 34px -20px rgba(0,0,0,.6)}
-.rj .case-folder::before{content:"CASE FILE · EXHIBITS";position:absolute;top:-21px;left:38px;
-  font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;color:#6b5a36;
-  background:linear-gradient(166deg,#dccba5,#d2bd93);padding:7px 20px 10px;border-radius:7px 7px 0 0;
-  box-shadow:0 -3px 8px -4px rgba(0,0,0,.45)}
-.rj .case-folder::after{content:"EXHIBITS";position:absolute;right:30px;bottom:20px;transform:rotate(-8deg);
-  font-family:var(--font-mono);font-weight:600;font-size:12px;letter-spacing:.2em;color:rgba(120,30,30,.32);
-  border:2px solid rgba(120,30,30,.26);border-radius:5px;padding:4px 11px;pointer-events:none}
-.rj .photos{display:flex;justify-content:center;align-items:flex-start}
-.rj .photo{background:#f3ede1;padding:9px 9px 0;border-radius:2px;width:33%;position:relative;
-  box-shadow:0 18px 32px -14px rgba(0,0,0,.65);transition:transform .28s,box-shadow .28s,z-index 0s}
-.rj .photo:nth-child(1){transform:rotate(-5deg)}
-.rj .photo:nth-child(2){transform:rotate(1.5deg);margin:16px -16px 0;z-index:2}
-.rj .photo:nth-child(3){transform:rotate(4.5deg);margin-top:7px}
-.rj .photo:hover{transform:rotate(0) scale(1.05);z-index:6;box-shadow:0 30px 56px -18px rgba(0,0,0,.72)}
-.rj .photo img{display:block;width:100%;height:auto;border-radius:1px;
-  filter:saturate(1.08) brightness(1.06) contrast(1.03) sepia(.1)}
-.rj .photo figcaption{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
-  color:#5a4a2c;text-align:center;padding:9px 4px 12px}
-@media(max-width:760px){
-  .rj .case-folder{padding:48px 22px 60px}
-  .rj .photos{flex-direction:column;align-items:center;gap:22px}
-  .rj .photo{width:84%;margin:0}
-  .rj .photo:nth-child(1),.rj .photo:nth-child(2),.rj .photo:nth-child(3){transform:rotate(0);margin:0}
+/* INVESTIGATION ("the verdict is where you start") — feature rows:
+   a focused screenshot of one real workspace view + copy, alternating
+   sides. Each shot is a tight crop (not the whole workspace) so it's
+   legible, tagged with a small brass exhibit label. */
+.rj .feature-row{display:grid;grid-template-columns:1.12fr .88fr;gap:50px;align-items:center;margin-bottom:56px}
+.rj .feature-row:last-child{margin-bottom:0}
+.rj .feature-row.flip .feature-shot{order:2}
+@media(max-width:820px){
+  .rj .feature-row{grid-template-columns:1fr;gap:24px;margin-bottom:44px}
+  .rj .feature-row.flip .feature-shot{order:0}
 }
-.rj .invest-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
-@media(max-width:820px){.rj .invest-grid{grid-template-columns:1fr}}
-.rj .invest-card{position:relative;border:1px solid var(--line);border-radius:14px;padding:28px;
-  background:linear-gradient(180deg,rgba(233,229,216,.035),rgba(233,229,216,.01));
-  transition:border-color .25s,transform .25s}
-.rj .invest-card:hover{border-color:rgba(201,162,39,.32);transform:translateY(-3px)}
-.rj .invest-glyph{width:46px;height:46px;margin-bottom:18px;border:1px solid var(--line);border-radius:11px;
-  display:flex;align-items:center;justify-content:center;color:var(--brass);background:rgba(201,162,39,.05)}
-.rj .invest-card h3{font-family:var(--font-display);font-weight:600;font-size:20px;letter-spacing:-.01em;
-  color:var(--bone);margin-bottom:10px;line-height:1.15}
-.rj .invest-card p{color:var(--bone-dim);font-size:14.5px;line-height:1.6}
+.rj .feature-shot{position:relative;border:1px solid var(--line);border-radius:13px;overflow:hidden;
+  background:var(--noir-800);box-shadow:0 34px 64px -32px rgba(0,0,0,.82),0 14px 28px -20px rgba(0,0,0,.5)}
+.rj .feature-shot img{display:block;width:100%;height:auto}
+.rj .feature-exhibit{position:absolute;top:12px;left:12px;z-index:2;font-family:var(--font-mono);font-size:9px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--brass-lt);background:rgba(8,10,14,.8);
+  border:1px solid rgba(201,162,39,.42);border-radius:6px;padding:5px 9px;backdrop-filter:blur(4px)}
+.rj .feature-tag{font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--brass);display:block;margin-bottom:14px}
+.rj .feature-copy h3{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,2.3vw,29px);
+  line-height:1.1;letter-spacing:-.015em;color:var(--bone);margin-bottom:14px}
+.rj .feature-copy p{color:var(--bone-dim);font-size:15px;line-height:1.66}
 
 /* TRIAL */
 .rj .trial{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative;margin-top:20px}

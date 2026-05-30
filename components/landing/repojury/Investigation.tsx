@@ -1,87 +1,52 @@
-// Investigation — "the verdict is where you start, not stop" (Phase N).
+// Investigation — "the verdict is where you start, not where you stop"
+// (Phase N; reworked to focused feature rows).
 //
-// The section the landing was missing. Persona testing (10/10) read
-// the page as a one-shot "paste URL → get a score → leave" tool
-// because the workspace — the reason you come back — was buried in the
-// pricing table. This section makes the investigation the promise:
-// trace every signal to its evidence, see the structure, know what to
-// fix, and come back to watch it change. The verdict is the hook; this
-// is the product.
+// Persona testing said the page read as a one-shot grader because the
+// workspace was never shown. First attempt (full-workspace polaroids
+// on a manila folder) looked unrealistic and the shots were too small
+// to read. This version shows tight, legible crops of the actual
+// product — blast radius, signal evidence, the security scanners — as
+// alternating feature rows, each tagged with a brass exhibit label.
+// Real screenshots, presented straight, inside the dossier palette.
 //
-// Server component. Glyphs match the Trial section's stroke style.
+// Server component. Crops captured from the analyzed colinhacks/zod
+// case (Exhibit A is the dependency graph in VerdictFull).
 
-import type { ReactNode } from "react";
 import { Reveal } from "../Reveal";
 
-type Move = { glyph: ReactNode; title: string; body: string };
+type Feature = {
+  no: string;
+  tag: string;
+  title: string;
+  body: string;
+  src: string;
+  alt: string;
+};
 
-const MOVES: Move[] = [
+const FEATURES: Feature[] = [
   {
-    glyph: (
-      <>
-        <circle cx="11" cy="11" r="7" />
-        <path d="M16 16l5 5" strokeWidth={2} />
-      </>
-    ),
-    title: "Trace every signal to its evidence",
-    body: "Open any department and see all of it — not just the headline finding. Each one carries its file path, the exact numbers, and a link to the advisory or the line of code behind it. Nothing is asserted without evidence you can open.",
+    no: "Exhibit B",
+    tag: "Forensics Lab · Blast radius",
+    title: "Know what breaks before you touch it",
+    body: "Pick any file and trace its blast radius — every module that depends on it, and everything it leans on. Refactor with the whole picture instead of a guess.",
+    src: "/shots/feature-blast.png",
+    alt: "RepoJury blast-radius view — incoming and outgoing dependencies for a single file",
   },
   {
-    glyph: (
-      <>
-        <circle cx="6" cy="6" r="2.4" />
-        <circle cx="18" cy="6" r="2.4" />
-        <circle cx="12" cy="18" r="2.4" />
-        <path d="M7.6 7.6 10.8 16M16.4 7.6 13.2 16" />
-      </>
-    ),
-    title: "See the structure, not just the score",
-    body: "Auto-extracted architecture diagrams, dependency graphs, and the hotspots taking all the churn. Walk your codebase the way a new hire wishes they could — and actually understand how it fits together.",
+    no: "Exhibit C",
+    tag: "Health Department · Signals",
+    title: "Every signal, with the evidence",
+    body: "All 20 deterministic signals, sorted into what's working, what needs work, and open questions. Each one carries the file paths and numbers behind it — nothing asserted without proof you can open.",
+    src: "/shots/feature-signals.png",
+    alt: "RepoJury signals view — deterministic signals with file paths and numbers as evidence",
   },
   {
-    glyph: (
-      <>
-        <path d="M9 6h11M9 12h11M9 18h11" />
-        <path d="M4 6l1.2 1.2L7.4 5M4 12l1.2 1.2L7.4 11" strokeWidth={1.8} />
-      </>
-    ),
-    title: "Know what to fix first",
-    body: "Findings are ranked by what actually moves the needle. Each tells you why it landed and what it would take to clear it — so the verdict isn't a grade you can't act on, it's a to-do list you understand.",
-  },
-  {
-    glyph: (
-      <>
-        <path d="M4 8h12l-3.5-3.5" />
-        <path d="M20 16H8l3.5 3.5" />
-      </>
-    ),
-    title: "Come back and watch it change",
-    body: "Re-run any time. “Since your last visit” shows exactly what improved, what regressed, and what's new — so you can watch the case turn in your favor as you ship.",
-  },
-];
-
-type Exhibit = { key: string; name: string; src: string; alt: string };
-
-// Real product screenshots (the analyzed colinhacks/zod case),
-// presented as warm-toned polaroids fanned on a manila case file.
-const EXHIBITS: Exhibit[] = [
-  {
-    key: "canvas",
-    name: "Hotspot map",
-    src: "/shots/workspace-canvas.png",
-    alt: "RepoJury Canvas view — every file as a node, sized by complexity and coloured by ownership",
-  },
-  {
-    key: "code",
-    name: "Blast radius",
-    src: "/shots/workspace-code.png",
-    alt: "RepoJury Code view — incoming and outgoing dependencies for a single file",
-  },
-  {
-    key: "signals",
-    name: "Signals",
-    src: "/shots/workspace-signals.png",
-    alt: "RepoJury Signals view — 20 deterministic signals with file paths and numbers as evidence",
+    no: "Exhibit D",
+    tag: "Security Bureau · Scanners",
+    title: "A security review you can trust",
+    body: "Three deterministic scanners — supply-chain incidents, leaked secrets, risky patterns. No AI guesses: every finding maps back to a documented advisory or a literal match in your code.",
+    src: "/shots/feature-security.png",
+    alt: "RepoJury security view — three deterministic scanners with clean status",
   },
 ];
 
@@ -106,44 +71,22 @@ export function Investigation() {
           </p>
         </Reveal>
 
-        {/* Real workspace views as evidence photos, fanned on a manila
-            case file — as if the prosecution laid the folder on the
-            bench. Actual screenshots of the analyzed colinhacks/zod
-            case, warm-toned and tilted so they read as exhibits, not
-            raw UI dumps. Proof the case file is a workspace you explore. */}
-        <Reveal className="case-folder">
-          <div className="photos">
-            {EXHIBITS.map((ex) => (
-              <figure className="photo" key={ex.key}>
-                <img src={ex.src} alt={ex.alt} loading="lazy" />
-                <figcaption>{ex.name}</figcaption>
-              </figure>
-            ))}
-          </div>
-        </Reveal>
-
-        <Reveal className="invest-grid">
-          {MOVES.map((m) => (
-            <div className="invest-card" key={m.title}>
-              <div className="invest-glyph">
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.6}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  {m.glyph}
-                </svg>
-              </div>
-              <h3>{m.title}</h3>
-              <p>{m.body}</p>
+        {FEATURES.map((f, i) => (
+          <Reveal
+            key={f.no}
+            className={`feature-row${i % 2 === 1 ? " flip" : ""}`}
+          >
+            <figure className="feature-shot">
+              <span className="feature-exhibit">{f.no}</span>
+              <img src={f.src} alt={f.alt} loading="lazy" />
+            </figure>
+            <div className="feature-copy">
+              <span className="feature-tag">{f.tag}</span>
+              <h3>{f.title}</h3>
+              <p>{f.body}</p>
             </div>
-          ))}
-        </Reveal>
+          </Reveal>
+        ))}
       </div>
     </section>
   );
