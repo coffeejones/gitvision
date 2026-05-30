@@ -1,16 +1,13 @@
-// Review route for the RepoJury landing. Lives at /landing-v2 so we
-// can compare it against the current home at / without breaking
-// traffic. Swap into the root once approved + repojury.com is wired.
+// /landing-v2 — back-compat redirect (Phase R).
+//
+// The RepoJury landing was previewed here while it lived alongside the
+// old home at "/". It's now the root experience for marketing visitors
+// (see app/page.tsx), so this route redirects to "/" to avoid serving
+// duplicate content. Kept so any links shared during the preview phase
+// keep working.
 
-import type { Metadata } from "next";
-import { RepoJury } from "@/components/landing/repojury/RepoJury";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "RepoJury — every repo has a verdict",
-  description:
-    "Four departments examine your codebase — health, security, forensics, supply — and return a verdict score you can defend. Bus factor, untested hotspots, blast radius, dependency risk, from one URL.",
-};
-
-export default function LandingV2Page() {
-  return <RepoJury />;
+export default function LandingV2Redirect() {
+  redirect("/");
 }

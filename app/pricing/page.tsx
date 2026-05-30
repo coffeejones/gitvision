@@ -85,8 +85,8 @@ function PricingNav() {
         </span>
       </Link>
       <div className="nav-links">
-        <Link href="/landing-v2#departments">Departments</Link>
-        <Link href="/landing-v2#trial">How it works</Link>
+        <Link href="/#departments">Departments</Link>
+        <Link href="/#trial">How it works</Link>
         <Link href="/pricing">Pricing</Link>
       </div>
       <Link href="/signup" className="btn btn-primary">
@@ -229,7 +229,7 @@ function PricingFooter() {
           </span>
         </Link>
         <div className="foot-links">
-          <Link href="/landing-v2">Home</Link>
+          <Link href="/">Home</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/login">Sign in</Link>
         </div>

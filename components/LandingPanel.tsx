@@ -46,17 +46,6 @@ export function LandingPanel({ demoRepos, demoSessions }: Props) {
   const router = useRouter();
   const [value, setValue] = useState("");
 
-  // Pre-fill from ?repo= — the landing hero's case-intake field
-  // routes here with the repo a visitor typed (see HeroIntake). Read
-  // from window.location rather than useSearchParams() to avoid the
-  // Next 16 Suspense-boundary requirement on the hook. Effect-only so
-  // it never blocks first paint; the visitor just sees their repo
-  // appear in the field, ready to analyze.
-  useEffect(() => {
-    const repo = new URLSearchParams(window.location.search).get("repo");
-    if (repo) setValue(repo);
-  }, []);
-
   // First-visit nudge — quiet inline hint under the form pointing at
   // the demo chips. Persists in localStorage so returning visitors
   // don't see it.

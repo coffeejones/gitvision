@@ -1,24 +1,24 @@
-// Home route — adaptive between marketing landing and power-user
-// workspace dashboard (v0.69 / C3 polish).
+// Home route — RepoJury landing for visitors, workspace dashboard for
+// power-users (v0.69 / C3 → Phase R: landing moved to root).
 //
-// Two distinct experiences live behind the same URL:
+// Two distinct experiences behind "/":
 //
-//   - First-time visitor (no owned sessions in localStorage) →
-//     MarketingHome: hero + form + demos + feature grid + footer.
-//     The HN/Reddit cold-traffic surface.
-//   - Returning power-user (1+ owned sessions) → WorkspaceHome:
-//     inline analyze-input + ranked dashboard cards. The
-//     "your code dashboard" experience that used to live at
-//     /workspace until v0.68; merging it here removes the routing
-//     friction (Workspace → Analyze new repo bounced to landing
-//     before v0.69).
+//   - Anonymous OR logged-in with 0 owned sessions → RepoJury, the
+//     forensic-dossier marketing landing (self-contained — no demo
+//     payload needed). The cold-traffic conversion surface.
+//   - Logged-in power-user (1+ owned sessions) → WorkspaceHome via
+//     AdaptiveHome: inline analyze-input + ranked dashboard cards.
 //
-// AdaptiveHome (client) does the localStorage check + render
-// switch. Server-side we always compute both data sets — the
-// marketing static content and the workspace summaries — so the
-// switch is instant and either path renders without an additional
-// fetch.
+// The split is decided server-side from the Better Auth session +
+// owned-session count, so the first paint is correct with no flash.
+// We only compute the (bounded) demo + workspace payloads on the
+// power-user branch — marketing visitors skip all of it.
+//
+// AuthForm calls router.refresh() after login/logout, so transitions
+// between the two branches re-run this server component and land on
+// the right experience without a manual reload.
 
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { listSessions } from "@/lib/storage";
@@ -27,8 +27,15 @@ import { getWorkspaceSummaries } from "@/lib/intelligence/workspaceSummary";
 import { getDemoCard, type DemoCard } from "@/lib/intelligence/demoCard";
 import { type DemoRepo } from "@/components/RepoInputForm";
 import { AdaptiveHome } from "@/components/AdaptiveHome";
+import { RepoJury } from "@/components/landing/repojury/RepoJury";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "RepoJury — every repo has a verdict",
+  description:
+    "Put any GitHub repo on trial. Four departments examine health, security, forensics, and supply, then return a verdict you can defend — from one URL, in seconds.",
+};
 
 // Curated demo set. One entry per AST-backed plugin so the row showcases
 // the plugin architecture at a glance. Each pick is small/medium-sized —
@@ -50,6 +57,29 @@ const WORKSPACE_SUMMARY_CAP = 30;
 
 export default async function Home() {
   const sessions = await listSessions();
+
+  // v0.76: login-required model. The workspace listing is gated
+  // behind sign-in; anonymous visitors see the marketing landing.
+  // Read the Better Auth session server-side so the split is decided
+  // before any rendering.
+  const authSession = await auth.api.getSession({
+    headers: await headers(),
+  });
+  const userId = authSession?.user.id ?? null;
+
+  // Filter to the caller's own sessions ONCE on the server. Drives
+  // both the marketing/workspace split below and the rich projection
+  // for the dashboard cards.
+  const userOwnedSessions = filterSessionsByUser(sessions, userId);
+
+  // Phase R: marketing branch — anonymous or zero-session visitors get
+  // the RepoJury landing. It's self-contained (no demo payload), so we
+  // return before computing any of the workspace projections below.
+  if (userOwnedSessions.length === 0) {
+    return <RepoJury />;
+  }
+
+  // ── Power-user branch: compute the workspace dashboard payloads ──
 
   // v0.53: build a `repoFullName → sessionId` map for demo-tagged
   // sessions so the LandingPanel can wire each demo button to a
@@ -88,29 +118,6 @@ export default async function Home() {
     }),
   );
 
-  // v0.76: login-required model. The workspace listing is gated
-  // behind sign-in; anonymous visitors see the marketing landing
-  // with demo sessions as the lead-in. Read the Better Auth session
-  // server-side so the initial paint matches what the user will see
-  // post-hydration (no flash between marketing and workspace).
-  const authSession = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const userId = authSession?.user.id ?? null;
-
-  // Filter to the caller's own sessions ONCE on the server. Both
-  // `initialSessions` (sent to the client) and `workspaceSummaries`
-  // (the rich projection for the dashboard cards) are derived from
-  // this filtered list. Two things this fixes:
-  //   1. Privacy: we never ship other users' session metadata down
-  //      the wire just for the client to filter it back out.
-  //   2. Hydration flash: the initial server paint of WorkspaceHome
-  //      used to render with ALL workspaceSummaries until client
-  //      hydration filtered them down to the user's own. That
-  //      "wrong sessions flash for a split second, then mine appear"
-  //      bug is gone now that the server sends only the right set.
-  const userOwnedSessions = filterSessionsByUser(sessions, userId);
-
   // Workspace summaries — projected for the caller's own most-recent
   // sessions only. Cap bounds TTFB on users with many sessions; the
   // rest stay on disk and are reachable via direct URL.
@@ -118,9 +125,6 @@ export default async function Home() {
     .slice(0, WORKSPACE_SUMMARY_CAP)
     .map((s) => s.id);
   const workspaceSummaries = await getWorkspaceSummaries(summaryIds);
-
-  const initialLayout: "marketing" | "workspace" =
-    userOwnedSessions.length > 0 ? "workspace" : "marketing";
 
   return (
     <AdaptiveHome
@@ -135,12 +139,9 @@ export default async function Home() {
       initialSessions={userOwnedSessions}
       workspaceSummaries={workspaceSummaries}
       totalOnDisk={userOwnedSessions.length}
-      initialLayout={initialLayout}
-      // Pass auth state explicitly. MarketingHome can't read
-      // next/headers itself — it gets pulled into the client bundle
-      // through AdaptiveHome — so we thread the server-decided value
-      // through. AdaptiveHome overrides this with useSession() once
-      // hydrated.
+      // This branch only runs for power-users (1+ owned sessions), so
+      // the layout is always "workspace" and the caller is logged in.
+      initialLayout="workspace"
       initialLoggedIn={userId !== null}
     />
   );
