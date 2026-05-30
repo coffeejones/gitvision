@@ -49,7 +49,7 @@ export default async function PricingPage({
 
   return (
     <RJSurface>
-      <PricingNav />
+      <PricingNav loggedIn={loggedIn} />
       <main className="wrap price-page spot">
         <header className="price-hero">
           <span className="eyebrow">Pricing · open your first case free</span>
@@ -75,7 +75,7 @@ export default async function PricingPage({
 
 // ─── Minimal nav (no landing anchors — they don't exist here) ─────────
 
-function PricingNav() {
+function PricingNav({ loggedIn }: { loggedIn: boolean }) {
   return (
     <nav>
       <Link href="/" className="brand">
@@ -89,9 +89,16 @@ function PricingNav() {
         <Link href="/#trial">How it works</Link>
         <Link href="/pricing">Pricing</Link>
       </div>
-      <Link href="/signup" className="btn btn-primary">
-        Open a case
-      </Link>
+      <div className="nav-right">
+        {!loggedIn && (
+          <Link href="/login" className="nav-signin">
+            Sign in
+          </Link>
+        )}
+        <Link href="/signup" className="btn btn-primary">
+          Open a case
+        </Link>
+      </div>
     </nav>
   );
 }

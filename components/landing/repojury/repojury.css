@@ -67,6 +67,9 @@
 .rj .nav-links{display:flex;gap:26px;font-size:14px;color:var(--bone-dim)}
 .rj .nav-links a{color:inherit;text-decoration:none;transition:color .2s}
 .rj .nav-links a:hover{color:var(--bone)}
+.rj .nav-right{display:flex;align-items:center;gap:18px}
+.rj .nav-signin{font-size:14px;color:var(--bone-dim);text-decoration:none;transition:color .2s;white-space:nowrap}
+.rj .nav-signin:hover{color:var(--bone)}
 .rj .btn{font-family:var(--font-body);font-weight:600;font-size:14px;border:none;cursor:pointer;
   border-radius:10px;padding:11px 18px;transition:transform .15s,box-shadow .2s,background .2s;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
 .rj .btn-primary{background:linear-gradient(180deg,#16d39a,#0fa97a);color:#04130d;
