@@ -46,8 +46,9 @@ export default function RefundsPage() {
       <Section id="plans" num="1." title="Plans & trials">
         <UL>
           <LI>
-            <strong>Open case</strong> is free, forever. There&rsquo;s nothing to
-            cancel and nothing to refund.
+            <strong>Open case</strong>{" "}
+            is free, forever. There&rsquo;s nothing to cancel and nothing to
+            refund.
           </LI>
           <LI>
             <strong>Standing docket</strong> and <strong>Full bench</strong> are

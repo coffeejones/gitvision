@@ -57,10 +57,11 @@ export default function PrivacyPage() {
           RepoJury (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is an early proof of
           concept, not yet run by a registered company. For the personal data
           described below, the operator of RepoJury acts as the{" "}
-          <strong>data controller</strong> under the EU General Data Protection
-          Regulation (GDPR). We&rsquo;ll name that operator, and where it&rsquo;s
-          registered, once RepoJury launches commercially. Until then, reach us
-          at <a href="mailto:support@repojury.com">support@repojury.com</a>.
+          <strong>data controller</strong>{" "}
+          under the EU General Data Protection Regulation (GDPR). We&rsquo;ll
+          name that operator, and where it&rsquo;s registered, once RepoJury
+          launches commercially. Until then, reach us at{" "}
+          <a href="mailto:support@repojury.com">support@repojury.com</a>.
         </P>
       </Section>
 
@@ -119,8 +120,9 @@ export default function PrivacyPage() {
           </LI>
         </UL>
         <P>
-          We do <strong>not</strong> collect special-category data (health,
-          political opinions, etc.), and we don&rsquo;t use advertising
+          We do <strong>not</strong>{" "}
+          collect special-category data (health, political opinions, etc.), and
+          we don&rsquo;t use advertising
           networks, fingerprinting, or session-replay tools.
         </P>
       </Section>
@@ -286,8 +288,8 @@ export default function PrivacyPage() {
       <Section id="contact" num="11." title="Contact">
         <P>
           Questions about this policy or your data? Email{" "}
-          <a href="mailto:support@repojury.com">support@repojury.com</a> and
-          we&rsquo;ll get back to you.
+          <a href="mailto:support@repojury.com">support@repojury.com</a>{" "}
+          and we&rsquo;ll get back to you.
         </P>
       </Section>
     </LegalShell>

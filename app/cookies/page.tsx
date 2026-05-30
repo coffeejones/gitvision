@@ -109,12 +109,13 @@ export default function CookiesPage() {
           first-visit hint again, for example).
         </P>
         <P>
-          <strong>Your choice.</strong> When you first visit, a banner asks you
-          to accept or decline the optional functional storage. Essential
-          cookies always run (the service can&rsquo;t work without them), but if
-          you decline, we don&rsquo;t write the functional items above. You can
-          change your mind by clearing the <code>cookie-consent</code> value in
-          your browser, which brings the banner back.
+          <strong>Your choice.</strong>{" "}
+          When you first visit, a banner asks you to accept or decline the
+          optional functional storage. Essential cookies always run (the
+          service can&rsquo;t work without them), but if you decline, we
+          don&rsquo;t write the functional items above. You can change your mind
+          by clearing the <code>cookie-consent</code> value in your browser,
+          which brings the banner back.
         </P>
       </Section>
 

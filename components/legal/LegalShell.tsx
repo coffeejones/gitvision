@@ -36,12 +36,13 @@ interface ShellProps {
 export function DraftNotice() {
   return (
     <div className="legal-note">
-      <b>Pre-launch notice.</b> RepoJury is an early proof of concept, not yet
-      a registered business. This page describes honestly how the service
-      handles data today — but there&rsquo;s no named operator, registered
-      address, or chosen jurisdiction yet, and it hasn&rsquo;t been reviewed by
-      a lawyer. Once RepoJury launches commercially, a registered entity and a
-      proper policy will replace this. Questions:{" "}
+      <b>Pre-launch notice.</b>{" "}
+      RepoJury is an early proof of concept, not yet a registered business.
+      This page describes honestly how the service handles data today — but
+      there&rsquo;s no named operator, registered address, or chosen
+      jurisdiction yet, and it hasn&rsquo;t been reviewed by a lawyer. Once
+      RepoJury launches commercially, a registered entity and a proper policy
+      will replace this. Questions:{" "}
       <a href="mailto:support@repojury.com">support@repojury.com</a>.
     </div>
   );
