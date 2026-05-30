@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CrestSeal } from "./seals";
 
 export function RJFooter() {
@@ -14,9 +15,15 @@ export function RJFooter() {
           <a href="#departments">Departments</a>
           <a href="#trial">How it works</a>
           <a href="#custody">Chain of custody</a>
-          <a href="#pricing">Pricing</a>
+          <Link href="/pricing">Pricing</Link>
         </div>
         <div className="copy">© 2026 REPOJURY · REPOJURY.COM</div>
+      </div>
+      <div className="wrap foot-legal">
+        <Link href="/privacy">Privacy</Link>
+        <Link href="/terms">Terms</Link>
+        <Link href="/cookies">Cookies</Link>
+        <Link href="/refunds">Refunds</Link>
       </div>
     </footer>
   );

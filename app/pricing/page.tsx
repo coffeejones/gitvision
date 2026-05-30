@@ -242,6 +242,12 @@ function PricingFooter() {
         </div>
         <span className="copy">© 2026 RepoJury</span>
       </div>
+      <div className="wrap foot-legal">
+        <Link href="/privacy">Privacy</Link>
+        <Link href="/terms">Terms</Link>
+        <Link href="/cookies">Cookies</Link>
+        <Link href="/refunds">Refunds</Link>
+      </div>
     </footer>
   );
 }

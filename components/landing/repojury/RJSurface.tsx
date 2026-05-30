@@ -25,6 +25,7 @@
 import "./repojury.css";
 import type { ReactNode } from "react";
 import { Fraunces, Hanken_Grotesk, Spline_Sans_Mono } from "next/font/google";
+import { CookieNotice } from "./CookieNotice";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -77,6 +78,7 @@ export function RJSurface({ children, className = "" }: Props) {
       <div className="desk-line" aria-hidden />
       <div className="grain" aria-hidden />
       {children}
+      <CookieNotice />
     </div>
   );
 }
