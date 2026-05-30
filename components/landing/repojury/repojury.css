@@ -197,15 +197,49 @@
 .rj .feature-exhibit{display:inline-flex;align-items:center;gap:9px;font-family:var(--font-mono);font-size:10px;
   letter-spacing:.18em;text-transform:uppercase;color:var(--brass);margin-bottom:13px}
 .rj .feature-exhibit::before{content:"";width:24px;height:1px;background:linear-gradient(90deg,var(--brass),transparent)}
-/* The screenshot, mounted like a physical evidence photo: cream matte
-   board + inner print border + drop shadow. */
-.rj .feature-shot{margin:0;background:linear-gradient(168deg,#ece4d1,#e2d9c2);padding:11px 11px 13px;border-radius:5px;
-  box-shadow:0 2px 0 rgba(255,255,255,.45) inset,0 34px 64px -30px rgba(0,0,0,.82),0 12px 26px -18px rgba(0,0,0,.55);
-  transition:transform .25s,box-shadow .25s}
-.rj .feature-shot:hover{transform:translateY(-3px);box-shadow:0 2px 0 rgba(255,255,255,.45) inset,0 42px 72px -28px rgba(0,0,0,.85)}
-.rj .feature-shot img{display:block;width:100%;height:auto;border-radius:2px;border:1px solid rgba(40,30,12,.28)}
 .rj .feature-tag{font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
   color:var(--brass);display:block;margin-bottom:14px}
+
+/* Hand-built feature mockup (dossier palette, not a screenshot) —
+   evokes a workspace panel while belonging to the page, like Exhibit A. */
+.rj .fm{position:relative;background:var(--noir-850);border:1px solid var(--line);border-radius:13px;padding:17px 18px;
+  font-family:var(--font-mono);overflow:hidden;
+  box-shadow:0 32px 62px -32px rgba(0,0,0,.8),0 10px 24px -18px rgba(0,0,0,.5),0 1px 0 rgba(233,229,216,.04) inset;
+  background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
+  background-size:100% 30px,30px 100%;transition:border-color .25s,transform .25s}
+.rj .fm:hover{border-color:rgba(201,162,39,.28);transform:translateY(-3px)}
+.rj .fm-head{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;padding-bottom:13px;margin-bottom:14px;
+  border-bottom:1px solid var(--line)}
+.rj .fm-eyebrow{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
+.rj .fm-file{font-size:13px;color:var(--bone)}
+.rj .fm-tag{margin-left:auto;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--bone-faint)}
+/* blast radius columns */
+.rj .fm-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.rj .fm-col-head{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--bone-dim);margin-bottom:9px}
+.rj .fm-col-head b{color:var(--brass-lt);margin-left:5px}
+.rj .fm-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.rj .fm-col li{font-size:11px;color:var(--bone-dim);display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rj .fm-warn{width:5px;height:5px;background:var(--caution);flex:none;transform:rotate(45deg)}
+.rj .fm-dot{width:5px;height:5px;border-radius:50%;background:var(--bone-faint);flex:none}
+/* signals */
+.rj .fm-signal{padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.rj .fm-signal:first-of-type{padding-top:0}
+.rj .fm-signal:last-child{border-bottom:none;padding-bottom:0}
+.rj .fm-signal-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.rj .fm-signal-top b{font-family:var(--font-body);font-size:14px;color:var(--bone);font-weight:600}
+.rj .fm-paths{font-size:11px;color:var(--bone-dim);line-height:1.5}
+/* security scanners */
+.rj .fm-scan{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--line-soft)}
+.rj .fm-scan:first-of-type{padding-top:0}
+.rj .fm-scan:last-child{border-bottom:none;padding-bottom:0}
+.rj .fm-scan-name b{font-family:var(--font-body);font-size:14px;color:var(--bone);font-weight:600;display:block;margin-bottom:2px}
+.rj .fm-scan-name span{font-size:10.5px;color:var(--bone-faint)}
+/* badges */
+.rj .fm-badge{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:6px;
+  border:1px solid;font-weight:600;flex:none}
+.rj .fm-badge.ok{color:var(--cleared);border-color:rgba(16,185,129,.42);background:rgba(16,185,129,.09)}
+.rj .fm-badge.warn,.rj .fm-badge.med{color:var(--caution);border-color:rgba(224,162,58,.42);background:rgba(224,162,58,.1)}
+.rj .fm-badge.high{color:var(--flagged);border-color:rgba(229,72,77,.42);background:rgba(229,72,77,.1)}
 .rj .feature-copy h3{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,2.3vw,29px);
   line-height:1.1;letter-spacing:-.015em;color:var(--bone);margin-bottom:14px}
 .rj .feature-copy p{color:var(--bone-dim);font-size:15px;line-height:1.66}

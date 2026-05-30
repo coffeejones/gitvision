@@ -1,26 +1,136 @@
 // Investigation — "the verdict is where you start, not where you stop"
-// (Phase N; reworked to focused feature rows).
+// (Phase N; mockups instead of screenshots).
 //
-// Persona testing said the page read as a one-shot grader because the
-// workspace was never shown. First attempt (full-workspace polaroids
-// on a manila folder) looked unrealistic and the shots were too small
-// to read. This version shows tight, legible crops of the actual
-// product — blast radius, signal evidence, the security scanners — as
-// alternating feature rows, each tagged with a brass exhibit label.
-// Real screenshots, presented straight, inside the dossier palette.
+// Real TOK-dark product screenshots never sat right against the warm
+// forensic-dossier palette — wrapping them four different ways didn't
+// fix a fundamental aesthetic clash. So these feature views are
+// hand-built mockups in the dossier palette (paper / brass / mono /
+// noir), the same approach as Exhibit A (the dependency graph in
+// VerdictFull). They evoke the real workspace — blast radius, signal
+// evidence, the security scanners — while belonging to the page.
 //
-// Server component. Crops captured from the analyzed colinhacks/zod
-// case (Exhibit A is the dependency graph in VerdictFull).
+// Server component, no images.
 
+import type { ReactNode } from "react";
 import { Reveal } from "../Reveal";
+
+// ── Hand-built feature mockups (dossier palette) ──────────────────────
+
+function BlastRadiusMock() {
+  const incoming = [
+    "routes/login.ts",
+    "middleware/require-auth.ts",
+    "api/users/[id].ts",
+    "lib/session-cookie.ts",
+    "tests/auth.e2e.ts",
+  ];
+  const outgoing = [
+    "lib/crypto/sign.ts",
+    "db/pool.ts",
+    "config/env.ts",
+  ];
+  return (
+    <div className="fm">
+      <div className="fm-head">
+        <span className="fm-eyebrow">Blast radius for</span>
+        <span className="fm-file">auth/session.ts</span>
+        <span className="fm-tag">complexity 58</span>
+      </div>
+      <div className="fm-cols">
+        <div className="fm-col">
+          <div className="fm-col-head">
+            Incoming — what breaks <b>41</b>
+          </div>
+          <ul>
+            {incoming.map((p) => (
+              <li key={p}>
+                <span className="fm-warn" /> {p}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="fm-col">
+          <div className="fm-col-head">
+            Outgoing — depends on <b>12</b>
+          </div>
+          <ul>
+            {outgoing.map((p) => (
+              <li key={p}>
+                <span className="fm-dot" /> {p}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SignalsMock() {
+  return (
+    <div className="fm">
+      <div className="fm-head">
+        <span className="fm-eyebrow">Signals · needs work</span>
+        <span className="fm-tag">20 deterministic</span>
+      </div>
+      <div className="fm-signal">
+        <div className="fm-signal-top">
+          <b>Tightly-coupled modules</b>
+          <span className="fm-badge high">High</span>
+        </div>
+        <div className="fm-paths">
+          auth/session.ts · payments/ledger.ts · users/store.ts
+        </div>
+      </div>
+      <div className="fm-signal">
+        <div className="fm-signal-top">
+          <b>Untested hotspots</b>
+          <span className="fm-badge med">Med</span>
+        </div>
+        <div className="fm-paths">ledger.ts — 1,240 LOC · cyclomatic 58 · 0 tests</div>
+      </div>
+      <div className="fm-signal">
+        <div className="fm-signal-top">
+          <b>Bus factor</b>
+          <span className="fm-badge med">Med</span>
+        </div>
+        <div className="fm-paths">auth/ — 62 commits · 1 author</div>
+      </div>
+    </div>
+  );
+}
+
+function SecurityMock() {
+  const rows: { name: string; sub: string; state: "ok" | "warn"; label: string }[] = [
+    { name: "Incidents", sub: "10 curated supply-chain attacks", state: "ok", label: "Clear" },
+    { name: "Secrets", sub: "regex scan of source + config", state: "ok", label: "Clear" },
+    { name: "Patterns", sub: "eval / new Function / exec", state: "warn", label: "1 noted" },
+  ];
+  return (
+    <div className="fm">
+      <div className="fm-head">
+        <span className="fm-eyebrow">Security · 3 scanners</span>
+        <span className="fm-tag">deterministic</span>
+      </div>
+      {rows.map((r) => (
+        <div className="fm-scan" key={r.name}>
+          <div className="fm-scan-name">
+            <b>{r.name}</b>
+            <span>{r.sub}</span>
+          </div>
+          <span className={`fm-badge ${r.state}`}>{r.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type Feature = {
   no: string;
   tag: string;
   title: string;
   body: string;
-  src: string;
-  alt: string;
+  mock: ReactNode;
 };
 
 const FEATURES: Feature[] = [
@@ -29,24 +139,21 @@ const FEATURES: Feature[] = [
     tag: "Forensics Lab · Blast radius",
     title: "Know what breaks before you touch it",
     body: "Pick any file and trace its blast radius — every module that depends on it, and everything it leans on. Refactor with the whole picture instead of a guess.",
-    src: "/shots/feature-blast.png",
-    alt: "RepoJury blast-radius view — incoming and outgoing dependencies for a single file",
+    mock: <BlastRadiusMock />,
   },
   {
     no: "Exhibit C",
     tag: "Health Department · Signals",
     title: "Every signal, with the evidence",
     body: "All 20 deterministic signals, sorted into what's working, what needs work, and open questions. Each one carries the file paths and numbers behind it — nothing asserted without proof you can open.",
-    src: "/shots/feature-signals.png",
-    alt: "RepoJury signals view — deterministic signals with file paths and numbers as evidence",
+    mock: <SignalsMock />,
   },
   {
     no: "Exhibit D",
     tag: "Security Bureau · Scanners",
     title: "A security review you can trust",
     body: "Three deterministic scanners — supply-chain incidents, leaked secrets, risky patterns. No AI guesses: every finding maps back to a documented advisory or a literal match in your code.",
-    src: "/shots/feature-security.png",
-    alt: "RepoJury security view — three deterministic scanners with clean status",
+    mock: <SecurityMock />,
   },
 ];
 
@@ -78,9 +185,7 @@ export function Investigation() {
           >
             <div className="feature-shot-wrap">
               <span className="feature-exhibit">{f.no}</span>
-              <figure className="feature-shot">
-                <img src={f.src} alt={f.alt} loading="lazy" />
-              </figure>
+              {f.mock}
             </div>
             <div className="feature-copy">
               <span className="feature-tag">{f.tag}</span>
