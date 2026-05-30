@@ -183,6 +183,17 @@
 .rj .estamp.ok{color:#0c7a59;border-color:rgba(12,122,89,.5);background:rgba(16,185,129,.08)}
 
 /* INVESTIGATION ("the verdict is where you start") */
+.rj .exhibit-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:50px}
+@media(max-width:860px){.rj .exhibit-strip{grid-template-columns:1fr;max-width:480px;margin-inline:auto}}
+.rj .exhibit-card{display:flex;flex-direction:column;border:1px solid rgba(201,162,39,.26);border-radius:13px;
+  overflow:hidden;background:var(--noir-800);box-shadow:0 26px 54px -30px rgba(0,0,0,.75);
+  transition:border-color .25s,transform .25s}
+.rj .exhibit-card:hover{border-color:rgba(201,162,39,.5);transform:translateY(-3px)}
+.rj .exhibit-label{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-family:var(--font-mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--brass);
+  padding:11px 14px;border-bottom:1px solid var(--line);background:rgba(201,162,39,.04)}
+.rj .exhibit-card img{display:block;width:100%;height:auto;border-bottom:1px solid var(--line)}
+.rj .exhibit-cap{font-size:12.5px;line-height:1.5;color:var(--bone-dim);padding:13px 15px;margin:0;flex:1}
 .rj .invest-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
 @media(max-width:820px){.rj .invest-grid{grid-template-columns:1fr}}
 .rj .invest-card{position:relative;border:1px solid var(--line);border-radius:14px;padding:28px;

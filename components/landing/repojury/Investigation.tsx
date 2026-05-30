@@ -60,6 +60,35 @@ const MOVES: Move[] = [
   },
 ];
 
+type Exhibit = { no: string; name: string; src: string; alt: string; cap: string };
+
+// Real product screenshots (the analyzed colinhacks/zod case), framed
+// as evidence exhibits. Exhibit A is the dependency graph in the
+// VerdictFull section, so these pick up at B.
+const EXHIBITS: Exhibit[] = [
+  {
+    no: "Exhibit B",
+    name: "Hotspot map",
+    src: "/shots/workspace-canvas.png",
+    alt: "RepoJury Canvas view — every file as a node, sized by complexity and coloured by ownership",
+    cap: "Every file as a node — sized by complexity, coloured by ownership. The whole codebase, at a glance.",
+  },
+  {
+    no: "Exhibit C",
+    name: "Blast radius",
+    src: "/shots/workspace-code.png",
+    alt: "RepoJury Code view — incoming and outgoing dependencies for a single file",
+    cap: "Pick any file and see exactly what breaks if you change it — and what it leans on.",
+  },
+  {
+    no: "Exhibit D",
+    name: "Signals",
+    src: "/shots/workspace-signals.png",
+    alt: "RepoJury Signals view — 20 deterministic signals with file paths and numbers as evidence",
+    cap: "All 20 signals, each with the exact file paths and numbers behind the finding.",
+  },
+];
+
 export function Investigation() {
   return (
     <section className="section-pad spot" id="investigate">
@@ -80,6 +109,24 @@ export function Investigation() {
             to.
           </p>
         </Reveal>
+
+        {/* Real workspace views, framed as exhibits. These are actual
+            screenshots of the product (the analyzed colinhacks/zod case)
+            — proof the case file is a workspace you explore, not a
+            one-page report. */}
+        <Reveal className="exhibit-strip">
+          {EXHIBITS.map((ex) => (
+            <figure className="exhibit-card" key={ex.no}>
+              <figcaption className="exhibit-label">
+                <span>{ex.no}</span>
+                <span>{ex.name}</span>
+              </figcaption>
+              <img src={ex.src} alt={ex.alt} loading="lazy" />
+              <p className="exhibit-cap">{ex.cap}</p>
+            </figure>
+          ))}
+        </Reveal>
+
         <Reveal className="invest-grid">
           {MOVES.map((m) => (
             <div className="invest-card" key={m.title}>

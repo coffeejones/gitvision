@@ -23,16 +23,15 @@ export function Hero() {
             <span className="dot" /> Case intake · open 24/7
           </div>
           <h1>
-            Every repo has a verdict.
+            Get a verdict.
             <br />
-            Then you open the <em>case file.</em>
+            Understand the <em>evidence.</em>
           </h1>
           <p className="lede">
             Four departments investigate your codebase — health,
             security, forensics, supply — and hand down a verdict. Then
-            you dig in: see why each finding landed, what to fix first,
-            and trace every signal to the evidence. Understand your
-            code, not just its grade.
+            you dig into the case file: why each finding landed, what to
+            fix first, and the evidence behind every signal.
           </p>
           <HeroIntake />
         </div>
