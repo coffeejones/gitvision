@@ -5,7 +5,7 @@
 // that must be identical across the landing, the auth pages, and
 // /pricing so they read as one continuous brand:
 //
-//   1. Fonts — Fraunces (display), Hanken Grotesk (body), Spline
+//   1. Fonts — Newsreader (display), Hanken Grotesk (body), Spline
 //      Sans Mono (case numbers). next/font requires module-scope
 //      initialization, so they live here and apply as CSS variables
 //      on the .rj root.
@@ -24,12 +24,12 @@
 
 import "./repojury.css";
 import type { ReactNode } from "react";
-import { Fraunces, Hanken_Grotesk, Spline_Sans_Mono } from "next/font/google";
+import { Newsreader, Hanken_Grotesk, Spline_Sans_Mono } from "next/font/google";
 import { CookieNotice } from "./CookieNotice";
 
-const fraunces = Fraunces({
+const display = Newsreader({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  variable: "--font-rj-display",
   style: ["normal", "italic"],
   display: "swap",
 });
@@ -71,7 +71,7 @@ interface Props {
 export function RJSurface({ children, className = "" }: Props) {
   return (
     <div
-      className={`rj ${fraunces.variable} ${hanken.variable} ${splineMono.variable} ${className}`}
+      className={`rj ${display.variable} ${hanken.variable} ${splineMono.variable} ${className}`}
     >
       <RJDefs />
       <div className="vignette" aria-hidden />
