@@ -12,8 +12,7 @@ export function RJFooter() {
           </span>
         </div>
         <div className="foot-links">
-          <a href="#departments">Departments</a>
-          <a href="#trial">How it works</a>
+          <a href="#process">How it works</a>
           <a href="#custody">Chain of custody</a>
           <Link href="/pricing">Pricing</Link>
         </div>

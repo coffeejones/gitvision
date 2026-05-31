@@ -27,7 +27,7 @@ import { getWorkspaceSummaries } from "@/lib/intelligence/workspaceSummary";
 import { getDemoCard, type DemoCard } from "@/lib/intelligence/demoCard";
 import { type DemoRepo } from "@/components/RepoInputForm";
 import { AdaptiveHome } from "@/components/AdaptiveHome";
-import { RepoJury } from "@/components/landing/repojury/RepoJury";
+import { RepoJuryV2 } from "@/components/landing/repojury/RepoJuryV2";
 
 export const dynamic = "force-dynamic";
 
@@ -73,10 +73,11 @@ export default async function Home() {
   const userOwnedSessions = filterSessionsByUser(sessions, userId);
 
   // Phase R: marketing branch — anonymous or zero-session visitors get
-  // the RepoJury landing. It's self-contained (no demo payload), so we
-  // return before computing any of the workspace projections below.
+  // the consolidated RepoJury landing (V2). It's self-contained (no demo
+  // payload), so we return before computing any of the workspace
+  // projections below.
   if (userOwnedSessions.length === 0) {
-    return <RepoJury />;
+    return <RepoJuryV2 />;
   }
 
   // ── Power-user branch: compute the workspace dashboard payloads ──
