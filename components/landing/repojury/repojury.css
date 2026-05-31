@@ -541,7 +541,8 @@
 .rj .auth-wrap{min-height:100vh;display:grid;grid-template-columns:5fr 6fr}
 @media(max-width:860px){.rj .auth-wrap{grid-template-columns:1fr}}
 .rj .auth-brand{display:none;position:relative;padding:56px 56px 48px;border-right:1px solid var(--line);
-  flex-direction:column;justify-content:space-between}
+  flex-direction:column;justify-content:space-between;
+  background:radial-gradient(75% 55% at 30% 40%,rgba(201,162,39,.1),rgba(233,229,216,.025) 38%,transparent 72%)}
 @media(min-width:861px){.rj .auth-brand{display:flex}}
 .rj .auth-brand .brand{font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--bone);
   display:flex;align-items:center;gap:11px}

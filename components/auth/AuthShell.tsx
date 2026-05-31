@@ -61,20 +61,22 @@ function BrandPanel() {
       </Link>
 
       <div className="auth-tease">
-        <h2>Every repo has a verdict.</h2>
+        <h2>Step inside the Chambers.</h2>
         <p>
-          Four departments examine your codebase — health, security,
-          forensics, supply — and return a score you can defend. From
-          one URL, in seconds.
+          Past the seal, the Chambers holds every repo you&rsquo;ve put
+          on trial — each verdict, and the evidence behind every
+          finding. Re-run anytime; &ldquo;since your last visit&rdquo;
+          shows exactly what moved.
         </p>
         <ul className="auth-points">
           <li>
             <Check size={15} />
-            Put any public repo on trial, free
+            Open any case file — verdict, signals, and the evidence
+            behind them
           </li>
           <li>
             <Check size={15} />
-            One grounded verdict on every pull request
+            Re-run anytime — see exactly what moved since your last visit
           </li>
           <li>
             <Check size={15} />

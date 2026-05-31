@@ -112,7 +112,7 @@ export function AuthForm({ mode, redirectTo = "/" }: Props) {
       <p className="sub">
         {isSignup
           ? "Put any GitHub repo on trial and keep your case files across devices."
-          : "Sign in to reopen your saved cases."}
+          : "Sign in and step back into the Chambers."}
       </p>
 
       {/* GitHub OAuth — primary path for our target audience */}
