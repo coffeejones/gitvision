@@ -948,7 +948,7 @@ function PRBotCompactMockup() {
           className="text-[11px] font-medium"
           style={{ color: TOK.textPrimary }}
         >
-          repobaron-pr
+          repojury
         </span>
         <span
           className="text-[9px] uppercase tracking-[0.1em] font-semibold px-1 py-0.5 rounded"

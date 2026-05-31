@@ -85,7 +85,7 @@ export function MarketingNav() {
             What&apos;s new
           </a>
           <a
-            href="https://github.com/apps/repobaron-pr"
+            href="https://github.com/apps/repojury"
             target="_blank"
             rel="noopener noreferrer"
             className="hidden md:inline-flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm transition hover:bg-white/5"
