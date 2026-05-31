@@ -17,12 +17,10 @@ import { authClient } from "@/lib/authClient";
 
 type NavLink = { href: string; label: string };
 
-// Default in-page anchors for the full "/" landing. V2 (the
-// consolidated /preview arc) has fewer sections, so it passes its own
-// set — keeping this default untouched means "/" is unchanged.
+// Canonical in-page anchors for the landing's sections. The optional
+// `links` prop can still override them; the default is the live set.
 const DEFAULT_LINKS: NavLink[] = [
-  { href: "#departments", label: "Departments" },
-  { href: "#trial", label: "How it works" },
+  { href: "#process", label: "How it works" },
   { href: "#custody", label: "Chain of custody" },
   { href: "#pricing", label: "Pricing" },
 ];
