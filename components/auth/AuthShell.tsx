@@ -85,7 +85,7 @@ function BrandPanel() {
         </ul>
       </div>
 
-      <p className="auth-foot">RepoJury · made by coffeejones</p>
+      <p className="auth-foot">© 2026 RepoJury</p>
     </aside>
   );
 }

@@ -96,7 +96,7 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
       ${footnoteHtml}
     </div>
     <p style="margin: 16px 0 0; text-align: center; color: ${TEXT_MUTED}; font-size: 11px; line-height: 1.5;">
-      RepoJury &middot; made by coffeejones &middot;
+      RepoJury &middot;
       <a href="https://repojury.com" style="color: ${TEXT_MUTED}; text-decoration: underline;">repojury.com</a>
     </p>
   </div>
