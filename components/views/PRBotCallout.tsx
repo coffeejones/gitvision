@@ -22,7 +22,7 @@ import {
 import { TOK } from "@/lib/theme";
 import type { Tier } from "@/components/TierIcon";
 
-const INSTALL_URL = "https://github.com/apps/repojury";
+const INSTALL_URL = "https://github.com/apps/repojury-pr";
 const LEARN_MORE_URL =
   "https://github.com/coffeejones/repobaron#pr-bot-github-app";
 

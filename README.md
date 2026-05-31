@@ -193,7 +193,7 @@ evidence.
 ### Install
 
 🚧 **Currently in private beta.** v1.0 install ceremony will land at
-`https://github.com/apps/repojury` once we've
+`https://github.com/apps/repojury-pr` once we've
 validated noise rate on 2-3 friendly real-world repos. If you want
 to be one of those early installs, [open an issue](https://github.com/coffeejones/repobaron/issues).
 
