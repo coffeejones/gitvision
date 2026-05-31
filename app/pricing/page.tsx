@@ -17,7 +17,6 @@ import { CrestSeal } from "@/components/landing/repojury/seals";
 import {
   TIER_CONFIG,
   TIER_ORDER,
-  TRIAL_DAYS,
   annualSavingsPercent,
   annualSavingsUsd,
   formatPrice,
@@ -57,8 +56,7 @@ export default async function PricingPage({
           <p className="lede">
             Put any public repo on trial for free. Upgrade when you need
             unlimited private cases, the verdict on every pull request, or
-            the whole bench for your team. {TRIAL_DAYS}-day trial on paid
-            tiers — no card up front.
+            the whole bench for your team.
           </p>
         </header>
 
@@ -155,7 +153,6 @@ function PricingCards({
               isPaid={isPaid}
               isRecommended={tier.isRecommended}
               loggedIn={loggedIn}
-              trialDays={TRIAL_DAYS}
             />
 
             <ul>

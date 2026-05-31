@@ -151,7 +151,7 @@ export async function POST(req: Request) {
     tierToSet = (tierInfo?.tier ?? "open-case") as Tier;
     statusToSet = "past_due";
   } else if (sub.status === "trialing") {
-    // Inside 14-day trial — full access
+    // Inside a Polar trial (if one is ever configured) — full access
     tierToSet = (tierInfo?.tier ?? "open-case") as Tier;
     statusToSet = "trialing";
   } else if (sub.status === "active") {

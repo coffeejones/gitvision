@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 const TOC: [string, string][] = [
-  ["plans", "1. Plans & trials"],
+  ["plans", "1. Plans"],
   ["cancel", "2. Cancelling"],
   ["withdrawal", "3. EU right of withdrawal"],
   ["refunds", "4. Refunds"],
@@ -38,12 +38,12 @@ export default function RefundsPage() {
       toc={TOC}
     >
       <Intro>
-        This explains how our paid plans, trials, cancellations, and refunds
+        This explains how our paid plans, cancellations, and refunds
         work. Payments are processed by our provider, Polar.
       </Intro>
       <DraftNotice />
 
-      <Section id="plans" num="1." title="Plans & trials">
+      <Section id="plans" num="1." title="Plans">
         <UL>
           <LI>
             <strong>Open case</strong>{" "}
@@ -54,11 +54,6 @@ export default function RefundsPage() {
             <strong>Standing docket</strong> and <strong>Full bench</strong> are
             subscriptions, billed monthly or annually. They renew automatically
             until you cancel.
-          </LI>
-          <LI>
-            Paid plans may start with a free trial. We won&rsquo;t charge you
-            during the trial. If you don&rsquo;t cancel before it ends, your paid
-            subscription begins and the first payment is taken.
           </LI>
         </UL>
       </Section>

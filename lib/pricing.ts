@@ -72,9 +72,6 @@ export interface TierConfig {
   isRecommended: boolean;
 }
 
-/** Trial period for paid tiers, in days. No card up front during trial. */
-export const TRIAL_DAYS = 14;
-
 export const TIER_CONFIG: Record<Tier, TierConfig> = {
   "open-case": {
     id: "open-case",

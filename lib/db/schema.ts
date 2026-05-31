@@ -41,7 +41,7 @@ export const user = sqliteTable("user", {
   polarSubscriptionId: text("polar_subscription_id"),
   // Subscription lifecycle status from Polar:
   //   "active"   — billing OK, full access
-  //   "trialing" — inside 14-day trial, full access
+  //   "trialing" — inside a Polar trial (if configured), full access
   //   "canceled" — user cancelled, access until currentPeriodEnd
   //   "revoked"  — payment failed, immediate downgrade
   //   "past_due" — last invoice failed but still in grace period

@@ -117,11 +117,6 @@ export default function TermsPage() {
             or annually through our payment provider, Polar.
           </LI>
           <LI>
-            Paid plans may include a free trial. If you don&rsquo;t cancel before
-            the trial ends, the subscription begins and the first charge is
-            taken.
-          </LI>
-          <LI>
             Subscriptions renew automatically until cancelled. You can cancel any
             time; see our <a href="/refunds">Refund &amp; Cancellation Policy</a>{" "}
             for what happens then and your withdrawal rights.

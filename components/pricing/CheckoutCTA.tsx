@@ -24,7 +24,6 @@ interface Props {
   /** Pre-resolved auth state — undefined means we'll fetch
    *  client-side; true/false means caller knows the answer. */
   loggedIn?: boolean;
-  trialDays: number;
 }
 
 export function CheckoutCTA({
@@ -33,7 +32,6 @@ export function CheckoutCTA({
   isPaid,
   isRecommended,
   loggedIn,
-  trialDays,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -86,7 +84,7 @@ export function CheckoutCTA({
   const label = loading
     ? "Opening checkout…"
     : isPaid
-      ? `Start ${trialDays}-day trial`
+      ? "Subscribe"
       : "Start free";
 
   return (
