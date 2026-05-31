@@ -110,8 +110,8 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
     tagline: "For repos you live in.",
     monthlyPriceUsd: 14.99,
     annualPriceUsd: 149.99,
-    polarProductIdMonthly: "e4a98280-2920-41b9-af24-f713841b22f6",
-    polarProductIdAnnual: "4ebaff71-30bb-46da-ba0a-a8df457fd277",
+    polarProductIdMonthly: "41dd4d70-8aeb-4bf9-9910-2528fd9cc389",
+    polarProductIdAnnual: "18fb0cc2-9fc7-4829-84fd-32ab65599764",
     limits: {
       savedSessions: -1,
       refreshesPerDay: -1,
@@ -141,8 +141,8 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
     tagline: "For the whole org.",
     monthlyPriceUsd: 39,
     annualPriceUsd: 390,
-    polarProductIdMonthly: "feabdb6f-55e1-4e3a-94a5-bd0c3ae609a3",
-    polarProductIdAnnual: "424ec832-e69b-49f0-8eda-417fc845a909",
+    polarProductIdMonthly: "8e8cbfe1-9e40-4b8c-a328-0fc8625a6353",
+    polarProductIdAnnual: "fd4941ba-b72d-4867-b8e5-0c8ab6d35b95",
     limits: {
       savedSessions: -1,
       refreshesPerDay: -1,
