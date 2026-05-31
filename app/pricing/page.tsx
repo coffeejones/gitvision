@@ -73,7 +73,7 @@ export default async function PricingPage({
   );
 }
 
-// ─── Minimal nav (no landing anchors — they don't exist here) ─────────
+// ─── Minimal nav — links back to the landing's sections (absolute anchors) ─
 
 function PricingNav({ loggedIn }: { loggedIn: boolean }) {
   return (
@@ -85,8 +85,8 @@ function PricingNav({ loggedIn }: { loggedIn: boolean }) {
         </span>
       </Link>
       <div className="nav-links">
-        <Link href="/#departments">Departments</Link>
-        <Link href="/#trial">How it works</Link>
+        <Link href="/#process">How it works</Link>
+        <Link href="/#custody">Chain of custody</Link>
         <Link href="/pricing">Pricing</Link>
       </div>
       <div className="nav-right">

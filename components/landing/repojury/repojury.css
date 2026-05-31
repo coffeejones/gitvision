@@ -505,6 +505,13 @@
 .rj .price-hero h1{font-family:var(--font-display);font-weight:600;font-size:clamp(34px,4.4vw,54px);
   line-height:1.04;letter-spacing:-.025em;color:var(--bone);max-width:18ch}
 .rj .price-hero .lede{max-width:60ch}
+/* match the section-header "case tag" pill on the centered pricing hero */
+.rj .price-hero .eyebrow{padding:7px 14px 7px 11px;border-radius:999px;
+  border:1px solid rgba(201,162,39,.3);
+  background:linear-gradient(180deg,rgba(201,162,39,.1),rgba(201,162,39,.025));
+  box-shadow:0 1px 0 rgba(233,229,216,.05) inset,0 10px 24px -16px rgba(201,162,39,.5)}
+.rj .price-hero .eyebrow::before{width:7px;height:7px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,var(--brass-lt),var(--brass-dk));box-shadow:0 0 8px rgba(201,162,39,.7)}
 .rj .price-toggle{display:inline-flex;align-items:center;gap:4px;padding:5px;border-radius:12px;
   background:rgba(233,229,216,.04);border:1px solid var(--line);margin:0 auto 38px}
 .rj .price-toggle button{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 18px;border:none;
