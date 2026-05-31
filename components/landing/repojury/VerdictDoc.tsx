@@ -44,8 +44,13 @@ export function VerdictDoc() {
 
   return (
     <div className="doc-stage">
-      <article className="verdict-doc">
-        <div className="tape" />
+      <div className="doc-stack">
+        {/* dimmed exhibit sheets fanned behind the verdict, so the hero
+            reads as a case file on a desk, not one floating card */}
+        <span className="doc-ghost g2" aria-hidden />
+        <span className="doc-ghost g1" aria-hidden />
+        <article className="verdict-doc">
+          <div className="tape" />
         <div className="doc-head">
           <div className="doc-case">
             <b>Verdict</b>CASE No. 2026-0481
@@ -108,7 +113,8 @@ export function VerdictDoc() {
           <span>Sealed sandbox · evidence destroyed</span>
           <span>2026·05·29</span>
         </div>
-      </article>
+        </article>
+      </div>
     </div>
   );
 }

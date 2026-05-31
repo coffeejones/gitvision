@@ -83,6 +83,13 @@
 
 /* HERO */
 .rj .hero{padding:150px 0 90px}
+/* warm room-light wash across the hero (in addition to the desk-lamp
+   pool behind the document) so the scene reads as a lit desk in a dark
+   archive, not flat black. Hero-only — other sections keep .spot. */
+.rj .hero::after{content:"";position:absolute;z-index:-1;pointer-events:none;
+  top:46%;right:3%;transform:translateY(-50%);width:1180px;height:900px;
+  background:radial-gradient(58% 54% at 63% 50%,rgba(201,162,39,.1),rgba(233,229,216,.04) 38%,transparent 72%)}
+@media(max-width:940px){.rj .hero::after{right:auto;left:50%;top:62%;transform:translate(-50%,-50%);width:780px;height:780px}}
 .rj .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
 @media(max-width:940px){.rj .hero-grid{grid-template-columns:1fr;gap:48px}.rj .hero{padding:130px 0 70px}}
 @media(max-width:560px){
@@ -117,7 +124,18 @@
 
 /* VERDICT DOCUMENT */
 .rj .doc-stage{position:relative;display:flex;justify-content:center;perspective:1600px}
-.rj .verdict-doc{position:relative;width:min(420px,100%);background:linear-gradient(168deg,var(--paper),var(--paper-2));
+/* warm desk-lamp pool behind the file — lights the document on the dark desk */
+.rj .doc-stage::before{content:"";position:absolute;z-index:0;width:620px;height:620px;top:50%;left:50%;
+  transform:translate(-50%,-54%);pointer-events:none;
+  background:radial-gradient(closest-side,rgba(201,162,39,.21),rgba(201,162,39,.06) 46%,transparent 72%)}
+/* fanned exhibit sheets behind the verdict (dimmed = sitting underneath) */
+.rj .doc-stack{position:relative;width:min(420px,100%)}
+.rj .doc-ghost{position:absolute;inset:0;border-radius:7px;pointer-events:none;
+  background:linear-gradient(168deg,var(--paper-2),var(--paper-edge));
+  box-shadow:0 26px 54px -26px rgba(0,0,0,.7)}
+.rj .doc-ghost.g1{z-index:1;transform:rotate(2.2deg) translate(13px,9px);filter:brightness(.8)}
+.rj .doc-ghost.g2{z-index:0;transform:rotate(5.6deg) translate(28px,20px);filter:brightness(.6)}
+.rj .verdict-doc{position:relative;z-index:2;width:100%;background:linear-gradient(168deg,var(--paper),var(--paper-2));
   color:var(--ink);border-radius:6px;padding:30px 30px 26px;transform:rotate(-2.4deg);
   box-shadow:0 2px 0 rgba(255,255,255,.4) inset, 0 40px 80px -24px rgba(0,0,0,.75),
              0 16px 30px -18px rgba(0,0,0,.6), 0 0 90px -30px rgba(201,162,39,.25);
@@ -159,8 +177,20 @@
 
 /* DEPARTMENTS */
 .rj .section-pad{padding:86px 0}
-.rj .sec-head{margin-bottom:48px;max-width:680px}
-.rj .sec-head .eyebrow{margin-bottom:18px}
+/* Section header — a sealed "case tag" eyebrow + a filed hairline with
+   a brass node, so the block reads as the head of an archived dossier
+   sheet instead of the generic eyebrow / title / lede stack. */
+.rj .sec-head{position:relative;max-width:680px;margin-bottom:44px;padding-bottom:28px}
+.rj .sec-head::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;
+  background:linear-gradient(90deg,rgba(201,162,39,.45),rgba(233,229,216,.12) 32%,transparent 72%)}
+.rj .sec-head::before{content:"";position:absolute;left:0;bottom:-3px;width:7px;height:7px;border-radius:50%;z-index:1;
+  background:radial-gradient(circle at 40% 35%,var(--brass-lt),var(--brass-dk));box-shadow:0 0 9px rgba(201,162,39,.6)}
+.rj .sec-head .eyebrow{margin-bottom:20px;padding:7px 14px 7px 11px;border-radius:999px;
+  border:1px solid rgba(201,162,39,.3);
+  background:linear-gradient(180deg,rgba(201,162,39,.1),rgba(201,162,39,.025));
+  box-shadow:0 1px 0 rgba(233,229,216,.05) inset,0 10px 24px -16px rgba(201,162,39,.5)}
+.rj .sec-head .eyebrow::before{width:7px;height:7px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,var(--brass-lt),var(--brass-dk));box-shadow:0 0 8px rgba(201,162,39,.7)}
 .rj .sec-head h2{margin-bottom:16px}
 .rj .dept-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
 @media(max-width:820px){.rj .dept-grid{grid-template-columns:1fr}}
@@ -202,11 +232,11 @@
 
 /* Hand-built feature mockup (dossier palette, not a screenshot) —
    evokes a workspace panel while belonging to the page, like Exhibit A. */
-.rj .fm{position:relative;background:var(--noir-850);border:1px solid var(--line);border-radius:13px;padding:17px 18px;
+.rj .fm{position:relative;border:1px solid var(--line);border-radius:13px;padding:17px 18px;
   font-family:var(--font-mono);overflow:hidden;
+  background:radial-gradient(120% 75% at 50% -15%,rgba(233,229,216,.05),transparent 58%),var(--noir-850);
   box-shadow:0 32px 62px -32px rgba(0,0,0,.8),0 10px 24px -18px rgba(0,0,0,.5),0 1px 0 rgba(233,229,216,.04) inset;
-  background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
-  background-size:100% 30px,30px 100%;transition:border-color .25s,transform .25s}
+  transition:border-color .25s,transform .25s}
 .rj .fm:hover{border-color:rgba(201,162,39,.28);transform:translateY(-3px)}
 .rj .fm-head{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;padding-bottom:13px;margin-bottom:14px;
   border-bottom:1px solid var(--line)}
@@ -221,6 +251,12 @@
 .rj .fm-col li{font-size:11px;color:var(--bone-dim);display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rj .fm-warn{width:5px;height:5px;background:var(--caution);flex:none;transform:rotate(45deg)}
 .rj .fm-dot{width:5px;height:5px;border-radius:50%;background:var(--bone-faint);flex:none}
+/* "+N more" row + icon legend pinned to the card bottom (fills height,
+   and explains the diamond/dot glyphs) */
+.rj .fm-more{padding-left:13px;color:var(--bone-faint);opacity:.75;font-size:10.5px;letter-spacing:.04em}
+.rj .fm-legend{margin-top:auto;display:flex;gap:18px;flex-wrap:wrap;padding-top:14px;
+  border-top:1px solid var(--line-soft);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--bone-faint)}
+.rj .fm-legend>span{display:inline-flex;align-items:center;gap:7px}
 /* signals */
 .rj .fm-signal{padding:12px 0;border-bottom:1px solid var(--line-soft)}
 .rj .fm-signal:first-of-type{padding-top:0}
@@ -243,6 +279,113 @@
 .rj .feature-copy h3{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,2.3vw,29px);
   line-height:1.1;letter-spacing:-.015em;color:var(--bone);margin-bottom:14px}
 .rj .feature-copy p{color:var(--bone-dim);font-size:15px;line-height:1.66}
+
+/* PROCESS (V2) — the whole case as one vertical arc on a brass
+   case-timeline rail. Four "acts" (intake → departments → verdict →
+   case file) replace V1's separate Departments / How-it-works /
+   Verdict-in-full / Investigation sections, so the page covers the
+   full story without becoming "the next Harry Potter book". Reuses the
+   shared .fm feature mockups in the case-file act. */
+.rj .acts{position:relative;margin-top:8px}
+/* the continuous rail behind the act markers */
+.rj .acts::before{content:"";position:absolute;top:28px;bottom:30px;left:27px;width:2px;
+  background:linear-gradient(180deg,transparent,rgba(201,162,39,.5) 5%,rgba(201,162,39,.5) 95%,transparent)}
+@media(max-width:820px){.rj .acts::before{left:21px}}
+.rj .act{display:grid;grid-template-columns:54px 1fr;gap:30px;padding-bottom:54px;align-items:start}
+.rj .act:last-child{padding-bottom:0}
+@media(max-width:820px){.rj .act{grid-template-columns:42px 1fr;gap:18px;padding-bottom:44px}}
+.rj .act-rail{position:relative;display:flex;justify-content:center}
+.rj .act-no{position:relative;z-index:2;width:54px;height:54px;border-radius:50%;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-weight:600;font-size:20px;letter-spacing:.02em;color:var(--brass-lt);
+  border:1px solid rgba(201,162,39,.5);
+  background:radial-gradient(circle at 50% 28%,rgba(201,162,39,.18),var(--noir-850) 72%)}
+@media(max-width:820px){.rj .act-no{width:42px;height:42px;font-size:16px}}
+.rj .act-body{padding-top:3px;min-width:0}
+.rj .act-label{font-family:var(--font-mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--brass);display:block;margin-bottom:11px}
+.rj .act-body h3{font-family:var(--font-display);font-weight:600;font-size:clamp(22px,2.4vw,30px);
+  line-height:1.08;letter-spacing:-.015em;color:var(--bone);margin-bottom:13px;max-width:20ch}
+.rj .act-body p{color:var(--bone-dim);font-size:15.5px;line-height:1.68;max-width:60ch}
+/* ACT I — intake log line */
+.rj .act-log{margin-top:18px;font-family:var(--font-mono);font-size:12px;line-height:1.7;
+  color:var(--bone-faint);letter-spacing:.02em;border-left:2px solid var(--brass);
+  background:rgba(233,229,216,.03);border-radius:0 9px 9px 0;padding:12px 15px;max-width:600px}
+/* ACT II — four department chips */
+.rj .act-depts{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:680px}
+@media(max-width:620px){.rj .act-depts{grid-template-columns:1fr}}
+.rj .act-dept{border:1px solid var(--line);border-radius:11px;padding:14px 16px;
+  background:linear-gradient(180deg,rgba(233,229,216,.035),transparent);transition:border-color .25s}
+.rj .act-dept:hover{border-color:rgba(201,162,39,.3)}
+.rj .act-dept b{display:block;font-family:var(--font-display);font-weight:600;font-size:16px;
+  color:var(--bone);margin-bottom:3px}
+.rj .act-dept span{font-size:13px;color:var(--bone-dim);line-height:1.5}
+/* ACT III — verdict stamp + department bars */
+.rj .act-verdict{margin-top:22px;display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;
+  border:1px solid var(--line);border-radius:14px;padding:22px 26px;max-width:680px;
+  background:linear-gradient(180deg,rgba(233,229,216,.035),transparent)}
+@media(max-width:620px){.rj .act-verdict{grid-template-columns:1fr;gap:22px;justify-items:center}}
+.rj .av-stamp{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  border:2px solid rgba(184,128,42,.5);border-radius:12px;padding:14px 24px;
+  background:radial-gradient(circle at 50% 26%,rgba(201,162,39,.12),transparent 72%)}
+.rj .av-grade{font-family:var(--font-display);font-weight:600;font-size:42px;line-height:1;
+  color:var(--bone);letter-spacing:-.02em}
+.rj .av-num{font-family:var(--font-mono);font-size:12px;color:var(--bone-faint);letter-spacing:.08em;margin-top:7px}
+.rj .av-ruling{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--caution);margin-top:9px}
+.rj .av-bars{display:flex;flex-direction:column;gap:12px;width:100%}
+.rj .av-bar{display:grid;grid-template-columns:74px 1fr 30px;align-items:center;gap:13px}
+.rj .av-bar-name{font-size:13.5px;color:var(--bone-dim)}
+.rj .av-bar-track{height:7px;border-radius:4px;background:rgba(233,229,216,.08);overflow:hidden}
+.rj .av-bar-track i{display:block;height:100%;border-radius:4px}
+.rj .av-bar-val{font-family:var(--font-mono);font-size:12.5px;color:var(--bone);text-align:right}
+/* ACT IV — since-last-visit diff + reused feature mockups */
+.rj .act-diff{margin-top:20px;display:inline-flex;align-items:center;gap:11px;flex-wrap:wrap;
+  font-family:var(--font-mono);font-size:12px;line-height:1.6;color:var(--bone-dim);letter-spacing:.02em;
+  background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.28);border-radius:10px;padding:9px 15px}
+.rj .act-diff-dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--cleared);
+  box-shadow:0 0 9px var(--cleared)}
+/* ACT IV case file — accordion of the four DEPARTMENTS. One open at a
+   time; the bar (name + mandate + score chip echoing ACT III) stays
+   visible, the department's findings expand below via grid-template-
+   rows 0fr→1fr. Shows the full scope of each department, not one
+   feature — Forensics lists bus factor, untested hotspots, history and
+   blast radius, etc. */
+.rj .cf{margin-top:24px;max-width:780px;display:flex;flex-direction:column;gap:12px}
+.rj .cf-item{border:1px solid var(--line);border-radius:13px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(233,229,216,.035),transparent);transition:border-color .25s,background .25s}
+.rj .cf-item:hover{border-color:rgba(201,162,39,.24)}
+.rj .cf-item.open{border-color:rgba(201,162,39,.36);
+  background:radial-gradient(120% 100% at 50% 0%,rgba(201,162,39,.06),transparent 60%)}
+.rj .cf-bar{width:100%;display:flex;align-items:center;gap:16px;padding:15px 18px;
+  background:none;border:none;cursor:pointer;text-align:left;color:var(--bone)}
+.rj .cf-bar:focus-visible{outline:2px solid rgba(201,162,39,.5);outline-offset:-3px;border-radius:12px}
+.rj .cf-titles{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.rj .cf-title{font-family:var(--font-display);font-weight:600;font-size:18px;letter-spacing:-.01em;color:var(--bone)}
+.rj .cf-mandate{font-size:12.5px;color:var(--bone-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rj .cf-score{flex:none;font-family:var(--font-mono);font-size:13px;font-weight:600;letter-spacing:.02em;
+  padding:4px 11px;border-radius:999px;border:1px solid}
+.rj .cf-score.ok{color:var(--cleared);border-color:rgba(16,185,129,.42);background:rgba(16,185,129,.09)}
+.rj .cf-score.warn{color:var(--caution);border-color:rgba(224,162,58,.42);background:rgba(224,162,58,.1)}
+.rj .cf-score.bad{color:var(--flagged);border-color:rgba(229,72,77,.42);background:rgba(229,72,77,.1)}
+.rj .cf-chev{flex:none;color:var(--bone-faint);transition:transform .3s,color .25s}
+.rj .cf-item.open .cf-chev{transform:rotate(180deg);color:var(--brass)}
+.rj .cf-panel{display:grid;grid-template-rows:0fr;transition:grid-template-rows .34s ease}
+.rj .cf-item.open .cf-panel{grid-template-rows:1fr}
+.rj .cf-panel-inner{overflow:hidden;min-height:0}
+/* department findings list — name + the evidence behind it */
+.rj .cf-finds{list-style:none;margin:0;padding:2px 18px 16px}
+.rj .cf-find{display:grid;grid-template-columns:minmax(150px,40%) 1fr;gap:18px;align-items:baseline;
+  padding:12px 0;border-top:1px solid var(--line-soft)}
+.rj .cf-find:first-child{border-top:none}
+.rj .cf-find-name{position:relative;padding-left:17px;font-size:14px;font-weight:600;color:var(--bone)}
+.rj .cf-find-name::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;
+  background:var(--brass);transform:rotate(45deg)}
+.rj .cf-find-ev{font-family:var(--font-mono);font-size:11.5px;color:var(--bone-dim);line-height:1.5}
+@media(max-width:560px){
+  .rj .cf-mandate{display:none}
+  .rj .cf-find{grid-template-columns:1fr;gap:4px}
+}
 
 /* TRIAL */
 .rj .trial{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative;margin-top:20px}
@@ -299,6 +442,46 @@
 .rj .cu.void::after{content:"DESTROYED";position:absolute;right:16px;bottom:54px;transform:rotate(-10deg);
   font-family:var(--font-mono);font-weight:600;font-size:12.5px;letter-spacing:.16em;color:rgba(229,72,77,.6);
   border:2px solid rgba(229,72,77,.42);border-radius:5px;padding:3px 9px;pointer-events:none}
+
+/* CHAIN OF CUSTODY — V2 refined cards. The three-card row (kept from
+   V1) but lifted to match the Process panels: the same gridded
+   noir-panel stock as the feature mockups, an embossed stage seal,
+   clean prose (no redaction bars), a mono custody log, and a DESTROYED
+   stamp on the final card. Used by /preview (RepoJuryV2) only. */
+.rj .cv-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
+@media(max-width:820px){.rj .cv-grid{grid-template-columns:1fr}}
+.rj .cv{position:relative;border:1px solid var(--line);border-radius:14px;padding:24px 22px 20px;overflow:hidden;
+  background:radial-gradient(120% 75% at 50% -15%,rgba(233,229,216,.045),transparent 58%),var(--noir-850);
+  box-shadow:0 32px 62px -34px rgba(0,0,0,.8),0 10px 24px -18px rgba(0,0,0,.5),0 1px 0 rgba(233,229,216,.04) inset;
+  transition:border-color .25s,transform .25s}
+.rj .cv:hover{border-color:rgba(201,162,39,.28);transform:translateY(-3px)}
+/* top status accent */
+.rj .cv::before{content:"";position:absolute;left:0;right:0;top:0;height:2px}
+.rj .cv.ok::before{background:linear-gradient(90deg,var(--cleared),rgba(16,185,129,0))}
+.rj .cv.warn::before{background:linear-gradient(90deg,var(--caution),rgba(224,162,58,0))}
+.rj .cv.gone::before{background:linear-gradient(90deg,var(--flagged),rgba(229,72,77,0))}
+.rj .cv-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:19px}
+/* embossed stage seal */
+.rj .cv-seal{position:relative;width:40px;height:40px;border-radius:50%;flex:none;
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:13px;font-weight:600;
+  color:var(--brass-lt);border:1px solid rgba(201,162,39,.5);
+  background:radial-gradient(circle at 50% 28%,rgba(201,162,39,.18),var(--noir-800) 72%);
+  box-shadow:0 1px 0 rgba(233,229,216,.06) inset}
+.rj .cv-seal::after{content:"";position:absolute;inset:4px;border-radius:50%;border:1px solid rgba(201,162,39,.2)}
+.rj .cv-chip{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  padding:4px 10px;border-radius:999px;border:1px solid;font-weight:600}
+.rj .cv-chip.ok{color:var(--cleared);border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.07)}
+.rj .cv-chip.warn{color:var(--caution);border-color:rgba(224,162,58,.4);background:rgba(224,162,58,.08)}
+.rj .cv-chip.gone{color:var(--flagged);border-color:rgba(229,72,77,.4);background:rgba(229,72,77,.07)}
+.rj .cv h4{font-family:var(--font-display);font-weight:600;font-size:20px;letter-spacing:-.01em;color:var(--bone);margin-bottom:9px}
+.rj .cv p{font-size:14px;line-height:1.62;color:var(--bone-dim);min-height:68px}
+.rj .cv-log{font-family:var(--font-mono);font-size:11px;letter-spacing:.03em;color:var(--bone-faint);
+  margin-top:18px;padding-top:13px;border-top:1px dashed var(--line)}
+.rj .cv-log b{color:var(--bone-dim);font-weight:500}
+.rj .cv.void::after{content:"DESTROYED";position:absolute;right:18px;bottom:60px;transform:rotate(-11deg);
+  font-family:var(--font-mono);font-weight:600;font-size:12.5px;letter-spacing:.16em;color:rgba(240,140,143,.78);
+  border:2px solid rgba(229,72,77,.5);border-radius:5px;padding:4px 10px;pointer-events:none}
+@media(max-width:820px){.rj .cv p{min-height:0}}
 
 /* PRICING */
 .rj .price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:stretch}

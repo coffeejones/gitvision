@@ -15,7 +15,19 @@ import Link from "next/link";
 import { CrestSeal } from "./seals";
 import { authClient } from "@/lib/authClient";
 
-export function RJNav() {
+type NavLink = { href: string; label: string };
+
+// Default in-page anchors for the full "/" landing. V2 (the
+// consolidated /preview arc) has fewer sections, so it passes its own
+// set — keeping this default untouched means "/" is unchanged.
+const DEFAULT_LINKS: NavLink[] = [
+  { href: "#departments", label: "Departments" },
+  { href: "#trial", label: "How it works" },
+  { href: "#custody", label: "Chain of custody" },
+  { href: "#pricing", label: "Pricing" },
+];
+
+export function RJNav({ links = DEFAULT_LINKS }: { links?: NavLink[] } = {}) {
   const [scrolled, setScrolled] = useState(false);
   const { data: session } = authClient.useSession();
   const loggedIn = !!session?.user;
@@ -43,10 +55,11 @@ export function RJNav() {
         </span>
       </div>
       <div className="nav-links">
-        <a href="#departments">Departments</a>
-        <a href="#trial">How it works</a>
-        <a href="#custody">Chain of custody</a>
-        <a href="#pricing">Pricing</a>
+        {links.map((l) => (
+          <a href={l.href} key={l.href}>
+            {l.label}
+          </a>
+        ))}
       </div>
       <div className="nav-right">
         {loggedIn ? (
