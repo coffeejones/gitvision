@@ -250,16 +250,17 @@ export function RepoInputForm({
           }}
           placeholder="github.com/owner/repo"
           disabled={pending}
-          className="flex-1 bg-transparent h-12 px-4 text-base focus:outline-none disabled:opacity-50"
+          className="flex-1 bg-transparent h-12 px-4 text-base rounded-l-lg outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#10b981] disabled:opacity-50"
           style={{ color: TOK.textPrimary }}
         />
         <button
           type="submit"
           disabled={pending || !value.trim()}
-          className="h-10 mr-1 px-4 rounded-md text-sm font-medium transition disabled:opacity-40"
+          className="h-10 mr-1 px-4 rounded-md text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           style={{
-            background: TOK.accent,
-            color: TOK.accentOn,
+            background: pending || !value.trim() ? TOK.surface : TOK.accent,
+            color: pending || !value.trim() ? TOK.textSecondary : TOK.accentOn,
+            border: `1px solid ${pending || !value.trim() ? TOK.border : "transparent"}`,
           }}
         >
           {pending ? "Analyzing…" : "Analyze →"}
@@ -274,7 +275,7 @@ export function RepoInputForm({
           <button
             type="button"
             onClick={() => setSubdirOpen((o) => !o)}
-            className="text-xs flex items-center gap-1 self-start transition"
+            className="text-xs flex items-center gap-1 self-start transition rounded outline-none focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
             style={{ color: TOK.textMuted }}
           >
             {subdirOpen ? (
@@ -309,7 +310,7 @@ export function RepoInputForm({
                     setAutoFilledFromUrl(false);
                   }}
                   placeholder="src/cmd  (optional · case-sensitive · no leading slash)"
-                  className="flex-1 bg-transparent h-9 px-3 text-sm focus:outline-none"
+                  className="flex-1 bg-transparent h-9 px-3 text-sm rounded-md outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#10b981]"
                   style={{ color: TOK.textPrimary }}
                 />
               </div>
