@@ -428,7 +428,7 @@ export default function HelpPage() {
         <p>
           Found something unclear? Open an issue on{" "}
           <a
-            href="https://github.com/coffeejones/repobaron/issues"
+            href="https://github.com/coffeejones/gitvision/issues"
             target="_blank"
             rel="noopener"
             className="underline underline-offset-2"

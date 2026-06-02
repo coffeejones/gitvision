@@ -24,7 +24,7 @@ import type { Tier } from "@/components/TierIcon";
 
 const INSTALL_URL = "https://github.com/apps/repojury-pr";
 const LEARN_MORE_URL =
-  "https://github.com/coffeejones/repobaron#pr-bot-github-app";
+  "https://github.com/coffeejones/gitvision#pr-bot-github-app";
 
 interface Props {
   /** Subscription tier of the viewing user. Open case sees an upgrade

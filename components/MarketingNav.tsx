@@ -95,7 +95,7 @@ export function MarketingNav() {
             <ArrowUpRight size={12} />
           </a>
           <a
-            href="https://github.com/coffeejones/repobaron"
+            href="https://github.com/coffeejones/gitvision"
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:inline-flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm transition hover:bg-white/5"
