@@ -139,7 +139,7 @@ function Sidebar({ active, user }: { active: ChambersNav; user: User }) {
 
         <Divider />
 
-        <NavLink href="/#process" icon={BookOpen} label="How it works" activeNow={active === "how"} />
+        <NavLink href="/help" icon={BookOpen} label="How it works" activeNow={active === "how"} />
         <NavLink href="/news" icon={Newspaper} label="News" activeNow={active === "news"} />
 
         {/* push the account group to the bottom */}
