@@ -14,9 +14,11 @@ import {
   type Vote,
   type VerdictOutcome,
 } from "./verdict";
+import { diffVerdict } from "./verdictDelta";
 import { pickHeadline } from "./headline";
 import { extractHealthSignals } from "../signals";
 import { getSession } from "../storage";
+import type { AnalysisSnapshot } from "../types";
 import type { CaseItem } from "@/components/chambers/CaseRow";
 
 type DeptKey = CaseItem["departments"][number]["key"];
@@ -54,7 +56,15 @@ function caseNumber(id: string, createdAt: string): string {
 
 /** Project one session to a CaseItem. Null when the session or its
  *  latest snapshot is missing — nothing meaningful to file. */
-export async function getCase(sessionId: string): Promise<CaseItem | null> {
+export async function getCase(
+  sessionId: string,
+  /** fetchedAt of the snapshot the viewing user last SAW for this case
+   *  (from their seen-map). The delta is measured against this baseline,
+   *  not the previous snapshot — so a case stops showing movement once the
+   *  user has opened it, and shows it again only when something new lands.
+   *  Undefined → never opened → no delta. */
+  seenFetchedAt?: string,
+): Promise<CaseItem | null> {
   const session = await getSession(sessionId);
   if (!session) return null;
   const latest = session.snapshots[session.snapshots.length - 1];
@@ -62,10 +72,37 @@ export async function getCase(sessionId: string): Promise<CaseItem | null> {
 
   const verdict = computeVerdict(latest);
   const headline = pickHeadline(latest);
-  const signals = extractHealthSignals(latest);
-  const criticalCount = signals.needsWork.filter(
-    (s) => s.severity === "high",
-  ).length;
+  const criticalCount = countCriticals(latest);
+
+  // "Since you last looked" — diff the latest verdict against the snapshot
+  // the user last SAW (their seen baseline), advanced when they open the
+  // case detail. No baseline (never opened) or a baseline that's already
+  // the latest (nothing new since) → no delta, so a case you've reviewed
+  // shows no movement line until it actually changes.
+  let delta: CaseItem["delta"];
+  const baseline =
+    seenFetchedAt && seenFetchedAt !== latest.fetchedAt
+      ? session.snapshots.find((s) => s.fetchedAt === seenFetchedAt)
+      : undefined;
+  if (baseline) {
+    const raw = diffVerdict(
+      computeVerdict(baseline),
+      verdict,
+      countCriticals(baseline),
+      criticalCount,
+    );
+    delta = {
+      direction: raw.direction,
+      grade: raw.grade,
+      scoreDelta: raw.scoreDelta,
+      criticalDelta: raw.criticalDelta,
+      departments: raw.departments.map((d) => ({
+        key: DEPT_KEY[d.id],
+        from: VOTE_STATUS[d.from],
+        to: VOTE_STATUS[d.to],
+      })),
+    };
+  }
 
   return {
     id: session.id,
@@ -84,14 +121,29 @@ export async function getCase(sessionId: string): Promise<CaseItem | null> {
       key: DEPT_KEY[r.id],
       status: VOTE_STATUS[r.vote],
     })),
+    delta,
   };
+}
+
+/** High-severity finding count for a snapshot — the "N critical" number
+ *  on the card + the basis for the since-last-visit critical delta. */
+function countCriticals(snap: AnalysisSnapshot): number {
+  return extractHealthSignals(snap).needsWork.filter(
+    (s) => s.severity === "high",
+  ).length;
 }
 
 /** Project a list of session ids in parallel; individual failures are
  *  dropped so one corrupt session doesn't blank the whole list. */
-export async function getCases(sessionIds: string[]): Promise<CaseItem[]> {
+export async function getCases(
+  sessionIds: string[],
+  /** Per-user seen-map (sessionId → last-seen fetchedAt). Drives each
+   *  case's since-last-visit delta. Defaults to empty (anonymous / no
+   *  history) → no deltas. */
+  seenMap: Record<string, string> = {},
+): Promise<CaseItem[]> {
   const results = await Promise.all(
-    sessionIds.map((id) => getCase(id).catch(() => null)),
+    sessionIds.map((id) => getCase(id, seenMap[id]).catch(() => null)),
   );
   return results.filter((c): c is CaseItem => c !== null);
 }

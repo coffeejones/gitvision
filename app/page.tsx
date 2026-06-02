@@ -17,6 +17,7 @@ import { auth } from "@/lib/auth";
 import { listSessions } from "@/lib/storage";
 import { filterSessionsByUser } from "@/lib/ownerId";
 import { getCases } from "@/lib/intelligence/cases";
+import { getSeenMap } from "@/lib/seen";
 import { getUserTier } from "@/lib/billing/gates";
 import { TIER_CONFIG } from "@/lib/pricing";
 import { ChambersHome } from "@/components/chambers/ChambersHome";
@@ -53,10 +54,12 @@ export default async function Home() {
 
   // ── Chambers branch: project the caller's cases + identity ──
   const caseIds = userOwnedSessions.slice(0, CASE_CAP).map((s) => s.id);
-  const [cases, tier] = await Promise.all([
-    getCases(caseIds),
+  // Seen-map first — it feeds each case's since-last-visit delta.
+  const [seenMap, tier] = await Promise.all([
+    getSeenMap(sessionUser.id),
     getUserTier(sessionUser.id),
   ]);
+  const cases = await getCases(caseIds, seenMap);
 
   // Rank by what needs attention first: most critical, then lowest
   // score, then most recently filed.

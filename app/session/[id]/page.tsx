@@ -54,7 +54,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { getSession } from "@/lib/storage";
+import { markSeen } from "@/lib/seen";
 import { diffSnapshots } from "@/lib/diff";
 import { findDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
 import { computeTestCoverage } from "@/lib/codeAnalysis/testCoverage";
@@ -190,6 +192,16 @@ export default async function OverviewPage({
     hasStructuralDiff &&
     structDiff !== null &&
     structuralDiffHasContent(structDiff);
+
+  // Advance the viewer's Chambers "seen" baseline: opening this detail
+  // page means they've now seen the latest verdict, so the case stops
+  // showing a since-last-visit delta until something new lands. Skipped
+  // on prefetch (hovering a case row in the list mustn't pre-clear its
+  // delta) and for anonymous viewers. Best-effort — never blocks render.
+  const isPrefetch = (await headers()).get("next-router-prefetch") === "1";
+  if (authSession && !isPrefetch) {
+    await markSeen(authSession.user.id, session.id, current.fetchedAt);
+  }
 
   const base = `/session/${session.id}`;
 

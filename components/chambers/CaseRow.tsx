@@ -15,6 +15,10 @@ import {
   XCircle,
   Check,
   X,
+  TrendingUp,
+  TrendingDown,
+  ArrowLeftRight,
+  RefreshCw,
 } from "lucide-react";
 import { CH, CH_FOCUS } from "./theme";
 
@@ -36,12 +40,35 @@ export interface CaseItem {
   criticalCount: number;
   snapshotCount: number;
   updatedAt: string;
+  /** Repo has new commits upstream since our latest snapshot (cheap
+   *  freshness check). Runtime nudge — set by CasesView from
+   *  /api/cases/check (or seeded in mocks). Refresh to update the verdict. */
+  hasNewChanges?: boolean;
   /** Top finding, one line. */
   headline: string;
   /** Per-department status for the breakdown strip (which axis failed). */
   departments: {
     key: "Health" | "Security" | "Forensics" | "Supply";
     status: "ok" | "warning" | "critical";
+  }[];
+  /** "Since last visit" verdict movement (vs the previous snapshot).
+   *  Absent when the case has only one snapshot. */
+  delta?: CaseDelta;
+}
+
+/** Display shape for a verdict delta — lib/intelligence/cases.ts maps the
+ *  raw VerdictDelta into this (department ids → titles, votes → statuses). */
+export interface CaseDelta {
+  direction: "improved" | "regressed" | "mixed" | "unchanged";
+  /** Letter grades when they changed; null when the grade held. */
+  grade: { from: string; to: string } | null;
+  scoreDelta: number;
+  criticalDelta: number;
+  /** Departments whose vote moved since the previous snapshot. */
+  departments: {
+    key: "Health" | "Security" | "Forensics" | "Supply";
+    from: "ok" | "warning" | "critical";
+    to: "ok" | "warning" | "critical";
   }[];
 }
 
@@ -128,6 +155,20 @@ export function CaseRow({ c }: { c: CaseItem }) {
         >
           Case No. {c.caseNo}
         </span>
+        {c.hasNewChanges && (
+          <span
+            className="inline-flex flex-none items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+            style={{
+              color: CH.accent,
+              background: CH.accentSoft,
+              border: `1px solid ${CH.accentBorder}`,
+            }}
+            title="New commits upstream since the last analysis — refresh to update this verdict"
+          >
+            <RefreshCw size={9} aria-hidden />
+            New changes
+          </span>
+        )}
       </div>
 
       {/* body */}
@@ -151,6 +192,7 @@ export function CaseRow({ c }: { c: CaseItem }) {
             {c.headline}
           </span>
           <DeptStrip departments={c.departments} />
+          <DeltaLine delta={c.delta} />
         </span>
 
         <span className="hidden sm:flex flex-none flex-col items-end gap-1.5">
@@ -221,6 +263,68 @@ function DeptStrip({
           </span>
         );
       })}
+    </span>
+  );
+}
+
+const DELTA_META: Record<
+  Exclude<CaseDelta["direction"], "unchanged">,
+  { Icon: typeof Check; color: string; word: string }
+> = {
+  improved: { Icon: TrendingUp, color: CH.ok, word: "Improved" },
+  regressed: { Icon: TrendingDown, color: CH.critical, word: "Regressed" },
+  mixed: { Icon: ArrowLeftRight, color: CH.warning, word: "Shuffled" },
+};
+
+/** "Since last visit" movement line. Renders nothing when the verdict
+ *  held (or the case has no prior snapshot) — movement should pop, a
+ *  static list shouldn't shout. Arrow + word + colour, so the direction
+ *  survives colour-blindness; per-department detail is on hover. */
+function DeltaLine({ delta }: { delta?: CaseDelta }) {
+  if (!delta || delta.direction === "unchanged") return null;
+  const meta = DELTA_META[delta.direction];
+  const Icon = meta.Icon;
+
+  let primary: string;
+  if (delta.grade) primary = `${delta.grade.from} → ${delta.grade.to}`;
+  else if (delta.scoreDelta !== 0)
+    primary = `${delta.scoreDelta > 0 ? "+" : ""}${delta.scoreDelta} pts`;
+  else
+    primary = `${delta.departments.length} ${
+      delta.departments.length === 1 ? "dept" : "depts"
+    } changed`;
+
+  const crit =
+    delta.criticalDelta !== 0
+      ? `${delta.criticalDelta > 0 ? "+" : ""}${delta.criticalDelta} critical`
+      : null;
+
+  const detail = delta.departments
+    .map((d) => `${d.key}: ${d.from} → ${d.to}`)
+    .join("; ");
+
+  return (
+    <span
+      className="mt-0.5 inline-flex items-center gap-1.5 text-[11.5px] font-medium"
+      title={detail || undefined}
+    >
+      <Icon
+        size={12}
+        strokeWidth={2.5}
+        style={{ color: meta.color }}
+        aria-hidden
+      />
+      <span style={{ color: meta.color }}>{meta.word}</span>
+      <span style={{ color: CH.textMuted }}>·</span>
+      <span style={{ color: CH.textDim }}>{primary}</span>
+      {crit && (
+        <>
+          <span style={{ color: CH.textMuted }}>·</span>
+          <span style={{ color: delta.criticalDelta > 0 ? CH.critical : CH.ok }}>
+            {crit}
+          </span>
+        </>
+      )}
     </span>
   );
 }

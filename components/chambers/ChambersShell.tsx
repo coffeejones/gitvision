@@ -59,7 +59,11 @@ export function ChambersShell({ active, user, children }: Props) {
       <Sidebar active={active} user={user} />
 
       <main className="flex-1 min-w-0">
-        <div className="mx-auto w-full max-w-5xl px-6 sm:px-10 py-10 sm:py-14">
+        {/* Fluid up to a ceiling so cases widen with the screen instead of
+         *  sitting narrow on large monitors. Tops out at 7xl (matches the
+         *  case-detail page, so no width jump on click-through) — wider than
+         *  that and the content-left / metadata-right rows read sparse. */}
+        <div className="mx-auto w-full max-w-6xl xl:max-w-7xl px-6 sm:px-10 py-10 sm:py-14">
           {children}
         </div>
       </main>
