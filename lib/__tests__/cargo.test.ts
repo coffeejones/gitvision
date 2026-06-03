@@ -55,8 +55,8 @@ tokio = "1.32.0"
 `;
     const deps = cargoPlugin.parseManifest("Cargo.toml", toml);
     expect(deps).toEqual([
-      { name: "serde", declared: "1.0", sourcePath: "Cargo.toml" },
-      { name: "tokio", declared: "1.32.0", sourcePath: "Cargo.toml" },
+      { name: "serde", declared: "1.0", sourcePath: "Cargo.toml", scope: "runtime" },
+      { name: "tokio", declared: "1.32.0", sourcePath: "Cargo.toml", scope: "runtime" },
     ]);
   });
 
@@ -92,7 +92,7 @@ my-rand = { package = "rand", version = "0.8" }
 `;
     const deps = cargoPlugin.parseManifest("Cargo.toml", toml);
     expect(deps).toEqual([
-      { name: "rand", declared: "0.8", sourcePath: "Cargo.toml" },
+      { name: "rand", declared: "0.8", sourcePath: "Cargo.toml", scope: "runtime" },
     ]);
   });
 
@@ -109,6 +109,9 @@ cc = "1.0"
 `;
     const deps = cargoPlugin.parseManifest("Cargo.toml", toml);
     expect(deps.map((d) => d.name).sort()).toEqual(["cc", "criterion", "serde"]);
+    // [dependencies] ship; dev/build are tooling → dev scope.
+    const byName = Object.fromEntries(deps.map((d) => [d.name, d.scope]));
+    expect(byName).toEqual({ serde: "runtime", criterion: "dev", cc: "dev" });
   });
 
   it("parses workspace-level dependencies", () => {

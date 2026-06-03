@@ -137,6 +137,14 @@ export interface CommitIndexEntry {
 // Dependency-health analysis for the npm ecosystem. Populated from
 // lib/depsHealth.ts at analyze time. Absent when the repo has no root
 // package.json or the analysis was skipped.
+/** Whether a dependency is a runtime/shipped dep or a dev/test/docs/build one.
+ *  Drives whether it counts toward the Security/Supply verdict (we grade on
+ *  runtime — a CVE in a docs/CI pin isn't what a consumer of the repo ships).
+ *  Optional on stored deps for backward-compat: snapshots analyzed before
+ *  provenance-tracking have no scope and are treated as runtime (prior
+ *  behavior, so old sessions don't change). */
+export type DepScope = "runtime" | "dev";
+
 export interface OutdatedDep {
   name: string;
   current: string; // exact string from package.json (may include ^ or ~)
@@ -144,18 +152,21 @@ export interface OutdatedDep {
   ageMonths: number; // months between current release and latest release
   lastPublished: string; // ISO date
   sources?: string[]; // package.json paths that declare this dep
+  scope?: DepScope;
 }
 export interface VulnerableDep {
   name: string;
   current: string;
   cves: string[]; // OSV / GHSA IDs
   sources?: string[];
+  scope?: DepScope;
 }
 export interface DeprecatedDep {
   name: string;
   current: string;
   message: string;
   sources?: string[];
+  scope?: DepScope;
 }
 /** Ecosystem identifier. Loose union — new plugins can add values without
  *  touching this file. Existing consumers should treat unknown values as

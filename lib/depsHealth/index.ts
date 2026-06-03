@@ -17,6 +17,7 @@ import type {
   OutdatedDep,
   VulnerableDep,
   DeprecatedDep,
+  DepScope,
 } from "../types";
 import { fetchRepoTree } from "./tree";
 import { fetchOsvBatch } from "./osv";
@@ -34,6 +35,17 @@ const MAX_MANIFEST_FILES = 50; // per ecosystem
 const MAX_UNIQUE_PACKAGES = 300; // per ecosystem (registry + OSV budget)
 const MAX_SOURCES_PER_PACKAGE = 5; // how many source paths we keep on each issue
 const OUTDATED_THRESHOLD_MONTHS = 6;
+
+/** A manifest under one of these directories describes an EXAMPLE app, the
+ *  docs/website, tests, a benchmark, or a playground — not the repo's shipped
+ *  surface. Its deps are forced to the dev lane so a sample/docs pin can't
+ *  FAIL the repo's verdict (e.g. flask's examples/celery declaring flask +
+ *  celery as runtime, or a docs site pinning a vulnerable next). Convention-
+ *  based and ecosystem-agnostic — the same dirs mean the same thing for
+ *  npm, pypi and cargo. Real monorepo workspaces (packages/, crates/, apps/)
+ *  are deliberately NOT here: those are first-party shipped code. */
+const NON_SHIPPED_DIR =
+  /(^|\/)(examples?|samples?|demos?|docs?|website|site|e2e|tests?|__tests__|fixtures?|benchmarks?|bench|integration|playground)\//i;
 
 /** Public entry point — scans the whole repo tree once and runs every plugin
  *  whose manifests are present. Returns one DependencyHealth per ecosystem. */
@@ -105,16 +117,32 @@ async function runPluginPipeline(
   );
   if (validManifests.length === 0) return null;
 
-  // 2. Parse each into declared packages
+  // 2a. Collect the project's own package name(s) so a repo that pins itself
+  //     in a lockfile/docs/CI file isn't reported as its own dependency
+  //     (e.g. flask listing flask). Names are normalized by the plugin.
+  const selfNames = new Set<string>();
+  for (const m of validManifests) {
+    const n = plugin.selfName?.(m.path, m.content);
+    if (n) selfNames.add(n);
+  }
+
+  // 2b. Parse each into declared packages, dropping self-references and
+  //     forcing deps from non-shipped dirs (examples/docs/tests/…) to dev.
   const declared: DeclaredPackage[] = [];
   for (const m of validManifests) {
-    declared.push(...plugin.parseManifest(m.path, m.content));
+    const nonShipped = NON_SHIPPED_DIR.test(m.path);
+    for (const d of plugin.parseManifest(m.path, m.content)) {
+      if (selfNames.has(d.name)) continue;
+      declared.push(nonShipped ? { ...d, scope: "dev" } : d);
+    }
   }
   if (declared.length === 0) return null;
 
-  // 3. Dedupe on (name, version) and track which manifests declared each
+  // 3. Dedupe on (name, version); track sources + resolved lane per key.
+  //    Runtime wins: a package declared as both runtime and dev is runtime.
   const sourcesByKey = new Map<string, Set<string>>();
   const uniqueByKey = new Map<string, { name: string; declared: string }>();
+  const scopeByKey = new Map<string, DepScope>();
   for (const d of declared) {
     const key = `${d.name}@${d.declared}`;
     if (!uniqueByKey.has(key)) {
@@ -123,6 +151,11 @@ async function runPluginPipeline(
     const set = sourcesByKey.get(key) ?? new Set<string>();
     set.add(d.sourcePath);
     sourcesByKey.set(key, set);
+    const prev = scopeByKey.get(key);
+    scopeByKey.set(
+      key,
+      prev === "runtime" || d.scope === "runtime" ? "runtime" : "dev"
+    );
   }
 
   const entries = [...uniqueByKey.entries()];
@@ -169,12 +202,14 @@ async function runPluginPipeline(
   }
 
   for (const d of withMeta) {
+    const scope = scopeByKey.get(d.key);
     if (d.meta?.deprecated) {
       deprecated.push({
         name: d.name,
         current: d.declared,
         message: d.meta.deprecated,
         sources: sourcesFor(d.key),
+        scope,
       });
     }
 
@@ -192,6 +227,7 @@ async function runPluginPipeline(
             ageMonths,
             lastPublished: d.meta.timeOfLatest,
             sources: sourcesFor(d.key),
+            scope,
           });
         }
       }
@@ -204,6 +240,7 @@ async function runPluginPipeline(
         current: d.declared,
         cves: cves.slice(0, 5),
         sources: sourcesFor(d.key),
+        scope,
       });
     }
   }

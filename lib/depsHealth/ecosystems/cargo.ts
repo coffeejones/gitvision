@@ -15,14 +15,17 @@
 // the logic with small adaptations.
 
 import TOML from "@iarna/toml";
+import type { DepScope } from "../../types";
 import type { DeclaredPackage, EcosystemPlugin, PackageMeta } from "../types";
 
-// Cargo.toml table sections that list dependencies. We scan all of them.
-const DEP_TABLES = [
-  "dependencies",
-  "dev-dependencies",
-  "build-dependencies",
-] as const;
+// Cargo.toml table sections that list dependencies, each with its lane:
+// [dependencies] ships; [dev-dependencies] (tests/benches) and
+// [build-dependencies] (build scripts) are not part of the shipped surface.
+const DEP_TABLES: [("dependencies" | "dev-dependencies" | "build-dependencies"), DepScope][] = [
+  ["dependencies", "runtime"],
+  ["dev-dependencies", "dev"],
+  ["build-dependencies", "dev"],
+];
 
 type DepValue =
   | string
@@ -138,29 +141,38 @@ export const cargoPlugin: EcosystemPlugin = {
     const declared: DeclaredPackage[] = [];
 
     // Top-level dep tables
-    for (const table of DEP_TABLES) {
+    for (const [table, scope] of DEP_TABLES) {
       const deps = toml[table];
       if (!deps) continue;
       for (const [key, value] of Object.entries(deps)) {
         const version = extractVersion(value);
         if (!version) continue;
         const name = resolveRegistryName(key, value);
-        declared.push({ name, declared: version, sourcePath: path });
+        declared.push({ name, declared: version, sourcePath: path, scope });
       }
     }
 
-    // Workspace dependencies (monorepo root) — treated like regular deps
+    // Workspace dependencies (monorepo root) — shared runtime deps members inherit
     const wsDeps = toml.workspace?.dependencies;
     if (wsDeps) {
       for (const [key, value] of Object.entries(wsDeps)) {
         const version = extractVersion(value);
         if (!version) continue;
         const name = resolveRegistryName(key, value);
-        declared.push({ name, declared: version, sourcePath: path });
+        declared.push({ name, declared: version, sourcePath: path, scope: "runtime" });
       }
     }
 
     return declared;
+  },
+
+  selfName(_path, content) {
+    try {
+      const toml = TOML.parse(content) as CargoToml;
+      return typeof toml.package?.name === "string" ? toml.package.name : null;
+    } catch {
+      return null;
+    }
   },
 
   normalizeVersion: normalizeCargoVersion,

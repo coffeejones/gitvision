@@ -794,7 +794,12 @@ function detectRealCodeActivity(snap: AnalysisSnapshot): HealthSignal[] {
 // ecosystems so a polyglot repo shows one signal: "30 vulnerable (22 npm, 3 cargo, 5 pypi)".
 function detectVulnerableDeps(snap: AnalysisSnapshot): HealthSignal[] {
   const healths = getDependencyHealths(snap);
-  const vulns = collectAcrossEcosystems(healths, (h) => h.vulnerable);
+  // Grade Security on runtime/shipped deps only — a CVE in a dev/test/docs
+  // pin isn't what a consumer of this repo is exposed to. Missing scope
+  // (pre-provenance snapshots) is treated as runtime, so old data is unchanged.
+  const vulns = collectAcrossEcosystems(healths, (h) => h.vulnerable).filter(
+    (t) => t.dep.scope !== "dev"
+  );
   if (vulns.length === 0) return [];
 
   const totalCves = vulns.reduce((s, t) => s + t.dep.cves.length, 0);
@@ -825,7 +830,11 @@ function detectVulnerableDeps(snap: AnalysisSnapshot): HealthSignal[] {
 // 14. Outdated dependencies — >=1 year behind across any ecosystem.
 function detectOutdatedDeps(snap: AnalysisSnapshot): HealthSignal[] {
   const healths = getDependencyHealths(snap);
-  const outdated = collectAcrossEcosystems(healths, (h) => h.outdated);
+  // Supply grades on runtime deps — stale dev/test/docs pins (compiled
+  // requirements locks, etc.) aren't the project's shipped supply chain.
+  const outdated = collectAcrossEcosystems(healths, (h) => h.outdated).filter(
+    (t) => t.dep.scope !== "dev"
+  );
   const stale = outdated.filter((t) => t.dep.ageMonths >= 12);
   if (stale.length < 3) return [];
 
@@ -862,7 +871,9 @@ function detectOutdatedDeps(snap: AnalysisSnapshot): HealthSignal[] {
 // 15. Deprecated dependencies — explicitly marked as such in a registry.
 function detectDeprecatedDeps(snap: AnalysisSnapshot): HealthSignal[] {
   const healths = getDependencyHealths(snap);
-  const deps = collectAcrossEcosystems(healths, (h) => h.deprecated);
+  const deps = collectAcrossEcosystems(healths, (h) => h.deprecated).filter(
+    (t) => t.dep.scope !== "dev"
+  );
   if (deps.length === 0) return [];
 
   const names = deps.slice(0, 3).map((t) => `[${t.ecosystem}] ${t.dep.name}`);
@@ -893,20 +904,23 @@ function detectFreshDeps(snap: AnalysisSnapshot): HealthSignal[] {
   const totalDeps = healths.reduce((s, h) => s + h.total, 0);
   if (totalDeps < 5) return [];
 
-  // Any CVE or deprecated anywhere → not fresh
-  const hasAnyCve = healths.some((h) => h.vulnerable.length > 0);
-  const hasAnyDeprecated = healths.some((h) => h.deprecated.length > 0);
+  // Freshness is judged on runtime deps — a CVE/staleness in a dev/test/docs
+  // pin shouldn't deny a project the "fresh" positive. Missing scope = runtime.
+  const isRuntime = (d: { scope?: string }) => d.scope !== "dev";
+  const hasAnyCve = healths.some((h) => h.vulnerable.some(isRuntime));
+  const hasAnyDeprecated = healths.some((h) => h.deprecated.some(isRuntime));
   if (hasAnyCve || hasAnyDeprecated) return [];
 
   // Any package ≥12 months behind → not fresh
   const anyYearBehind = healths.some((h) =>
-    h.outdated.some((d) => d.ageMonths >= 12)
+    h.outdated.some((d) => isRuntime(d) && d.ageMonths >= 12)
   );
   if (anyYearBehind) return [];
 
   // Less than 20% can be even 6 months behind
   const somewhatStale = healths.reduce(
-    (s, h) => s + h.outdated.filter((d) => d.ageMonths >= 6).length,
+    (s, h) =>
+      s + h.outdated.filter((d) => isRuntime(d) && d.ageMonths >= 6).length,
     0
   );
   if (somewhatStale > totalDeps * 0.2) return [];

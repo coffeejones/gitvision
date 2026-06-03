@@ -3,9 +3,11 @@
 // Registry:  https://registry.npmjs.org
 // OSV:       "npm"
 
+import type { DepScope } from "../../types";
 import type { DeclaredPackage, EcosystemPlugin, PackageMeta } from "../types";
 
 interface PackageJsonContent {
+  name?: string;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
@@ -78,18 +80,30 @@ export const npmPlugin: EcosystemPlugin = {
       return [];
     }
     const declared: DeclaredPackage[] = [];
-    for (const group of [
-      pkg.dependencies,
-      pkg.devDependencies,
-      pkg.peerDependencies,
-    ]) {
+    // dependencies + peerDependencies are shipped/runtime expectations;
+    // devDependencies are build/test/tooling only.
+    const groups: [Record<string, string> | undefined, DepScope][] = [
+      [pkg.dependencies, "runtime"],
+      [pkg.peerDependencies, "runtime"],
+      [pkg.devDependencies, "dev"],
+    ];
+    for (const [group, scope] of groups) {
       if (!group) continue;
       for (const [name, version] of Object.entries(group)) {
         if (typeof version !== "string") continue;
-        declared.push({ name, declared: version, sourcePath: path });
+        declared.push({ name, declared: version, sourcePath: path, scope });
       }
     }
     return declared;
+  },
+
+  selfName(_path, content) {
+    try {
+      const pkg = JSON.parse(content) as PackageJsonContent;
+      return typeof pkg.name === "string" ? pkg.name : null;
+    } catch {
+      return null;
+    }
   },
 
   normalizeVersion: normalizeNpmVersion,

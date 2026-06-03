@@ -12,7 +12,27 @@
 // Python, not declarative.
 
 import TOML from "@iarna/toml";
+import type { DepScope } from "../../types";
 import type { DeclaredPackage, EcosystemPlugin, PackageMeta } from "../types";
+
+/** PEP 503 name normalization — lowercase, runs of _/. → single "-". */
+function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/[._]+/g, "-");
+}
+
+/** Lane for a requirements*.txt file, by path convention (not project-
+ *  specific). A project's RUNTIME manifest sits at the repo root, so only a
+ *  root-level "requirements.txt" counts as runtime (the common shape for an
+ *  app without a pyproject). Anything else is dev/test/docs/sample tooling
+ *  and must NOT drive the repo's verdict:
+ *    - nested in a subdirectory — examples/celery/requirements.txt, a
+ *      docs/ or sample sub-app's pins, a requirements/ lock dir
+ *    - suffixed — requirements-dev.txt, requirements.test.txt
+ *  (Flask's false "vulnerable deps" all came from examples/celery/
+ *  requirements.txt — an example app's full pinned tree, not Flask's deps.) */
+function requirementsScope(path: string): DepScope {
+  return path.toLowerCase() === "requirements.txt" ? "runtime" : "dev";
+}
 
 // ------------------- Requirement-line parsing -------------------
 // Matches lines like:
@@ -65,6 +85,7 @@ export function normalizePyPiVersion(raw: string): string | null {
 
 interface PyProjectToml {
   project?: {
+    name?: string;
     // PEP 621 flat list: ["requests>=2.0", "click~=8.0", ...]
     dependencies?: string[];
     // Optional deps grouped: { dev: [...], test: [...] }
@@ -72,6 +93,7 @@ interface PyProjectToml {
   };
   tool?: {
     poetry?: {
+      name?: string;
       // Poetry shape: { "package-name": "^1.0" } or { name: { version, ... } }
       dependencies?: Record<string, PoetryDepValue>;
       "dev-dependencies"?: Record<string, PoetryDepValue>;
@@ -101,7 +123,8 @@ function extractPoetryVersion(value: PoetryDepValue): string | null {
 function pep621Add(
   declared: DeclaredPackage[],
   path: string,
-  specs: string[] | undefined
+  specs: string[] | undefined,
+  scope: DepScope
 ) {
   if (!specs) return;
   for (const spec of specs) {
@@ -111,6 +134,7 @@ function pep621Add(
         name: parsed.name,
         declared: parsed.version,
         sourcePath: path,
+        scope,
       });
     }
   }
@@ -119,15 +143,20 @@ function pep621Add(
 function poetryAdd(
   declared: DeclaredPackage[],
   path: string,
-  deps: Record<string, PoetryDepValue> | undefined
+  deps: Record<string, PoetryDepValue> | undefined,
+  scope: DepScope
 ) {
   if (!deps) return;
   for (const [rawName, value] of Object.entries(deps)) {
     if (rawName === "python") continue; // Poetry declares Python runtime here
     const version = extractPoetryVersion(value);
     if (!version) continue;
-    const normalized = rawName.toLowerCase().replace(/[._]+/g, "-");
-    declared.push({ name: normalized, declared: version, sourcePath: path });
+    declared.push({
+      name: normalizeName(rawName),
+      declared: version,
+      sourcePath: path,
+      scope,
+    });
   }
 }
 
@@ -141,26 +170,27 @@ function parsePyProject(path: string, content: string): DeclaredPackage[] {
 
   const declared: DeclaredPackage[] = [];
 
-  // PEP 621 — modern [project] section
-  pep621Add(declared, path, toml.project?.dependencies);
+  // PEP 621 — [project.dependencies] are runtime; optional-dependencies
+  // groups (dev/test/docs/...) are dev.
+  pep621Add(declared, path, toml.project?.dependencies, "runtime");
   if (toml.project?.["optional-dependencies"]) {
     for (const group of Object.values(toml.project["optional-dependencies"])) {
-      pep621Add(declared, path, group);
+      pep621Add(declared, path, group, "dev");
     }
   }
 
-  // Poetry — [tool.poetry.dependencies] + dev + groups
+  // Poetry — main deps are runtime; dev-dependencies + every group are dev.
   const poetry = toml.tool?.poetry;
-  poetryAdd(declared, path, poetry?.dependencies);
-  poetryAdd(declared, path, poetry?.["dev-dependencies"]);
+  poetryAdd(declared, path, poetry?.dependencies, "runtime");
+  poetryAdd(declared, path, poetry?.["dev-dependencies"], "dev");
   if (poetry?.group) {
     for (const g of Object.values(poetry.group)) {
-      poetryAdd(declared, path, g.dependencies);
+      poetryAdd(declared, path, g.dependencies, "dev");
     }
   }
 
-  // Flit — [tool.flit.metadata.requires]
-  pep621Add(declared, path, toml.tool?.flit?.metadata?.requires);
+  // Flit — [tool.flit.metadata.requires] are runtime.
+  pep621Add(declared, path, toml.tool?.flit?.metadata?.requires, "runtime");
 
   return declared;
 }
@@ -169,6 +199,7 @@ function parseRequirementsTxt(
   path: string,
   content: string
 ): DeclaredPackage[] {
+  const scope = requirementsScope(path);
   const declared: DeclaredPackage[] = [];
   for (const line of content.split(/\r?\n/)) {
     const parsed = parseRequirementLine(line);
@@ -177,6 +208,7 @@ function parseRequirementsTxt(
         name: parsed.name,
         declared: parsed.version,
         sourcePath: path,
+        scope,
       });
     }
   }
@@ -254,6 +286,17 @@ export const pypiPlugin: EcosystemPlugin = {
     if (path.endsWith("pyproject.toml")) return parsePyProject(path, content);
     if (REQUIREMENTS_FILE_RE.test(path)) return parseRequirementsTxt(path, content);
     return [];
+  },
+
+  selfName(path, content) {
+    if (!path.endsWith("pyproject.toml")) return null;
+    try {
+      const toml = TOML.parse(content) as PyProjectToml;
+      const n = toml.project?.name ?? toml.tool?.poetry?.name ?? null;
+      return n ? normalizeName(n) : null;
+    } catch {
+      return null;
+    }
   },
 
   normalizeVersion: normalizePyPiVersion,

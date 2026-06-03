@@ -9,6 +9,7 @@
 // changes to types, signals, UI, or storage should be necessary.
 
 import type { Octokit } from "octokit";
+import type { DepScope } from "../types";
 
 /** String union kept loose so plugins added later don't require a central
  *  refactor. Existing consumers should treat unknown values as opaque. */
@@ -20,6 +21,10 @@ export interface DeclaredPackage {
   name: string;
   declared: string; // raw version string as written in the manifest
   sourcePath: string; // manifest file that declared it (e.g. "packages/x/package.json")
+  /** Runtime (shipped) vs dev/test/docs/build. Set by the plugin from the
+   *  manifest section / file the dep came from. The verdict grades on
+   *  runtime; dev-scope deps stay visible but don't drive a Failed ruling. */
+  scope: DepScope;
 }
 
 /** Registry-enriched metadata for a single package at a specific version. */
@@ -44,6 +49,14 @@ export interface EcosystemPlugin {
   /** Parse raw manifest content into declared packages. Return empty array on
    *  parse failure so one bad file doesn't sink the whole plugin. */
   parseManifest(path: string, content: string): DeclaredPackage[];
+
+  /** The package's OWN name as declared in this manifest, normalized the same
+   *  way parseManifest normalizes dependency names. Lets the orchestrator drop
+   *  a project from its own dependency list (e.g. a lockfile/docs pin that
+   *  installs the package itself — flask listing flask). Null when the manifest
+   *  declares no own name (e.g. a requirements.txt). Optional: a plugin without
+   *  it simply doesn't self-exclude. */
+  selfName?(path: string, content: string): string | null;
 
   /** Strip range syntax ("^1.2.3", "~2", ">=3.0 <4") down to a concrete version
    *  string. Return null for non-concrete specs (URLs, file paths, "*", etc.)
