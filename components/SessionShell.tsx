@@ -25,6 +25,7 @@ import { usePathname } from "next/navigation";
 import {
   AlertCircle,
   Boxes,
+  ChevronDown,
   Code as CodeIcon,
   FileCode,
   Fingerprint,
@@ -108,6 +109,34 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  // Per-department collapse state. The active department always renders
+  // expanded (so you never lose the tab you're on); this only governs the
+  // user's manual collapse choice for the others. Persisted in localStorage
+  // so a hard reload remembers it — SessionShell lives in the [id] layout,
+  // so collapse already survives tab navigation without this. Init empty
+  // (server renders everything expanded) and hydrate after mount to avoid an
+  // SSR mismatch.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("rj.sessionNav.collapsed");
+      if (raw) setCollapsed(JSON.parse(raw) as Record<string, boolean>);
+    } catch {
+      // Corrupt/unavailable storage — fall back to all-expanded.
+    }
+  }, []);
+  function toggleDept(title: string) {
+    setCollapsed((prev) => {
+      const next = { ...prev, [title]: !prev[title] };
+      try {
+        localStorage.setItem("rj.sessionNav.collapsed", JSON.stringify(next));
+      } catch {
+        // Ignore storage failures — the toggle still works in-session.
+      }
+      return next;
+    });
+  }
 
   // Counts that drive the sidebar badges. Same logic as the v0.3 tab
   // bar — preserved here so users still see "Code · 22,041" at a
@@ -314,36 +343,100 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
           </button>
         </div>
 
-        <nav className="flex flex-col gap-3">
-          {departments.map((dept) => (
-            <div key={dept.title} className="flex flex-col gap-0.5">
+        <nav className="flex flex-col gap-1">
+          {departments.map((dept, di) => {
+            // Active = exact path match. Sub-routes (e.g. /code with future
+            // ?file=... params) share the segment, so exact-match keeps the
+            // item highlighted regardless of query state.
+            const isActive = (item: NavItem) =>
+              item.href === base
+                ? pathname === base
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
+            const deptActive = dept.items.some(isActive);
+            // The active department is always open so the current tab can't
+            // hide; otherwise honour the user's manual collapse.
+            const open = deptActive || !collapsed[dept.title];
+            const panelId = `dept-${dept.title.toLowerCase().replace(/\s+/g, "-")}`;
+            return (
               <div
-                className={`flex items-center gap-1.5 px-2 ${STYLE.eyebrow}`}
-                style={{ color: TOK.textMuted }}
+                key={dept.title}
+                className="flex flex-col gap-0.5"
+                style={di > 0 ? { marginTop: 10 } : undefined}
               >
-                <span style={{ color: TOK.textMuted }}>{dept.icon}</span>
-                <span>{dept.title}</span>
-              </div>
-              {dept.items.map((item) => {
-                // Active = exact path match. Sub-routes (e.g. /code
-                // with future ?file=... params) all share the /code
-                // segment so exact-match keeps the item highlighted
-                // regardless of query state.
-                const active =
-                  item.href === base
-                    ? pathname === base
-                    : pathname === item.href ||
-                      pathname.startsWith(`${item.href}/`);
-                return (
-                  <SidebarLink
-                    key={item.href}
-                    item={item}
-                    active={active}
+                <button
+                  type="button"
+                  onClick={() => toggleDept(dept.title)}
+                  aria-expanded={open}
+                  aria-controls={panelId}
+                  className={`group flex w-full items-center gap-1.5 px-2 py-1 rounded-md transition-colors ${STYLE.eyebrow}`}
+                  style={{ color: TOK.textMuted }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = TOK.textSecondary;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = TOK.textMuted;
+                  }}
+                  title={open ? "Collapse" : "Expand"}
+                >
+                  <span>{dept.icon}</span>
+                  <span className="flex-1 text-left">{dept.title}</span>
+                  <ChevronDown
+                    size={12}
+                    style={{
+                      opacity: 0.55,
+                      transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+                      transition: "transform 160ms ease",
+                    }}
                   />
-                );
-              })}
-            </div>
-          ))}
+                </button>
+                {/* Collapse via grid-rows 1fr→0fr (smooth height anim); the
+                    inner wrapper clips. `inert` when closed keeps the hidden
+                    links out of tab order + the a11y tree. */}
+                <div
+                  id={panelId}
+                  inert={!open}
+                  style={{
+                    display: "grid",
+                    gridTemplateRows: open ? "1fr" : "0fr",
+                    transition:
+                      "grid-template-rows 220ms cubic-bezier(0.4, 0, 0.2, 1)",
+                  }}
+                >
+                  {/* Clip wrapper has no padding/border of its own, so it
+                      collapses cleanly to 0 (no leftover stub). The guide line
+                      + indent live on the inner element and stay constant —
+                      toggling animates only height, never a horizontal jump.
+                      A short opacity fade softens the in/out. */}
+                  <div
+                    style={{
+                      overflow: "hidden",
+                      minHeight: 0,
+                      opacity: open ? 1 : 0,
+                      transition: "opacity 150ms ease",
+                    }}
+                  >
+                    <div
+                      className="flex flex-col gap-0.5 pt-1"
+                      style={{
+                        marginLeft: 13,
+                        paddingLeft: 8,
+                        borderLeft: `1px solid ${TOK.border}`,
+                      }}
+                    >
+                      {dept.items.map((item) => (
+                        <SidebarLink
+                          key={item.href}
+                          item={item}
+                          active={isActive(item)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </nav>
 
         {/* Final Verdict — the climax button. Pinned to the bottom of
