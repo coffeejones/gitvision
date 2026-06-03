@@ -46,28 +46,10 @@ export default async function BillingPage() {
   // open-case) — never the raw DB string, which could be a pre-rename value
   // that isn't a TIER_CONFIG key and would crash BillingPanel.
   const tier = await getUserTier(session.user.id);
-
-  // Pull the accounts list for the AccountShell hero badges
-  const accountRows = await db
-    .select({
-      providerId: schema.account.providerId,
-      hasPassword: schema.account.password,
-    })
-    .from(schema.account)
-    .where(eq(schema.account.userId, session.user.id));
-
-  const hasPassword = accountRows.some(
-    (r) => r.providerId === "credential" && r.hasPassword !== null,
-  );
-  const hasGithub = accountRows.some((r) => r.providerId === "github");
   const user = userFromSession(session);
 
   return (
-    <SettingsShell
-      user={user}
-      hasPassword={hasPassword}
-      hasGithub={hasGithub}
-    >
+    <SettingsShell user={user}>
       <BillingPanel
         tier={tier}
         subscriptionStatus={subscription?.subscriptionStatus ?? null}

@@ -40,11 +40,6 @@ export function SettingsShell({
   children,
 }: {
   user: AccountUser;
-  /** Accepted for drop-in compat with the pages that passed these to the
-   *  old AccountShell hero; the CH header doesn't render the "signed-in via"
-   *  line, so they're intentionally unused here. */
-  hasPassword?: boolean;
-  hasGithub?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();

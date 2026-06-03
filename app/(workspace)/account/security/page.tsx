@@ -29,11 +29,10 @@ export default async function SecurityPage() {
   const hasPassword = accountRows.some(
     (r) => r.providerId === "credential" && r.hasPassword !== null
   );
-  const hasGithub = accountRows.some((r) => r.providerId === "github");
   const user = userFromSession(session);
 
   return (
-    <SettingsShell user={user} hasPassword={hasPassword} hasGithub={hasGithub}>
+    <SettingsShell user={user}>
       <SecurityPanel user={user} hasPassword={hasPassword} />
     </SettingsShell>
   );

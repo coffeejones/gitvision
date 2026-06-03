@@ -53,11 +53,7 @@ export default async function ConnectionsPage() {
     : false;
 
   return (
-    <SettingsShell
-      user={user}
-      hasPassword={hasPassword}
-      hasGithub={!!githubAccount}
-    >
+    <SettingsShell user={user}>
       <ConnectionsPanel
         githubAccount={githubAccount}
         githubLogin={user.githubLogin ?? null}

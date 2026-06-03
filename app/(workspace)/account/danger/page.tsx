@@ -7,8 +7,6 @@
 import { redirect } from "next/navigation";
 import { getAuthSession } from "@/lib/authSession";
 import { userFromSession } from "@/lib/userFromSession";
-import { db, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
 import { SettingsShell } from "@/components/account/SettingsShell";
 import { DangerPanel } from "@/components/account/DangerPanel";
 
@@ -21,22 +19,10 @@ export default async function DangerPage() {
   const session = await getAuthSession();
   if (!session) redirect("/login?next=/account/danger");
 
-  const accountRows = await db
-    .select({
-      providerId: schema.account.providerId,
-      hasPassword: schema.account.password,
-    })
-    .from(schema.account)
-    .where(eq(schema.account.userId, session.user.id));
-
-  const hasPassword = accountRows.some(
-    (r) => r.providerId === "credential" && r.hasPassword !== null
-  );
-  const hasGithub = accountRows.some((r) => r.providerId === "github");
   const user = userFromSession(session);
 
   return (
-    <SettingsShell user={user} hasPassword={hasPassword} hasGithub={hasGithub}>
+    <SettingsShell user={user}>
       <DangerPanel />
     </SettingsShell>
   );
