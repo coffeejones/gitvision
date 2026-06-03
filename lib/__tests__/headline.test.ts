@@ -426,6 +426,37 @@ describe("pickHeadline · high-churn-hotspot", () => {
     );
     expect(headline.kind).not.toBe("high-churn-hotspot");
   });
+
+  it("skips non-code hotspots (changelog/docs) and leads with the most-changed CODE file", () => {
+    const headline = pickHeadline(
+      snap({
+        codeGraph: emptyGraph(),
+        hotspots: [
+          hotspot("CHANGES.rst", 339, 7), // changelog — churns every release, not a god-file
+          hotspot("docs/quickstart.rst", 185, 6),
+          hotspot("src/app.ts", 120, 3), // the real code hotspot
+        ],
+      })
+    );
+    expect(headline.kind).toBe("high-churn-hotspot");
+    expect(headline.primary).toContain("src/app.ts");
+    expect(headline.primary).toContain("most-changed code file");
+    expect(headline.primary).not.toContain("CHANGES");
+    expect(headline.detail).toContain("120 commits");
+  });
+
+  it("does NOT fire when only non-code files are high-churn", () => {
+    const headline = pickHeadline(
+      snap({
+        codeGraph: emptyGraph(),
+        hotspots: [
+          hotspot("CHANGES.rst", 339, 7),
+          hotspot("docs/config.rst", 200, 4),
+        ],
+      })
+    );
+    expect(headline.kind).not.toBe("high-churn-hotspot");
+  });
 });
 
 // ------------------- Rule 5: stale-repo -------------------

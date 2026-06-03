@@ -226,6 +226,33 @@ describe("Cross-boundary coupling", () => {
   });
 });
 
+// ------------------- Untested hotspots: scope awareness -------------------
+
+describe("Untested hotspots — scope awareness", () => {
+  const codeHotspots: FileHotspot[] = [
+    hotspot("src/a.ts", 60),
+    hotspot("src/b.ts", 55),
+    hotspot("src/c.ts", 50),
+    hotspot("src/d.ts", 45),
+    hotspot("src/e.ts", 40),
+    hotspot("src/f.ts", 35),
+  ];
+
+  it("fires on a full-repo analysis with untested code hotspots", () => {
+    const { needsWork } = extractHealthSignals(
+      mockSnapshot({ hotspots: codeHotspots })
+    );
+    expect(hasSignal(needsWork, "untested-hotspots")).toBe(true);
+  });
+
+  it("is suppressed when scoped to a subdir (test suite likely outside scope)", () => {
+    const { needsWork } = extractHealthSignals(
+      mockSnapshot({ hotspots: codeHotspots, analyzedSubdir: "src" })
+    );
+    expect(hasSignal(needsWork, "untested-hotspots")).toBe(false);
+  });
+});
+
 // ------------------- Hygiene -------------------
 
 describe("Missing hygiene", () => {

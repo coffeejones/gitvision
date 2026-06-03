@@ -31,6 +31,7 @@
 
 import { findDuplicateGroups } from "../codeAnalysis/duplicates";
 import { computeTestCoverage } from "../codeAnalysis/testCoverage";
+import { isCodeFile } from "../signals";
 import type { AnalysisSnapshot } from "../types";
 
 export type HeadlineSeverity = "critical" | "warning" | "info";
@@ -213,14 +214,20 @@ export function pickHeadline(snap: AnalysisSnapshot): Headline {
     };
   }
 
-  // 4. High-churn hotspot — architectural friction marker.
-  const topHotspot = snap.hotspots?.[0];
-  if (topHotspot && topHotspot.churn >= HIGH_CHURN_THRESHOLD) {
+  // 4. High-churn hotspot — architectural friction marker. Restrict to CODE
+  //    files: a CHANGES.rst / docs page churning every release is expected,
+  //    not a god-file, and leading with it reads as a false alarm. Pick the
+  //    most-changed code file so the "most-changed" claim matches the data
+  //    (raw churn) rather than the hotspot score ordering.
+  const topCodeHotspot = [...(snap.hotspots ?? [])]
+    .filter((h) => isCodeFile(h.path))
+    .sort((a, b) => b.churn - a.churn)[0];
+  if (topCodeHotspot && topCodeHotspot.churn >= HIGH_CHURN_THRESHOLD) {
     return {
       kind: "high-churn-hotspot",
       severity: "warning",
-      primary: `${topHotspot.path} is the most-changed file`,
-      detail: `${topHotspot.churn} commits across ${topHotspot.authors} author${topHotspot.authors === 1 ? "" : "s"}. High churn often signals architectural friction or a god-file pattern.`,
+      primary: `${topCodeHotspot.path} is the most-changed code file`,
+      detail: `${topCodeHotspot.churn} commits across ${topCodeHotspot.authors} author${topCodeHotspot.authors === 1 ? "" : "s"}. High churn often signals architectural friction or a god-file pattern.`,
       ctaLink: "canvas",
       ctaLabel: "View on canvas",
     };

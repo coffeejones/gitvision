@@ -175,7 +175,7 @@ function isSourceOutputPair(f1: string, f2: string): boolean {
   return OUTPUT_LIKE_FOLDERS.has(a) || OUTPUT_LIKE_FOLDERS.has(b);
 }
 
-function isCodeFile(path: string): boolean {
+export function isCodeFile(path: string): boolean {
   if (isMetadataFile(path)) return false;
   if (isTestFile(path)) return false;
   const ext = path.match(/\.([^./]+)$/)?.[1]?.toLowerCase();
@@ -395,6 +395,13 @@ function detectKnowledgeDistribution(
 // files), the test layout just isn't sibling/import-discoverable and we'd
 // rather stay silent than cry wolf.
 function detectUntestedHotspots(snap: AnalysisSnapshot): HealthSignal[] {
+  // A subdir-scoped analysis sees only part of the repo — the test suite
+  // conventionally lives at the repo root, OUTSIDE the analyzed subdir — so a
+  // low in-scope test count is NOT evidence of "no tests". Don't make a
+  // repo-wide untested claim from a partial view. (This is what wrongly
+  // Failed pallets/flask when scoped to src/flask, with tests/ excluded.)
+  if (snap.analyzedSubdir) return [];
+
   const { allPaths, allTests, codeFileCount } = collectPathIndices(snap);
 
   const codeHotspots = snap.hotspots
