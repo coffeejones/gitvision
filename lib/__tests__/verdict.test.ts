@@ -150,9 +150,10 @@ describe("computeVerdict · score + grade", () => {
     expect(v.grade).toBe("A");
   });
 
-  it("drops the score on a failing department", () => {
-    // Vulnerable deps → Security fails. Score = 25 (Health) + 5 (Security) +
-    // 25 (Forensics) + 25 (Supply) = 80 → B+.
+  it("caps the grade at C- when a department fails — never a B+ for a Returned", () => {
+    // Vulnerable deps → Security fails → outcome "returned". The raw sum is
+    // 25 + 5 + 25 + 25 = 80 (which used to read as B+), but a Returned verdict
+    // is capped at 59 / C- so the grade can't contradict the ruling.
     const v = computeVerdict(
       snap({
         dependencyHealths: [
@@ -169,13 +170,15 @@ describe("computeVerdict · score + grade", () => {
         ],
       })
     );
-    expect(v.score).toBe(80);
-    expect(v.grade).toBe("B+");
+    expect(v.outcome).toBe("returned");
+    expect(v.rawScore).toBe(80);
+    expect(v.score).toBe(59);
+    expect(v.grade).toBe("C-");
   });
 
-  it("drops further with conditional + fail mix", () => {
-    // Stale activity (conditional on Health) + vulnerable deps (fail on
-    // Security). Score = 15 + 5 + 25 + 25 = 70 → B-.
+  it("holds the C- cap on a conditional + fail mix (raw sum differs, grade doesn't)", () => {
+    // Stale activity (Health conditional) + vulnerable deps (Security fail).
+    // Raw sum 15 + 5 + 25 + 25 = 70 — still a Returned, still capped at 59.
     const stale = new Date(
       Date.now() - 120 * 24 * 3600 * 1000
     ).toISOString();
@@ -196,8 +199,23 @@ describe("computeVerdict · score + grade", () => {
         ],
       })
     );
-    expect(v.score).toBe(70);
-    expect(v.grade).toBe("B-");
+    expect(v.outcome).toBe("returned");
+    expect(v.rawScore).toBe(70);
+    expect(v.score).toBe(59);
+    expect(v.grade).toBe("C-");
+  });
+
+  it("caps a Conditional verdict at B+ — A-range stays exclusive to Cleared", () => {
+    // Stale activity makes Health conditional, the other three pass. Raw sum
+    // 15 + 25 + 25 + 25 = 90 (which would be A-), capped to 89 / B+.
+    const stale = new Date(
+      Date.now() - 120 * 24 * 3600 * 1000
+    ).toISOString();
+    const v = computeVerdict(snap({ recentCommits: [commit(stale)] }));
+    expect(v.outcome).toBe("conditional");
+    expect(v.rawScore).toBe(90);
+    expect(v.score).toBe(89);
+    expect(v.grade).toBe("B+");
   });
 
   it("bottoms out at 20 / F when every department fails", () => {

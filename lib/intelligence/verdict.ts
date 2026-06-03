@@ -59,6 +59,10 @@ export interface DepartmentRuling {
   /** Total number of signals the department considered (working +
    *  needsWork + questions across its mandate). */
   signalCount: number;
+  /** How many of those are flagged (needsWork) — the signals that drove a
+   *  conditional/fail vote. 0 on a clean pass. Lets the card show "2 of 7
+   *  flagged" so a Failed department with mostly-green evidence reconciles. */
+  flaggedSignalCount: number;
   /** Best entry-route for the user to investigate further — the
    *  first tab in that department's sidebar group. Server-rendered
    *  page injects sessionId-prefixed path on its side. */
@@ -70,15 +74,16 @@ export interface Verdict {
   /** Full label: "Cleared", "Conditional Approval", "Returned for
    *  Revision". */
   outcomeLabel: string;
-  /** 0-100 composite score, summed across the four departments
-   *  (pass = 25, conditional = 15, fail = 5). Designed so that
-   *    100  = all four pass
-   *    >=85 = three pass + one conditional/fail
-   *    60–80 = mixed; one or two flagged offices
-   *    <50  = multiple offices failed
-   *  Mirrors the score-ring + grade letter on the landing page's
-   *  VerdictDoc so the brand promise survives all the way through. */
+  /** 0-100 composite score. The raw sum of the four department votes
+   *  (pass 25 / conditional 15 / fail 5), then GATED by the outcome so the
+   *  letter grade can't contradict the ruling: Cleared up to 100, a single
+   *  Conditional office caps at 89 (B+), and any Failed department caps at
+   *  59 (C-). The raw sum still orders results within the cap — one fail
+   *  ranks above four. Mirrors the landing's VerdictDoc score-ring. */
   score: number;
+  /** The uncapped vote-sum, before the outcome gate — so the UI can show
+   *  when (and explain why) the grade was capped. */
+  rawScore: number;
   /** Letter grade derived from `score`. US-school style:
    *  A / A- / B+ / B / B- / C+ / C / C- / D+ / D / F. */
   grade: string;
@@ -303,6 +308,17 @@ const VOTE_POINTS: Record<Vote, number> = {
   fail: 5,
 };
 
+/** Maximum score an outcome may reach, so the letter grade stays consistent
+ *  with the ruling. Cleared earns full marks; a Conditional office can't read
+ *  as A-range (caps at B+); any Failed department caps the repo in "needs
+ *  work" (≤ C-). The raw vote-sum fills in below the cap, so one fail ranks
+ *  above four. Tunable — these are the band ceilings, not magic. */
+const SCORE_CAP_BY_OUTCOME: Record<VerdictOutcome, number> = {
+  cleared: 100, // A
+  conditional: 89, // B+ (just under A-, which needs 90)
+  returned: 59, // C- (just under C, clearly "needs work")
+};
+
 /** Sum the four department votes into a 0-100 composite score.
  *  Range: 20 (all fail) – 100 (all pass). The 20 floor is deliberate:
  *  a "0" would look like "no data" rather than "every office filed
@@ -389,15 +405,19 @@ export function computeVerdict(snap: AnalysisSnapshot): Verdict {
       reason,
       topSignals,
       signalCount,
+      flaggedSignalCount: matched.needsWork.length,
       exploreSlug: DEPARTMENT_EXPLORE_SLUGS[id],
     };
   });
 
   const outcome = rollupOutcome(rulings);
   const outcomeLabel = OUTCOME_LABELS[outcome];
-  const score = computeScore(rulings);
+  // Gate the score by the outcome so the letter grade can't contradict the
+  // ruling (a "Returned" verdict must never read as a B+).
+  const rawScore = computeScore(rulings);
+  const score = Math.min(rawScore, SCORE_CAP_BY_OUTCOME[outcome]);
   const grade = scoreToGrade(score);
   const summary = composeSummary(outcome, rulings);
 
-  return { outcome, outcomeLabel, score, grade, summary, rulings };
+  return { outcome, outcomeLabel, score, rawScore, grade, summary, rulings };
 }

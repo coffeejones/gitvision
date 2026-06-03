@@ -142,10 +142,20 @@ export default async function OverviewPage({
     (s, h) => s + (h.uniquePackages ?? h.total),
     0
   );
-  const packageIssues = healths.reduce(
-    (s, h) => s + h.vulnerable.length + h.deprecated.length,
+  // Count runtime-scope issues only, matching the Security/Supply verdict
+  // (dev/test/docs deps don't drive the ruling) — so the Overview's package
+  // numbers reconcile with the verdict cards instead of reading higher.
+  const isRuntimeDep = (d: { scope?: string }) => d.scope !== "dev";
+  const packageVulnerable = healths.reduce(
+    (s, h) => s + h.vulnerable.filter(isRuntimeDep).length,
     0
   );
+  const packageOutdated = healths.reduce(
+    (s, h) =>
+      s + h.outdated.filter((d) => isRuntimeDep(d) && d.ageMonths >= 12).length,
+    0
+  );
+  const packageIssues = packageVulnerable + packageOutdated;
 
   // v0.57: pick the single most-actionable signal for above-the-fold.
   // Pure function — server-rendered, no AI call.
@@ -401,8 +411,8 @@ export default async function OverviewPage({
               stat={
                 packageCount > 0
                   ? `${packageCount.toLocaleString()} packages${
-                      packageIssues > 0 ? ` · ${packageIssues} issue${packageIssues === 1 ? "" : "s"}` : ""
-                    }`
+                      packageVulnerable > 0 ? ` · ${packageVulnerable} vulnerable` : ""
+                    }${packageOutdated > 0 ? ` · ${packageOutdated} outdated` : ""}`
                   : "No manifests detected"
               }
               description="CVE-aware health for npm / Cargo / PyPI"

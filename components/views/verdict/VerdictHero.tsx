@@ -176,6 +176,20 @@ export function VerdictHero({ verdict }: Props) {
         >
           {verdict.summary}
         </p>
+
+        {/* Grade math — when the score was gated by the ruling, say so, so
+            the letter grade never looks arbitrary ("30 against what?"). The
+            raw vote-sum is shown for transparency. */}
+        {verdict.score < verdict.rawScore && (
+          <p className="text-xs leading-relaxed" style={{ color: TOK.textMuted }}>
+            Grade capped at {verdict.grade}: the raw vote-sum is{" "}
+            {verdict.rawScore}/100, but a{" "}
+            {verdict.outcome === "returned" ? "returned" : "conditional"} ruling
+            can&apos;t outrank itself — a department was flagged, so the letter
+            stays in {verdict.outcome === "returned" ? "needs-work" : "non-clear"}{" "}
+            territory.
+          </p>
+        )}
       </div>
     </section>
   );

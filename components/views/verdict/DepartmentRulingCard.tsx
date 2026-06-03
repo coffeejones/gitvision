@@ -115,8 +115,9 @@ export function DepartmentRulingCard({ ruling, sessionBase }: Props) {
         style={{ borderTop: `1px solid ${TOK.border}` }}
       >
         <span className="text-xs" style={{ color: TOK.textMuted }}>
-          {ruling.signalCount}{" "}
-          {ruling.signalCount === 1 ? "signal" : "signals"} considered
+          {ruling.flaggedSignalCount > 0
+            ? `${ruling.flaggedSignalCount} of ${ruling.signalCount} signals flagged`
+            : `${ruling.signalCount} ${ruling.signalCount === 1 ? "signal" : "signals"} considered`}
         </span>
         <Link
           href={`${sessionBase}${ruling.exploreSlug}`}

@@ -21,6 +21,7 @@ function mkVerdict(
     outcome,
     outcomeLabel: outcome,
     score,
+    rawScore: score,
     grade,
     summary: "",
     rulings: ORDER.map((id) => ({
@@ -31,6 +32,7 @@ function mkVerdict(
       reason: "",
       topSignals: [],
       signalCount: 0,
+      flaggedSignalCount: 0,
       exploreSlug: "",
     })),
   };
