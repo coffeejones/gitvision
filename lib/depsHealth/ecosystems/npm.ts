@@ -108,5 +108,11 @@ export const npmPlugin: EcosystemPlugin = {
 
   normalizeVersion: normalizeNpmVersion,
 
+  // Exact pin: a plain semver with no range operator. ^1.2.3 / ~1.2.3 /
+  // >=1.0 / 1.x / * are ranges that resolve to the latest matching release.
+  isExactVersion(raw) {
+    return /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(raw.trim());
+  },
+
   fetchMeta: fetchNpmMeta,
 };

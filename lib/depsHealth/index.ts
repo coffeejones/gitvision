@@ -165,15 +165,20 @@ async function runPluginPipeline(
       ? `Analyzed first ${MAX_UNIQUE_PACKAGES} of ${entries.length} unique packages across ${validManifests.length} manifests`
       : undefined;
 
-  // 4. Fetch registry meta (concurrency 10)
+  // 4. Fetch registry meta (concurrency 10). `exact` distinguishes a pinned
+  //    version (assess as-is) from a range/floor (assess at the resolved ≈
+  //    latest version, since that's what a fresh install gets).
   const withMeta = await mapWithConcurrency(capped, 10, async ([key, d]) => {
+    const exact = plugin.isExactVersion?.(d.declared) ?? true;
     const current = plugin.normalizeVersion(d.declared);
-    if (!current) return { key, ...d, current: null, meta: null };
+    if (!current) return { key, ...d, exact, current: null, meta: null };
     const meta = await plugin.fetchMeta(d.name, current);
-    return { key, ...d, current, meta };
+    return { key, ...d, exact, current, meta };
   });
 
-  // 5. OSV batch for concrete versions only
+  // 5. OSV batch. For a range/floor, check the resolved (latest) version —
+  //    flagging a `>=3.1.2` floor for a CVE fixed in 3.1.3 is a false
+  //    positive, since the range resolves to a patched release.
   const osvReady = withMeta
     .filter(
       (d): d is typeof d & { current: string } => typeof d.current === "string"
@@ -181,7 +186,7 @@ async function runPluginPipeline(
     .map((d) => ({
       key: d.key,
       name: d.name,
-      version: d.current,
+      version: d.exact ? d.current : d.meta?.latest ?? d.current,
       ecosystem: plugin.osvEcosystem,
     }));
   const osvCves = await fetchOsvBatch(osvReady);
@@ -213,7 +218,9 @@ async function runPluginPipeline(
       });
     }
 
-    if (d.current && d.meta?.latest && d.current !== d.meta.latest) {
+    // Only EXACT pins can be "behind" — a range/floor resolves to the latest
+    // matching release, so it's never outdated by definition.
+    if (d.exact && d.current && d.meta?.latest && d.current !== d.meta.latest) {
       if (d.meta.timeOfCurrent && d.meta.timeOfLatest) {
         const ageMs =
           new Date(d.meta.timeOfLatest).getTime() -

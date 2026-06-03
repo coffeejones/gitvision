@@ -14,7 +14,7 @@
 // common prefixes (^, ~, >=, <) align with our npm normalizer, so we reuse
 // the logic with small adaptations.
 
-import TOML from "@iarna/toml";
+import { parse as parseToml } from "smol-toml";
 import type { DepScope } from "../../types";
 import type { DeclaredPackage, EcosystemPlugin, PackageMeta } from "../types";
 
@@ -133,7 +133,7 @@ export const cargoPlugin: EcosystemPlugin = {
   parseManifest(path, content) {
     let toml: CargoToml;
     try {
-      toml = TOML.parse(content) as CargoToml;
+      toml = parseToml(content) as unknown as CargoToml;
     } catch {
       return [];
     }
@@ -168,7 +168,7 @@ export const cargoPlugin: EcosystemPlugin = {
 
   selfName(_path, content) {
     try {
-      const toml = TOML.parse(content) as CargoToml;
+      const toml = parseToml(content) as unknown as CargoToml;
       return typeof toml.package?.name === "string" ? toml.package.name : null;
     } catch {
       return null;
@@ -176,6 +176,12 @@ export const cargoPlugin: EcosystemPlugin = {
   },
 
   normalizeVersion: normalizeCargoVersion,
+
+  // Cargo exact pin: =1.2.3. A bare "1.2.3" is caret (^1.2.3) by default, and
+  // ^ / ~ / >= / * are ranges — all resolve to the latest matching release.
+  isExactVersion(raw) {
+    return raw.trim().startsWith("=");
+  },
 
   fetchMeta: fetchCargoMeta,
 };

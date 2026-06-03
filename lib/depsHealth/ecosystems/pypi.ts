@@ -11,7 +11,7 @@
 // them, plus plain requirements.txt. setup.py is skipped — it's executable
 // Python, not declarative.
 
-import TOML from "@iarna/toml";
+import { parse as parseToml } from "smol-toml";
 import type { DepScope } from "../../types";
 import type { DeclaredPackage, EcosystemPlugin, PackageMeta } from "../types";
 
@@ -163,7 +163,7 @@ function poetryAdd(
 function parsePyProject(path: string, content: string): DeclaredPackage[] {
   let toml: PyProjectToml;
   try {
-    toml = TOML.parse(content) as PyProjectToml;
+    toml = parseToml(content) as unknown as PyProjectToml;
   } catch {
     return [];
   }
@@ -291,7 +291,7 @@ export const pypiPlugin: EcosystemPlugin = {
   selfName(path, content) {
     if (!path.endsWith("pyproject.toml")) return null;
     try {
-      const toml = TOML.parse(content) as PyProjectToml;
+      const toml = parseToml(content) as unknown as PyProjectToml;
       const n = toml.project?.name ?? toml.tool?.poetry?.name ?? null;
       return n ? normalizeName(n) : null;
     } catch {
@@ -300,6 +300,13 @@ export const pypiPlugin: EcosystemPlugin = {
   },
 
   normalizeVersion: normalizePyPiVersion,
+
+  // PEP 440 exact pin: ==X / ===X. Everything else (>=, ~=, >, *, ranges) is
+  // a floor that resolves to the latest matching release.
+  isExactVersion(raw) {
+    const v = raw.split(";")[0].trim();
+    return v.startsWith("==") || v.startsWith("===");
+  },
 
   fetchMeta: fetchPyPiMeta,
 };

@@ -25,7 +25,6 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.0",
     "@dagrejs/dagre": "^3.0.0",
-    "@iarna/toml": "^2.2.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@polar-sh/sdk": "^0.47.1",
     "@types/d3-sankey": "^0.12.5",
@@ -44,6 +43,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.12.3",
+    "smol-toml": "^1.6.1",
     "tar": "^7.5.13",
     "web-tree-sitter": "^0.26.8",
     "zod": "^4.3.6"

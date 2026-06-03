@@ -113,3 +113,29 @@ describe("dependency provenance — cargo lanes", () => {
     expect(cargoPlugin.selfName!("Cargo.toml", `[workspace]\nmembers = []`)).toBeNull();
   });
 });
+
+describe("dependency provenance — exact pin vs range", () => {
+  it("pypi: == / === is exact; >=, ~=, * are ranges", () => {
+    expect(pypiPlugin.isExactVersion!("==3.1.2")).toBe(true);
+    expect(pypiPlugin.isExactVersion!("===3.1.2")).toBe(true);
+    expect(pypiPlugin.isExactVersion!(">=3.1.2")).toBe(false);
+    expect(pypiPlugin.isExactVersion!("~=2.31")).toBe(false);
+    expect(pypiPlugin.isExactVersion!("*")).toBe(false);
+  });
+
+  it("npm: plain semver is exact; ^, ~, >=, x are ranges", () => {
+    expect(npmPlugin.isExactVersion!("1.2.3")).toBe(true);
+    expect(npmPlugin.isExactVersion!("^1.2.3")).toBe(false);
+    expect(npmPlugin.isExactVersion!("~1.2.3")).toBe(false);
+    expect(npmPlugin.isExactVersion!(">=1.0.0")).toBe(false);
+    expect(npmPlugin.isExactVersion!("1.x")).toBe(false);
+    expect(npmPlugin.isExactVersion!("*")).toBe(false);
+  });
+
+  it("cargo: =X is exact; bare (caret default), ^, ~ are ranges", () => {
+    expect(cargoPlugin.isExactVersion!("=1.2.3")).toBe(true);
+    expect(cargoPlugin.isExactVersion!("1.2.3")).toBe(false);
+    expect(cargoPlugin.isExactVersion!("^1.0")).toBe(false);
+    expect(cargoPlugin.isExactVersion!("~1.0")).toBe(false);
+  });
+});

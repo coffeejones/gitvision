@@ -63,6 +63,15 @@ export interface EcosystemPlugin {
    *  — we'll skip registry/OSV lookups for those but still count them. */
   normalizeVersion(raw: string): string | null;
 
+  /** Is the raw spec an EXACT pin (the installed version is known) vs a
+   *  range/floor (^1.2, >=3, ~=2, cargo's bare caret) that resolves to the
+   *  latest matching release? Assessment differs: a pin is checked as-is; a
+   *  range is assessed at the resolved (≈ latest) version, because that's what
+   *  a fresh install gets — flagging a `>=3.1.2` floor for a CVE fixed in
+   *  3.1.3 is a false positive. Optional — a plugin without it is treated as
+   *  always-exact (prior behavior). */
+  isExactVersion?(raw: string): boolean;
+
   /** Fetch registry metadata for a concrete (name, version) pair. Should return
    *  null on any error — we catch individual failures without failing the run. */
   fetchMeta(name: string, version: string): Promise<PackageMeta | null>;
