@@ -19,7 +19,7 @@ import Link from "next/link";
 import { ArrowRight, ExternalLink, RefreshCw } from "lucide-react";
 import { TOK } from "@/lib/theme";
 import { TierIcon, type Tier } from "@/components/TierIcon";
-import { TIER_CONFIG, formatPrice } from "@/lib/pricing";
+import { tierFor, formatPrice } from "@/lib/pricing";
 import {
   FlashBanner,
   SectionCard,
@@ -55,7 +55,9 @@ export function BillingPanel({
     return { kind: "none" };
   });
 
-  const tierConfig = TIER_CONFIG[tier];
+  // tierFor defaults unknown/legacy tier values to Open case instead of
+  // returning undefined — so a stale DB tier can never crash this render.
+  const tierConfig = tierFor(tier);
   const isPaid = tier !== "open-case";
 
   async function openPortal() {

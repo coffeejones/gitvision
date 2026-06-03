@@ -15,7 +15,7 @@ import { userFromSession } from "@/lib/userFromSession";
 import { db, schema } from "@/lib/db";
 import { AccountShell } from "@/components/AccountShell";
 import { BillingPanel } from "@/components/account/BillingPanel";
-import type { Tier } from "@/components/TierIcon";
+import { getUserTier } from "@/lib/billing/gates";
 
 export const metadata = {
   title: "Billing — Account — RepoJury",
@@ -42,7 +42,10 @@ export default async function BillingPage() {
     .limit(1);
 
   const subscription = rows[0];
-  const tier = (subscription?.tier ?? "open-case") as Tier;
+  // Validated tier (whitelists known keys, defaults legacy/unknown to
+  // open-case) — never the raw DB string, which could be a pre-rename value
+  // that isn't a TIER_CONFIG key and would crash BillingPanel.
+  const tier = await getUserTier(session.user.id);
 
   // Pull the accounts list for the AccountShell hero badges
   const accountRows = await db

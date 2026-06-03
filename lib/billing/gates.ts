@@ -33,7 +33,13 @@ export async function getUserTier(userId: string): Promise<Tier> {
     .limit(1);
   const raw = rows[0]?.tier;
   if (raw === "standing-docket" || raw === "full-bench") return raw;
-  return "open-case";
+  // Legacy tier names from before the Scout/Knight/Baron → Open case/
+  // Standing docket/Full bench rename (1:1). Map them so a user who
+  // subscribed before the rename keeps their paid tier across the app —
+  // and so reading a legacy row never yields a non-TIER_CONFIG key.
+  if (raw === "knight") return "standing-docket";
+  if (raw === "baron") return "full-bench";
+  return "open-case"; // scout, null, or anything unrecognized
 }
 
 /** Get the limits object for a user's current tier. Useful for
