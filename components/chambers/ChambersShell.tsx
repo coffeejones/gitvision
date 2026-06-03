@@ -18,6 +18,7 @@ import {
   Settings,
   LogOut,
   Loader2,
+  ArrowUpCircle,
 } from "lucide-react";
 import { authClient } from "@/lib/authClient";
 import { CrestSeal } from "@/components/landing/repojury/seals";
@@ -157,6 +158,13 @@ function Sidebar({ active, user }: { active: ChambersNav; user: User }) {
 
         <NavLink href="/how-it-works" icon={BookOpen} label="How it works" activeNow={active === "how"} />
         <NavLink href="/news" icon={Newspaper} label="News" activeNow={active === "news"} />
+
+        {/* Upgrade — only for free tiers. Unlike the others this leaves the
+            workspace for /pricing (marketing + checkout), so it's never an
+            "active" workspace route; it reads as a plain destination link. */}
+        {!user.paid && (
+          <NavLink href="/pricing" icon={ArrowUpCircle} label="Upgrade" activeNow={false} />
+        )}
 
         {/* push the account group to the bottom */}
         <div className="flex-1" />
