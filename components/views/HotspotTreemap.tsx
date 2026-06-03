@@ -47,6 +47,41 @@ function fileDisplayName(path: string): string {
   return base;
 }
 
+// Author diversity → discrete, lightness-ordered levels (not a continuous
+// gradient). Discrete so each level is easy to tell apart and the legend
+// maps 1:1 to tiles; lightness-ordered (dark = few authors, bright = many)
+// so the ramp is the redundant second channel — diversity stays legible
+// without relying on hue (colour-blind safe) and even on tiles too small
+// to fit a label. Buckets use absolute author counts, meaningful on any
+// repo regardless of its max.
+const DIVERSITY_BUCKETS: { label: string; test: (a: number) => boolean }[] = [
+  { label: "1", test: (a) => a <= 1 },
+  { label: "2–3", test: (a) => a <= 3 },
+  { label: "4–6", test: (a) => a <= 6 },
+  { label: "7+", test: () => true },
+];
+
+// Dark-teal → light-brass, Lab-interpolated so the four fills step evenly in
+// lightness. Each level carries the label colour that clears WCAG AA on that
+// fill (white on the two dark levels, near-black on the two light ones — both
+// verified ≥ 5.7:1), so labels stay legible across the ramp with no outline.
+const BUCKET_STYLE: { fill: string; text: string }[] = [
+  { fill: "#123a37", text: "#ffffff" },
+  { fill: "#5a603e", text: "#ffffff" },
+  { fill: "#9c8941", text: "#0a0a0a" },
+  { fill: "#e0b341", text: "#0a0a0a" },
+];
+
+function bucketFor(authors: number): number {
+  const i = DIVERSITY_BUCKETS.findIndex((b) => b.test(authors));
+  return i === -1 ? DIVERSITY_BUCKETS.length - 1 : i;
+}
+
+// Height of the strip reserved at the top of each folder group for its label,
+// so the grouping (by top-level folder) is legible instead of looking like
+// arbitrary nested boxes.
+const GROUP_HEADER = 17;
+
 export function HotspotTreemap({
   hotspots,
   width = 800,
@@ -71,9 +106,15 @@ export function HotspotTreemap({
       .hierarchy(root as unknown as d3.HierarchyNode<unknown>)
       .sum((d) => ((d as { value?: number }).value ?? 0))
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
-    d3.treemap().size([width, height]).paddingInner(2).paddingOuter(3).round(true)(
-      hier as d3.HierarchyNode<unknown>
-    );
+    d3
+      .treemap()
+      .size([width, height])
+      .paddingInner(2)
+      .paddingOuter(3)
+      // Reserve a header strip at the top of each folder group (depth 1) for
+      // its label; the root (depth 0) keeps the normal 3px inset.
+      .paddingTop((d) => (d.depth === 1 ? GROUP_HEADER : 3))
+      .round(true)(hier as d3.HierarchyNode<unknown>);
     return hier as d3.HierarchyRectangularNode<unknown>;
   }, [hotspots, width, height]);
 
@@ -91,15 +132,6 @@ export function HotspotTreemap({
       </div>
     );
   }
-
-  // Author-diversity color scale — more unique authors = hotter.
-  // Muted palette that reads well on dark: teal → emerald → amber → rose
-  const maxAuthors = Math.max(1, ...hotspots.map((h) => h.authors));
-  const color = d3
-    .scaleLinear<string>()
-    .domain([0, maxAuthors * 0.33, maxAuthors * 0.66, maxAuthors])
-    .range(["#134e4a", "#065f46", "#b45309", "#991b1b"])
-    .clamp(true);
 
   const leaves = layout.leaves() as d3.HierarchyRectangularNode<{
     name: string;
@@ -134,7 +166,7 @@ export function HotspotTreemap({
           const w = node.x1 - node.x0;
           const h = node.y1 - node.y0;
           const file = node.data as unknown as { name: string; data: FileHotspot };
-          const fill = color(file.data.authors);
+          const style = BUCKET_STYLE[bucketFor(file.data.authors)];
           const displayName = fileDisplayName(file.data.path);
           // Max chars we can fit at ~7.5 px per mono char, leaving 10px padding
           const maxChars = Math.max(0, Math.floor((w - 10) / 7.5));
@@ -147,8 +179,11 @@ export function HotspotTreemap({
           return (
             <g key={i} transform={`translate(${node.x0},${node.y0})`}>
               <title>{`${file.data.path}\nChurn: ${file.data.churn} commits\nAuthors: ${file.data.authors}\nScore: ${file.data.score.toFixed(2)}`}</title>
-              <rect width={w} height={h} fill={fill} rx={3} />
-              {/* Only render label if tile is roomy enough — skip the
+              <rect width={w} height={h} fill={style.fill} rx={3} />
+              {/* Labels carry a per-tile text colour — light on the dark
+                  levels, dark on the light ones — each verified ≥ 5.7:1, so
+                  they stay legible across the ramp with no outline. Only
+                  render if the tile is roomy enough to avoid the
                   "truncated-to-two-letters" look on tiny tiles. */}
               {w >= 50 && h >= 20 && label && (
                 <text
@@ -156,7 +191,7 @@ export function HotspotTreemap({
                   y={14}
                   fontSize={11}
                   fontFamily="var(--font-geist-mono)"
-                  fill="rgba(255,255,255,0.9)"
+                  fill={style.text}
                   style={{ pointerEvents: "none" }}
                 >
                   {label}
@@ -167,7 +202,8 @@ export function HotspotTreemap({
                   x={5}
                   y={28}
                   fontSize={10}
-                  fill="rgba(255,255,255,0.55)"
+                  fill={style.text}
+                  fillOpacity={0.85}
                   style={{ pointerEvents: "none" }}
                 >
                   {file.data.churn}× · {file.data.authors} auth
@@ -176,21 +212,58 @@ export function HotspotTreemap({
             </g>
           );
         })}
+        {/* Folder-group labels — small + muted, sitting in the header strip
+            reserved at the top of each group so the grouping (by top-level
+            folder) reads as a group, not arbitrary nested boxes. Skipped for
+            narrow groups and single-file groups (the file label already names
+            those). */}
+        {layout.children?.map((group, gi) => {
+          const gw = group.x1 - group.x0;
+          const childCount = group.children?.length ?? 0;
+          if (gw < 42 || childCount < 2) return null;
+          const folder = (group.data as unknown as { name: string }).name;
+          const maxChars = Math.max(1, Math.floor((gw - 8) / 6.2));
+          const text =
+            folder.length > maxChars
+              ? folder.slice(0, Math.max(1, maxChars - 1)) + "…"
+              : folder;
+          return (
+            <text
+              key={`group-${gi}`}
+              x={group.x0 + 4}
+              y={group.y0 + 12}
+              fontSize={10}
+              fontFamily="var(--font-geist-mono)"
+              fill={TOK.textMuted}
+              style={{ pointerEvents: "none", letterSpacing: "0.04em" }}
+            >
+              {text}
+            </text>
+          );
+        })}
       </svg>
       <div
-        className="flex items-center justify-between text-xs px-2 py-1"
+        className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs px-2 py-1"
         style={{ color: TOK.textMuted }}
       >
         <span>Size = churn · Color = unique authors</span>
-        <div className="flex items-center gap-2">
-          <span>less diverse</span>
-          <div
-            className="h-2 w-24 rounded"
-            style={{
-              background: `linear-gradient(to right, ${color(0)}, ${color(maxAuthors)})`,
-            }}
-          />
-          <span>more diverse</span>
+        <div className="flex items-center gap-2.5">
+          <span>authors</span>
+          {DIVERSITY_BUCKETS.map((b, i) => (
+            <span key={b.label} className="inline-flex items-center gap-1">
+              <span
+                aria-hidden
+                className="inline-block rounded-sm"
+                style={{
+                  width: 10,
+                  height: 10,
+                  background: BUCKET_STYLE[i].fill,
+                  border: `1px solid ${TOK.border}`,
+                }}
+              />
+              {b.label}
+            </span>
+          ))}
         </div>
       </div>
     </div>
