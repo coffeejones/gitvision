@@ -352,7 +352,11 @@ function detectKnowledgeDistribution(
   for (const h of snap.hotspots) {
     const folder = folderOf(h.path);
     const authors = byFolder.get(folder) ?? new Set<string>();
-    (h.authorLogins ?? []).forEach((a) => authors.add(a));
+    // Exclude bots (dependabot, pre-commit-ci, …) — they shouldn't inflate a
+    // folder's owner count (masking bus-factor) or fake "broad ownership".
+    (h.authorLogins ?? []).forEach((a) => {
+      if (!isBotAuthor(a)) authors.add(a);
+    });
     byFolder.set(folder, authors);
     churnByFolder.set(folder, (churnByFolder.get(folder) ?? 0) + h.churn);
   }
@@ -694,7 +698,9 @@ function detectActivityRecency(
 function detectSoloProject(snap: AnalysisSnapshot): HealthSignal[] {
   const authors = new Set<string>();
   snap.hotspots.forEach((h) =>
-    (h.authorLogins ?? []).forEach((a) => authors.add(a))
+    (h.authorLogins ?? []).forEach((a) => {
+      if (!isBotAuthor(a)) authors.add(a);
+    })
   );
   if (authors.size !== 1) return [];
   if (snap.recentCommits.length < 5) return [];
@@ -947,19 +953,22 @@ function detectFreshDeps(snap: AnalysisSnapshot): HealthSignal[] {
 
 // 17. Large contributor spread — many contributors = usually working
 function detectContributorSpread(snap: AnalysisSnapshot): HealthSignal[] {
-  if (snap.contributors.length >= 20) {
-    const top = snap.contributors.slice(0, 5);
+  // Exclude bots — dependabot et al. shouldn't count toward a "broad
+  // contributor base" or inflate the participation curve.
+  const humans = snap.contributors.filter((c) => !isBotAuthor(c.login));
+  if (humans.length >= 20) {
+    const top = humans.slice(0, 5);
     const topContribs = top.reduce((s, c) => s + c.contributions, 0);
-    const allContribs = snap.contributors.reduce((s, c) => s + c.contributions, 0);
+    const allContribs = humans.reduce((s, c) => s + c.contributions, 0);
     const topShare = Math.round((topContribs / Math.max(1, allContribs)) * 100);
     return [
       {
         id: "many-contributors",
         title: "Broad contributor base",
-        detail: `${snap.contributors.length}+ people have contributed; top 5 account for ${topShare}% — healthy participation curve.`,
+        detail: `${humans.length}+ people have contributed; top 5 account for ${topShare}% — healthy participation curve.`,
         evidence: {
           numbers: {
-            totalContributors: snap.contributors.length,
+            totalContributors: humans.length,
             top5SharePct: topShare,
           },
         },

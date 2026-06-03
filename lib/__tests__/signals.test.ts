@@ -9,6 +9,7 @@ import type {
   FileHotspot,
   PullRequestSummary,
   DependencyHealth,
+  Contributor,
 } from "../types";
 
 // ------------------- Mock factory -------------------
@@ -250,6 +251,43 @@ describe("Untested hotspots — scope awareness", () => {
       mockSnapshot({ hotspots: codeHotspots, analyzedSubdir: "src" })
     );
     expect(hasSignal(needsWork, "untested-hotspots")).toBe(false);
+  });
+});
+
+// ------------------- Bot filtering: contributors / Team -------------------
+
+describe("Bot filtering — contributors", () => {
+  const human = (i: number): Contributor => ({
+    login: `human${i}`,
+    avatarUrl: "",
+    htmlUrl: "",
+    contributions: 10,
+  });
+  const bot = (login: string): Contributor => ({
+    login,
+    avatarUrl: "",
+    htmlUrl: "",
+    contributions: 500,
+  });
+  const bots = [bot("dependabot[bot]"), bot("pre-commit-ci[bot]")];
+
+  it("excludes bots from the broad-contributor-base count", () => {
+    const humans = Array.from({ length: 20 }, (_, i) => human(i));
+    const { working } = extractHealthSignals(
+      mockSnapshot({ contributors: [...humans, ...bots] })
+    );
+    const s = working.find((x) => x.id === "many-contributors");
+    expect(s).toBeDefined();
+    // 20 humans counted, the 2 bots excluded.
+    expect(s!.evidence.numbers!.totalContributors).toBe(20);
+  });
+
+  it("does not fire broad-contributor-base when humans < 20 after excluding bots", () => {
+    const humans = Array.from({ length: 18 }, (_, i) => human(i));
+    const { working } = extractHealthSignals(
+      mockSnapshot({ contributors: [...humans, ...bots] })
+    );
+    expect(working.find((x) => x.id === "many-contributors")).toBeUndefined();
   });
 });
 
