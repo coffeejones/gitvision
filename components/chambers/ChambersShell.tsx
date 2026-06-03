@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Scale,
   Bot,
@@ -36,12 +37,27 @@ interface User {
 }
 
 interface Props {
-  active: ChambersNav;
+  /** Which nav item is current. Optional — when omitted (the normal case
+   *  inside the workspace layout) it's derived from the URL, so the sidebar
+   *  highlights correctly without each page passing it. The mockup passes it
+   *  explicitly since its path doesn't match a real workspace route. */
+  active?: ChambersNav;
   user: User;
   children: React.ReactNode;
 }
 
+/** Map a workspace pathname to the active nav item. */
+function navFromPath(pathname: string): ChambersNav {
+  if (pathname.startsWith("/pr-bot")) return "pr-bot";
+  if (pathname.startsWith("/news")) return "news";
+  if (pathname.startsWith("/how-it-works")) return "how";
+  if (pathname.startsWith("/account")) return "settings";
+  return "cases";
+}
+
 export function ChambersShell({ active, user, children }: Props) {
+  const pathname = usePathname();
+  const current = active ?? navFromPath(pathname);
   return (
     <div className="flex min-h-screen w-full" style={{ background: CH.bg }}>
       {/* Brass gradient def so CrestSeal's url(#brass) fill renders
@@ -56,7 +72,7 @@ export function ChambersShell({ active, user, children }: Props) {
         </defs>
       </svg>
 
-      <Sidebar active={active} user={user} />
+      <Sidebar active={current} user={user} />
 
       <main className="flex-1 min-w-0">
         {/* Fluid up to a ceiling so cases widen with the screen instead of
@@ -84,7 +100,7 @@ function Sidebar({ active, user }: { active: ChambersNav; user: User }) {
     >
       {/* Brand */}
       <Link
-        href="/"
+        href="/cases"
         className="flex items-center gap-2.5 px-5 h-[68px] flex-none"
         style={{ borderBottom: `1px solid ${CH.border}` }}
       >
@@ -134,12 +150,12 @@ function Sidebar({ active, user }: { active: ChambersNav; user: User }) {
 
       {/* Nav */}
       <nav className="flex flex-1 flex-col gap-1 px-3 pt-4 pb-6 overflow-y-auto">
-        <NavLink href="/" icon={Scale} label="Cases" activeNow={active === "cases"} />
+        <NavLink href="/cases" icon={Scale} label="Cases" activeNow={active === "cases"} />
         <NavLink href="/pr-bot" icon={Bot} label="PR-bot" activeNow={active === "pr-bot"} />
 
         <Divider />
 
-        <NavLink href="/help" icon={BookOpen} label="How it works" activeNow={active === "how"} />
+        <NavLink href="/how-it-works" icon={BookOpen} label="How it works" activeNow={active === "how"} />
         <NavLink href="/news" icon={Newspaper} label="News" activeNow={active === "news"} />
 
         {/* push the account group to the bottom */}
