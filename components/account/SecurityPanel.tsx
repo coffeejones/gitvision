@@ -6,9 +6,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, KeyRound, Mail, MailCheck } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/components/account/theme";
 import { authClient } from "@/lib/authClient";
-import { setPasswordAction } from "@/app/account/actions";
+import { setPasswordAction } from "@/app/(workspace)/account/actions";
 import {
   Badge,
   ComingSoonBadge,

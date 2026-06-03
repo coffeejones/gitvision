@@ -6,7 +6,7 @@ import { getAuthSession } from "@/lib/authSession";
 import { userFromSession } from "@/lib/userFromSession";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
-import { AccountShell } from "@/components/AccountShell";
+import { SettingsShell } from "@/components/account/SettingsShell";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 
 export const metadata = {
@@ -33,8 +33,8 @@ export default async function SecurityPage() {
   const user = userFromSession(session);
 
   return (
-    <AccountShell user={user} hasPassword={hasPassword} hasGithub={hasGithub}>
+    <SettingsShell user={user} hasPassword={hasPassword} hasGithub={hasGithub}>
       <SecurityPanel user={user} hasPassword={hasPassword} />
-    </AccountShell>
+    </SettingsShell>
   );
 }

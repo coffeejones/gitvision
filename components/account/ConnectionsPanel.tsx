@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Link as LinkIcon, Unlink, Mail, ShieldCheck } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/components/account/theme";
 import { authClient } from "@/lib/authClient";
 import { GithubIcon } from "@/components/GithubIcon";
 import {

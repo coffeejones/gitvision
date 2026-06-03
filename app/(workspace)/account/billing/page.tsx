@@ -13,7 +13,7 @@ import { eq } from "drizzle-orm";
 import { getAuthSession } from "@/lib/authSession";
 import { userFromSession } from "@/lib/userFromSession";
 import { db, schema } from "@/lib/db";
-import { AccountShell } from "@/components/AccountShell";
+import { SettingsShell } from "@/components/account/SettingsShell";
 import { BillingPanel } from "@/components/account/BillingPanel";
 import { getUserTier } from "@/lib/billing/gates";
 
@@ -63,7 +63,7 @@ export default async function BillingPage() {
   const user = userFromSession(session);
 
   return (
-    <AccountShell
+    <SettingsShell
       user={user}
       hasPassword={hasPassword}
       hasGithub={hasGithub}
@@ -75,6 +75,6 @@ export default async function BillingPage() {
         cancelAtPeriodEnd={subscription?.cancelAtPeriodEnd ?? false}
         hasSubscriptionId={!!subscription?.polarSubscriptionId}
       />
-    </AccountShell>
+    </SettingsShell>
   );
 }

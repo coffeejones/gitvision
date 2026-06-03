@@ -17,7 +17,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, ExternalLink, RefreshCw } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/components/account/theme";
 import { TierIcon, type Tier } from "@/components/TierIcon";
 import { tierFor, formatPrice } from "@/lib/pricing";
 import {

@@ -23,7 +23,7 @@
 "use client";
 
 import { CheckCircle2, AlertCircle, X } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/components/account/theme";
 
 // ─── Row ────────────────────────────────────────────────────────────
 

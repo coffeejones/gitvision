@@ -9,7 +9,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, MailCheck } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/components/account/theme";
 import { authClient } from "@/lib/authClient";
 import {
   Badge,

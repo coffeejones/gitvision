@@ -5,7 +5,7 @@ import { getAuthSession } from "@/lib/authSession";
 import { userFromSession } from "@/lib/userFromSession";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
-import { AccountShell } from "@/components/AccountShell";
+import { SettingsShell } from "@/components/account/SettingsShell";
 import { ConnectionsPanel } from "@/components/account/ConnectionsPanel";
 import { userHasRepoScope } from "@/lib/githubUserToken";
 
@@ -53,7 +53,7 @@ export default async function ConnectionsPage() {
     : false;
 
   return (
-    <AccountShell
+    <SettingsShell
       user={user}
       hasPassword={hasPassword}
       hasGithub={!!githubAccount}
@@ -64,6 +64,6 @@ export default async function ConnectionsPage() {
         signInMethodCount={signInMethodCount}
         hasRepoScope={hasRepoScope}
       />
-    </AccountShell>
+    </SettingsShell>
   );
 }
