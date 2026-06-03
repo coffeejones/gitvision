@@ -35,7 +35,12 @@ function formatRel(iso: string): string {
   if (diff < hr) return `${Math.floor(diff / min)}m`;
   if (diff < day) return `${Math.floor(diff / hr)}h ${Math.floor((diff % hr) / min)}m`;
   const days = Math.floor(diff / day);
-  return days < 30 ? `${days}d` : new Date(iso).toLocaleDateString();
+  if (days < 30) return `${days}d`;
+  // Stay relative beyond a month — both call sites append " ago", so an
+  // absolute date here produced "29.4.2026 ago". Mirror CaseRow's mo/y units.
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+  return `${Math.floor(months / 12)}y`;
 }
 
 /** Format a path for display: take the basename for breathing room, full

@@ -253,6 +253,24 @@ function median(nums: number[]): number {
     : sorted[mid];
 }
 
+// Humanize a day-count for prose. A raw `toFixed(1)` rendered sub-day
+// durations as "0.0 days" (fast repos merge in hours) — nonsense. Drop to
+// hours under a day, keep one decimal up to ~10 days, whole days beyond.
+// Returns the unit too, so callers must NOT append "days".
+function humanizeDuration(days: number): string {
+  const hours = days * 24;
+  if (hours < 1) return "under an hour";
+  if (days < 1) {
+    const h = Math.round(hours);
+    return `about ${h} hour${h === 1 ? "" : "s"}`;
+  }
+  if (days < 10) {
+    const r = Math.round(days * 10) / 10;
+    return `${r} day${r === 1 ? "" : "s"}`;
+  }
+  return `${Math.round(days)} days`;
+}
+
 // ------------------- Detectors -------------------
 
 // 1. PR throughput — healthy merge vs. open ratio (working) OR backlog (needsWork).
@@ -322,14 +340,14 @@ function detectPrCycleTime(
     working.push({
       id: "fast-pr-cycle",
       title: "Fast PR cycle",
-      detail: `Median time-to-merge is ${medianDays.toFixed(1)} days across ${mergedPRs.length} recent human-authored merges — team ships quickly.`,
+      detail: `Median time-to-merge is ${humanizeDuration(medianDays)} across ${mergedPRs.length} recent human-authored merges — team ships quickly.`,
       evidence: { numbers: { medianDays: +medianDays.toFixed(1), sampled: mergedPRs.length } },
     });
   } else if (medianDays >= 14) {
     needsWork.push({
       id: "slow-pr-cycle",
       title: "Slow PR reviews",
-      detail: `Human-authored PRs take a median of ${medianDays.toFixed(0)} days to merge — review friction is real.`,
+      detail: `Human-authored PRs take a median of ${humanizeDuration(medianDays)} to merge — review friction is real.`,
       evidence: { numbers: { medianDays: +medianDays.toFixed(1), sampled: mergedPRs.length } },
       severity: medianDays > 30 ? "high" : "medium",
     });
