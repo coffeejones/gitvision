@@ -7,18 +7,18 @@
 //
 // D4: layout now uses AuthShell (split brand panel + form column).
 
-import { ForgotPasswordForm } from "@/components/ForgotPasswordForm";
-import { AuthShell } from "@/components/auth/AuthShell";
+import { CTForgotPasswordForm } from "@/components/landing/codetrawl/CTForgotPasswordForm";
+import { CTAuthShell } from "@/components/landing/codetrawl/CTAuthShell";
 
 export const metadata = {
-  title: "Reset your password — RepoJury",
+  title: "Reset your password — CodeTrawl",
   description: "Send yourself a password-reset link.",
 };
 
 export default function ForgotPasswordRoute() {
   return (
-    <AuthShell>
-      <ForgotPasswordForm />
-    </AuthShell>
+    <CTAuthShell>
+      <CTForgotPasswordForm />
+    </CTAuthShell>
   );
 }

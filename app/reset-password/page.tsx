@@ -8,12 +8,12 @@
 //
 // D4: layout now uses AuthShell (split brand panel + form column).
 
-import { ResetPasswordForm } from "@/components/ResetPasswordForm";
-import { AuthShell } from "@/components/auth/AuthShell";
+import { CTResetPasswordForm } from "@/components/landing/codetrawl/CTResetPasswordForm";
+import { CTAuthShell } from "@/components/landing/codetrawl/CTAuthShell";
 
 export const metadata = {
-  title: "Set a new password — RepoJury",
-  description: "Choose a new password for your RepoJury account.",
+  title: "Set a new password — CodeTrawl",
+  description: "Choose a new password for your CodeTrawl account.",
 };
 
 interface SearchParams {
@@ -31,8 +31,8 @@ export default async function ResetPasswordRoute({
   const params = await searchParams;
 
   return (
-    <AuthShell>
-      <ResetPasswordForm token={params.token ?? null} />
-    </AuthShell>
+    <CTAuthShell>
+      <CTResetPasswordForm token={params.token ?? null} />
+    </CTAuthShell>
   );
 }

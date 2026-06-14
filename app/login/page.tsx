@@ -15,11 +15,11 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { CheckCircle2 } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { AuthForm } from "@/components/AuthForm";
-import { AuthShell } from "@/components/auth/AuthShell";
+import { CTAuthForm } from "@/components/landing/codetrawl/CTAuthForm";
+import { CTAuthShell } from "@/components/landing/codetrawl/CTAuthShell";
 
 export const metadata = {
-  title: "Log in — RepoJury",
+  title: "Log in — CodeTrawl",
   description: "Log in to access your saved sessions.",
 };
 
@@ -50,14 +50,14 @@ export default async function LoginPage({
   const justReset = params.reset === "ok";
 
   return (
-    <AuthShell>
+    <CTAuthShell>
       {justReset && (
         <div className="auth-banner" role="status">
           <CheckCircle2 size={14} />
           <span>Password updated — sign in with your new password below.</span>
         </div>
       )}
-      <AuthForm mode="login" redirectTo={params.next ?? "/"} />
-    </AuthShell>
+      <CTAuthForm mode="login" redirectTo={params.next ?? "/"} />
+    </CTAuthShell>
   );
 }

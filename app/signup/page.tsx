@@ -10,12 +10,12 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { AuthForm } from "@/components/AuthForm";
-import { AuthShell } from "@/components/auth/AuthShell";
+import { CTAuthForm } from "@/components/landing/codetrawl/CTAuthForm";
+import { CTAuthShell } from "@/components/landing/codetrawl/CTAuthShell";
 
 export const metadata = {
-  title: "Sign up — RepoJury",
-  description: "Create a free RepoJury account.",
+  title: "Sign up — CodeTrawl",
+  description: "Create a free CodeTrawl account.",
 };
 
 interface SearchParams {
@@ -35,8 +35,8 @@ export default async function SignupPage({
   }
 
   return (
-    <AuthShell>
-      <AuthForm mode="signup" redirectTo={params.next ?? "/"} />
-    </AuthShell>
+    <CTAuthShell>
+      <CTAuthForm mode="signup" redirectTo={params.next ?? "/"} />
+    </CTAuthShell>
   );
 }
