@@ -87,6 +87,13 @@ const RULING_ICON: Record<Ruling, typeof Lock> = {
   Conditional: AlertTriangle,
   Returned: XCircle,
 };
+// Display labels (Stage 3 lexicon): the internal Ruling type stays
+// Cleared/Conditional/Returned; the user sees the CodeTrawl words.
+const RULING_LABEL: Record<Ruling, string> = {
+  Cleared: "Clear",
+  Conditional: "Conditional",
+  Returned: "Flagged",
+};
 
 type DeptStatus = "ok" | "warning" | "critical";
 const DEPT_ABBR: Record<string, string> = {
@@ -156,7 +163,7 @@ export function CaseRow({ c }: { c: CaseItem }) {
             <span
               className="inline-flex flex-none items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium"
               style={{ color: CH.textDim, border: `1px solid ${CH.border}` }}
-              title="New commits upstream since the last analysis — refresh to update this verdict"
+              title="New commits upstream since the last sweep — refresh to update this grade"
             >
               <RefreshCw size={9} aria-hidden />
               New changes
@@ -182,7 +189,7 @@ export function CaseRow({ c }: { c: CaseItem }) {
             className="font-mono text-[10.5px] tabular-nums"
             style={{ color: CH.textMuted }}
           >
-            {c.caseNo} · {ago(c.updatedAt)}
+            swept {ago(c.updatedAt)}
           </span>
         </span>
 
@@ -204,7 +211,7 @@ function RulingBadge({ ruling, tone }: { ruling: Ruling; tone: string }) {
       style={{ color: tone, background: TONE_SOFT[ruling] }}
     >
       <Icon size={11} aria-hidden />
-      {ruling}
+      {RULING_LABEL[ruling]}
     </span>
   );
 }
@@ -215,7 +222,7 @@ function DeptStrip({
   departments: CaseItem["departments"];
 }) {
   return (
-    <span className="mt-0.5 flex items-center gap-1.5" aria-label="Department breakdown">
+    <span className="mt-0.5 flex items-center gap-1.5" aria-label="Lens breakdown">
       {departments.map((d) => {
         const s = DEPT_STATUS_STYLE[d.status];
         const Icon = s.Icon;

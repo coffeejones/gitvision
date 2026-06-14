@@ -15,16 +15,13 @@ export function PRBotView({ canInstall }: { canInstall: boolean }) {
     <div>
       <header className="mb-7">
         <h1
-          className="flex items-center gap-2.5 text-[28px] font-semibold tracking-tight"
-          style={{ color: CH.text, letterSpacing: "-0.02em" }}
+          className="text-[28px] font-semibold tracking-tight"
+          style={{ color: CH.text, letterSpacing: "-0.025em" }}
         >
-          <span aria-hidden style={{ fontSize: 22, lineHeight: 1 }}>
-            🤖
-          </span>
           PR-bot
         </h1>
-        <p className="mt-1 text-[14px]" style={{ color: CH.textDim }}>
-          The same verdict, on every pull request — one grounded review comment,
+        <p className="mt-1.5 text-[14px]" style={{ color: CH.textDim }}>
+          The same grade, on every pull request — one grounded review comment,
           no LLM in the loop, no token cost.
         </p>
       </header>

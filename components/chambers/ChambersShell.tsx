@@ -11,7 +11,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Scale,
+  Layers,
   Bot,
   BookOpen,
   Newspaper,
@@ -137,7 +137,7 @@ function Sidebar({ active, user }: { active: ChambersNav; user: User }) {
 
       {/* Nav */}
       <nav className="flex flex-1 flex-col gap-1 px-3 pt-4 pb-6 overflow-y-auto">
-        <NavLink href="/cases" icon={Scale} label="Cases" activeNow={active === "cases"} />
+        <NavLink href="/cases" icon={Layers} label="Surveys" activeNow={active === "cases"} />
         <NavLink href="/pr-bot" icon={Bot} label="PR-bot" activeNow={active === "pr-bot"} />
 
         <Divider />
@@ -177,7 +177,7 @@ function NavLink({
   activeNow,
 }: {
   href: string;
-  icon: typeof Scale;
+  icon: typeof Layers;
   label: string;
   activeNow: boolean;
 }) {

@@ -113,7 +113,7 @@ export function PrivateRepos({ analyzedRepos }: { analyzedRepos: Set<string> }) 
         throw new Error(data.error ?? "Could not start analysis.");
       }
       const job = await pollJob(data.jobId, () => {});
-      if (!job.sessionId) throw new Error("Analysis finished but no case was created.");
+      if (!job.sessionId) throw new Error("Analysis finished but no survey was created.");
       router.push(`/session/${job.sessionId}`);
       router.refresh();
     } catch (e) {

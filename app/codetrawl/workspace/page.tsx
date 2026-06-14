@@ -116,7 +116,7 @@ const PUBLIC_CASES: CaseItem[] = [
     criticalCount: 0,
     snapshotCount: 2,
     updatedAt: "2026-05-28T17:45:00Z",
-    headline: "All four departments cleared this codebase.",
+    headline: "Clean across all four lenses.",
     departments: [
       { key: "Health", status: "ok" },
       { key: "Security", status: "ok" },

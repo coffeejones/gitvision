@@ -13,25 +13,25 @@ interface Item {
 const SHIPPED: Item[] = [
   {
     tag: "Jun 2026",
-    title: "Trustworthy dependency verdicts",
+    title: "Trustworthy dependency grades",
     description:
       "Security & Supply now grade only your shipped/runtime deps — example apps, docs and CI pins no longer fail a repo. Modern pyproject configs parse, CVE checks resolve version ranges, and a repo is never its own dependency.",
   },
   {
     tag: "Jun 2026",
-    title: "“Since last visit” on every case",
+    title: "“Since last visit” on every survey",
     description:
-      "Each case shows how its verdict moved since you last looked — grade, department votes, and new criticals — plus a “New changes” nudge when a repo has new commits to re-analyze.",
+      "Each survey shows how its grade moved since you last looked — grade, lens scores, and new criticals — plus a “New changes” nudge when a repo has new commits to re-sweep.",
   },
   {
     tag: "Jun 2026",
-    title: "Chambers workspace",
+    title: "Surveys workspace",
     description:
-      "A records-room home for your cases: worst-first ranking, a four-department breakdown per repo, and public/private tabs.",
+      "A home for your surveys: worst-first ranking, a four-lens breakdown per repo, and public/private tabs.",
   },
   {
     tag: "May 2026",
-    title: "RepoJury PR-bot",
+    title: "CodeTrawl PR-bot",
     description:
       "One grounded review comment on every PR — the same deterministic signal layer as the workspace, zero LLM cost.",
   },
@@ -46,15 +46,15 @@ const COMING: Item[] = [
   },
   {
     tag: "Soon",
-    title: "Per-department policy",
+    title: "Per-lens policy",
     description:
-      "Tune which departments block vs. warn (e.g. Security gates a merge, Forensics only advises) so the verdict fits your bar.",
+      "Tune which lenses block vs. warn (e.g. Security gates a merge, Forensics only advises) so the grade fits your bar.",
   },
   {
     tag: "Planned",
     title: "Team & org workspace",
     description:
-      "Shared cases across a team, who-ran-what, and an org-wide worst-first board — not one account bought many times.",
+      "Shared surveys across a team, who-ran-what, and an org-wide worst-first board — not one account bought many times.",
   },
 ];
 
@@ -63,15 +63,12 @@ export function NewsView() {
     <div>
       <header className="mb-7">
         <h1
-          className="flex items-center gap-2.5 text-[28px] font-semibold tracking-tight"
-          style={{ color: CH.text, letterSpacing: "-0.02em" }}
+          className="text-[28px] font-semibold tracking-tight"
+          style={{ color: CH.text, letterSpacing: "-0.025em" }}
         >
-          <span aria-hidden style={{ fontSize: 22, lineHeight: 1 }}>
-            📰
-          </span>
           News
         </h1>
-        <p className="mt-1 text-[14px]" style={{ color: CH.textDim }}>
+        <p className="mt-1.5 text-[14px]" style={{ color: CH.textDim }}>
           What we shipped, and what&apos;s coming next.
         </p>
       </header>

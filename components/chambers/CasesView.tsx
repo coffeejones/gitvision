@@ -63,11 +63,11 @@ export function CasesView({ publicCases, privateCases = [] }: Props) {
           className="text-[28px] font-semibold tracking-tight"
           style={{ color: CH.text, letterSpacing: "-0.025em" }}
         >
-          Cases
+          Surveys
         </h1>
         <p className="mt-1.5 text-[14px]" style={{ color: CH.textDim }}>
-          Your repositories under review — open one for its verdict, or bring
-          a new one before the bench.
+          Every repo you&rsquo;ve swept — open one for its grade, or sweep a
+          new one.
         </p>
       </header>
 
@@ -95,7 +95,7 @@ export function CasesView({ publicCases, privateCases = [] }: Props) {
               </div>
             </div>
           ) : (
-            <EmptyState text="No public cases yet. Paste a repo above to open your first." />
+            <EmptyState text="No public surveys yet. Paste a repo above to run your first." />
           )}
         </div>
       ) : (
@@ -175,7 +175,7 @@ function DeptLegend() {
     >
       <span>
         <span className="font-semibold" style={{ color: CH.textDim }}>
-          Departments
+          Lenses
         </span>{" "}
         H Health · S Security · F Forensics · Su Supply
       </span>
