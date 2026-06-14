@@ -1,51 +1,56 @@
 // Chambers palette — the post-login app shell.
 //
-// Deliberately darker + cooler-neutral than the marketing TOK theme
-// (and with NO warm orange): a clean, deep records-room dark. Emerald
-// is the action/active accent (consistent with the product); brass is
-// used only as a small brand tint on the crest.
+// Re-skinned to the CodeTrawl "SURFACE & DEPTH" system (Stage 1): bitumen
+// surfaces, bone text, hairlines. Every Chambers component reads these tokens
+// inline, so this one file re-colours the whole workspace.
+//
+// Orange is RATIONED hard: International Orange (#FF4F00) is reserved for the
+// single strongest signal — a genuine CRITICAL (a returned case, a critical
+// department, a critical count). Everything else — active marks, links, tags,
+// "new changes", and even "conditional/warning" — reads in TONE (brightness),
+// not colour, so the workspace stays calm and the one alert colour means
+// something. The accent + warning tokens are therefore neutral bone, not warm.
 
 export const CH = {
-  // Surfaces — deep near-black, faint cool tint, layered up.
-  bg: "#0A0A0D",
-  sidebar: "#0D0D12",
-  panel: "#121218",
-  panelHover: "#16161D",
-  elevated: "#1A1A22",
+  // Surfaces — bitumen, layered up.
+  bg: "#0c0b0a",
+  sidebar: "#0e0d0b",
+  panel: "#161412",
+  panelHover: "#1b1916",
+  elevated: "#1f1c18",
 
-  // Lines
-  border: "rgba(255,255,255,0.07)",
-  borderStrong: "rgba(255,255,255,0.12)",
+  // Lines — hairlines (--ct-line)
+  border: "rgba(242,239,234,0.09)",
+  borderStrong: "rgba(242,239,234,0.14)",
 
-  // Text
-  text: "#ECECF1",
-  textDim: "#9A9AA6",
-  // Lifted from #62626C → #8A8A95 so metadata text (case numbers, score,
-  // snapshot/filed counts, the private-repo sub-line) clears WCAG AA
-  // 4.5:1 on the panel/elevated surfaces. The old value was ~3.09:1 —
-  // legible-but-straining for sighted users, a fail for low-vision ones.
-  textMuted: "#8A8A95",
+  // Text — bone tones (--ct-text / dim / faint), all AA on the surfaces.
+  text: "#f2efea",
+  textDim: "#9c968e",
+  textMuted: "#8a847c",
 
-  // Emerald action/active accent (matches the product green).
-  accent: "#10b981",
-  accentText: "#04130d",
-  accentSoft: "rgba(16,185,129,0.13)",
-  accentBorder: "rgba(16,185,129,0.34)",
+  // Accent — NEUTRAL bone, not orange. Active marks, links, tags and "new
+  // changes" read as brightness, not a warm wash. (The one inverted button
+  // that uses accent-as-background gets bone bg + near-black text.)
+  accent: "#f2efea",
+  accentText: "#150700",
+  accentSoft: "rgba(242,239,234,0.10)",
+  accentBorder: "rgba(242,239,234,0.20)",
 
-  // Status (for case rows)
-  critical: "#f87171",
-  criticalSoft: "rgba(248,113,113,0.13)",
-  warning: "#f59e0b",
-  warningSoft: "rgba(245,158,11,0.13)",
-  ok: "#4ade80",
+  // Status (case rows) — ONLY a genuine critical glows orange. Conditional/
+  // warning is neutral dim, cleared/ok is quiet faint: severity by tone.
+  critical: "#ff4f00",
+  criticalSoft: "rgba(255,79,0,0.12)",
+  warning: "#9c968e",
+  warningSoft: "rgba(242,239,234,0.07)",
+  ok: "#8a847c",
 
-  // Brass — brand tint, used sparingly (the crest only).
-  brass: "#c9a227",
-  brassLight: "#ecd488",
+  // Brass — retired with the courtroom crest; kept as neutral aliases so any
+  // stray importer doesn't break. Not used in the CodeTrawl chrome.
+  brass: "#9c968e",
+  brassLight: "#f2efea",
 } as const;
 
-/** Shared keyboard focus ring for interactive Chambers elements.
- *  There was no visible focus anywhere (WCAG 2.4.7 fail); this gives a
- *  consistent emerald ring on :focus-visible only (not on mouse click). */
+/** Shared keyboard focus ring for interactive Chambers elements — ember, the
+ *  CodeTrawl focus colour (never new orange), on :focus-visible only. */
 export const CH_FOCUS =
-  "outline-none focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0A0D]";
+  "outline-none focus-visible:ring-1 focus-visible:ring-[#ff8a50] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0b0a]";

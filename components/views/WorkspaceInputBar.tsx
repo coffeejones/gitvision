@@ -15,8 +15,22 @@
 
 import { useState } from "react";
 import { RepoInputForm } from "@/components/RepoInputForm";
+import { CH } from "@/components/chambers/theme";
 
 export function WorkspaceInputBar() {
   const [value, setValue] = useState("");
-  return <RepoInputForm value={value} onValueChange={setValue} />;
+  return (
+    <RepoInputForm
+      value={value}
+      onValueChange={setValue}
+      // CodeTrawl workspace: a bitumen, hairline, shadow-free bar that sits in
+      // the page rather than the lifted-card look used on the marketing landing.
+      surface={CH.panel}
+      borderColor={CH.border}
+      flat
+      // De-green the submit button + soften the focus ring → neutral bone.
+      accent={CH.accent}
+      accentOn={CH.accentText}
+    />
+  );
 }

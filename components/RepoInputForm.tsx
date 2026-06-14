@@ -76,13 +76,47 @@ interface RepoInputFormProps {
    *  Used by LandingPanel to dismiss the first-visit nudge once any
    *  meaningful interaction happens. */
   onUserInteract?: () => void;
+  /** Container surface colour. Defaults to the lifted-card TOK surface used on
+   *  the marketing landing; the CodeTrawl workspace passes a bitumen value so
+   *  the bar blends into the page instead of standing out. */
+  surface?: string;
+  /** Container border colour. Defaults to TOK.borderStrong. */
+  borderColor?: string;
+  /** Drop the elevation shadow + inner highlight (CodeTrawl is hairline, no
+   *  box-shadow). Also softens the focus rings to a minimal hairline. */
+  flat?: boolean;
+  /** Active (ready-to-submit) button background. Defaults to TOK.accent
+   *  (emerald); the CodeTrawl workspace passes a neutral bone so the button
+   *  isn't a loud green. */
+  accent?: string;
+  /** Active button text colour, paired with `accent`. */
+  accentOn?: string;
 }
 
 export function RepoInputForm({
   value,
   onValueChange,
   onUserInteract,
+  surface,
+  borderColor,
+  flat = false,
+  accent,
+  accentOn,
 }: RepoInputFormProps) {
+  // Flat (workspace) variant: the focus indicator lives on the CONTAINER
+  // (focus-within) so a single minimal hairline ring wraps the whole bar —
+  // input AND button — instead of a ring around just the input that cuts off
+  // before the button. The default landing keeps its emerald inset ring on
+  // the input. Literal strings so Tailwind JITs them.
+  const inputFocus = flat
+    ? ""
+    : "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#10b981]";
+  const containerFocus = flat
+    ? "focus-within:ring-1 focus-within:ring-inset focus-within:ring-[#5f5a52]"
+    : "";
+  const buttonFocus = flat
+    ? "focus-visible:ring-1 focus-visible:ring-[#5f5a52] focus-visible:ring-offset-1 focus-visible:ring-offset-transparent"
+    : "focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent";
   const [subdir, setSubdir] = useState("");
   const [subdirOpen, setSubdirOpen] = useState(false);
   const [autoFilledFromUrl, setAutoFilledFromUrl] = useState(false);
@@ -229,16 +263,16 @@ export function RepoInputForm({
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
       <div
-        className="flex items-center rounded-lg"
+        className={`flex items-center rounded-lg ${containerFocus}`}
         style={{
-          // Lifted-card treatment: brighter surface + stronger border +
-          // elevation shadow + faint inner top-highlight. Reads as a
-          // distinct "primary action" element against the gradient
-          // background, rather than blending into the page.
-          background: TOK.surfaceElevated,
-          border: `1px solid ${TOK.borderStrong}`,
-          boxShadow:
-            "0 1px 0 rgba(255,255,255,0.05) inset, 0 8px 24px -8px rgba(0,0,0,0.5)",
+          // Lifted-card treatment by default (marketing landing): brighter
+          // surface + stronger border + elevation shadow. The workspace passes
+          // a bitumen `surface` + `flat` so the bar blends into the page.
+          background: surface ?? TOK.surfaceElevated,
+          border: `1px solid ${borderColor ?? TOK.borderStrong}`,
+          boxShadow: flat
+            ? "none"
+            : "0 1px 0 rgba(255,255,255,0.05) inset, 0 8px 24px -8px rgba(0,0,0,0.5)",
         }}
       >
         <input
@@ -250,17 +284,24 @@ export function RepoInputForm({
           }}
           placeholder="github.com/owner/repo"
           disabled={pending}
-          className="flex-1 bg-transparent h-12 px-4 text-base rounded-l-lg outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#10b981] disabled:opacity-50"
+          className={`flex-1 bg-transparent h-12 px-4 text-base rounded-l-lg outline-none ${inputFocus} disabled:opacity-50`}
           style={{ color: TOK.textPrimary }}
         />
         <button
           type="submit"
           disabled={pending || !value.trim()}
-          className="h-10 mr-1 px-4 rounded-md text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+          className={`h-10 mr-1 px-4 rounded-md text-sm font-medium transition outline-none ${buttonFocus}`}
           style={{
-            background: pending || !value.trim() ? TOK.surface : TOK.accent,
-            color: pending || !value.trim() ? TOK.textSecondary : TOK.accentOn,
-            border: `1px solid ${pending || !value.trim() ? TOK.border : "transparent"}`,
+            background:
+              pending || !value.trim()
+                ? flat
+                  ? "transparent"
+                  : TOK.surface
+                : (accent ?? TOK.accent),
+            color: pending || !value.trim() ? TOK.textSecondary : (accentOn ?? TOK.accentOn),
+            // Flat (workspace) variant: no button border, so the bar reads as
+            // one continuous outline rather than a box-within-a-box.
+            border: `1px solid ${!flat && (pending || !value.trim()) ? TOK.border : "transparent"}`,
           }}
         >
           {pending ? "Analyzing…" : "Analyze →"}

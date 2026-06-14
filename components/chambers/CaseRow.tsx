@@ -78,7 +78,7 @@ const TONE: Record<Ruling, string> = {
   Returned: CH.critical,
 };
 const TONE_SOFT: Record<Ruling, string> = {
-  Cleared: "rgba(74,222,128,0.14)",
+  Cleared: "rgba(242,239,234,0.08)",
   Conditional: CH.warningSoft,
   Returned: CH.criticalSoft,
 };
@@ -103,7 +103,7 @@ const DEPT_STATUS_STYLE: Record<
   DeptStatus,
   { fg: string; bg: string; Icon: typeof Check; word: string }
 > = {
-  ok: { fg: CH.ok, bg: "rgba(74,222,128,0.10)", Icon: Check, word: "pass" },
+  ok: { fg: CH.ok, bg: "rgba(242,239,234,0.07)", Icon: Check, word: "pass" },
   warning: { fg: CH.warning, bg: CH.warningSoft, Icon: AlertTriangle, word: "conditional" },
   critical: { fg: CH.critical, bg: CH.criticalSoft, Icon: X, word: "fail" },
 };
@@ -114,7 +114,10 @@ export function CaseRow({ c }: { c: CaseItem }) {
   return (
     <Link
       href={`/session/${c.id}`}
-      className="group relative block overflow-hidden rounded-xl transition-colors"
+      // CodeTrawl row: one hairline panel, radius <=10, no dog-ear / filed-edge
+      // stripe / case-number band. Severity reads through the grade ring + the
+      // ruling/dept tones; hover just brightens the border.
+      className="group block rounded-lg transition-colors"
       style={{ background: CH.panel, border: `1px solid ${CH.border}` }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = CH.panelHover;
@@ -125,54 +128,7 @@ export function CaseRow({ c }: { c: CaseItem }) {
         e.currentTarget.style.borderColor = CH.border;
       }}
     >
-      {/* filed-edge tone stripe */}
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{ background: tone }}
-      />
-      {/* folded corner (dog-ear) */}
-      <span
-        aria-hidden
-        className="absolute right-0 top-0"
-        style={{
-          width: 0,
-          height: 0,
-          borderTop: `20px solid ${CH.elevated}`,
-          borderLeft: "20px solid transparent",
-          filter: "drop-shadow(-1px 1px 1px rgba(0,0,0,0.45))",
-        }}
-      />
-
-      {/* header — case number + barcode motif */}
-      <div
-        className="flex items-center justify-between gap-3 pl-5 pr-9 py-2"
-        style={{ borderBottom: `1px solid ${CH.border}` }}
-      >
-        <span
-          className="font-mono text-[10.5px] uppercase tracking-[0.16em]"
-          style={{ color: CH.textMuted }}
-        >
-          Case No. {c.caseNo}
-        </span>
-        {c.hasNewChanges && (
-          <span
-            className="inline-flex flex-none items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-            style={{
-              color: CH.accent,
-              background: CH.accentSoft,
-              border: `1px solid ${CH.accentBorder}`,
-            }}
-            title="New commits upstream since the last analysis — refresh to update this verdict"
-          >
-            <RefreshCw size={9} aria-hidden />
-            New changes
-          </span>
-        )}
-      </div>
-
-      {/* body */}
-      <div className="flex items-center gap-4 pl-5 pr-4 py-4">
+      <div className="flex items-center gap-4 px-5 py-4">
         <ScoreRing grade={c.grade} score={c.score} tone={tone} />
 
         <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -196,6 +152,16 @@ export function CaseRow({ c }: { c: CaseItem }) {
         </span>
 
         <span className="hidden sm:flex flex-none flex-col items-end gap-1.5">
+          {c.hasNewChanges && (
+            <span
+              className="inline-flex flex-none items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium"
+              style={{ color: CH.textDim, border: `1px solid ${CH.border}` }}
+              title="New commits upstream since the last analysis — refresh to update this verdict"
+            >
+              <RefreshCw size={9} aria-hidden />
+              New changes
+            </span>
+          )}
           <span className="flex items-center gap-2.5">
             {c.criticalCount > 0 && (
               <span
@@ -212,8 +178,11 @@ export function CaseRow({ c }: { c: CaseItem }) {
               {c.snapshotCount} {c.snapshotCount === 1 ? "snapshot" : "snapshots"}
             </span>
           </span>
-          <span className="text-[11px]" style={{ color: CH.textMuted }}>
-            filed {ago(c.updatedAt)}
+          <span
+            className="font-mono text-[10.5px] tabular-nums"
+            style={{ color: CH.textMuted }}
+          >
+            {c.caseNo} · {ago(c.updatedAt)}
           </span>
         </span>
 

@@ -21,7 +21,6 @@ import {
   ArrowUpCircle,
 } from "lucide-react";
 import { authClient } from "@/lib/authClient";
-import { CrestSeal } from "@/components/landing/repojury/seals";
 import { CH, CH_FOCUS } from "./theme";
 
 export type ChambersNav = "cases" | "pr-bot" | "how" | "news" | "settings";
@@ -61,18 +60,6 @@ export function ChambersShell({ active, user, children }: Props) {
   const current = active ?? navFromPath(pathname);
   return (
     <div className="flex min-h-screen w-full" style={{ background: CH.bg }}>
-      {/* Brass gradient def so CrestSeal's url(#brass) fill renders
-          outside the marketing RJSurface. */}
-      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
-        <defs>
-          <linearGradient id="brass" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor={CH.brassLight} />
-            <stop offset="0.5" stopColor={CH.brass} />
-            <stop offset="1" stopColor="#8f6f17" />
-          </linearGradient>
-        </defs>
-      </svg>
-
       <Sidebar active={current} user={user} />
 
       <main className="flex-1 min-w-0">
@@ -102,15 +89,14 @@ function Sidebar({ active, user }: { active: ChambersNav; user: User }) {
       {/* Brand */}
       <Link
         href="/cases"
-        className="flex items-center gap-2.5 px-5 h-[68px] flex-none"
+        className="flex items-center px-5 h-[68px] flex-none"
         style={{ borderBottom: `1px solid ${CH.border}` }}
       >
-        <CrestSeal size={26} />
         <span
-          className="text-[17px] font-semibold tracking-tight"
-          style={{ color: CH.text }}
+          className="text-[18px] font-semibold tracking-tight"
+          style={{ color: CH.text, letterSpacing: "-0.02em" }}
         >
-          <b style={{ fontWeight: 700 }}>Repo</b>Jury
+          CodeTrawl
         </span>
       </Link>
 
@@ -139,9 +125,9 @@ function Sidebar({ active, user }: { active: ChambersNav; user: User }) {
           <span
             className="mt-0.5 inline-flex w-fit items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]"
             style={{
-              color: user.paid ? CH.brassLight : CH.textDim,
-              background: user.paid ? "rgba(201,162,39,0.12)" : CH.elevated,
-              border: `1px solid ${user.paid ? "rgba(201,162,39,0.3)" : CH.border}`,
+              color: user.paid ? CH.text : CH.textDim,
+              background: CH.elevated,
+              border: `1px solid ${CH.border}`,
             }}
           >
             {user.tierName}
@@ -200,20 +186,22 @@ function NavLink({
       href={href}
       className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] transition-colors ${CH_FOCUS}`}
       style={{
+        // CodeTrawl active-state: brightness + a hairline rule, never an
+        // orange wash — keeps the accent rationed and the sidebar calm.
         color: activeNow ? CH.text : CH.textDim,
-        background: activeNow ? CH.accentSoft : "transparent",
+        background: activeNow ? CH.panel : "transparent",
       }}
     >
       {activeNow && (
         <span
           aria-hidden
-          className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r"
-          style={{ background: CH.accent }}
+          className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r"
+          style={{ background: CH.text }}
         />
       )}
       <Icon
         size={16}
-        style={{ color: activeNow ? CH.accent : CH.textMuted }}
+        style={{ color: activeNow ? CH.text : CH.textMuted }}
       />
       <span style={{ fontWeight: activeNow ? 600 : 500 }}>{label}</span>
     </Link>
