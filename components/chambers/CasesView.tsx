@@ -60,15 +60,12 @@ export function CasesView({ publicCases, privateCases = [] }: Props) {
     <div>
       <header className="mb-7">
         <h1
-          className="flex items-center gap-2.5 text-[28px] font-semibold tracking-tight"
-          style={{ color: CH.text, letterSpacing: "-0.02em" }}
+          className="text-[28px] font-semibold tracking-tight"
+          style={{ color: CH.text, letterSpacing: "-0.025em" }}
         >
-          <span aria-hidden style={{ fontSize: 23, lineHeight: 1 }}>
-            🗂️
-          </span>
           Cases
         </h1>
-        <p className="mt-1 text-[14px]" style={{ color: CH.textDim }}>
+        <p className="mt-1.5 text-[14px]" style={{ color: CH.textDim }}>
           Your repositories under review — open one for its verdict, or bring
           a new one before the bench.
         </p>
@@ -152,11 +149,13 @@ function DocketSummary({ cases }: { cases: CaseItem[] }) {
         <RefreshCw size={12} style={{ color: CH.textMuted }} aria-hidden />
         Since your last visit
       </span>
+      {/* Neutral tone for direction; orange reserved for the genuine critical
+          count (matches the workspace rationing). */}
       {regressed > 0 && (
-        <span style={{ color: CH.critical }}>{regressed} regressed</span>
+        <span style={{ color: CH.text }}>{regressed} regressed</span>
       )}
       {improved > 0 && (
-        <span style={{ color: CH.ok }}>{improved} improved</span>
+        <span style={{ color: CH.textDim }}>{improved} improved</span>
       )}
       {criticalAdded > 0 && (
         <span style={{ color: CH.critical }}>+{criticalAdded} critical</span>
@@ -239,7 +238,7 @@ function Tab({
 function EmptyState({ text }: { text: string }) {
   return (
     <div
-      className="rounded-xl px-6 py-12 text-center text-[13.5px]"
+      className="rounded-lg px-6 py-12 text-center text-[13.5px]"
       style={{
         background: CH.panel,
         border: `1px dashed ${CH.border}`,

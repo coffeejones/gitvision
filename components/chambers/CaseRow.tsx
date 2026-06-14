@@ -78,7 +78,7 @@ const TONE: Record<Ruling, string> = {
   Returned: CH.critical,
 };
 const TONE_SOFT: Record<Ruling, string> = {
-  Cleared: "rgba(242,239,234,0.08)",
+  Cleared: "rgba(255,255,255,0.07)",
   Conditional: CH.warningSoft,
   Returned: CH.criticalSoft,
 };
@@ -103,7 +103,7 @@ const DEPT_STATUS_STYLE: Record<
   DeptStatus,
   { fg: string; bg: string; Icon: typeof Check; word: string }
 > = {
-  ok: { fg: CH.ok, bg: "rgba(242,239,234,0.07)", Icon: Check, word: "pass" },
+  ok: { fg: CH.ok, bg: "rgba(255,255,255,0.06)", Icon: Check, word: "pass" },
   warning: { fg: CH.warning, bg: CH.warningSoft, Icon: AlertTriangle, word: "conditional" },
   critical: { fg: CH.critical, bg: CH.criticalSoft, Icon: X, word: "fail" },
 };

@@ -12,45 +12,48 @@
 // something. The accent + warning tokens are therefore neutral bone, not warm.
 
 export const CH = {
-  // Surfaces — bitumen, layered up.
-  bg: "#0c0b0a",
-  sidebar: "#0e0d0b",
-  panel: "#161412",
-  panelHover: "#1b1916",
-  elevated: "#1f1c18",
+  // Surfaces — a dim "warm grey" (greige): roughly half the warmth of the
+  // landing's bitumen, so the screen isn't a warm/orange wash, but it isn't
+  // cool/blue-grey either. The middle ground. Only the accents carry heat.
+  bg: "#0c0b0b",
+  sidebar: "#0e0d0c",
+  panel: "#171615",
+  panelHover: "#1d1c1a",
+  elevated: "#232220",
 
-  // Lines — hairlines (--ct-line)
-  border: "rgba(242,239,234,0.09)",
-  borderStrong: "rgba(242,239,234,0.14)",
+  // Lines — near-neutral white hairlines.
+  border: "rgba(255,255,255,0.08)",
+  borderStrong: "rgba(255,255,255,0.13)",
 
-  // Text — bone tones (--ct-text / dim / faint), all AA on the surfaces.
-  text: "#f2efea",
-  textDim: "#9c968e",
-  textMuted: "#8a847c",
+  // Text — warm-grey light/grey, all AA on the surfaces.
+  text: "#eceae8",
+  textDim: "#9b9794",
+  textMuted: "#8a8783",
 
-  // Accent — NEUTRAL bone, not orange. Active marks, links, tags and "new
-  // changes" read as brightness, not a warm wash. (The one inverted button
-  // that uses accent-as-background gets bone bg + near-black text.)
-  accent: "#f2efea",
-  accentText: "#150700",
-  accentSoft: "rgba(242,239,234,0.10)",
-  accentBorder: "rgba(242,239,234,0.20)",
+  // Accent — NEUTRAL light, not orange. Active marks, links, tags and "new
+  // changes" read as brightness. (The one inverted button that uses accent as
+  // a background gets a light bg + near-black text.)
+  accent: "#eceae8",
+  accentText: "#0c0b0b",
+  accentSoft: "rgba(255,255,255,0.10)",
+  accentBorder: "rgba(255,255,255,0.20)",
 
-  // Status (case rows) — ONLY a genuine critical glows orange. Conditional/
-  // warning is neutral dim, cleared/ok is quiet faint: severity by tone.
+  // Status (case rows) — ONLY a genuine critical glows orange (the brand
+  // heat). Conditional/warning is neutral dim, cleared/ok is quiet faint:
+  // severity by tone, warmth reserved for criticals.
   critical: "#ff4f00",
-  criticalSoft: "rgba(255,79,0,0.12)",
-  warning: "#9c968e",
-  warningSoft: "rgba(242,239,234,0.07)",
-  ok: "#8a847c",
+  criticalSoft: "rgba(255,79,0,0.13)",
+  warning: "#9b9794",
+  warningSoft: "rgba(255,255,255,0.07)",
+  ok: "#8a8783",
 
   // Brass — retired with the courtroom crest; kept as neutral aliases so any
   // stray importer doesn't break. Not used in the CodeTrawl chrome.
-  brass: "#9c968e",
-  brassLight: "#f2efea",
+  brass: "#9b9794",
+  brassLight: "#eceae8",
 } as const;
 
 /** Shared keyboard focus ring for interactive Chambers elements — ember, the
  *  CodeTrawl focus colour (never new orange), on :focus-visible only. */
 export const CH_FOCUS =
-  "outline-none focus-visible:ring-1 focus-visible:ring-[#ff8a50] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0b0a]";
+  "outline-none focus-visible:ring-1 focus-visible:ring-[#ff8a50] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0b0b]";
