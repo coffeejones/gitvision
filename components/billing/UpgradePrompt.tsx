@@ -16,7 +16,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Lock, Sparkles } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { TierIcon, type Tier } from "@/components/TierIcon";
 import { TIER_CONFIG, formatPrice } from "@/lib/pricing";
 

@@ -34,6 +34,7 @@ import {
 } from "@xyflow/react";
 import { AlertTriangle, Network } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
+import { MUTED, VIZ_NEUTRAL, VIZ_SURFACE } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
 import type {
   FileGraph,
@@ -47,45 +48,50 @@ const EXT_STYLE: Record<
   string,
   { bg: string; ring: string; text: string; lang: string }
 > = {
-  tsx: { bg: "#134e4a", ring: "#2dd4bf", text: "#5eead4", lang: "TSX" },
-  ts: { bg: "#1e3a5f", ring: "#3b82f6", text: "#93c5fd", lang: "TS" },
-  js: { bg: "#5a4a1a", ring: "#eab308", text: "#fde047", lang: "JS" },
-  jsx: { bg: "#5a4a1a", ring: "#eab308", text: "#fde047", lang: "JSX" },
-  mjs: { bg: "#5a4a1a", ring: "#eab308", text: "#fde047", lang: "MJS" },
-  cjs: { bg: "#5a4a1a", ring: "#eab308", text: "#fde047", lang: "CJS" },
-  py: { bg: "#1e3a5f", ring: "#60a5fa", text: "#93c5fd", lang: "Py" },
-  go: { bg: "#164e63", ring: "#06b6d4", text: "#67e8f9", lang: "Go" },
-  rs: { bg: "#5a2e1a", ring: "#f97316", text: "#fdba74", lang: "Rust" },
-  java: { bg: "#5a1a1a", ring: "#ef4444", text: "#fca5a5", lang: "Java" },
-  kt: { bg: "#3b1a5a", ring: "#a855f7", text: "#d8b4fe", lang: "Kotlin" },
-  cs: { bg: "#134e4a", ring: "#22c55e", text: "#86efac", lang: "C#" },
-  php: { bg: "#1e2a5f", ring: "#6366f1", text: "#a5b4fc", lang: "PHP" },
-  rb: { bg: "#5a1a1a", ring: "#dc2626", text: "#fca5a5", lang: "Ruby" },
-  html: { bg: "#5a2e1a", ring: "#ea580c", text: "#fdba74", lang: "HTML" },
-  css: { bg: "#3b1a5a", ring: "#c026d3", text: "#e9d5ff", lang: "CSS" },
+  // Muted categorical (lib/vizPalette) + the per-language label. Related
+  // languages share a hue; unknown extensions fall back to neutral grey.
+  tsx: { ...MUTED.teal, lang: "TSX" },
+  ts: { ...MUTED.blue, lang: "TS" },
+  js: { ...MUTED.sand, lang: "JS" },
+  jsx: { ...MUTED.sand, lang: "JSX" },
+  mjs: { ...MUTED.sand, lang: "MJS" },
+  cjs: { ...MUTED.sand, lang: "CJS" },
+  py: { ...MUTED.blue, lang: "Py" },
+  go: { ...MUTED.teal, lang: "Go" },
+  rs: { ...MUTED.clay, lang: "Rust" },
+  java: { ...MUTED.rose, lang: "Java" },
+  kt: { ...MUTED.plum, lang: "Kotlin" },
+  cs: { ...MUTED.sage, lang: "C#" },
+  php: { ...MUTED.plum, lang: "PHP" },
+  rb: { ...MUTED.rose, lang: "Ruby" },
+  html: { ...MUTED.clay, lang: "HTML" },
+  css: { ...MUTED.plum, lang: "CSS" },
 };
-const FALLBACK = { bg: "#262628", ring: "#52525b", text: "#d4d4d8", lang: "?" };
+const FALLBACK = { ...VIZ_NEUTRAL, lang: "?" };
 
+// Edge colours by kind — the muted node hues at low alpha, so edges read as
+// quiet connective tissue, not loud wires. Dash distinguishes renders /
+// implements without adding colour.
 const EDGE_COLOR: Record<
   FileGraphEdgeKind,
   { stroke: string; strokeDim: string; dash?: string }
 > = {
   import: {
-    stroke: "rgba(96, 165, 250, 0.9)",
-    strokeDim: "rgba(96, 165, 250, 0.18)",
+    stroke: "rgba(110, 140, 168, 0.9)",
+    strokeDim: "rgba(110, 140, 168, 0.18)",
   },
   renders: {
-    stroke: "rgba(134, 239, 172, 0.95)",
-    strokeDim: "rgba(134, 239, 172, 0.5)",
+    stroke: "rgba(137, 155, 121, 0.95)",
+    strokeDim: "rgba(137, 155, 121, 0.5)",
     dash: "5 3",
   },
   extends: {
-    stroke: "rgba(244, 114, 182, 0.95)",
-    strokeDim: "rgba(244, 114, 182, 0.4)",
+    stroke: "rgba(154, 132, 153, 0.95)",
+    strokeDim: "rgba(154, 132, 153, 0.4)",
   },
   implements: {
-    stroke: "rgba(244, 114, 182, 0.95)",
-    strokeDim: "rgba(244, 114, 182, 0.4)",
+    stroke: "rgba(154, 132, 153, 0.95)",
+    strokeDim: "rgba(154, 132, 153, 0.4)",
     dash: "2 3",
   },
 };
@@ -139,7 +145,7 @@ const FileNode = memo(function FileNode({ data }: NodeProps) {
       }`}
       style={{
         background: c.bg,
-        borderColor: isSelected ? "#ffffff" : c.ring,
+        borderColor: isSelected ? VIZ_SURFACE.selected : c.ring,
         borderWidth: isSelected ? 2 : 1,
         width: 220,
         padding: "7px 10px",
@@ -454,7 +460,7 @@ function DependencyCanvasInner({ graph }: Props) {
       style={{
         width: "100%",
         height: 720,
-        background: "#0a0a0c",
+        background: VIZ_SURFACE.bg,
         border: "1px solid rgba(255,255,255,0.04)",
       }}
     >
@@ -580,7 +586,7 @@ function DependencyCanvasInner({ graph }: Props) {
         panOnDrag
         onPaneClick={() => setSelected(null)}
       >
-        <Background color="#1a1a1d" gap={28} size={1} />
+        <Background color={VIZ_SURFACE.grid} gap={28} size={1} />
         <Controls
           showInteractive={false}
           style={{

@@ -8,6 +8,7 @@ import { sankey, sankeyLinkHorizontal } from "d3-sankey";
 import { GitPullRequest } from "lucide-react";
 import type { PullRequestSummary } from "@/lib/types";
 import { TOK } from "@/lib/sessionTheme";
+import { MUTED, VIZ_NEUTRAL, CYCLE_TIME_RAMP } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
 
 interface Props {
@@ -41,19 +42,22 @@ const BUCKET_ORDER: DurationBucket[] = [
   "> 1 month",
 ];
 
+// Time-to-merge buckets read as severity: fast is good (bone/neutral), slow is
+// the genuine problem (ember → International Orange). Tone + rationed orange.
 const BUCKET_COLOR: Record<DurationBucket, string> = {
-  "< 1 hour": "#10b981",
-  "< 1 day": "#22c55e",
-  "< 1 week": "#eab308",
-  "< 1 month": "#f97316",
-  "> 1 month": "#ef4444",
+  "< 1 hour": CYCLE_TIME_RAMP.fast,
+  "< 1 day": CYCLE_TIME_RAMP.quick,
+  "< 1 week": CYCLE_TIME_RAMP.steady,
+  "< 1 month": CYCLE_TIME_RAMP.slow,
+  "> 1 month": CYCLE_TIME_RAMP.stale,
 };
 
+// PR states are categories, not severity — muted hues (lib/vizPalette).
 const NODE_COLOR: Record<string, string> = {
-  Opened: "#3b82f6",
-  Merged: "#8b5cf6",
-  "Closed (unmerged)": "#64748b",
-  "Still open": "#06b6d4",
+  Opened: MUTED.blue.ring,
+  Merged: MUTED.sage.ring,
+  "Closed (unmerged)": VIZ_NEUTRAL.ring,
+  "Still open": MUTED.teal.ring,
 };
 
 export function PRFlow({ prs }: Props) {
@@ -190,7 +194,7 @@ export function PRFlow({ prs }: Props) {
   });
 
   function nodeColor(name: string) {
-    return NODE_COLOR[name] ?? BUCKET_COLOR[name as DurationBucket] ?? "#64748b";
+    return NODE_COLOR[name] ?? BUCKET_COLOR[name as DurationBucket] ?? VIZ_NEUTRAL.ring;
   }
 
   function fmtDuration(ms: number): string {

@@ -1,13 +1,15 @@
 import type { LanguageBreakdown } from "@/lib/types";
 import { TOK } from "@/lib/sessionTheme";
+import { MUTED_LIST } from "@/lib/vizPalette";
 
-// Deterministic color per language name. Slightly muted saturation to match
-// the dark theme; pure hue-only was too candy.
+// Deterministic colour per language name — a stable index into the shared
+// muted categorical palette (lib/vizPalette), so the language bar matches the
+// canvas/graph hues and stays on the calm bitumen palette instead of a
+// full-saturation rainbow.
 function colorFor(lang: string): string {
   let hash = 0;
   for (let i = 0; i < lang.length; i++) hash = (hash * 31 + lang.charCodeAt(i)) >>> 0;
-  const hue = hash % 360;
-  return `hsl(${hue} 55% 55%)`;
+  return MUTED_LIST[hash % MUTED_LIST.length].ring;
 }
 
 export function LanguageBar({ languages }: { languages: LanguageBreakdown }) {

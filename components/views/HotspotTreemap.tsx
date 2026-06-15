@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import * as d3 from "d3";
 import type { FileHotspot } from "@/lib/types";
 import { TOK } from "@/lib/sessionTheme";
+import { DIVERSITY_RAMP } from "@/lib/vizPalette";
 
 // Same ambiguous-basename list as the canvas — these appear all over
 // monorepos with identical names, so we prefix the parent folder to
@@ -61,16 +62,12 @@ const DIVERSITY_BUCKETS: { label: string; test: (a: number) => boolean }[] = [
   { label: "7+", test: () => true },
 ];
 
-// Dark-teal → light-brass, Lab-interpolated so the four fills step evenly in
-// lightness. Each level carries the label colour that clears WCAG AA on that
-// fill (white on the two dark levels, near-black on the two light ones — both
-// verified ≥ 5.7:1), so labels stay legible across the ramp with no outline.
-const BUCKET_STYLE: { fill: string; text: string }[] = [
-  { fill: "#123a37", text: "#ffffff" },
-  { fill: "#5a603e", text: "#ffffff" },
-  { fill: "#9c8941", text: "#0a0a0a" },
-  { fill: "#e0b341", text: "#0a0a0a" },
-];
+// Dark bitumen → warm sand (lib/vizPalette DIVERSITY_RAMP), stepping evenly in
+// lightness. More authors is a positive signal, so the tile brightens rather
+// than alarms — no rationed orange here. Each level carries the label colour
+// that clears WCAG AA on its fill (light text on the dark levels, near-black on
+// the light ones), so labels stay legible across the ramp with no outline.
+const BUCKET_STYLE: { fill: string; text: string }[] = DIVERSITY_RAMP;
 
 function bucketFor(authors: number): number {
   const i = DIVERSITY_BUCKETS.findIndex((b) => b.test(authors));

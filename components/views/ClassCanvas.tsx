@@ -55,6 +55,7 @@ import {
   type ClassNodeData,
 } from "@/lib/intelligence/classCanvas";
 import { TOK } from "@/lib/sessionTheme";
+import { MUTED } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
 
 interface Props {
@@ -82,10 +83,10 @@ interface AugmentedClassEdgeData extends ClassEdgeData {
 // this kind of class". Used in both the node header and the
 // stereotype badge.
 const STEREOTYPE_STYLE = {
-  interface: { accent: "#60a5fa", label: "interface" }, // blue
-  abstract: { accent: "#a78bfa", label: "abstract" }, // violet
-  enum: { accent: "#f59e0b", label: "enumeration" }, // amber
-  class: { accent: TOK.accent, label: "class" }, // emerald
+  interface: { accent: MUTED.blue.ring, label: "interface" }, // muted blue
+  abstract: { accent: MUTED.plum.ring, label: "abstract" }, // muted plum
+  enum: { accent: MUTED.sand.ring, label: "enumeration" }, // muted sand
+  class: { accent: TOK.accent, label: "class" }, // neutral bone
 } as const;
 
 // Edge color/style by kind. Matches UML conventions:
@@ -93,8 +94,8 @@ const STEREOTYPE_STYLE = {
 //   implements: dashed line, filled triangle (realization)
 //   association: solid line, open arrow + label (uses)
 const EDGE_STYLE = {
-  extends: { stroke: "#a78bfa", dashed: false },
-  implements: { stroke: "#60a5fa", dashed: true },
+  extends: { stroke: MUTED.plum.ring, dashed: false },
+  implements: { stroke: MUTED.blue.ring, dashed: true },
   association: { stroke: TOK.textSecondary, dashed: false },
 } as const;
 

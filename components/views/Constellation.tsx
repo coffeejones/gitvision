@@ -22,37 +22,46 @@ import * as d3 from "d3";
 import { Activity, Pause, Play, Users } from "lucide-react";
 import type { AnalysisSnapshot, FileHotspot, CoChangeEdge } from "@/lib/types";
 import { TOK } from "@/lib/sessionTheme";
+import {
+  MUTED,
+  MUTED_LIST,
+  VIZ_NEUTRAL,
+  VIZ_SURFACE,
+  type VizColor,
+} from "@/lib/vizPalette";
 import { FileDetailsPanel } from "./FileDetailsPanel";
 
 // ------------------- Visual helpers -------------------
 
-// File-extension palette. Stable and friendly to dark bg.
-const EXT_COLORS: Record<string, { bg: string; ring: string; text: string }> = {
-  ts:    { bg: "#1e3a5f", ring: "#3b82f6", text: "#93c5fd" },
-  tsx:   { bg: "#134e4a", ring: "#2dd4bf", text: "#5eead4" },
-  js:    { bg: "#5a4a1a", ring: "#eab308", text: "#fde047" },
-  jsx:   { bg: "#5a4a1a", ring: "#eab308", text: "#fde047" },
-  py:    { bg: "#1e3a5f", ring: "#60a5fa", text: "#93c5fd" },
-  rs:    { bg: "#5a2e1a", ring: "#f97316", text: "#fdba74" },
-  go:    { bg: "#164e63", ring: "#06b6d4", text: "#67e8f9" },
-  java:  { bg: "#5a1a1a", ring: "#ef4444", text: "#fca5a5" },
-  kt:    { bg: "#3b1a5a", ring: "#a855f7", text: "#d8b4fe" },
-  swift: { bg: "#5a2e1a", ring: "#f97316", text: "#fdba74" },
-  html:  { bg: "#5a2e1a", ring: "#ea580c", text: "#fdba74" },
-  css:   { bg: "#3b1a5a", ring: "#c026d3", text: "#e9d5ff" },
-  scss:  { bg: "#3b1a5a", ring: "#c026d3", text: "#e9d5ff" },
-  md:    { bg: "#27272a", ring: "#71717a", text: "#a1a1aa" },
-  mdx:   { bg: "#27272a", ring: "#71717a", text: "#a1a1aa" },
-  json:  { bg: "#3f3f1f", ring: "#facc15", text: "#fde68a" },
-  yml:   { bg: "#3f3f1f", ring: "#facc15", text: "#fde68a" },
-  yaml:  { bg: "#3f3f1f", ring: "#facc15", text: "#fde68a" },
-  toml:  { bg: "#3f3f1f", ring: "#facc15", text: "#fde68a" },
-  sh:    { bg: "#052e16", ring: "#22c55e", text: "#86efac" },
-  sql:   { bg: "#3b0a4a", ring: "#d946ef", text: "#e9d5ff" },
-  vue:   { bg: "#064e3b", ring: "#10b981", text: "#6ee7b7" },
-  svelte:{ bg: "#5a1e0e", ring: "#f97316", text: "#fdba74" },
+// File-extension palette — muted categorical (lib/vizPalette). Languages map
+// to desaturated, earthy hues that stay legible on the bitumen canvas without
+// competing with the rationed orange. Related languages share a hue.
+const EXT_COLORS: Record<string, VizColor> = {
+  ts:     MUTED.blue,
+  tsx:    MUTED.teal,
+  js:     MUTED.sand,
+  jsx:    MUTED.sand,
+  py:     MUTED.blue,
+  rs:     MUTED.clay,
+  go:     MUTED.teal,
+  java:   MUTED.rose,
+  kt:     MUTED.plum,
+  swift:  MUTED.clay,
+  html:   MUTED.clay,
+  css:    MUTED.plum,
+  scss:   MUTED.plum,
+  md:     VIZ_NEUTRAL,
+  mdx:    VIZ_NEUTRAL,
+  json:   MUTED.sand,
+  yml:    MUTED.sand,
+  yaml:   MUTED.sand,
+  toml:   MUTED.sand,
+  sh:     MUTED.sage,
+  sql:    MUTED.plum,
+  vue:    MUTED.sage,
+  svelte: MUTED.clay,
 };
-const DEFAULT_COLOR = { bg: "#262628", ring: "#52525b", text: "#d4d4d8" };
+const DEFAULT_COLOR = VIZ_NEUTRAL;
 
 function fileExt(path: string): string {
   const m = path.match(/\.([^./]+)$/);
@@ -208,7 +217,7 @@ const FileNode = memo(function FileNode({ data }: NodeProps) {
       }`}
       style={{
         background: c.bg,
-        borderColor: isSelected ? "#ffffff" : c.ring,
+        borderColor: isSelected ? VIZ_SURFACE.selected : c.ring,
         borderWidth: isSelected ? 2 : 1,
         width: 150, // exact match with layout's CARD_W — prevents overflow
         boxShadow: isSelected
@@ -236,7 +245,8 @@ const FileNode = memo(function FileNode({ data }: NodeProps) {
         </span>
         {recent && (
           <span
-            className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0"
+            className="ml-auto h-1.5 w-1.5 rounded-full shrink-0"
+            style={{ background: VIZ_SURFACE.selected }}
             title="changed in the last 7 days"
           />
         )}
@@ -434,21 +444,11 @@ interface Props {
   snapshot: AnalysisSnapshot;
 }
 
-// Author color palette — up to 10 distinct hues, rest fall back to neutral gray.
-// Chosen for reasonable contrast on dark bg + rough colorblind-friendliness.
-const AUTHOR_PALETTE: Array<{ bg: string; ring: string; text: string }> = [
-  { bg: "#1e3a5f", ring: "#3b82f6", text: "#bfdbfe" },
-  { bg: "#134e4a", ring: "#14b8a6", text: "#99f6e4" },
-  { bg: "#5a2e1a", ring: "#f97316", text: "#fed7aa" },
-  { bg: "#3b1a5a", ring: "#a855f7", text: "#e9d5ff" },
-  { bg: "#5a1a1a", ring: "#ef4444", text: "#fecaca" },
-  { bg: "#1a5a3b", ring: "#22c55e", text: "#bbf7d0" },
-  { bg: "#5a4a1a", ring: "#eab308", text: "#fef08a" },
-  { bg: "#4a1a5a", ring: "#d946ef", text: "#f5d0fe" },
-  { bg: "#164e63", ring: "#06b6d4", text: "#a5f3fc" },
-  { bg: "#5a1a3e", ring: "#ec4899", text: "#fbcfe8" },
-];
-const AUTHOR_OTHER = { bg: "#262628", ring: "#52525b", text: "#d4d4d8" };
+// Author color palette — the muted categorical hues (lib/vizPalette); authors
+// beyond the palette fall back to neutral grey. Desaturated so a busy
+// contributor map stays calm and never competes with the rationed orange.
+const AUTHOR_PALETTE: VizColor[] = MUTED_LIST;
+const AUTHOR_OTHER = VIZ_NEUTRAL;
 
 function ConstellationInner({ snapshot }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -841,7 +841,7 @@ function ConstellationInner({ snapshot }: Props) {
       style={{
         width: "100%",
         height: 680,
-        background: "#0a0a0c",
+        background: VIZ_SURFACE.bg,
         border: "1px solid rgba(255,255,255,0.04)",
       }}
     >
@@ -849,7 +849,7 @@ function ConstellationInner({ snapshot }: Props) {
       <div
         className="absolute z-10 top-3 left-3 flex items-center gap-3 backdrop-blur rounded-lg px-3 py-2 text-xs shadow-lg flex-wrap max-w-[calc(100%-24px)]"
         style={{
-          background: "rgba(10, 10, 12, 0.92)",
+          background: "rgba(12, 11, 11, 0.92)",
           color: TOK.textPrimary,
           border: `1px solid ${TOK.border}`,
         }}
@@ -940,7 +940,7 @@ function ConstellationInner({ snapshot }: Props) {
       <div
         className="absolute z-10 bottom-3 left-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] shadow-lg max-w-[calc(100%-24px)]"
         style={{
-          background: "rgba(10, 10, 12, 0.92)",
+          background: "rgba(12, 11, 11, 0.92)",
           color: TOK.textSecondary,
           border: `1px solid ${TOK.border}`,
         }}
@@ -997,7 +997,7 @@ function ConstellationInner({ snapshot }: Props) {
         onPaneClick={() => setSelected(null)}
         defaultEdgeOptions={{ type: "straight" }}
       >
-        <Background color="#1a1a1d" gap={28} size={1} />
+        <Background color={VIZ_SURFACE.grid} gap={28} size={1} />
         <Controls
           showInteractive={false}
           style={{
@@ -1040,7 +1040,7 @@ function ConstellationInner({ snapshot }: Props) {
             className="rounded-xl border border-dashed px-7 py-6 text-center flex flex-col items-center gap-2"
             style={{
               borderColor: TOK.border,
-              background: "rgba(10, 10, 12, 0.6)",
+              background: "rgba(12, 11, 11, 0.6)",
               backdropFilter: "blur(4px)",
               WebkitBackdropFilter: "blur(4px)",
               color: TOK.textMuted,
@@ -1067,7 +1067,7 @@ function ConstellationInner({ snapshot }: Props) {
         <div
           className="absolute z-10 bottom-3 right-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] shadow-lg flex items-center gap-3"
           style={{
-            background: "rgba(10, 10, 12, 0.92)",
+            background: "rgba(12, 11, 11, 0.92)",
             color: TOK.textPrimary,
             border: `1px solid ${TOK.border}`,
             width: "min(560px, calc(100% - 260px))",
