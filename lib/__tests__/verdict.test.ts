@@ -246,15 +246,15 @@ describe("computeVerdict · empty snapshot", () => {
   it("rolls up to cleared when no signals fire", () => {
     const v = computeVerdict(snap());
     expect(v.outcome).toBe("cleared");
-    expect(v.outcomeLabel).toBe("Cleared");
+    expect(v.outcomeLabel).toBe("Clear");
     for (const r of v.rulings) {
       expect(r.vote).toBe("pass");
     }
   });
 
-  it("summary references 'all four departments' on cleared", () => {
+  it("summary references 'all four lenses' on cleared", () => {
     const v = computeVerdict(snap());
-    expect(v.summary.toLowerCase()).toContain("all four departments");
+    expect(v.summary.toLowerCase()).toContain("all four lenses");
   });
 });
 
@@ -274,7 +274,7 @@ describe("computeVerdict · outcome rollup", () => {
       })
     );
     expect(v.outcome).toBe("returned");
-    expect(v.outcomeLabel).toBe("Returned for Revision");
+    expect(v.outcomeLabel).toBe("Flagged");
   });
 
   it("returns 'conditional' when departments only have non-high needsWork", () => {
@@ -282,13 +282,13 @@ describe("computeVerdict · outcome rollup", () => {
     const stale = new Date(Date.now() - 120 * 24 * 3600 * 1000).toISOString();
     const v = computeVerdict(snap({ recentCommits: [commit(stale)] }));
     expect(v.outcome).toBe("conditional");
-    expect(v.outcomeLabel).toBe("Conditional Approval");
+    expect(v.outcomeLabel).toBe("Conditional");
   });
 });
 
 // ---------------- Per-department votes ----------------
 
-describe("computeVerdict · Health Department", () => {
+describe("computeVerdict · Health", () => {
   it("fails on 1-year+ stale repo (activity goes critical)", () => {
     const longAgo = new Date(
       Date.now() - 400 * 24 * 3600 * 1000
@@ -305,7 +305,7 @@ describe("computeVerdict · Health Department", () => {
   });
 });
 
-describe("computeVerdict · Security Bureau", () => {
+describe("computeVerdict · Security", () => {
   it("fails on known-incident-match (always high severity)", () => {
     const v = computeVerdict(
       snap({
@@ -407,7 +407,7 @@ describe("computeVerdict · Security Bureau", () => {
   });
 });
 
-describe("computeVerdict · Forensics Lab", () => {
+describe("computeVerdict · Forensics", () => {
   it("passes by default — no structural signals fire on empty snapshot", () => {
     const v = computeVerdict(snap());
     const forensics = v.rulings.find((r) => r.id === "forensics")!;
@@ -415,7 +415,7 @@ describe("computeVerdict · Forensics Lab", () => {
   });
 });
 
-describe("computeVerdict · Supply Office", () => {
+describe("computeVerdict · Supply", () => {
   it("flags conditional on outdated deps", () => {
     const stale = Array.from({ length: 4 }, (_, i) => ({
       name: `pkg${i}`,

@@ -29,7 +29,7 @@ import {
   Code as CodeIcon,
   FileCode,
   Fingerprint,
-  Gavel,
+  Gauge,
   GitPullRequest,
   Home,
   ListChecks,
@@ -63,7 +63,7 @@ interface NavItem {
    *  vulnerable / deprecated packages exist. */
   hasIssueBadge?: boolean;
   /** Accent dot for "new feature lives here" — used for the PRs
-   *  tab to surface the RepoJury PR-bot callout that sits below
+   *  tab to surface the CodeTrawl PR-bot callout that sits below
    *  the historical PR-flow analysis. Discrete; not an alert. */
   hasNewFeatureBadge?: boolean;
   /** Subtle "refresh me" hint for tabs whose data isn't on the
@@ -71,14 +71,12 @@ interface NavItem {
   hint?: string;
 }
 
-/** v0.82+ Department model — the sidebar is grouped into the four
- *  jury "offices" that produce the Final Verdict. Each department
- *  owns a focused mandate, named for its specific institutional
- *  archetype (medical Department, investigative Bureau, scientific
- *  Lab, logistics Office) so each label evokes the work it does
- *  rather than reading as a row of generic "Department" suffixes.
- *  When we open a new sector later, it becomes a new Department
- *  entry here — no other UI touches needed. */
+/** The sidebar is grouped into the four lenses that combine into the
+ *  Final grade. Each lens owns a focused mandate, named for the work it
+ *  does (Health, Security, Forensics, Supply) so the label reads as its
+ *  domain. Adding a new lens later is just a new entry here — no other
+ *  UI touches needed. (The `Department` type name is kept internally to
+ *  avoid churn; it carries no courtroom meaning anymore.) */
 interface Department {
   /** Title shown as a small uppercase header above the items. */
   title: string;
@@ -180,7 +178,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       // and the raw signal evidence. Named "Department" because it's
       // the holistic patient-chart view (vitals, physician's notes,
       // lab results) rather than a specialized investigation.
-      title: "Health Department",
+      title: "Health",
       icon: <Stethoscope size={12} />,
       items: [
         {
@@ -208,7 +206,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       // leakage, risky dynamic-execution patterns. "Bureau" because
       // it's the FBI/CIA-style focused unit (one mandate, depth over
       // breadth) rather than a hospital wing or a forensics bench.
-      title: "Security Bureau",
+      title: "Security",
       icon: <Fingerprint size={12} />,
       items: [
         {
@@ -224,7 +222,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       // jury that takes the case apart under the microscope. "Lab"
       // because Architecture / Canvas / Code / Imports are all
       // examination instruments rather than administrative offices.
-      title: "Forensics Lab",
+      title: "Forensics",
       icon: <Microscope size={12} />,
       items: [
         {
@@ -264,7 +262,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       // pull requests going out. "Office" because it's the
       // logistics desk (orders, shipments, paperwork) more than a
       // bureau or a lab.
-      title: "Supply Office",
+      title: "Supply",
       icon: <Truck size={12} />,
       items: [
         {
@@ -439,7 +437,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
           })}
         </nav>
 
-        {/* Final Verdict — the climax button. Pinned to the bottom of
+        {/* Final grade — the climax button. Pinned to the bottom of
             the sidebar (mt-auto) so it reads as the "submit your
             findings" action after the user has visited the
             departments. Styled as a primary action rather than a
@@ -490,7 +488,7 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
         <span
           className="h-1.5 w-1.5 rounded-full shrink-0"
           style={{ background: TOK.accent }}
-          title="New: RepoJury PR-bot available"
+          title="New: CodeTrawl PR-bot available"
         />
       )}
       {item.count !== undefined && (
@@ -518,9 +516,9 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
-/** Final Verdict pin — the climax button at the bottom of the
+/** Final grade pin — the climax button at the bottom of the
  *  sidebar (v0.82+, Phase C). Visually distinct from the per-tab
- *  sidebar links: outlined card with gavel icon + bold label rather
+ *  sidebar links: outlined card with grade icon + bold label rather
  *  than a thin nav row. Pinned to the bottom via `mt-auto` so it
  *  reads as "submit your findings" after the user has walked through
  *  the four departments. */
@@ -558,8 +556,8 @@ function VerdictPin({
         }}
         title="See the four departments' combined ruling"
       >
-        <Gavel size={14} style={{ color: active ? TOK.accentOn : TOK.accent }} />
-        <span className="text-sm font-medium flex-1">Final Verdict</span>
+        <Gauge size={14} style={{ color: active ? TOK.accentOn : TOK.accent }} />
+        <span className="text-sm font-medium flex-1">Final grade</span>
       </Link>
     </div>
   );

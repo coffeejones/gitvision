@@ -89,7 +89,7 @@ export function PackagesPanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
         title="No package manifests detected in this repo"
         body={
           <>
-            RepoJury reads{" "}
+            CodeTrawl reads{" "}
             <code className="font-mono">package.json</code>,{" "}
             <code className="font-mono">Cargo.toml</code>,{" "}
             <code className="font-mono">pyproject.toml</code>, and{" "}

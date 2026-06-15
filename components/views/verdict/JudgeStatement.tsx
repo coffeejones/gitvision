@@ -4,7 +4,7 @@
 // Presentational only. The narrative text is generated server-side
 // by lib/intelligence/verdictNarrative.ts and passed in as a prop;
 // this component is responsible solely for the visual treatment of
-// the text + the small attribution footer ("Bench statement · model
+// the text + the small attribution footer ("AI read · model
 // · generated at"). Renders nothing when text is empty so the
 // caller can hide AI when ANTHROPIC_API_KEY is unset without an
 // extra conditional.
@@ -40,7 +40,7 @@ export function JudgeStatement({ text, model }: Props) {
         style={{ color: TOK.textMuted }}
       >
         <Quote size={12} />
-        <span>Bench statement · generated</span>
+        <span>The read · generated</span>
       </div>
 
       {/* The bench statement itself — styled as a deliberate prose
@@ -68,7 +68,7 @@ export function JudgeStatement({ text, model }: Props) {
       >
         <span>{model}</span>
         <span aria-hidden>·</span>
-        <span>grounded in the four department rulings above</span>
+        <span>grounded in the four lens scores above</span>
       </div>
     </section>
   );

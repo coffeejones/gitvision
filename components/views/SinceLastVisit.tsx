@@ -555,7 +555,7 @@ export function SinceLastVisit({ diff, repoFullName }: Props) {
           borderTop: `1px solid ${TOK.border}`,
         }}
       >
-        <span style={{ color: TOK.textSecondary }}>RepoJury</span>
+        <span style={{ color: TOK.textSecondary }}>CodeTrawl</span>
         <span>·</span>
         <span className="font-mono">{repoFullName}</span>
       </div>

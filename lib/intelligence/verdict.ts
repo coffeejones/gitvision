@@ -1,6 +1,6 @@
 // Verdict computation (v0.82+, Phase C).
 //
-// The Final Verdict is the climax of the RepoJury narrative: each
+// The Final grade is the climax of the RepoJury narrative: each
 // of the four jury departments (Health, Security, Forensics, Supply)
 // votes on the codebase based on the deterministic signals from
 // extractHealthSignals() + the standalone security scanners on the
@@ -23,7 +23,7 @@
 // Verdict reorganizes around DECISIONS (does this codebase pass the
 // jury). vulnerable-deps lives in the "deps" dimension on the Overview
 // strip because it's dependency data, but the Verdict puts it under
-// Security Bureau because the decision it informs is a security one.
+// Security because the decision it informs is a security one.
 
 import type { AnalysisSnapshot, HealthSignal } from "../types";
 import { extractHealthSignals } from "../signals";
@@ -71,7 +71,7 @@ export interface DepartmentRuling {
 
 export interface Verdict {
   outcome: VerdictOutcome;
-  /** Full label: "Cleared", "Conditional Approval", "Returned for
+  /** Full label: "Cleared", "Conditional", "Returned for
    *  Revision". */
   outcomeLabel: string;
   /** 0-100 composite score. The raw sum of the four department votes
@@ -153,11 +153,13 @@ const DEPARTMENT_SIGNAL_IDS: Record<DepartmentId, readonly string[]> = {
   ],
 };
 
+// Display titles for the four lenses. The DepartmentId type values stay
+// (health/security/forensics/supply) — these are the CodeTrawl-voiced labels.
 const DEPARTMENT_TITLES: Record<DepartmentId, string> = {
-  health: "Health Department",
-  security: "Security Bureau",
-  forensics: "Forensics Lab",
-  supply: "Supply Office",
+  health: "Health",
+  security: "Security",
+  forensics: "Forensics",
+  supply: "Supply",
 };
 
 /** First tab in each department's sidebar group — where the explore
@@ -171,15 +173,15 @@ const DEPARTMENT_EXPLORE_SLUGS: Record<DepartmentId, string> = {
 };
 
 const VOTE_LABELS: Record<Vote, string> = {
-  pass: "Cleared",
+  pass: "Clear",
   conditional: "Conditional",
-  fail: "Failed",
+  fail: "Flagged",
 };
 
 const OUTCOME_LABELS: Record<VerdictOutcome, string> = {
-  cleared: "Cleared",
-  conditional: "Conditional Approval",
-  returned: "Returned for Revision",
+  cleared: "Clear",
+  conditional: "Conditional",
+  returned: "Flagged",
 };
 
 // ---------------- Helpers ----------------
@@ -358,18 +360,18 @@ function composeSummary(
 
   switch (outcome) {
     case "cleared":
-      return `All four departments cleared this codebase — ${passes.length} units, no flagged findings.`;
+      return `All four lenses came back clear — ${passes.length} clean, nothing flagged.`;
     case "returned": {
       const names = fails.map((r) => r.title).join(", ");
       return `${fails.length} ${
-        fails.length === 1 ? "department" : "departments"
-      } returned this codebase for revision: ${names}.`;
+        fails.length === 1 ? "lens" : "lenses"
+      } flagged this codebase: ${names}.`;
     }
     case "conditional": {
       const names = conditionals.map((r) => r.title).join(", ");
       return `${conditionals.length} ${
-        conditionals.length === 1 ? "department" : "departments"
-      } granted conditional approval: ${names}.`;
+        conditionals.length === 1 ? "lens" : "lenses"
+      } returned a conditional grade: ${names}.`;
     }
   }
 }

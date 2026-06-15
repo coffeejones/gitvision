@@ -1,10 +1,10 @@
-// /session/[id]/verdict — the Final Verdict page (v0.82+, Phase C).
+// /session/[id]/verdict — the Final grade page (v0.82+, Phase C).
 //
 // The climax of the RepoJury experience: each of the four jury
 // departments (Health, Security, Forensics, Supply) votes on the
 // codebase based on the deterministic signals from extractHealthSignals
 // + standalone security scanners. Their votes roll up into one of
-// three outcomes — Cleared, Conditional Approval, Returned for
+// three outcomes — Cleared, Conditional, Returned for
 // Revision — rendered as a large color-keyed seal at the top of the
 // page (VerdictHero), followed by per-department breakdowns
 // (DepartmentRulingCard) so the user can see what each office found
@@ -68,7 +68,7 @@ export default async function VerdictRoute({
           className="text-[10px] uppercase tracking-[0.18em] font-medium"
           style={{ color: TOK.textMuted }}
         >
-          Final Verdict · the jury speaks
+          Final grade · where four lenses land
         </span>
         <h1
           className="text-3xl sm:text-4xl font-semibold tracking-tight"
@@ -78,25 +78,25 @@ export default async function VerdictRoute({
             lineHeight: 1.1,
           }}
         >
-          Four departments. One ruling.
+          Four lenses. One grade.
         </h1>
         <p
           className="text-sm sm:text-base max-w-2xl leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          Each jury department votes on the codebase using the same
-          20 deterministic signals you see across the workspace. The
-          combined ruling is the bottom-line summary. Every claim
-          below is anchored to a signal you can drill into.
+          Each lens scores the codebase using the same 20 deterministic
+          signals you see across the workspace. The combined grade is the
+          bottom line. Every claim below is anchored to a signal you can
+          drill into.
         </p>
       </header>
 
       <VerdictHero verdict={verdict} />
 
-      {/* AI bench statement, when available. Standing docket tier gated +
+      {/* AI summary, when available. Standing docket tier gated +
           conditional on ANTHROPIC_API_KEY being set. Renders nothing
           for Open case users or when the AI feature is off — the
-          deterministic verdict on the hero above carries the page on
+          deterministic grade on the hero above carries the page on
           its own. */}
       {narrative && (
         <JudgeStatement text={narrative.text} model={narrative.model} />
@@ -107,7 +107,7 @@ export default async function VerdictRoute({
           className="text-[10px] uppercase tracking-[0.2em] font-medium"
           style={{ color: TOK.textMuted }}
         >
-          Department rulings
+          Lens breakdown
         </span>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {verdict.rulings.map((ruling) => (

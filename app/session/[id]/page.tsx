@@ -433,7 +433,7 @@ export default async function OverviewPage({
               href={`${base}/insights`}
               icon={<Sparkles size={15} />}
               label="Insights"
-              stat="AI summary + health verdict"
+              stat="AI summary + health grade"
               description="Grounded in 20 deterministic signals · zero hallucination"
             />
           </div>
@@ -468,7 +468,7 @@ export default async function OverviewPage({
           className="pt-6 text-[11px] flex items-center justify-between border-t flex-wrap gap-3"
           style={{ borderColor: TOK.border, color: TOK.textMuted }}
         >
-          <span>© 2026 RepoJury</span>
+          <span>© 2026 CodeTrawl</span>
           <div className="flex items-center gap-4">
             {current.rateLimitInfo && (
               <span className="font-mono tabular-nums">

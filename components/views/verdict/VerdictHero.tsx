@@ -8,7 +8,7 @@
 //   right — eyebrow, outcome label, micro-line, summary
 //
 // The seal is color-keyed to the outcome (Cleared = emerald,
-// Conditional Approval = amber, Returned = rose). The same colour
+// Conditional = amber, Returned = rose). The same colour
 // drives the score-ring stroke so the visual reads as one composed
 // artefact rather than two stuck-together panels.
 //
@@ -19,7 +19,7 @@
 
 import type { Verdict } from "@/lib/intelligence/verdict";
 import { TOK } from "@/lib/sessionTheme";
-import { Gavel } from "lucide-react";
+import { Gauge } from "lucide-react";
 
 interface Props {
   verdict: Verdict;
@@ -40,25 +40,25 @@ interface OutcomeStyle {
 
 const STYLE_BY_OUTCOME: Record<Verdict["outcome"], OutcomeStyle> = {
   cleared: {
-    // accent is the brand emerald family — reusing keeps the verdict
-    // visually coherent with the rest of the workspace's "good"
-    // state (Health-at-a-Glance healthy tiles use the same hue).
+    // accent is the neutral brand tone (bone) — reusing keeps the grade
+    // visually coherent with the rest of the workspace's "good" state
+    // (Health-at-a-Glance healthy tiles read in the same neutral tone).
     fg: TOK.accent,
     bg: TOK.accentSoft,
     border: TOK.accent,
-    micro: "Approved by all four departments",
+    micro: "Clear across all four lenses",
   },
   conditional: {
     fg: TOK.amber,
     bg: TOK.amberSoft,
     border: TOK.amber,
-    micro: "Approved with conditions attached",
+    micro: "Passed, with conditions to watch",
   },
   returned: {
     fg: TOK.rose,
     bg: TOK.roseSoft,
     border: TOK.rose,
-    micro: "Returned for revision before approval",
+    micro: "Flagged by at least one lens",
   },
 };
 
@@ -89,7 +89,7 @@ export function VerdictHero({ verdict }: Props) {
           width={138}
           height={138}
           viewBox="0 0 138 138"
-          aria-label={`Verdict score ${verdict.score} out of 100, grade ${verdict.grade}`}
+          aria-label={`Grade ${verdict.grade}, score ${verdict.score} out of 100`}
         >
           {/* Background track — neutral, lets the colored arc do the work. */}
           <circle
@@ -143,8 +143,8 @@ export function VerdictHero({ verdict }: Props) {
           className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] font-medium"
           style={{ color: style.fg }}
         >
-          <Gavel size={12} />
-          <span>Final Verdict</span>
+          <Gauge size={12} />
+          <span>Final grade</span>
         </div>
 
         {/* Outcome label — the largest text on the page. */}
@@ -184,8 +184,8 @@ export function VerdictHero({ verdict }: Props) {
           <p className="text-xs leading-relaxed" style={{ color: TOK.textMuted }}>
             Grade capped at {verdict.grade}: the raw vote-sum is{" "}
             {verdict.rawScore}/100, but a{" "}
-            {verdict.outcome === "returned" ? "returned" : "conditional"} ruling
-            can&apos;t outrank itself — a department was flagged, so the letter
+            {verdict.outcome === "returned" ? "flagged" : "conditional"} grade
+            can&apos;t outrank itself — a lens was flagged, so the letter
             stays in {verdict.outcome === "returned" ? "needs-work" : "non-clear"}{" "}
             territory.
           </p>

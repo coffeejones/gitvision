@@ -35,7 +35,7 @@ import {
   Boxes,
   Code as CodeIcon,
   FileCode,
-  Gavel,
+  Gauge,
   GitPullRequest,
   Hash,
   Home,
@@ -85,23 +85,23 @@ export function CommandPalette({ sessionId, snapshot, open, onClose }: Props) {
   const allItems = useMemo<PaletteItem[]>(() => {
     const base = `/session/${sessionId}`;
     const pages: PaletteItem[] = [
-      // Health Department
+      // Health
       { id: "p:overview", group: "pages", label: "Overview", icon: <Home size={13} />, href: base },
       { id: "p:insights", group: "pages", label: "Insights", icon: <Sparkles size={13} />, href: `${base}/insights` },
       { id: "p:signals", group: "pages", label: "Signals", icon: <ListChecks size={13} />, href: `${base}/signals` },
-      // Security Bureau
+      // Security
       { id: "p:security", group: "pages", label: "Security", icon: <Shield size={13} />, href: `${base}/security` },
-      // Forensics Lab
+      // Forensics
       { id: "p:architecture", group: "pages", label: "Architecture", icon: <Boxes size={13} />, href: `${base}/architecture` },
       { id: "p:canvas", group: "pages", label: "Canvas", icon: <Network size={13} />, href: `${base}/canvas` },
       { id: "p:code", group: "pages", label: "Code", icon: <CodeIcon size={13} />, href: `${base}/code` },
       { id: "p:imports", group: "pages", label: "Imports", icon: <FileCode size={13} />, href: `${base}/imports` },
-      // Supply Office
+      // Supply
       { id: "p:packages", group: "pages", label: "Packages", icon: <Package size={13} />, href: `${base}/packages` },
       { id: "p:prs", group: "pages", label: "PRs", icon: <GitPullRequest size={13} />, href: `${base}/prs` },
-      // Final Verdict — climax page; lives outside the departments
+      // Final grade — climax page; lives outside the departments
       // grouping but is still a navigable workspace destination.
-      { id: "p:verdict", group: "pages", label: "Final Verdict", icon: <Gavel size={13} />, href: `${base}/verdict` },
+      { id: "p:verdict", group: "pages", label: "Final grade", icon: <Gauge size={13} />, href: `${base}/verdict` },
     ];
 
     const cg = snapshot.codeGraph;

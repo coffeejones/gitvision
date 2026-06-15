@@ -69,7 +69,7 @@ export default async function InsightsRoute({
           style={{ color: TOK.textSecondary }}
         >
           A 150-word repo briefing plus the three-column health
-          verdict. Every claim is anchored to a deterministic signal
+          read. Every claim is anchored to a deterministic signal
           from the analysis pipeline — no LLM guesses, no
           hallucinations.
         </p>
@@ -84,10 +84,10 @@ export default async function InsightsRoute({
           <UpgradePrompt
             featureName="AI Insights"
             requiredTier="standing-docket"
-            context="The deterministic Health Summary on your Overview page is free forever. AI Briefing + Health Check verdict — the prose layer that explains the signals in plain English — needs Standing docket."
+            context="The deterministic Health Summary on your Overview page is free forever. AI Briefing + Health Check grade — the prose layer that explains the signals in plain English — needs Standing docket."
             unlockedFeatures={[
               "AI Briefing — 150-word repo profile generated from your codebase",
-              "Health Check verdict — three-column \"what works / dig deeper / open questions\" grounded in 20 signals",
+              "Health Check grade — three-column \"what works / dig deeper / open questions\" grounded in 20 signals",
               "Structural diff between snapshots (see what changed semantically)",
               "Auto-extracted Architecture diagrams",
               "Unlimited saved sessions + private repos",

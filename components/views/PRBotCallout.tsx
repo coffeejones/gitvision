@@ -48,7 +48,7 @@ export function PRBotCallout({ userTier }: Props) {
             className="text-xs uppercase tracking-[0.18em] font-medium"
             style={{ color: TOK.textMuted }}
           >
-            RepoJury PR-bot · GitHub App · private beta
+            CodeTrawl PR-bot · GitHub App · private beta
           </span>
         </div>
         <h2
@@ -88,7 +88,7 @@ export function PRBotCallout({ userTier }: Props) {
             Sample comment on a PR
           </div>
           <div style={{ color: TOK.textPrimary }}>
-            <strong>RepoJury Review</strong>
+            <strong>CodeTrawl Review</strong>
           </div>
           <div>
             Diff summary: 3 files changed · functions: 5 added, 2

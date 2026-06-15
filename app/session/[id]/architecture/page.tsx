@@ -134,7 +134,7 @@ export default async function ArchitectureRoute({
               "Class diagrams rendered automatically from your codebase",
               "Scope-filter to focus on one folder at a time",
               "Copy as Mermaid source — paste anywhere",
-              "AI Briefing + Health Check verdict",
+              "AI Briefing + Health Check grade",
               "Unlimited saved sessions + private repos",
             ]}
           />
