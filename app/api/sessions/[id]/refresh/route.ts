@@ -53,7 +53,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const denied = await requireSessionOwnership(session, req);
   if (denied) return denied;
 
-  // Tier gate: Open case users get 5 refreshes per day. Standing docket + Full bench are
+  // Tier gate: Free users get 5 refreshes per day. Plus + Pro are
   // unlimited (the helper still updates the counter for observability
   // but doesn't reject). We check + increment AFTER ownership has been
   // verified — wouldn't want a rate-limited "you're not the owner"

@@ -1,6 +1,6 @@
 // Refresh-quota enforcement for tier-limited refresh rates.
 //
-// Open case tier gets 5 refreshes per calendar day. Standing docket + Full bench are
+// Free tier gets 5 refreshes per calendar day. Plus + Pro are
 // unlimited (limit = -1 in TIER_CONFIG).
 //
 // The counter lives on user.dailyRefreshCount + user.dailyRefreshDate
@@ -48,7 +48,7 @@ function todayUtc(): string {
  *  counter is NOT incremented — caller should return 429 to the
  *  client without performing the refresh.
  *
- *  Standing docket + Full bench tiers bypass the cap (limit = -1) but the counter
+ *  Plus + Pro tiers bypass the cap (limit = -1) but the counter
  *  still updates for observability — useful if we later want to
  *  show "X refreshes today" stats to power users. */
 export async function checkAndIncrementRefresh(
@@ -95,7 +95,7 @@ export async function checkAndIncrementRefresh(
       allowed: false,
       used: row.count,
       max,
-      reason: `You've used ${row.count} of ${max} refreshes today. Upgrade to Standing docket for unlimited.`,
+      reason: `You've used ${row.count} of ${max} refreshes today. Upgrade to Plus for unlimited.`,
     };
   }
 

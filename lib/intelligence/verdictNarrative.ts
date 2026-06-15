@@ -8,7 +8,7 @@
 // data → constrained AI prose.
 //
 // Returns null when ANTHROPIC_API_KEY is unset so the UI can hide
-// the panel without special-casing. Standing docket tier billing gate lives
+// the panel without special-casing. Plus tier billing gate lives
 // on the caller (the verdict page); this module is unconcerned with
 // who can see it.
 

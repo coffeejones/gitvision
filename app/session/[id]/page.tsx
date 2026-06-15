@@ -191,7 +191,7 @@ export default async function OverviewPage({
   // v0.67: per-function / per-file structural diff. Computed only
   // when there's a previous snapshot AND there's actual content to
   // show — small refreshes that touched no code don't need a panel.
-  // v0.78: gated to Standing docket+ — Open case sees the SinceLastVisit aggregate
+  // v0.78: gated to Plus+ — Free sees the SinceLastVisit aggregate
   // diff but not the per-function semantic deltas.
   const authSession = await getAuthSession();
   const hasStructuralDiff = authSession

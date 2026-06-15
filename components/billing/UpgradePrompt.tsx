@@ -1,7 +1,7 @@
 // Reusable upgrade prompt for locked features.
 //
 // Renders inside a route where the user has navigated to a feature
-// their current tier doesn't unlock — e.g. Open case user opens
+// their current tier doesn't unlock — e.g. Free user opens
 // /session/{id}/insights, sees this prompt instead of AI Briefing.
 //
 // Visual language: same material card recipe as everything else

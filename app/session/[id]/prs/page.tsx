@@ -31,7 +31,7 @@ export default async function PRsRoute({
   const current = session.snapshots[session.snapshots.length - 1];
 
   // The PR-flow historical analysis is free for all tiers. The
-  // PR-bot installation callout below is tier-gated — Open case sees
+  // PR-bot installation callout below is tier-gated — Free sees
   // "Upgrade to install" instead of the Install CTA.
   const authSession = await getAuthSession();
   const userTier = authSession

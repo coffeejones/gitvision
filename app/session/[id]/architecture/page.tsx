@@ -44,8 +44,8 @@ export default async function ArchitectureRoute({
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 
-  // Tier gate: Architecture diagrams unlock from Standing docket tier up.
-  // Open case still gets the editorial hero (so the upgrade prompt has
+  // Tier gate: Architecture diagrams unlock from Plus tier up.
+  // Free still gets the editorial hero (so the upgrade prompt has
   // context), but the actual diagram is hidden.
   const authSession = await getAuthSession();
   const hasArchitecture = authSession

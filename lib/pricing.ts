@@ -11,8 +11,8 @@
 //   2. Mirror the change in Polar.sh dashboard (product + price)
 //   3. Re-deploy — no other code changes required
 //
-// To add a new tier (e.g. "Daily docket" between Open case and
-// Standing docket):
+// To add a new tier (e.g. "Daily docket" between Free and
+// Plus):
 //   1. Add it to the Tier union type in components/TierIcon.tsx
 //   2. Add a lucide-react icon mapping in TierIcon.tsx
 //   3. Add an entry to TIER_CONFIG here
@@ -75,7 +75,7 @@ export interface TierConfig {
 export const TIER_CONFIG: Record<Tier, TierConfig> = {
   "open-case": {
     id: "open-case",
-    name: "Open case",
+    name: "Free",
     tagline: "For a one-off look. No card required.",
     monthlyPriceUsd: 0,
     annualPriceUsd: 0,
@@ -95,10 +95,10 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       apiAccess: false,
     },
     featureBullets: [
-      "One case at a time",
+      "One repo at a time",
       "Public repos only",
       "5 refreshes per day",
-      "Full verdict + all exhibits",
+      "Full grade + all panels",
       "Deterministic Health Summary (20 signals)",
       "Browse all demo repos",
     ],
@@ -106,7 +106,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
   },
   "standing-docket": {
     id: "standing-docket",
-    name: "Standing docket",
+    name: "Plus",
     tagline: "For repos you live in.",
     monthlyPriceUsd: 14.99,
     annualPriceUsd: 149.99,
@@ -128,16 +128,16 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
     featureBullets: [
       "Unlimited private repos",
       "Re-runs + “since last visit” diffs",
-      "AI Briefing + bench statement",
+      "AI Briefing + the read",
       "Architecture diagrams (auto class extraction)",
       "Structural diff between snapshots",
-      "Verdict watch on every PR (5 repos)",
+      "Grade watch on every PR (5 repos)",
     ],
     isRecommended: true,
   },
   "full-bench": {
     id: "full-bench",
-    name: "Full bench",
+    name: "Pro",
     tagline: "For the whole org.",
     monthlyPriceUsd: 39,
     annualPriceUsd: 390,
@@ -157,8 +157,8 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       apiAccess: true,
     },
     featureBullets: [
-      "Everything in Standing docket",
-      "Verdict watch on unlimited repos",
+      "Everything in Plus",
+      "Grade watch on unlimited repos",
       "Team workspaces (multi-user)",
       "Priority support",
       "Early access to new features",
@@ -168,7 +168,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
   },
 };
 
-/** Ordered list for rendering — Open case first, then up through Full bench. */
+/** Ordered list for rendering — Free first, then up through Pro. */
 export const TIER_ORDER: Tier[] = ["open-case", "standing-docket", "full-bench"];
 
 /** Convenience helper for annual savings display. Returns absolute

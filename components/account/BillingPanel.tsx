@@ -5,7 +5,7 @@
 // button for subscription management.
 //
 // Three rendering modes based on tier + status:
-//   1. Open case (no subscription) — promotional card: "Upgrade to unlock"
+//   1. Free (no subscription) — promotional card: "Upgrade to unlock"
 //   2. Paid + active/trialing — current plan card + manage button
 //   3. Paid + canceled — "Plan ends on X" warning + reactivate hint
 //
@@ -55,7 +55,7 @@ export function BillingPanel({
     return { kind: "none" };
   });
 
-  // tierFor defaults unknown/legacy tier values to Open case instead of
+  // tierFor defaults unknown/legacy tier values to Free instead of
   // returning undefined — so a stale DB tier can never crash this render.
   const tierConfig = tierFor(tier);
   const isPaid = tier !== "open-case";
@@ -197,11 +197,11 @@ export function BillingPanel({
         </SectionCard>
       )}
 
-      {/* Upgrade card for Open case users */}
+      {/* Upgrade card for Free users */}
       {!isPaid && (
         <SectionCard
           title="Unlock more"
-          description="Upgrade to Standing docket for unlimited sessions, AI Insights, and the PR-bot. Or jump straight to Full bench for team workspaces and priority support."
+          description="Upgrade to Plus for unlimited sessions, AI Insights, and the PR-bot. Or jump straight to Pro for team workspaces and priority support."
         >
           <div className="pt-2">
             <Link

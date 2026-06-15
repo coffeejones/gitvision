@@ -30,7 +30,7 @@ interface User {
   name?: string | null;
   /** GitHub handle, shown as @handle when present. */
   username?: string | null;
-  /** Human tier label, e.g. "Open case" / "Standing docket". */
+  /** Human tier label, e.g. "Free" / "Plus". */
   tierName: string;
   /** Whether the tier is paid (drives the brass tier chip). */
   paid?: boolean;

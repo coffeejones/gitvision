@@ -138,11 +138,11 @@ export async function POST(req: Request) {
   const ownerId = req.headers.get(OWNER_ID_HEADER) ?? undefined;
   const userId = authSession.user.id;
 
-  // Tier gate: Open case users get 1 saved session at a time. When they
+  // Tier gate: Free users get 1 saved session at a time. When they
   // create a new one, auto-delete their oldest existing session
   // (matches the "1 session at a time" wording on /pricing — it's
   // not "you can't make new ones", it's "the new one replaces the
-  // old one"). Standing docket + Full bench have unlimited saved sessions.
+  // old one"). Plus + Pro have unlimited saved sessions.
   const userTier = await getUserTier(userId);
   const savedSessionsCap = TIER_CONFIG[userTier].limits.savedSessions;
   if (savedSessionsCap !== -1) {

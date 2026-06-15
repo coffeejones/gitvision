@@ -5,7 +5,7 @@
 //
 //   1. Logged out  → redirect to /signup?tier=X&billing=Y (we'll
 //      come back through the upgrade flow after signup completes)
-//   2. Logged in + Open case tier  → POST to /api/billing/checkout,
+//   2. Logged in + Free tier  → POST to /api/billing/checkout,
 //      follow the returned Polar URL
 //   3. Already on the same tier → button says "Current plan" and
 //      is disabled (P5 will wire this up properly; for now we just
@@ -40,7 +40,7 @@ export function CheckoutCTA({
   async function handleClick(e: React.MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
 
-    // Open case — straight to signup, no checkout needed
+    // Free — straight to signup, no checkout needed
     if (!isPaid) {
       router.push("/signup?tier=open-case");
       return;

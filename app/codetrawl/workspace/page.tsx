@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 const MOCK_USER = {
   name: "Jonas",
   username: "coffeejones",
-  tierName: "Open case",
+  tierName: "Free",
   paid: false,
 };
 

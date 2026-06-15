@@ -112,8 +112,8 @@ export default function TermsPage() {
       <Section id="billing" num="5." title="Plans & billing">
         <UL>
           <LI>
-            <strong>Open case</strong> is free. <strong>Standing docket</strong>{" "}
-            and <strong>Full bench</strong> are paid subscriptions billed monthly
+            <strong>Free</strong> is free. <strong>Plus</strong>{" "}
+            and <strong>Pro</strong> are paid subscriptions billed monthly
             or annually through our payment provider, Polar.
           </LI>
           <LI>

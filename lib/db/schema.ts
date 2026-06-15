@@ -37,7 +37,7 @@ export const user = sqliteTable("user", {
   // Polar webhook handler when checkout completes or status changes.
   tier: text("tier").notNull().default("open-case"),
   // Polar's identifier for the active subscription. Nullable for
-  // Open case (no subscription) and for users who cancelled.
+  // Free (no subscription) and for users who cancelled.
   polarSubscriptionId: text("polar_subscription_id"),
   // Subscription lifecycle status from Polar:
   //   "active"   — billing OK, full access
@@ -55,8 +55,8 @@ export const user = sqliteTable("user", {
   cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" })
     .notNull()
     .default(false),
-  // Daily refresh quota counter for Open case tier rate-limiting (5/day).
-  // Reset whenever dailyRefreshDate changes (i.e. new day). Standing docket+
+  // Daily refresh quota counter for Free tier rate-limiting (5/day).
+  // Reset whenever dailyRefreshDate changes (i.e. new day). Plus+
   // tiers have unlimited refreshes — the counter is still updated
   // but never enforced for them.
   //

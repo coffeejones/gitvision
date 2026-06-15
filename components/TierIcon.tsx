@@ -1,10 +1,10 @@
-// Tier signature icons for RepoJury pricing (v0.82+ case rebrand).
+// Tier signature icons for CodeTrawl pricing.
 //
-// Tiers are case-flavoured now: Open case (free) / Standing docket
-// (subscription) / Full bench (org). Icons reflect the metaphor:
-//   - Open case       → FolderOpen — first folder pulled off the shelf
-//   - Standing docket → ScrollText — the ongoing case list you live in
-//   - Full bench      → Landmark   — the whole courthouse, every seat
+// Tiers are Free / Plus / Pro. Icons are a quiet nautical scale that
+// nods to the trawl brand without crowding the now-plain tier names:
+//   - Free → Anchor   — moored; a single one-off look
+//   - Plus → Sailboat — out on the water; the repos you live in
+//   - Pro  → Ship     — the whole vessel / fleet; for an org
 //
 // Why lucide instead of bespoke SVG: scaling-friendly vector,
 // stroke-weight matches the rest of the UI automatically, and we
@@ -13,15 +13,15 @@
 // for a custom-designed family without touching any consumer code.
 //
 // Default colour is TOK.textPrimary (off-white) so the icons match
-// the white-on-dark CTA system established in D4 Pass 1–10. Callers
-// pass a different colour for severity contexts (rose for downgrade
-// prompts, textMuted for inactive tiers, etc.).
+// the white-on-dark CTA system. Callers pass a different colour for
+// severity contexts (rose for downgrade prompts, textMuted for
+// inactive tiers, etc.).
 //
 // Usage:
 //   <TierIcon tier="open-case" size={32} />
 //   <TierIcon tier="full-bench" size={128} color={TOK.textMuted} />
 
-import { FolderOpen, Landmark, ScrollText } from "lucide-react";
+import { Anchor, Sailboat, Ship } from "lucide-react";
 import type { CSSProperties } from "react";
 
 export type Tier = "open-case" | "standing-docket" | "full-bench";
@@ -39,9 +39,9 @@ interface Props {
 }
 
 const TIER_LABELS: Record<Tier, string> = {
-  "open-case": "Open case tier — try it free",
-  "standing-docket": "Standing docket tier — repos you live in",
-  "full-bench": "Full bench tier — for the whole org",
+  "open-case": "Free tier — try it free",
+  "standing-docket": "Plus tier — repos you live in",
+  "full-bench": "Pro tier — for the whole org",
 };
 
 export function TierIcon({
@@ -63,10 +63,10 @@ export function TierIcon({
 
   switch (tier) {
     case "open-case":
-      return <FolderOpen {...commonProps} />;
+      return <Anchor {...commonProps} />;
     case "standing-docket":
-      return <ScrollText {...commonProps} />;
+      return <Sailboat {...commonProps} />;
     case "full-bench":
-      return <Landmark {...commonProps} />;
+      return <Ship {...commonProps} />;
   }
 }

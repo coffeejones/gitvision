@@ -36,7 +36,7 @@ export default async function InsightsRoute({
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 
-  // Tier gate: AI Insights is unlocked from Standing docket tier up. Open case
+  // Tier gate: AI Insights is unlocked from Plus tier up. Free
   // users land on the upgrade prompt instead of the panels — we
   // don't want to spend Anthropic tokens on free users + this is
   // the strongest conversion hook in the product
@@ -84,7 +84,7 @@ export default async function InsightsRoute({
           <UpgradePrompt
             featureName="AI Insights"
             requiredTier="standing-docket"
-            context="The deterministic Health Summary on your Overview page is free forever. AI Briefing + Health Check grade — the prose layer that explains the signals in plain English — needs Standing docket."
+            context="The deterministic Health Summary on your Overview page is free forever. AI Briefing + Health Check grade — the prose layer that explains the signals in plain English — needs Plus."
             unlockedFeatures={[
               "AI Briefing — 150-word repo profile generated from your codebase",
               "Health Check grade — three-column \"what works / dig deeper / open questions\" grounded in 20 signals",

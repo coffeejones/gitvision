@@ -7,7 +7,7 @@
 //
 // "open-case" is the fallback for any unknown / unauthenticated caller.
 // Gates that require login should check session before calling these
-// (otherwise an anonymous request lands on Open case limits, which is the
+// (otherwise an anonymous request lands on Free limits, which is the
 // strictest available — safe default).
 //
 // Server-only. Never import from a Client Component.
@@ -33,8 +33,8 @@ export async function getUserTier(userId: string): Promise<Tier> {
     .limit(1);
   const raw = rows[0]?.tier;
   if (raw === "standing-docket" || raw === "full-bench") return raw;
-  // Legacy tier names from before the Scout/Knight/Baron → Open case/
-  // Standing docket/Full bench rename (1:1). Map them so a user who
+  // Legacy tier names from before the Scout/Knight/Baron → Free/
+  // Plus/Pro rename (1:1). Map them so a user who
   // subscribed before the rename keeps their paid tier across the app —
   // and so reading a legacy row never yields a non-TIER_CONFIG key.
   if (raw === "knight") return "standing-docket";
@@ -109,12 +109,12 @@ export function tierDisplayName(tier: Tier): string {
 }
 
 /** Lowest tier that grants a given boolean feature. Used by
- *  UpgradePrompt to render "Upgrade to Standing docket" or "Upgrade
- *  to Full bench" depending on what's needed. */
+ *  UpgradePrompt to render "Upgrade to Plus" or "Upgrade
+ *  to Pro" depending on what's needed. */
 export function minimumTierFor(feature: BooleanFeature): Tier {
   if (TIER_CONFIG["standing-docket"].limits[feature]) return "standing-docket";
   if (TIER_CONFIG["full-bench"].limits[feature]) return "full-bench";
   // Shouldn't happen in practice — every feature flag should be
-  // unlocked at some tier. Fallback to Full bench as the safest answer.
+  // unlocked at some tier. Fallback to Pro as the safest answer.
   return "full-bench";
 }

@@ -46,12 +46,12 @@ export default function RefundsPage() {
       <Section id="plans" num="1." title="Plans">
         <UL>
           <LI>
-            <strong>Open case</strong>{" "}
+            <strong>Free</strong>{" "}
             is free, forever. There&rsquo;s nothing to cancel and nothing to
             refund.
           </LI>
           <LI>
-            <strong>Standing docket</strong> and <strong>Full bench</strong> are
+            <strong>Plus</strong> and <strong>Pro</strong> are
             subscriptions, billed monthly or annually. They renew automatically
             until you cancel.
           </LI>
@@ -72,7 +72,7 @@ export default function RefundsPage() {
           </LI>
           <LI>you&rsquo;re not charged again;</LI>
           <LI>
-            after the period ends, your account moves to the free Open case plan
+            after the period ends, your account moves to the free Free plan
             — your saved cases beyond the free limit may become inaccessible, so
             export anything you need first.
           </LI>
