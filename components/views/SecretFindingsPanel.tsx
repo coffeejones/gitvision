@@ -17,7 +17,7 @@ import type {
   SecretScanResult,
   SecretSeverity,
 } from "@/lib/security/types";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 
 interface SeverityStyle {
   fg: string;

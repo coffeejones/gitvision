@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import type { DepartmentRuling } from "@/lib/intelligence/verdict";
 import type { HealthSignal } from "@/lib/types";
-import { TOK, STYLE } from "@/lib/theme";
+import { TOK, STYLE } from "@/lib/sessionTheme";
 
 interface Props {
   ruling: DepartmentRuling;

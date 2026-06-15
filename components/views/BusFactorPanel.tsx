@@ -3,7 +3,7 @@
 // blame. The "approx" pill in the header sets the expectation.
 
 import type { FileHotspot } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 export function BusFactorPanel({ hotspots }: { hotspots: FileHotspot[] }) {
   const byFolder = new Map<string, { churn: number; authors: number }>();

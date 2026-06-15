@@ -15,7 +15,7 @@
 
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { SecurityPanel } from "@/components/views/security/SecurityPanel";
 
 export const dynamic = "force-dynamic";

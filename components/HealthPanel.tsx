@@ -8,7 +8,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCw, Stethoscope } from "lucide-react";
 import type { AnalysisSnapshot, HealthSignal } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 /** The three anchor IDs the HealthSummary tiles deep-link to. Kept
  *  exhaustive (not extended) so a typo in a tile's anchor never lights

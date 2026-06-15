@@ -47,7 +47,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 
 interface Props {
   sessionId: string;

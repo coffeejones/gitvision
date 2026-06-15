@@ -24,7 +24,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { Headline, HeadlineSeverity } from "@/lib/intelligence/headline";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 
 interface SeverityStyle {
   /** Color of the icon + accent. */

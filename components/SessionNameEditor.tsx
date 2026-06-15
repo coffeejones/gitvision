@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 export function SessionNameEditor({
   sessionId,

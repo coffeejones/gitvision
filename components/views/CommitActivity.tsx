@@ -1,5 +1,5 @@
 import type { AnalysisSnapshot } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 // Cap to the last MAX_WEEKS so big repos like golang/go (multi-year
 // history → 200+ weeks) don't blow out the bar chart.

@@ -22,7 +22,7 @@ import type {
   OutdatedDep,
   VulnerableDep,
 } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { SearchInput } from "@/components/SearchInput";
 import { HelpHint } from "@/components/HelpHint";
 import { EmptyPanel } from "@/components/EmptyPanel";

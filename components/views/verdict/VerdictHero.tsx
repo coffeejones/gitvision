@@ -18,7 +18,7 @@
 // in-product we show the final number).
 
 import type { Verdict } from "@/lib/intelligence/verdict";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { Gavel } from "lucide-react";
 
 interface Props {

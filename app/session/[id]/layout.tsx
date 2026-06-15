@@ -17,14 +17,40 @@
 // pages independently testable + composable without a layout-context
 // dance.
 
+import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
 import { requireSessionReadAccess } from "@/lib/ownership";
 import { SessionToolbar } from "@/components/SessionToolbar";
 import { SessionShell } from "@/components/SessionShell";
 import { HideOnMarketing } from "@/components/MarketingModeWrapper";
+import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
+import { TOK } from "@/lib/sessionTheme";
 
 export const dynamic = "force-dynamic";
+
+// The session surface reads CodeTrawl tokens (lib/sessionTheme.ts) but inherits
+// the global Geist fonts. Repoint Tailwind's font vars to the CodeTrawl
+// families (Schibsted Grotesk + Fragment Mono) for this subtree, so the shell
+// + every analysis view renders in the brand type.
+//
+// We override BOTH the Tailwind theme vars (--font-sans/--font-mono, used by the
+// `font-sans`/`font-mono` utilities) AND the underlying --font-geist-* roots,
+// because several analysis views hardcode `fontFamily: var(--font-geist-mono)`
+// inline — overriding only --font-mono would miss those.
+//
+// `background` paints the CodeTrawl warm bg (TOK.bg → CH #0c0b0b) over the
+// global body bg (cool #14141B from globals.css), so the transparent main
+// content area matches the warm sidebar instead of letting the cool bg peek.
+const FONT_VARS = {
+  "--font-sans": "var(--font-ct-display)",
+  "--font-mono": "var(--font-ct-mono)",
+  "--font-geist-sans": "var(--font-ct-display)",
+  "--font-geist-mono": "var(--font-ct-mono)",
+  fontFamily: "var(--font-ct-display)",
+  background: TOK.bg,
+  minHeight: "100vh",
+} as CSSProperties;
 
 export default async function SessionLayout({
   params,
@@ -54,7 +80,7 @@ export default async function SessionLayout({
   const current = session.snapshots[session.snapshots.length - 1];
 
   return (
-    <>
+    <div className={`${ctDisplay.variable} ${ctMono.variable}`} style={FONT_VARS}>
       {/* HideOnMarketing strips the top toolbar when ?marketing=1 is
        *  in the URL. Used for taking clean session-page screenshots
        *  for marketing assets (sidebar stays — adds product
@@ -73,6 +99,6 @@ export default async function SessionLayout({
       <SessionShell sessionId={session.id} snapshot={current}>
         {children}
       </SessionShell>
-    </>
+    </div>
   );
 }

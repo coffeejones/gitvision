@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { sankey, sankeyLinkHorizontal } from "d3-sankey";
 import { GitPullRequest } from "lucide-react";
 import type { PullRequestSummary } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { EmptyPanel } from "@/components/EmptyPanel";
 
 interface Props {

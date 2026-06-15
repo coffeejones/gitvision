@@ -3,7 +3,7 @@
 import { notFound } from "next/navigation";
 import { Network } from "lucide-react";
 import { getSession } from "@/lib/storage";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { DependencyCanvas } from "@/components/views/DependencyCanvas";
 import { HelpHint } from "@/components/HelpHint";
 import { EmptyPanel } from "@/components/EmptyPanel";

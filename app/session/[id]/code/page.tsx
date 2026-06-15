@@ -6,7 +6,7 @@
 
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { CodePanel } from "@/components/views/CodePanel";
 
 export const dynamic = "force-dynamic";

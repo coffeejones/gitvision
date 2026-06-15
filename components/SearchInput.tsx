@@ -14,7 +14,7 @@
 // those are inline toolbar elements with their own much-tighter shape.
 
 import { Search } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
   value: string;

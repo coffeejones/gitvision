@@ -20,7 +20,7 @@
 // intentional — the goal is "calmly explain", not "alarm".
 
 import type { ReactNode } from "react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
   /** Lucide icon (or any ReactNode) shown above the title. */

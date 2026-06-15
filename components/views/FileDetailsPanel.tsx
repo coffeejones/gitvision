@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import type { FileHotspot, CoChangeEdge, CommitSummary, RepoMeta } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
   hotspot: FileHotspot;

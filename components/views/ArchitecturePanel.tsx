@@ -26,7 +26,7 @@ import type {
   ClassDiagramResult,
   ScopeOption,
 } from "@/lib/intelligence/classDiagram";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 import { ArchitectureScope } from "./ArchitectureScope";
 import { ClassCanvas } from "./ClassCanvas";
 import { HelpHint } from "@/components/HelpHint";

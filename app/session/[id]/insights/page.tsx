@@ -19,7 +19,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
 import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
 import { HealthPanel } from "@/components/HealthPanel";
 import { UpgradePrompt } from "@/components/billing/UpgradePrompt";

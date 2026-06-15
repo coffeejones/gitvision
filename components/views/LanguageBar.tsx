@@ -1,5 +1,5 @@
 import type { LanguageBreakdown } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 // Deterministic color per language name. Slightly muted saturation to match
 // the dark theme; pure hue-only was too candy.

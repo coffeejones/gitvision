@@ -24,7 +24,7 @@ import type {
   StructuralDiff,
   StructuralFnRef,
 } from "@/lib/intelligence/structuralDiff";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 import { HelpHint } from "@/components/HelpHint";
 
 interface Props {

@@ -8,7 +8,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCw, Sparkles } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
   sessionId: string;

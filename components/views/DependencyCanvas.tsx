@@ -33,7 +33,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import { AlertTriangle, Network } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { EmptyPanel } from "@/components/EmptyPanel";
 import type {
   FileGraph,

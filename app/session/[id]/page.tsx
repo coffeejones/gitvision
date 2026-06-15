@@ -71,7 +71,7 @@ import {
   structuralDiff,
   structuralDiffHasContent,
 } from "@/lib/intelligence/structuralDiff";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 import { StatGrid } from "@/components/views/StatGrid";
 import { SinceLastVisit } from "@/components/views/SinceLastVisit";
 import { HeadlineFinding } from "@/components/HeadlineFinding";

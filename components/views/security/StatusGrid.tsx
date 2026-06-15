@@ -11,7 +11,7 @@
 //   "findings"     — scanner ran, findings present. Show count pill.
 //   "not scanned"  — pre-v0.81 snapshot or scan failed. Muted pill.
 
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 interface StatusCardProps {
   title: string;

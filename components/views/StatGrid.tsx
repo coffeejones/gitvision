@@ -2,7 +2,7 @@
 // Prioritizes fast-scan readability over table-like exhaustiveness.
 
 import type { AnalysisSnapshot } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

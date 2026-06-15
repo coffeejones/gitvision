@@ -54,7 +54,7 @@ import {
   type ClassEdgeData,
   type ClassNodeData,
 } from "@/lib/intelligence/classCanvas";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { EmptyPanel } from "@/components/EmptyPanel";
 
 interface Props {

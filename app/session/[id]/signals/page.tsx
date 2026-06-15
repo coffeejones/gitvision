@@ -23,7 +23,7 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
 import { extractHealthSignals } from "@/lib/signals";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { SignalsPanel } from "@/components/views/SignalsPanel";
 
 export const dynamic = "force-dynamic";

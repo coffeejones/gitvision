@@ -28,7 +28,7 @@ import type {
   DimensionSummary,
   DimensionTrend,
 } from "@/lib/intelligence/healthSummary";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 
 /** Map a tile's status to the relevant Health-check column anchor on
  *  /insights. critical + warning tiles want the "needs work" column;

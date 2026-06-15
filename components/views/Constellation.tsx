@@ -21,7 +21,7 @@ import {
 import * as d3 from "d3";
 import { Activity, Pause, Play, Users } from "lucide-react";
 import type { AnalysisSnapshot, FileHotspot, CoChangeEdge } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { FileDetailsPanel } from "./FileDetailsPanel";
 
 // ------------------- Visual helpers -------------------

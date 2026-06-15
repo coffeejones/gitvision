@@ -17,7 +17,7 @@
 //   patterns  → title = path:line, detail = source snippet
 
 import { ArrowUpRight, ShieldCheck } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import type { IncidentMatch } from "@/lib/security/knownIncidents";
 import type { RiskyPatternFinding } from "@/lib/security/riskyPatterns";
 import type { SecretFinding } from "@/lib/security/types";

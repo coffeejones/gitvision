@@ -34,7 +34,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import type { HealthSignal, HealthSignals } from "@/lib/types";
 
 interface Props {

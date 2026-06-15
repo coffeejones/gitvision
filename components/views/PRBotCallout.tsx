@@ -19,7 +19,7 @@ import {
   Lock,
   ShieldCheck,
 } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import type { Tier } from "@/components/TierIcon";
 
 const INSTALL_URL = "https://github.com/apps/repojury-pr";

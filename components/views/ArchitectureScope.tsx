@@ -15,7 +15,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Filter } from "lucide-react";
 import type { ScopeOption } from "@/lib/intelligence/classDiagram";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
   /** Folders sorted by class-count desc, computed server-side via

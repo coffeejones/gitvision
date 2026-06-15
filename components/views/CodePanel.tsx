@@ -38,7 +38,7 @@ import {
   Target,
 } from "lucide-react";
 import type { AnalysisSnapshot, CodeGraph } from "@/lib/types";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { HelpHint } from "@/components/HelpHint";
 import { EmptyPanel } from "@/components/EmptyPanel";

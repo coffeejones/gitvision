@@ -43,7 +43,7 @@ import {
   Truck,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 import { CommandPalette } from "./CommandPalette";
 
 interface Props {

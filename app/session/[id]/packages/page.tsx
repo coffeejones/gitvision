@@ -2,7 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { PackagesPanel } from "@/components/views/PackagesPanel";
 
 export const dynamic = "force-dynamic";

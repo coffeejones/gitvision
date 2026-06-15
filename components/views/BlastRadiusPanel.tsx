@@ -16,7 +16,7 @@
 import Link from "next/link";
 import { ArrowRight, Zap } from "lucide-react";
 import type { RankedBlastFunction } from "@/lib/codeAnalysis/blastRanking";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 import { HelpHint } from "@/components/HelpHint";
 
 interface Props {

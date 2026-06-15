@@ -25,7 +25,7 @@ import {
   computeScopeOptions,
   generateClassDiagram,
 } from "@/lib/intelligence/classDiagram";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { ArchitecturePanel } from "@/components/views/ArchitecturePanel";
 import { UpgradePrompt } from "@/components/billing/UpgradePrompt";
 

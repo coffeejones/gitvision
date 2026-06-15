@@ -28,7 +28,7 @@ import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
 import { computeVerdict } from "@/lib/intelligence/verdict";
 import { generateVerdictNarrative } from "@/lib/intelligence/verdictNarrative";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { VerdictHero } from "@/components/views/verdict/VerdictHero";
 import { DepartmentRulingCard } from "@/components/views/verdict/DepartmentRulingCard";
 import { JudgeStatement } from "@/components/views/verdict/JudgeStatement";

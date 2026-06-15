@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 import * as d3 from "d3";
 import type { FileHotspot } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 // Same ambiguous-basename list as the canvas — these appear all over
 // monorepos with identical names, so we prefix the parent folder to

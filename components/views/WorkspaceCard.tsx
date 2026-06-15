@@ -30,7 +30,7 @@ import type {
   DimensionSummary,
 } from "@/lib/intelligence/healthSummary";
 import type { HeadlineSeverity } from "@/lib/intelligence/headline";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
   summary: WorkspaceSummary;

@@ -14,7 +14,7 @@
 // the AI call.
 
 import { Quote } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
   /** The AI-generated 50-80 word bench statement. */

@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import type { SnapshotDiff, Headline } from "@/lib/diff";
 import { pickHeadline } from "@/lib/diff";
-import { STYLE, TOK } from "@/lib/theme";
+import { STYLE, TOK } from "@/lib/sessionTheme";
 import { HelpHint } from "@/components/HelpHint";
 
 function formatRel(iso: string): string {
@@ -474,11 +474,17 @@ export function SinceLastVisit({ diff, repoFullName }: Props) {
   const chips = buildSupportingChips(diff, headline);
 
   return (
+    // The "what changed since last time" block is the product's update story —
+    // it must NOT blend into the neighbouring panels. CodeTrawl rations orange
+    // to criticals, so this stands out by TONE, not colour: the brightest
+    // surface on the page (elevated), a crisp border, and a bone "live edge"
+    // left rule (the same active-marker device the workspace nav uses).
     <div
       className="rounded-xl p-6 flex flex-col gap-5"
       style={{
-        background: `linear-gradient(135deg, ${TOK.accentSoft} 0%, transparent 55%)`,
-        border: `1px solid ${TOK.border}`,
+        background: `linear-gradient(135deg, ${TOK.accentSoft} 0%, ${TOK.surfaceElevated} 70%)`,
+        border: `1px solid ${TOK.borderStrong}`,
+        borderLeft: `3px solid ${TOK.accent}`,
       }}
     >
       {/* Header strip: refresh icon + "Since your last visit" on left,

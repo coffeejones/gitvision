@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, Link2 } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
   /** URL search params to attach to the current pathname. The button

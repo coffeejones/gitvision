@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { Contributor } from "@/lib/types";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 export function ContributorList({ contributors }: { contributors: Contributor[] }) {
   const top = contributors.slice(0, 12);

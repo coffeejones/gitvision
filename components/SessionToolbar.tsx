@@ -38,7 +38,7 @@ import {
 import type { AnalysisSnapshot } from "@/lib/types";
 import { pollJob } from "@/lib/jobsClient";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 import { ShareCardModal } from "./ShareCardModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
 import { FeedbackModal } from "./FeedbackModal";

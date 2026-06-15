@@ -26,7 +26,7 @@
 // pages (imports route, help route) and client panels.
 
 import { Info } from "lucide-react";
-import { TOK } from "@/lib/theme";
+import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
   /** Anchor on /help (without the `#`). Must match an `id` on the
