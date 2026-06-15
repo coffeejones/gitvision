@@ -1,19 +1,18 @@
-// Public pricing page — restyled to forensic-dossier in Phase M.
+// Public pricing page — CodeTrawl "SURFACE & DEPTH" system.
 //
-// Wraps the whole route in RJSurface (the shared records-office shell)
-// so /pricing reads as one brand with the landing + auth. Keeps the
-// real machinery: billing toggle (?billing=monthly|annual), Polar.sh
-// checkout via CheckoutCTA, and the feature comparison grid. Tier
-// definitions come from lib/pricing.ts so the page stays in sync with
-// auth-gating + the Polar webhook handler.
+// Wraps the route in CTSurface (the same shell + fonts + codetrawl.css as the
+// landing) so /pricing reads as one brand. Keeps the real machinery: billing
+// toggle (?billing=monthly|annual), Polar.sh checkout via CheckoutCTA, and the
+// feature comparison grid. Tier definitions come from lib/pricing.ts so the
+// page stays in sync with auth-gating + the Polar webhook handler.
 
 import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { Check } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { RJSurface } from "@/components/landing/repojury/RJSurface";
-import { CrestSeal } from "@/components/landing/repojury/seals";
+import { CTSurface } from "@/components/landing/codetrawl/CTSurface";
+import { CTFooter } from "@/components/landing/codetrawl/CTFooter";
 import {
   TIER_CONFIG,
   TIER_ORDER,
@@ -25,9 +24,9 @@ import { PricingBillingToggle } from "@/components/pricing/PricingBillingToggle"
 import { CheckoutCTA } from "@/components/pricing/CheckoutCTA";
 
 export const metadata: Metadata = {
-  title: "Pricing — RepoJury",
+  title: "Pricing — CodeTrawl",
   description:
-    "Three ways to retain the jury. Open your first case free, then upgrade for unlimited private repos, the verdict on every PR, and team access.",
+    "Start free on public repos. Upgrade for unlimited private repos, a grade on every pull request, and team access — one deterministic sweep, computed not generated.",
 };
 
 export const dynamic = "force-dynamic";
@@ -47,16 +46,16 @@ export default async function PricingPage({
   const loggedIn = !!authSession?.user;
 
   return (
-    <RJSurface>
+    <CTSurface>
       <PricingNav loggedIn={loggedIn} />
-      <main className="wrap price-page spot">
+      <main className="wrap price-page">
         <header className="price-hero">
-          <span className="eyebrow">Pricing · open your first case free</span>
-          <h1>Retain the jury.</h1>
+          <span className="eyebrow">Pricing · your first sweep is free</span>
+          <h1>Pick your depth.</h1>
           <p className="lede">
-            Put any public repo on trial for free. Upgrade when you need
-            unlimited private cases, the verdict on every pull request, or
-            the whole bench for your team.
+            Sweep any public repo for free. Upgrade for unlimited private
+            repos, a grade on every pull request, and access for the whole
+            team.
           </p>
         </header>
 
@@ -66,42 +65,42 @@ export default async function PricingPage({
 
         <FeatureComparison />
       </main>
-      <PricingFooter />
-    </RJSurface>
+      <CTFooter />
+    </CTSurface>
   );
 }
 
-// ─── Minimal nav — links back to the landing's sections (absolute anchors) ─
+// ─── Nav — reuses the landing's .nav-* classes, absolute anchors back home ─
 
 function PricingNav({ loggedIn }: { loggedIn: boolean }) {
   return (
-    <nav>
-      <Link href="/" className="brand">
-        <CrestSeal className="seal-sm" />
-        <span>
-          <b style={{ fontWeight: 700 }}>Repo</b>Jury
-        </span>
-      </Link>
-      <div className="nav-links">
-        <Link href="/#process">How it works</Link>
-        <Link href="/#custody">Chain of custody</Link>
-        <Link href="/pricing">Pricing</Link>
-      </div>
-      <div className="nav-right">
-        {!loggedIn && (
-          <Link href="/login" className="btn btn-ghost">
-            Sign in
-          </Link>
-        )}
-        <Link href="/signup" className="btn btn-primary">
-          Open a case
+    <nav className="scrolled">
+      <div className="nav-inner">
+        <Link href="/" className="nav-brand">
+          CodeTrawl
         </Link>
+        <div className="nav-links">
+          <Link href="/#how">How it works</Link>
+          <Link href="/#features">Features</Link>
+          <Link href="/#compare">Compare</Link>
+          <Link href="/pricing">Pricing</Link>
+        </div>
+        <div className="nav-right">
+          {!loggedIn && (
+            <Link href="/login" className="nav-signin">
+              Sign in
+            </Link>
+          )}
+          <Link href="/#analyze" className="nav-cta">
+            Analyze a repo
+          </Link>
+        </div>
       </div>
     </nav>
   );
 }
 
-// ─── Tier cards (reuses the landing's .price-grid / .tier) ────────────
+// ─── Tier cards (styled via .ct .price-grid / .tier in codetrawl.css) ──────
 
 function PricingCards({
   billing,
@@ -142,9 +141,9 @@ function PricingCards({
                 {annualSavingsPercent(tier)}%)
               </span>
             ) : isPaid ? (
-              <span className="price-note muted">Billed monthly</span>
+              <span className="price-note">Billed monthly</span>
             ) : (
-              <span className="price-note muted">Forever free</span>
+              <span className="price-note">Forever free</span>
             )}
 
             <CheckoutCTA
@@ -170,18 +169,18 @@ function PricingCards({
   );
 }
 
-// ─── Feature comparison grid ──────────────────────────────────────────
+// ─── Feature comparison grid (reuses the .compare table styling) ───────────
 
 function FeatureComparison() {
   const rows: Array<{ label: string; values: [boolean, boolean, boolean] }> = [
     { label: "Public repo analysis", values: [true, true, true] },
     { label: "Private repo analysis", values: [false, true, true] },
-    { label: "Saved cases", values: [false, true, true] },
+    { label: "Saved surveys", values: [false, true, true] },
     { label: "Unlimited refreshes", values: [false, true, true] },
-    { label: "AI Briefing + bench statement", values: [false, true, true] },
+    { label: "AI Briefing + the read", values: [false, true, true] },
     { label: "Architecture diagrams", values: [false, true, true] },
     { label: "Structural diff between snapshots", values: [false, true, true] },
-    { label: "Verdict watch on PRs", values: [false, true, true] },
+    { label: "Grade watch on PRs", values: [false, true, true] },
     { label: "Unlimited PR repos", values: [false, false, true] },
     { label: "Team workspaces", values: [false, false, true] },
     { label: "Priority support", values: [false, false, true] },
@@ -190,61 +189,45 @@ function FeatureComparison() {
 
   return (
     <section className="cmp">
-      <div className="cmp-head sec-head">
-        <span className="eyebrow">The full docket · feature by feature</span>
-        <h2 className="display">Compare the bench.</h2>
+      <div className="cmp-head">
+        <span className="eyebrow">Every feature · plan by plan</span>
+        <h2>Compare the plans.</h2>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Feature</th>
-            {TIER_ORDER.map((id) => (
-              <th key={id}>{TIER_CONFIG[id].name}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.label}>
-              <td>{row.label}</td>
-              {row.values.map((included, j) => (
-                <td key={j} className={included ? "yes" : "no"}>
-                  {included ? "✓" : "—"}
-                </td>
+      <div className="compare">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">
+                <span className="sr-only">Feature</span>
+              </th>
+              {TIER_ORDER.map((id) => (
+                <th scope="col" key={id}>
+                  {TIER_CONFIG[id].name}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label}>
+                <th scope="row">{row.label}</th>
+                {row.values.map((included, j) => (
+                  <td key={j} className={included ? "yes" : "no"}>
+                    {included ? (
+                      "✓"
+                    ) : (
+                      <>
+                        <span aria-hidden>—</span>
+                        <span className="sr-only">no</span>
+                      </>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
-  );
-}
-
-// ─── Footer (mirrors the landing's) ───────────────────────────────────
-
-function PricingFooter() {
-  return (
-    <footer>
-      <div className="wrap foot">
-        <Link href="/" className="brand">
-          <CrestSeal className="seal-sm" />
-          <span>
-            <b style={{ fontWeight: 700 }}>Repo</b>Jury
-          </span>
-        </Link>
-        <div className="foot-links">
-          <Link href="/">Home</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/login">Sign in</Link>
-        </div>
-        <span className="copy">© 2026 RepoJury</span>
-      </div>
-      <div className="wrap foot-legal">
-        <Link href="/privacy">Privacy</Link>
-        <Link href="/terms">Terms</Link>
-        <Link href="/cookies">Cookies</Link>
-        <Link href="/refunds">Refunds</Link>
-      </div>
-    </footer>
   );
 }

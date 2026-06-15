@@ -1577,6 +1577,244 @@ html:has(.ct) {
   background: var(--ct-ember);
 }
 
+/* ── PRICING PAGE (/pricing) ──────────────────────────────────────────────
+   Reuses the .ct namespace + tokens. Orange is concentrated on the ONE
+   recommended tier (its ribbon + Subscribe button) — that's the page's single
+   heat source; Free + Pro stay neutral hairline. Everything else is tone. */
+.ct .price-page {
+  padding-top: 64px;
+}
+.ct .price-hero {
+  text-align: center;
+  padding: 64px 0 8px;
+}
+.ct .price-hero .eyebrow {
+  font-family: var(--ct-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ct-faint);
+}
+.ct .price-hero h1 {
+  margin: 16px 0 0;
+  font-size: clamp(36px, 4.6vw, 60px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+}
+.ct .price-hero .lede {
+  margin: 18px auto 0;
+  max-width: 600px;
+  font-size: clamp(15px, 1.7vw, 18px);
+  line-height: 1.55;
+  color: var(--ct-dim);
+}
+
+/* Monthly / Annual segmented toggle — hairline track, tone for the active. */
+.ct .price-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  width: fit-content;
+  margin: 32px auto 0;
+  padding: 4px;
+  border: 1px solid var(--ct-line);
+  border-radius: 10px;
+}
+.ct .price-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ct-dim);
+  transition: background 0.2s, color 0.2s;
+}
+.ct .price-toggle button.on {
+  background: var(--ct-text);
+  color: var(--ct-bg);
+}
+.ct .price-toggle .tg-badge {
+  font-family: var(--ct-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ct-ember);
+}
+.ct .price-toggle button.on .tg-badge {
+  color: var(--ct-bg);
+}
+
+/* Tier cards — flat hairline, no shadow. The recommended card carries the
+   page's one orange accent (tinted border + ribbon + Subscribe fill). */
+.ct .price-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 44px;
+  align-items: start;
+}
+@media (max-width: 880px) {
+  .ct .price-grid {
+    grid-template-columns: 1fr;
+    max-width: 460px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+.ct .price-grid .tier {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px;
+  border: 1px solid var(--ct-line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ct-surface) 55%, transparent);
+}
+.ct .price-grid .tier.feat {
+  border-color: color-mix(in srgb, var(--ct-orange) 38%, var(--ct-line));
+  background: color-mix(in srgb, var(--ct-orange) 5%, var(--ct-surface));
+}
+.ct .price-grid .ribbon {
+  position: absolute;
+  top: -10px;
+  left: 24px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--ct-orange);
+  color: #150700;
+  font-family: var(--ct-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.ct .price-grid .tname {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.ct .price-grid .tsub {
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: var(--ct-dim);
+}
+.ct .price-grid .price {
+  margin-top: 22px;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.ct .price-grid .price .per {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ct-faint);
+}
+.ct .price-grid .price-note {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--ct-mono);
+  font-size: 11.5px;
+  color: var(--ct-faint);
+}
+.ct .price-grid .price-note.save {
+  color: var(--ct-ember);
+}
+.ct .price-grid .tier-cta {
+  margin: 22px 0 4px;
+}
+.ct .price-grid .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 11px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--ct-line);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ct-text);
+  transition: border-color 0.2s, background 0.2s;
+}
+.ct .price-grid .btn.btn-ghost:hover {
+  border-color: var(--ct-faint);
+}
+.ct .price-grid .btn.btn-primary {
+  border-color: transparent;
+  background: var(--ct-orange);
+  color: #150700;
+}
+.ct .price-grid .btn.btn-primary:hover {
+  background: var(--ct-ember);
+}
+.ct .price-grid .btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.ct .price-grid .tier-cta .err {
+  margin: 8px 0 0;
+  font-family: var(--ct-mono);
+  font-size: 11.5px;
+  color: var(--ct-orange);
+}
+.ct .price-grid .tier ul {
+  margin: 18px 0 0;
+  padding: 18px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--ct-line);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.ct .price-grid .tier li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ct-dim);
+}
+.ct .price-grid .tier li svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ct-faint);
+}
+
+/* Feature comparison header on /pricing (reuses .compare table styling). */
+.ct .cmp {
+  padding-top: 96px;
+}
+.ct .cmp .cmp-head {
+  text-align: center;
+  margin-bottom: 36px;
+}
+.ct .cmp .cmp-head .eyebrow {
+  font-family: var(--ct-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ct-faint);
+}
+.ct .cmp .cmp-head h2 {
+  margin: 14px 0 0;
+  font-size: clamp(28px, 3.2vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.ct .cmp td.yes {
+  color: var(--ct-text);
+}
+.ct .cmp td.no {
+  color: var(--ct-ghost);
+}
+
 /* ── FOOTER ───────────────────────────────────────────────────────────── */
 .ct .ct-footer {
   margin-top: 104px;
