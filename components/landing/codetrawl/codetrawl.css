@@ -1676,9 +1676,12 @@ html:has(.ct) {
   border-radius: 10px;
   background: color-mix(in srgb, var(--ct-surface) 55%, transparent);
 }
+/* Recommended tier stands out by TONE, not an orange wash: a brighter
+   neutral hairline + a slightly more solid surface. The only orange left on
+   the card is the Subscribe button (the CTA heat) + a faint ember ribbon. */
 .ct .price-grid .tier.feat {
-  border-color: color-mix(in srgb, var(--ct-orange) 38%, var(--ct-line));
-  background: color-mix(in srgb, var(--ct-orange) 5%, var(--ct-surface));
+  border-color: color-mix(in srgb, var(--ct-text) 16%, transparent);
+  background: var(--ct-surface);
 }
 .ct .price-grid .ribbon {
   position: absolute;
@@ -1686,8 +1689,9 @@ html:has(.ct) {
   left: 24px;
   padding: 3px 10px;
   border-radius: 6px;
-  background: var(--ct-orange);
-  color: #150700;
+  background: color-mix(in srgb, var(--ct-orange) 14%, var(--ct-bg));
+  border: 1px solid color-mix(in srgb, var(--ct-orange) 30%, transparent);
+  color: var(--ct-ember);
   font-family: var(--ct-mono);
   font-size: 10.5px;
   letter-spacing: 0.05em;
