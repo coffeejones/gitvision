@@ -8,6 +8,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import * as htmlToImage from "html-to-image";
 import type { AnalysisSnapshot, Contributor } from "@/lib/types";
+import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
+import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
   snapshot: AnalysisSnapshot;
@@ -17,6 +19,9 @@ interface Props {
 
 const CARD_W = 500;
 const CARD_H = 720;
+
+const DISPLAY = `${ctDisplay.style.fontFamily}, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif`;
+const MONO = `${ctMono.style.fontFamily}, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
 
 const DAY_NAMES = [
   "Sunday",
@@ -173,13 +178,6 @@ interface CardProps {
 }
 
 function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
-  const hue = (() => {
-    let h = 0;
-    const src = stats.displayName;
-    for (const ch of src) h = (h * 31 + ch.charCodeAt(0)) % 360;
-    return h;
-  })();
-
   const initial = stats.displayName.charAt(0).toUpperCase() || "?";
 
   return (
@@ -187,10 +185,9 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
       style={{
         width: CARD_W,
         height: CARD_H,
-        background: `linear-gradient(160deg, hsl(${hue}, 55%, 12%) 0%, #0b0b14 55%, hsl(${
-          (hue + 60) % 360
-        }, 60%, 10%) 100%)`,
-        color: "#fafafa",
+        background:
+          "linear-gradient(160deg, #1c140d 0%, #0c0b0b 55%, #141210 100%)",
+        color: "#eceae8",
         padding: 40,
         boxSizing: "border-box",
         display: "flex",
@@ -198,11 +195,11 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
         gap: 20,
         position: "relative",
         overflow: "hidden",
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
+        fontFamily: DISPLAY,
       }}
     >
-      {/* Decorative blobs */}
+      {/* Decorative glow — International Orange (the celebratory accent) +
+          a faint ember balance. */}
       <div
         style={{
           position: "absolute",
@@ -211,7 +208,8 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
           width: 320,
           height: 320,
           borderRadius: "50%",
-          background: `radial-gradient(circle, hsla(${hue}, 80%, 50%, 0.3) 0%, hsla(${hue}, 80%, 50%, 0) 70%)`,
+          background:
+            "radial-gradient(circle, rgba(255,79,0,0.24) 0%, rgba(255,79,0,0) 70%)",
           filter: "blur(8px)",
         }}
       />
@@ -223,9 +221,8 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
           width: 360,
           height: 360,
           borderRadius: "50%",
-          background: `radial-gradient(circle, hsla(${
-            (hue + 60) % 360
-          }, 80%, 50%, 0.25) 0%, hsla(${hue}, 80%, 50%, 0) 70%)`,
+          background:
+            "radial-gradient(circle, rgba(255,138,80,0.14) 0%, rgba(255,138,80,0) 70%)",
           filter: "blur(8px)",
         }}
       />
@@ -245,7 +242,7 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
               width: 9,
               height: 9,
               borderRadius: "50%",
-              background: "#10b981",
+              background: "#ff4f00",
             }}
           />
           <span
@@ -253,17 +250,17 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
               fontSize: 13,
               fontWeight: 600,
               letterSpacing: "-0.01em",
+              fontFamily: DISPLAY,
             }}
           >
-            RepoJury · Wrapped
+            CodeTrawl · Wrapped
           </span>
         </div>
         <span
           style={{
             fontSize: 11,
             color: "rgba(255,255,255,0.55)",
-            fontFamily:
-              "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontFamily: MONO,
           }}
         >
           {repoFullName}
@@ -298,7 +295,7 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
               height: 72,
               borderRadius: "50%",
               border: "2px solid rgba(255,255,255,0.25)",
-              background: `hsl(${hue}, 65%, 30%)`,
+              background: "#232220",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -327,7 +324,7 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
               fontWeight: 700,
               letterSpacing: "-0.02em",
               background:
-                "linear-gradient(90deg, #ffffff 0%, #bfdbfe 60%, #c4b5fd 100%)",
+                "linear-gradient(90deg, #ffffff 0%, #eceae8 55%, #b0aca8 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -420,8 +417,8 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
           position: "relative",
         }}
       >
-        <span>repojury.com</span>
-        <span>#RepoJuryWrapped</span>
+        <span>CodeTrawl</span>
+        <span>#CodeTrawlWrapped</span>
       </div>
     </div>
   );
@@ -462,8 +459,7 @@ function StatRow({
         style={{
           fontSize: 18,
           fontWeight: 600,
-          fontFamily:
-            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          fontFamily: MONO,
           letterSpacing: "-0.01em",
           whiteSpace: "nowrap",
           overflow: "hidden",
@@ -477,8 +473,7 @@ function StatRow({
           style={{
             fontSize: 10,
             color: "rgba(255,255,255,0.4)",
-            fontFamily:
-              "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontFamily: MONO,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -526,7 +521,7 @@ export function ContributorWrappedModal({ snapshot, open, onClose }: Props) {
       });
       const safe = displayName.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
       const link = document.createElement("a");
-      link.download = `repobaron-wrapped-${snapshot.repo.name}-${safe}.png`;
+      link.download = `codetrawl-wrapped-${snapshot.repo.name}-${safe}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -545,22 +540,33 @@ export function ContributorWrappedModal({ snapshot, open, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="relative bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
-        style={{ width: "min(1180px, 96vw)" }}
+        className="relative rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+        style={{
+          width: "min(1180px, 96vw)",
+          background: TOK.surface,
+          border: `1px solid ${TOK.border}`,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-200 dark:border-zinc-800">
+        <div
+          className="flex items-center justify-between px-5 py-3"
+          style={{ borderBottom: `1px solid ${TOK.border}` }}
+        >
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold">
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: TOK.textPrimary }}
+            >
               Contributor Wrapped{" "}
-              <span className="text-zinc-500 font-normal text-sm">
+              <span className="font-normal text-sm" style={{ color: TOK.textMuted }}>
                 · {snapshot.repo.fullName}
               </span>
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 transition text-zinc-500"
+            className="h-8 w-8 flex items-center justify-center rounded-lg transition"
+            style={{ color: TOK.textMuted }}
             aria-label="Close"
           >
             ✕
@@ -568,14 +574,17 @@ export function ContributorWrappedModal({ snapshot, open, onClose }: Props) {
         </div>
 
         {!hasData ? (
-          <div className="p-10 text-center text-sm text-zinc-500">
+          <div
+            className="p-10 text-center text-sm"
+            style={{ color: TOK.textMuted }}
+          >
             No per-contributor data in this snapshot yet. Click{" "}
             <strong>Refresh</strong> to build it.
           </div>
         ) : (
           <div
             className="flex-1 min-h-0 p-6 overflow-auto"
-            style={{ background: "rgba(0,0,0,0.2)" }}
+            style={{ background: TOK.bgDeep }}
           >
             <div
               className="grid gap-6 justify-items-center"
@@ -626,7 +635,12 @@ export function ContributorWrappedModal({ snapshot, open, onClose }: Props) {
                     <button
                       onClick={() => download(s.key, s.displayName)}
                       disabled={downloading === s.key}
-                      className="text-xs px-3 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition disabled:opacity-40"
+                      className="text-xs px-3 py-1 rounded-md transition hover:opacity-90 disabled:opacity-40"
+                      style={{
+                        background: TOK.surfaceElevated,
+                        border: `1px solid ${TOK.border}`,
+                        color: TOK.textPrimary,
+                      }}
                     >
                       {downloading === s.key ? "Rendering…" : "⬇ PNG"}
                     </button>
@@ -638,11 +652,17 @@ export function ContributorWrappedModal({ snapshot, open, onClose }: Props) {
         )}
 
         {error && (
-          <div className="px-5 py-2 border-t border-zinc-200 dark:border-zinc-800 text-sm text-red-600 dark:text-red-400">
+          <div
+            className="px-5 py-2 text-sm"
+            style={{ borderTop: `1px solid ${TOK.border}`, color: TOK.rose }}
+          >
             {error}
           </div>
         )}
-        <div className="px-5 py-2 border-t border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500">
+        <div
+          className="px-5 py-2 text-xs"
+          style={{ borderTop: `1px solid ${TOK.border}`, color: TOK.textMuted }}
+        >
           Stats come from the sampled commit history. Avatars show when the
           author&apos;s git email ties to a GitHub login (typically{" "}
           <code>noreply.github.com</code>); otherwise we use the author name.

@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as htmlToImage from "html-to-image";
 import type { AnalysisSnapshot } from "@/lib/types";
+import { TOK } from "@/lib/sessionTheme";
 import {
   ShareCard,
   SHARE_CARD_DIMS,
@@ -56,7 +57,7 @@ export function ShareCardModal({
         style: { transform: "none" }, // override preview scaling
       });
       const link = document.createElement("a");
-      link.download = `repojury-${sessionName
+      link.download = `codetrawl-${sessionName
         .replace(/\s+/g, "-")
         .toLowerCase()}-${variant}.png`;
       link.href = dataUrl;
@@ -80,20 +81,33 @@ export function ShareCardModal({
       onClick={onClose}
     >
       <div
-        className="relative bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-        style={{ maxWidth: "min(1040px, 95vw)" }}
+        className="relative rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        style={{
+          maxWidth: "min(1040px, 95vw)",
+          background: TOK.surface,
+          border: `1px solid ${TOK.border}`,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-200 dark:border-zinc-800">
+        <div
+          className="flex items-center justify-between px-5 py-3"
+          style={{ borderBottom: `1px solid ${TOK.border}` }}
+        >
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold">Share card</h2>
-            <span className="text-xs text-zinc-500">
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: TOK.textPrimary }}
+            >
+              Share card
+            </h2>
+            <span className="text-xs" style={{ color: TOK.textMuted }}>
               {dim.w}×{dim.h}
             </span>
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 transition text-zinc-500"
+            className="h-8 w-8 flex items-center justify-center rounded-lg transition"
+            style={{ color: TOK.textMuted }}
             aria-label="Close"
           >
             ✕
@@ -103,7 +117,7 @@ export function ShareCardModal({
         {/* Preview */}
         <div
           className="flex-1 min-h-0 p-6 flex items-center justify-center overflow-hidden"
-          style={{ background: "rgba(0,0,0,0.15)" }}
+          style={{ background: TOK.bgDeep }}
         >
           <div
             style={{
@@ -130,50 +144,52 @@ export function ShareCardModal({
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+        <div
+          className="flex items-center justify-between gap-3 px-5 py-3"
+          style={{ borderTop: `1px solid ${TOK.border}`, background: TOK.surface }}
+        >
           <div
             role="tablist"
-            className="inline-flex gap-1 rounded-lg border border-zinc-200 dark:border-zinc-800 p-1"
+            className="inline-flex gap-1 rounded-lg p-1"
+            style={{ border: `1px solid ${TOK.border}` }}
           >
-            <button
-              role="tab"
-              aria-selected={variant === "landscape"}
-              onClick={() => setVariant("landscape")}
-              className={`px-3 h-8 rounded-md text-sm font-medium transition ${
-                variant === "landscape"
-                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-              }`}
-            >
-              Landscape · 1200×630
-            </button>
-            <button
-              role="tab"
-              aria-selected={variant === "square"}
-              onClick={() => setVariant("square")}
-              className={`px-3 h-8 rounded-md text-sm font-medium transition ${
-                variant === "square"
-                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-              }`}
-            >
-              Square · 1080×1080
-            </button>
+            {(["landscape", "square"] as const).map((v) => {
+              const sel = variant === v;
+              return (
+                <button
+                  key={v}
+                  role="tab"
+                  aria-selected={sel}
+                  onClick={() => setVariant(v)}
+                  className="px-3 h-8 rounded-md text-sm font-medium transition"
+                  style={{
+                    background: sel ? TOK.accent : "transparent",
+                    color: sel ? TOK.accentOn : TOK.textSecondary,
+                  }}
+                >
+                  {v === "landscape" ? "Landscape · 1200×630" : "Square · 1080×1080"}
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex items-center gap-3">
             {error && (
-              <span className="text-sm text-red-600 dark:text-red-400">
+              <span className="text-sm" style={{ color: TOK.rose }}>
                 {error}
               </span>
             )}
-            <span className="text-xs text-zinc-500 hidden sm:inline">
+            <span
+              className="text-xs hidden sm:inline"
+              style={{ color: TOK.textMuted }}
+            >
               OG / Twitter / LinkedIn · Instagram
             </span>
             <button
               onClick={download}
               disabled={downloading}
-              className="h-9 px-4 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-medium hover:opacity-90 transition disabled:opacity-40"
+              className="h-9 px-4 rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-40"
+              style={{ background: TOK.accent, color: TOK.accentOn }}
             >
               {downloading ? "Rendering…" : "Download PNG"}
             </button>

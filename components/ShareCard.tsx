@@ -2,9 +2,23 @@
 
 // Branded share-card layout. Renders at exact pixel dimensions so the capture
 // is publishing-ready (1200×630 for OG / Twitter, 1080×1080 for Instagram-ish).
+//
+// CodeTrawl "SURFACE & DEPTH": bitumen ground, bone text, Schibsted Grotesk +
+// Fragment Mono. International Orange is the one accent — the brand dot, glow,
+// and the hotspot "heat" bars (churn literally reads as heat). Languages use
+// the muted categorical palette; activity stays neutral bone. The card is
+// captured live (html-to-image), so the CodeTrawl webfonts embed in the PNG.
 
 import Image from "next/image";
 import type { AnalysisSnapshot } from "@/lib/types";
+import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
+import { MUTED } from "@/lib/vizPalette";
+
+const DISPLAY = `${ctDisplay.style.fontFamily}, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif`;
+const MONO = `${ctMono.style.fontFamily}, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
+
+// Muted categorical hues for the language bar (lib/vizPalette).
+const LANG_COLORS = [MUTED.blue.ring, MUTED.sage.ring, MUTED.sand.ring];
 
 export type ShareCardVariant = "landscape" | "square";
 
@@ -30,7 +44,7 @@ function Sparkline({
           width,
           height,
           background:
-            "linear-gradient(90deg, rgba(16,185,129,0.08), rgba(139,92,246,0.08))",
+            "linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02))",
         }}
       />
     );
@@ -48,20 +62,15 @@ function Sparkline({
     <svg width={width} height={height} style={{ display: "block" }}>
       <defs>
         <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(16,185,129,0.45)" />
-          <stop offset="100%" stopColor="rgba(16,185,129,0)" />
-        </linearGradient>
-        <linearGradient id="sparkStroke" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#10b981" />
-          <stop offset="50%" stopColor="#0ea5e9" />
-          <stop offset="100%" stopColor="#8b5cf6" />
+          <stop offset="0%" stopColor="rgba(236,234,232,0.22)" />
+          <stop offset="100%" stopColor="rgba(236,234,232,0)" />
         </linearGradient>
       </defs>
       <path d={areaD} fill="url(#sparkFill)" />
       <path
         d={pathD}
         fill="none"
-        stroke="url(#sparkStroke)"
+        stroke="#eceae8"
         strokeWidth={2.5}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -80,9 +89,10 @@ function StatPill({ label, value }: { label: string; value: string }) {
         style={{
           fontSize: 32,
           fontWeight: 700,
-          color: "#fafafa",
+          color: "#eceae8",
           lineHeight: 1.1,
           letterSpacing: "-0.01em",
+          fontFamily: MONO,
         }}
       >
         {value}
@@ -141,10 +151,9 @@ export function ShareCard({ snapshot, variant }: Props) {
         width: dim.w,
         height: dim.h,
         background:
-          "linear-gradient(135deg, #0a0a0c 0%, #17172a 50%, #1a1030 100%)",
-        color: "#fafafa",
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
+          "linear-gradient(135deg, #0c0b0b 0%, #141210 55%, #1c140d 100%)",
+        color: "#eceae8",
+        fontFamily: DISPLAY,
         padding: isSquare ? 64 : 56,
         boxSizing: "border-box",
         display: "flex",
@@ -154,7 +163,8 @@ export function ShareCard({ snapshot, variant }: Props) {
         overflow: "hidden",
       }}
     >
-      {/* Decorative blur glow */}
+      {/* Decorative glow — International Orange (the brand moment) top-right,
+          a faint ember balance bottom-left. */}
       <div
         style={{
           position: "absolute",
@@ -164,7 +174,7 @@ export function ShareCard({ snapshot, variant }: Props) {
           height: 480,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(16,185,129,0.35) 0%, rgba(16,185,129,0) 70%)",
+            "radial-gradient(circle, rgba(255,79,0,0.20) 0%, rgba(255,79,0,0) 70%)",
           filter: "blur(8px)",
           pointerEvents: "none",
         }}
@@ -178,7 +188,7 @@ export function ShareCard({ snapshot, variant }: Props) {
           height: 540,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(139,92,246,0.35) 0%, rgba(139,92,246,0) 70%)",
+            "radial-gradient(circle, rgba(255,138,80,0.12) 0%, rgba(255,138,80,0) 70%)",
           filter: "blur(8px)",
           pointerEvents: "none",
         }}
@@ -199,8 +209,8 @@ export function ShareCard({ snapshot, variant }: Props) {
               width: 10,
               height: 10,
               borderRadius: "50%",
-              background: "#10b981",
-              boxShadow: "0 0 12px #10b98188",
+              background: "#ff4f00",
+              boxShadow: "0 0 12px rgba(255,79,0,0.55)",
             }}
           />
           <span
@@ -208,17 +218,17 @@ export function ShareCard({ snapshot, variant }: Props) {
               fontSize: 16,
               fontWeight: 600,
               letterSpacing: "-0.01em",
+              fontFamily: DISPLAY,
             }}
           >
-            RepoJury
+            CodeTrawl
           </span>
         </div>
         <span
           style={{
             fontSize: 13,
             color: "rgba(255,255,255,0.55)",
-            fontFamily:
-              "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontFamily: MONO,
           }}
         >
           {snapshot.repo.fullName}
@@ -233,8 +243,9 @@ export function ShareCard({ snapshot, variant }: Props) {
             fontWeight: 700,
             lineHeight: 1.02,
             letterSpacing: "-0.035em",
+            fontFamily: DISPLAY,
             background:
-              "linear-gradient(90deg, #ffffff 0%, #bfdbfe 60%, #c4b5fd 100%)",
+              "linear-gradient(90deg, #ffffff 0%, #eceae8 55%, #b0aca8 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -314,7 +325,7 @@ export function ShareCard({ snapshot, variant }: Props) {
                 marginBottom: 10,
               }}
             >
-              🔥 Top hotspots
+              Top hotspots
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {topHotspots.map((h) => (
@@ -325,8 +336,7 @@ export function ShareCard({ snapshot, variant }: Props) {
                   <span
                     style={{
                       fontSize: 13,
-                      fontFamily:
-                        "ui-monospace, SFMono-Regular, Menlo, monospace",
+                      fontFamily: MONO,
                       color: "rgba(255,255,255,0.85)",
                       width: isSquare ? 320 : 260,
                       whiteSpace: "nowrap",
@@ -350,8 +360,7 @@ export function ShareCard({ snapshot, variant }: Props) {
                       style={{
                         height: "100%",
                         width: `${(h.churn / maxChurn) * 100}%`,
-                        background:
-                          "linear-gradient(90deg, #10b981, #0ea5e9, #8b5cf6)",
+                        background: "linear-gradient(90deg, #c2693a, #ff4f00)",
                       }}
                     />
                   </div>
@@ -359,8 +368,7 @@ export function ShareCard({ snapshot, variant }: Props) {
                     style={{
                       fontSize: 12,
                       color: "rgba(255,255,255,0.6)",
-                      fontFamily:
-                        "ui-monospace, SFMono-Regular, Menlo, monospace",
+                      fontFamily: MONO,
                       width: 32,
                       textAlign: "right",
                     }}
@@ -382,7 +390,7 @@ export function ShareCard({ snapshot, variant }: Props) {
                 marginBottom: 8,
               }}
             >
-              📈 Commit activity (sampled)
+              Commit activity (sampled)
             </div>
             <Sparkline
               data={activity}
@@ -404,7 +412,7 @@ export function ShareCard({ snapshot, variant }: Props) {
                 marginBottom: 10,
               }}
             >
-              👥 Top contributors
+              Top contributors
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {topContributors.map((c) => (
@@ -432,8 +440,7 @@ export function ShareCard({ snapshot, variant }: Props) {
                     style={{
                       fontSize: 12,
                       color: "rgba(255,255,255,0.85)",
-                      fontFamily:
-                        "ui-monospace, SFMono-Regular, Menlo, monospace",
+                      fontFamily: MONO,
                     }}
                   >
                     {c.login}
@@ -453,7 +460,7 @@ export function ShareCard({ snapshot, variant }: Props) {
                 marginBottom: 8,
               }}
             >
-              🎨 Languages
+              Languages
             </div>
             <div
               style={{
@@ -464,18 +471,15 @@ export function ShareCard({ snapshot, variant }: Props) {
                 marginBottom: 8,
               }}
             >
-              {langEntries.map(([lang, bytes], i) => {
-                const colors = ["#3b82f6", "#10b981", "#f97316"];
-                return (
-                  <div
-                    key={lang}
-                    style={{
-                      flex: bytes / langTotal,
-                      background: colors[i % colors.length],
-                    }}
-                  />
-                );
-              })}
+              {langEntries.map(([lang, bytes], i) => (
+                <div
+                  key={lang}
+                  style={{
+                    flex: bytes / langTotal,
+                    background: LANG_COLORS[i % LANG_COLORS.length],
+                  }}
+                />
+              ))}
             </div>
             <div
               style={{
@@ -487,7 +491,6 @@ export function ShareCard({ snapshot, variant }: Props) {
               }}
             >
               {langEntries.map(([lang, bytes], i) => {
-                const colors = ["#3b82f6", "#10b981", "#f97316"];
                 const pct = Math.round((bytes / langTotal) * 100);
                 return (
                   <span
@@ -499,7 +502,7 @@ export function ShareCard({ snapshot, variant }: Props) {
                         width: 8,
                         height: 8,
                         borderRadius: "50%",
-                        background: colors[i % colors.length],
+                        background: LANG_COLORS[i % LANG_COLORS.length],
                       }}
                     />
                     {lang} {pct}%
@@ -530,7 +533,7 @@ export function ShareCard({ snapshot, variant }: Props) {
             day: "numeric",
           })}
         </span>
-        <span>repojury.com · paste a repo URL, get a constellation</span>
+        <span>CodeTrawl · paste a repo URL, get a constellation</span>
       </div>
     </div>
   );
