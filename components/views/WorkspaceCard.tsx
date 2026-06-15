@@ -76,29 +76,21 @@ export function WorkspaceCard({ summary }: Props) {
   return (
     <Link
       href={`/session/${summary.id}`}
-      // Apple-style material card:
-      //   - Subtle diagonal gradient (surfaceElevated → surface) gives
-      //     the card a "real material" feel rather than flat-colored.
-      //   - Hover-lift via translate-y plus a soft layered shadow that
-      //     intensifies under hover; the rest-state shadow is a near-
-      //     invisible 1px ambient so the card sits *on* the page, not
-      //     glued to it.
-      //   - 300ms ease so the hover feels deliberate, not flicker-y.
-      className="group flex flex-col gap-3.5 p-5 rounded-xl transition-all duration-300 hover:-translate-y-0.5"
+      // CodeTrawl flat hairline card: no gradient, no shadow. Depth comes
+      // from surface layers + hairlines, so hover lifts by TONE — the
+      // border brightens and the surface steps up to `elevated`, with a
+      // subtle translate-y for responsiveness. 200ms so it feels deliberate.
+      className="group flex flex-col gap-3.5 p-5 rounded-xl transition-all duration-200 hover:-translate-y-0.5"
       style={{
-        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+        background: TOK.surface,
         border: `1px solid ${TOK.border}`,
-        boxShadow:
-          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow =
-          "0 1px 2px rgba(0, 0, 0, 0.2), 0 16px 40px -12px rgba(0, 0, 0, 0.5)";
+        e.currentTarget.style.background = TOK.surfaceElevated;
         e.currentTarget.style.borderColor = TOK.borderStrong;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow =
-          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)";
+        e.currentTarget.style.background = TOK.surface;
         e.currentTarget.style.borderColor = TOK.border;
       }}
     >

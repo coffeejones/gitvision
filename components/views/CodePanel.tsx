@@ -323,10 +323,8 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
         ref={blastRadiusRef}
         className="rounded-xl p-5 flex flex-col gap-4"
         style={{
-          background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+          background: TOK.surface,
           border: `1px solid ${TOK.border}`,
-          boxShadow:
-            "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
         }}
       >
         <SelectedFileHeader
@@ -505,10 +503,8 @@ function CodeStatTile({
     <div
       className="rounded-xl p-4 flex flex-col gap-1.5"
       style={{
-        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+        background: TOK.surface,
         border: `1px solid ${TOK.border}`,
-        boxShadow:
-          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-start justify-between gap-2">
@@ -1192,10 +1188,8 @@ function HeavyFilesList({
     <div
       className="rounded-xl p-4 flex flex-col gap-3"
       style={{
-        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+        background: TOK.surface,
         border: `1px solid ${TOK.border}`,
-        boxShadow:
-          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider" style={{ color: TOK.textMuted }}>
@@ -1297,10 +1291,8 @@ function UntestedHotspotsPanel({
     <div
       className="rounded-xl p-5 flex flex-col gap-4"
       style={{
-        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+        background: TOK.surface,
         border: `1px solid ${TOK.border}`,
-        boxShadow:
-          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1478,10 +1470,8 @@ function NearDuplicatesPanel({
     <div
       className="rounded-xl p-5 flex flex-col gap-4"
       style={{
-        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+        background: TOK.surface,
         border: `1px solid ${TOK.border}`,
-        boxShadow:
-          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1740,10 +1730,8 @@ function TopFunctionsList({
     <div
       className="rounded-xl p-4 flex flex-col gap-3"
       style={{
-        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+        background: TOK.surface,
         border: `1px solid ${TOK.border}`,
-        boxShadow:
-          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider" style={{ color: TOK.textMuted }}>

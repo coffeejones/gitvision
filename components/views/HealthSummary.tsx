@@ -293,12 +293,10 @@ function HealthTile({
   // visual family. Status colour tints upper-left, fading to the
   // gradient-elevated surface in the lower-right.
   const inlineStyle = {
-    background: `linear-gradient(135deg, ${style.bg} 0%, transparent 70%), linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+    background: `linear-gradient(135deg, ${style.bg} 0%, transparent 70%), ${TOK.surface}`,
     border: `1px solid ${style.border}`,
     color: style.fg,
     minHeight: 96,
-    boxShadow:
-      "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
   };
 
   if (isInteractive) {

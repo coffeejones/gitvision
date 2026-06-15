@@ -142,10 +142,8 @@ export function HotspotTreemap({
     <div
       className="rounded-xl p-5 overflow-hidden flex flex-col gap-3"
       style={{
-        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+        background: TOK.surface,
         border: `1px solid ${TOK.border}`,
-        boxShadow:
-          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <h3

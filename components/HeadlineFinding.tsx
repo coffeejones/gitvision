@@ -166,8 +166,6 @@ export function HeadlineFinding({ headline, sessionId }: Props) {
   const containerStyle = {
     background: `linear-gradient(135deg, ${style.bg} 0%, transparent 55%), ${TOK.surface}`,
     border: `1px solid ${style.ring}`,
-    boxShadow:
-      "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
   };
 
   if (href) {

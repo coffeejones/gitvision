@@ -259,10 +259,8 @@ function HealthColumn({
       // hinted edge" rather than "card with a colored label sticker".
       className="rounded-xl p-5 flex flex-col gap-3 relative overflow-hidden"
       style={{
-        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+        background: TOK.surface,
         border: `1px solid ${TOK.border}`,
-        boxShadow:
-          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
         scrollMarginTop: "5rem",
       }}
     >

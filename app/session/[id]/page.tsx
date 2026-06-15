@@ -539,10 +539,8 @@ function QuickLookCard({
       // with motion — same pattern as WorkspaceCard.
       className="group flex flex-col gap-2 p-5 rounded-xl transition-all duration-300 hover:-translate-y-0.5"
       style={{
-        background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+        background: TOK.surface,
         border: `1px solid ${borderColor}`,
-        boxShadow:
-          "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
       }}
     >
       <div className="flex items-center gap-2">

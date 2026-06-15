@@ -15,10 +15,8 @@ export function LanguageBar({ languages }: { languages: LanguageBreakdown }) {
   const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
 
   const containerStyle = {
-    background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 60%)`,
+    background: TOK.surface,
     border: `1px solid ${TOK.border}`,
-    boxShadow:
-      "0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px -12px rgba(0, 0, 0, 0.35)",
   };
 
   if (entries.length === 0) {
