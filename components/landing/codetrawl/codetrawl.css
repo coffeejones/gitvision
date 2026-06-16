@@ -75,9 +75,15 @@ body:has(.ct) {
   line-height: 1.6;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  /* The document never scrolls sideways — wide artifacts (survey log,
-     compare table) scroll inside their own overflow containers. */
-  overflow-x: clip;
+  /* Clip BOTH axes. `overflow-x: clip` alone leaves overflow-y visible, and a
+     few px of vertical sub-pixel/transform overflow inside .ct then escaped and
+     inflated the document's scrollHeight — in Chrome that compounded into a
+     whole phantom empty page below the footer when scrolling (devtools forced a
+     reflow that masked it). `overflow: clip` contains it without making .ct a
+     scroll container, so sticky nav + horizontal-artifact clipping still work.
+     (Wide artifacts — survey log, compare table — scroll in their own
+     containers, so vertical clip here costs nothing.) */
+  overflow: clip;
 }
 
 .ct *,
