@@ -22,6 +22,15 @@
 
 html {
   color-scheme: dark;
+  /* Kill rubber-band overscroll past the page ends. Without this you can
+     scroll into an empty void below the footer: <html> has no background of
+     its own (transparent), so the bounce reveals the bare canvas. Setting the
+     background here too means any residual overscroll shows the page colour
+     instead of a transparent gap. (The .ct landing keeps its own bitumen
+     override in codetrawl.css; this is the global default for every other
+     surface.) */
+  overscroll-behavior-y: none;
+  background: var(--background);
   /* Smooth in-page anchor navigation for the marketing nav's
    * "What's new" / "PR-bot" links — feels modern, no hard jumps. */
   scroll-behavior: smooth;
