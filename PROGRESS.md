@@ -13,7 +13,7 @@ The whole product was re-skinned + re-voiced from **RepoJury** (a courtroom/"ver
 **Design system — "SURFACE & DEPTH":** bitumen black (`#0c0b0a`), bone text (`#f2efea`), hairlines instead of cards (radius ≤ 10, no shadows). **International Orange `#FF4F00` is rationed** to genuine criticals only; severity reads in TONE (brightness), not hue. Fonts: **Schibsted Grotesk** (display) + **Fragment Mono** (weight 400 only — emphasis via colour/rule, never faux-bold). Maritime lexicon allowlist: sweep, survey, grade, depth, lens. The landing also enforces a hard **6-slot orange budget** (documented at the top of `codetrawl.css`).
 
 **Three theme islands (don't confuse them):**
-- `--ct-*` CSS vars in `components/landing/codetrawl/codetrawl.css`, scoped under `.ct` (via `CTSurface`). Covers the **landing** (`/codetrawl`), **auth**, **/pricing**, and **legal pages**.
+- `--ct-*` CSS vars in `components/landing/codetrawl/codetrawl.css`, scoped under `.ct` (via `CTSurface`). Covers the **landing** (now at `/`), **auth**, **/pricing**, and **legal pages**.
 - `CH` token object in `components/chambers/theme.ts` — the **post-login workspace** (`/cases`). Warm-grey, neutral accent, orange only on criticals.
 - `TOK` token object — the **deep per-session surface** (`/session/[id]`). Re-skinned via `lib/sessionTheme.ts`, a CH-backed alias with TOK's exact key names, so ~50 session files only needed a one-line import repoint (`@/lib/theme` → `@/lib/sessionTheme`). `lib/vizPalette.ts` holds the muted categorical palette + tone ramps for the data-viz (canvas / treemap / PR-flow / class diagram).
 
@@ -27,9 +27,11 @@ The whole product was re-skinned + re-voiced from **RepoJury** (a courtroom/"ver
 - `.ct` must use **`overflow: clip`** (both axes), not `overflow-x: clip` — the latter leaves overflow-y visible, and stray vertical sub-pixel overflow inflated `scrollHeight` into a phantom empty page below the footer (Chrome-only; devtools masked it).
 - Overscroll-into-void on non-`.ct` pages: `globals.css` `html` now sets `overscroll-behavior-y: none` + a background; the `<body>` background moved out of an inline style in `layout.tsx` so `body:has(.ct)` can paint it bitumen (Safari reveals the *body* bg at the bounce).
 
+**`/` flipped to CodeTrawl** (commit `2faaf40`): `app/page.tsx` now renders `CodeTrawlLanding` (indexable; signed-in users still redirect to `/cases`). The former preview routes `/codetrawl` and `/landing-v2` redirect to `/` to avoid duplicate content. The old `RepoJuryV2` landing components stay on disk — still reachable via the `/landing-v3` WIP sandbox — but are unwired from every public route.
+
 **Deferred (NOT done — next session's menu):**
-- **Flip `/`** from `RepoJuryV2` (still live, `components/landing/repojury/*`) to the CodeTrawl landing, and retire the old landing.
-- **Rename the GitHub App** "RepoJury-PR" / slug `repojury-pr` (Tier-E infra) + migrate the `repojury.com` domain / `support@repojury.com` inbox.
+- **Rename the GitHub App** "RepoJury-PR" / slug `repojury-pr` (Tier-E infra) + migrate the `repojury.com` domain / `support@repojury.com` inbox. This is the last user-visible "RepoJury" left.
+- **Retire the old landing components** (`components/landing/repojury/*`) + the `/landing-v3` sandbox once you're sure they're not needed for reference.
 - Internal type/route renames (Tier B/C), if ever wanted.
 
 ---
