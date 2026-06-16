@@ -1,22 +1,14 @@
-// Sandbox route for the CodeTrawl rebrand (feat/codetrawl-landing branch).
+// /codetrawl — back-compat redirect.
 //
-// Iterates on the new landing without touching "/" — no auth redirect, so it
-// previews regardless of login state (the real "/" bounces signed-in users to
-// /cases). Wired to "/" on this branch once the page is right; noindex while
-// it's a work-in-progress.
+// This was the sandbox route where the CodeTrawl landing was built on the
+// feat/codetrawl-landing branch, kept noindex while it lived alongside the old
+// home at "/". CodeTrawl is now the root experience (see app/page.tsx), so this
+// redirects to "/" to avoid serving duplicate content. Kept so any links shared
+// during the preview phase keep working. (The no-login demo at
+// /codetrawl/workspace still lives under this path.)
 
-import type { Metadata } from "next";
-import { CodeTrawlLanding } from "@/components/landing/codetrawl/CodeTrawlLanding";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "CodeTrawl — see to the bottom of any codebase",
-  description:
-    "One deterministic sweep — git history, structure, security, supply chain — and a survey deep enough to dig into. Computed, never generated.",
-  robots: { index: false, follow: false },
-};
-
-export const dynamic = "force-dynamic";
-
-export default function CodeTrawlPage() {
-  return <CodeTrawlLanding />;
+export default function CodeTrawlRedirect() {
+  redirect("/");
 }
