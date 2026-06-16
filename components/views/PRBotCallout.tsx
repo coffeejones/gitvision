@@ -61,7 +61,7 @@ export function PRBotCallout({ userTier }: Props) {
           className="text-sm sm:text-base max-w-3xl leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          RepoJury-PR is a GitHub App that runs the same signal layer
+          CodeTrawl-PR is a GitHub App that runs the same signal layer
           as the analysis above — but on every new pull request,
           automatically. One grounded review comment per PR. No LLM
           in the comment, no token cost, no surprise bills.
@@ -160,7 +160,7 @@ export function PRBotCallout({ userTier }: Props) {
                   color: TOK.accentOn,
                 }}
               >
-                Install RepoJury-PR
+                Install CodeTrawl-PR
                 <ArrowUpRight size={14} />
               </a>
             ) : (

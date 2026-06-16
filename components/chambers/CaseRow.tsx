@@ -322,7 +322,7 @@ function ScoreRing({
       className="relative flex-none"
       style={{ width: 56, height: 56 }}
       role="img"
-      aria-label={`Verdict grade ${grade}, score ${score} of 100`}
+      aria-label={`Grade ${grade}, score ${score} of 100`}
     >
       <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden>
         <circle cx="28" cy="28" r={R} fill="none" stroke={CH.elevated} strokeWidth="4" />

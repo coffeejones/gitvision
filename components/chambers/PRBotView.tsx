@@ -97,7 +97,7 @@ export function PRBotView({ canInstall }: { canInstall: boolean }) {
                 className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-semibold transition-all hover:-translate-y-px ${CH_FOCUS}`}
                 style={{ background: CH.accent, color: CH.accentText }}
               >
-                Install RepoJury-PR
+                Install CodeTrawl-PR
                 <ArrowUpRight size={14} />
               </a>
             ) : (

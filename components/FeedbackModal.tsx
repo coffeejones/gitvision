@@ -47,7 +47,7 @@ type Status =
 
 const TYPE_LABELS: Record<FeedbackType, string> = {
   bug: "Bug — something's broken or behaving weirdly",
-  feature: "Feature request — something I wish RepoJury did",
+  feature: "Feature request — something I wish CodeTrawl did",
   general: "General feedback — anything else",
   question: "Question — I'm stuck and need help",
 };

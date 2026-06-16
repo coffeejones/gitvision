@@ -169,7 +169,7 @@ export function SessionToolbar({
         cacheBust: true,
       });
       const link = document.createElement("a");
-      link.download = `repojury-${sessionName.replace(/\s+/g, "-").toLowerCase()}.png`;
+      link.download = `codetrawl-${sessionName.replace(/\s+/g, "-").toLowerCase()}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {

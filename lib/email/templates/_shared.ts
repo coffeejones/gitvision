@@ -15,11 +15,11 @@
 // Design choice: light theme. Modern clients invert dark CSS in
 // unpredictable ways (Gmail's auto-darken), so a light email is
 // safest for cross-client consistency. We lean on a single accent
-// color (emerald, matching the brand) for the CTA button and the
-// "RepoJury" wordmark so the visual identity carries through.
+// color (International Orange, the CodeTrawl accent) for the CTA
+// button and the "CodeTrawl" wordmark so the brand carries through.
 
 export interface EmailLayoutOptions {
-  /** The bold accented brand line at the top — usually "RepoJury". */
+  /** The bold accented brand line at the top — usually "CodeTrawl". */
   brand?: string;
   /** Main heading inside the card. */
   heading: string;
@@ -34,7 +34,7 @@ export interface EmailLayoutOptions {
   footnote?: string;
 }
 
-const BRAND_ACCENT = "#10b981"; // emerald-500, matches TOK.accent
+const BRAND_ACCENT = "#ff4f00"; // International Orange — the CodeTrawl accent
 const TEXT_PRIMARY = "#1a1a1a";
 const TEXT_SECONDARY = "#555";
 const TEXT_MUTED = "#888";
@@ -46,7 +46,7 @@ const BORDER = "#e5e5ea";
  *  matches what Gmail / Apple Mail render comfortably on desktop without
  *  feeling cramped on phones. */
 export function renderEmailLayout(opts: EmailLayoutOptions): string {
-  const brand = opts.brand ?? "RepoJury";
+  const brand = opts.brand ?? "CodeTrawl";
   const paragraphsHtml = opts.paragraphs
     .map(
       (p) =>
@@ -96,7 +96,7 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
       ${footnoteHtml}
     </div>
     <p style="margin: 16px 0 0; text-align: center; color: ${TEXT_MUTED}; font-size: 11px; line-height: 1.5;">
-      RepoJury &middot;
+      CodeTrawl &middot;
       <a href="https://repojury.com" style="color: ${TEXT_MUTED}; text-decoration: underline;">repojury.com</a>
     </p>
   </div>
@@ -109,7 +109,7 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
  *  and Slack / Outlook 2007 / accessibility tools all benefit. */
 export function renderEmailText(opts: EmailLayoutOptions): string {
   const lines: string[] = [];
-  lines.push(opts.brand ?? "RepoJury");
+  lines.push(opts.brand ?? "CodeTrawl");
   lines.push("");
   lines.push(opts.heading);
   lines.push("");

@@ -24,7 +24,7 @@ import { Resend } from "resend";
  *  EMAIL_FROM=noreply@repojury.com (or whatever verified address)
  *  via Railway env after verifying the domain on Resend's dashboard. */
 function fromAddress(): string {
-  return process.env.EMAIL_FROM ?? "RepoJury <onboarding@resend.dev>";
+  return process.env.EMAIL_FROM ?? "CodeTrawl <onboarding@resend.dev>";
 }
 
 let cachedClient: Resend | null = null;

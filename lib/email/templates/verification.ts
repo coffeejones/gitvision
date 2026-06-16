@@ -28,15 +28,15 @@ export function verificationEmail(args: Args): {
   const opts: EmailLayoutOptions = {
     heading: "Confirm your email",
     paragraphs: [
-      `Hi ${greet} — welcome to RepoJury.`,
+      `Hi ${greet} — welcome to CodeTrawl.`,
       `Click the button below to confirm this is your email address. The link is valid for 24 hours.`,
     ],
     cta: { label: "Confirm email", href: args.link },
     footnote:
-      "If you didn't sign up for RepoJury, you can safely ignore this email — no account was created without confirmation.",
+      "If you didn't sign up for CodeTrawl, you can safely ignore this email — no account was created without confirmation.",
   };
   return {
-    subject: "Confirm your RepoJury email",
+    subject: "Confirm your CodeTrawl email",
     html: renderEmailLayout(opts),
     text: renderEmailText(opts),
   };

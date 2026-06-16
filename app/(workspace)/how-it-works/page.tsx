@@ -6,7 +6,7 @@ import { HowItWorksView } from "@/components/chambers/HowItWorksView";
 export const metadata: Metadata = {
   title: "How it works — CodeTrawl",
   description:
-    "How CodeTrawl reaches a verdict: four departments, ~20 deterministic signals, zero AI guessing.",
+    "How CodeTrawl reaches a grade: four lenses, ~20 deterministic signals, zero AI guessing.",
 };
 
 export default function HowItWorksPage() {

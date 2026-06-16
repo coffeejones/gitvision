@@ -40,7 +40,7 @@ export function JudgeStatement({ text, model }: Props) {
         style={{ color: TOK.textMuted }}
       >
         <Quote size={12} />
-        <span>The read · generated</span>
+        <span>The read · AI-generated</span>
       </div>
 
       {/* The bench statement itself — styled as a deliberate prose

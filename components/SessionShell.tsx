@@ -554,7 +554,7 @@ function VerdictPin({
             e.currentTarget.style.background = TOK.surface;
           }
         }}
-        title="See the four departments' combined ruling"
+        title="See the four lenses' combined grade"
       >
         <Gauge size={14} style={{ color: active ? TOK.accentOn : TOK.accent }} />
         <span className="text-sm font-medium flex-1">Final grade</span>
