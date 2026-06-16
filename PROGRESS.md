@@ -1,6 +1,36 @@
-# RepoJury — Progress & Design Notes
+# CodeTrawl (formerly RepoJury) — Progress & Design Notes
 
 > Living document — update as the project evolves. Picks up where the first collab session ended.
+>
+> **Naming note:** the product is now **CodeTrawl**. Older sections below still say "RepoJury" / use the courtroom metaphor (verdict / jury / departments) — that's the historical record of the engine work and is left as-is. The rebrand section directly below is the current source of truth for the brand + UI.
+
+---
+
+## CodeTrawl rebrand — shipped on `feat/codetrawl-landing` (2026-06-17)
+
+The whole product was re-skinned + re-voiced from **RepoJury** (a courtroom/"verdict" metaphor on a cool slate-violet theme) to **CodeTrawl** — a fishing-trawler/"sweep the depths" metaphor on a warm-grey bitumen theme. 35 commits, pushed; build + 1389 tests green; reviewed by an 8-slice multi-agent pass (no blockers).
+
+**Design system — "SURFACE & DEPTH":** bitumen black (`#0c0b0a`), bone text (`#f2efea`), hairlines instead of cards (radius ≤ 10, no shadows). **International Orange `#FF4F00` is rationed** to genuine criticals only; severity reads in TONE (brightness), not hue. Fonts: **Schibsted Grotesk** (display) + **Fragment Mono** (weight 400 only — emphasis via colour/rule, never faux-bold). Maritime lexicon allowlist: sweep, survey, grade, depth, lens. The landing also enforces a hard **6-slot orange budget** (documented at the top of `codetrawl.css`).
+
+**Three theme islands (don't confuse them):**
+- `--ct-*` CSS vars in `components/landing/codetrawl/codetrawl.css`, scoped under `.ct` (via `CTSurface`). Covers the **landing** (`/codetrawl`), **auth**, **/pricing**, and **legal pages**.
+- `CH` token object in `components/chambers/theme.ts` — the **post-login workspace** (`/cases`). Warm-grey, neutral accent, orange only on criticals.
+- `TOK` token object — the **deep per-session surface** (`/session/[id]`). Re-skinned via `lib/sessionTheme.ts`, a CH-backed alias with TOK's exact key names, so ~50 session files only needed a one-line import repoint (`@/lib/theme` → `@/lib/sessionTheme`). `lib/vizPalette.ts` holds the muted categorical palette + tone ramps for the data-viz (canvas / treemap / PR-flow / class diagram).
+
+**Lexicon (Tier A — visible copy only):** verdict → **grade**, departments → **lenses** (Health / Security / Forensics / Supply), Cleared/Conditional/Returned → **Clear / Conditional / Flagged**, "Final Verdict" → **Final grade**, bench statement → **the read**. Internal type names (`DepartmentId`, `VerdictOutcome`, `Vote`, `Ruling`), the `/cases` route, and the deterministic vote logic are **unchanged** (Tier B/C, deferred) — the rebrand is presentational.
+
+**Tiers:** display names → **Free / Plus / Pro**, but the billing **identifiers `open-case` / `standing-docket` / `full-bench` are unchanged** (Polar product keys + the `tier` column in `lib/db/schema.ts`). Never rename those.
+
+**Brand assets:** the orange-swirl mark in `public/icon/` (lowercase dir — Railway's Linux FS is case-sensitive, a capital `Icon` 404s every asset). Favicon/apple/manifest via Next file conventions in `app/`; OG image inlines the swirl as a base64 data-URI (`lib/ogIcon.ts`, edge runtime). The old "Baron" mascot is retired.
+
+**Gotchas hit (so we don't repeat them):**
+- `.ct` must use **`overflow: clip`** (both axes), not `overflow-x: clip` — the latter leaves overflow-y visible, and stray vertical sub-pixel overflow inflated `scrollHeight` into a phantom empty page below the footer (Chrome-only; devtools masked it).
+- Overscroll-into-void on non-`.ct` pages: `globals.css` `html` now sets `overscroll-behavior-y: none` + a background; the `<body>` background moved out of an inline style in `layout.tsx` so `body:has(.ct)` can paint it bitumen (Safari reveals the *body* bg at the bounce).
+
+**Deferred (NOT done — next session's menu):**
+- **Flip `/`** from `RepoJuryV2` (still live, `components/landing/repojury/*`) to the CodeTrawl landing, and retire the old landing.
+- **Rename the GitHub App** "RepoJury-PR" / slug `repojury-pr` (Tier-E infra) + migrate the `repojury.com` domain / `support@repojury.com` inbox.
+- Internal type/route renames (Tier B/C), if ever wanted.
 
 ---
 
