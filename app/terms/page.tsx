@@ -18,9 +18,9 @@ import {
 } from "@/components/legal/LegalShell";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — RepoJury",
+  title: "Terms of Service — CodeTrawl",
   description:
-    "The terms you agree to when you use RepoJury — accounts, acceptable use, billing, and liability.",
+    "The terms you agree to when you use CodeTrawl — accounts, acceptable use, billing, and liability.",
 };
 
 const TOC: [string, string][] = [
@@ -42,15 +42,15 @@ export default function TermsPage() {
   return (
     <LegalShell title="Terms of Service" updated="2026-05-30" toc={TOC}>
       <Intro>
-        These terms govern your use of RepoJury. By creating an account or using
+        These terms govern your use of CodeTrawl. By creating an account or using
         the service, you agree to them. If you don&rsquo;t agree, please
-        don&rsquo;t use RepoJury.
+        don&rsquo;t use CodeTrawl.
       </Intro>
       <DraftNotice />
 
       <Section id="accept" num="1." title="Agreement">
         <P>
-          RepoJury (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is an early proof of
+          CodeTrawl (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is an early proof of
           concept, not yet run by a registered company. These Terms of Service
           still form an agreement between you and us covering how you use the
           service. Our <a href="/privacy">Privacy Policy</a> and{" "}
@@ -60,7 +60,7 @@ export default function TermsPage() {
 
       <Section id="service" num="2." title="The service">
         <P>
-          RepoJury analyzes GitHub repositories and returns a deterministic
+          CodeTrawl analyzes GitHub repositories and returns a deterministic
           &ldquo;verdict&rdquo; across four areas — health, security, forensics,
           and supply — plus optional AI-generated commentary. Analysis is a
           best-effort estimate built from public signals and heuristics. It may
@@ -92,7 +92,7 @@ export default function TermsPage() {
         <P>You agree not to:</P>
         <UL>
           <LI>
-            analyze repositories you have no right to access, or use RepoJury to
+            analyze repositories you have no right to access, or use CodeTrawl to
             infringe anyone&rsquo;s rights;
           </LI>
           <LI>
@@ -130,7 +130,7 @@ export default function TermsPage() {
 
       <Section id="termination" num="6." title="Termination">
         <P>
-          You can stop using RepoJury and delete your account at any time. We may
+          You can stop using CodeTrawl and delete your account at any time. We may
           suspend or terminate access if you breach these terms, or if we need to
           for legal or security reasons. We may also discontinue the service with
           reasonable notice. On termination, your right to use the service ends;
@@ -140,7 +140,7 @@ export default function TermsPage() {
 
       <Section id="ip" num="7." title="Intellectual property">
         <P>
-          The RepoJury name, branding, and hosted service are ours. The RepoJury
+          The CodeTrawl name, branding, and hosted service are ours. The CodeTrawl
           source code is licensed under{" "}
           <a
             href="https://polyformproject.org/licenses/noncommercial/1.0.0/"
@@ -152,13 +152,13 @@ export default function TermsPage() {
           : you may use, modify, and self-host it for personal, educational, or
           nonprofit purposes, but not for commercial gain without a separate
           license. Your repositories and analysis results remain yours — using
-          RepoJury doesn&rsquo;t transfer any rights in your code to us.
+          CodeTrawl doesn&rsquo;t transfer any rights in your code to us.
         </P>
       </Section>
 
       <Section id="warranty" num="8." title="No warranty">
         <P>
-          RepoJury is provided <strong>&ldquo;as is&rdquo;</strong> and{" "}
+          CodeTrawl is provided <strong>&ldquo;as is&rdquo;</strong> and{" "}
           <strong>&ldquo;as available&rdquo;</strong>, without warranties of any
           kind, whether express or implied, including fitness for a particular
           purpose, accuracy, or uninterrupted availability. Nothing in these
@@ -180,7 +180,7 @@ export default function TermsPage() {
 
       <Section id="law" num="10." title="Governing law">
         <P>
-          As a pre-launch project, RepoJury hasn&rsquo;t set a governing
+          As a pre-launch project, CodeTrawl hasn&rsquo;t set a governing
           jurisdiction yet — that will be specified, along with the registered
           operator, before any commercial launch. Whatever is chosen, your
           mandatory local consumer-protection rights always apply.
@@ -191,7 +191,7 @@ export default function TermsPage() {
         <P>
           We may update these terms. We&rsquo;ll change the &ldquo;last
           updated&rdquo; date and, for material changes, give notice by email or
-          in-app. Continuing to use RepoJury after changes take effect means you
+          in-app. Continuing to use CodeTrawl after changes take effect means you
           accept them.
         </P>
       </Section>

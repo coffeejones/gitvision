@@ -246,7 +246,7 @@ export default function MockupA2() {
           className="pt-8 text-xs flex items-center justify-between border-t"
           style={{ borderColor: TOK.border, color: TOK.textMuted }}
         >
-          <span>RepoJury · made by coffeejones</span>
+          <span>CodeTrawl · made by coffeejones</span>
           <span>
             Set{" "}
             <code

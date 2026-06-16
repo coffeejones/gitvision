@@ -18,7 +18,7 @@ import { BillingPanel } from "@/components/account/BillingPanel";
 import { getUserTier } from "@/lib/billing/gates";
 
 export const metadata = {
-  title: "Billing — Account — RepoJury",
+  title: "Billing — Account — CodeTrawl",
   description: "Your subscription tier and billing settings.",
 };
 

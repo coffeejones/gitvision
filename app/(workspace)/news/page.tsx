@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 import { NewsView } from "@/components/chambers/NewsView";
 
 export const metadata: Metadata = {
-  title: "News — RepoJury",
-  description: "What's new in RepoJury, and what's coming next.",
+  title: "News — CodeTrawl",
+  description: "What's new in CodeTrawl, and what's coming next.",
 };
 
 export default function NewsPage() {

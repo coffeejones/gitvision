@@ -11,7 +11,7 @@ import { SettingsShell } from "@/components/account/SettingsShell";
 import { GeneralPanel } from "@/components/account/GeneralPanel";
 
 export const metadata = {
-  title: "General — Account — RepoJury",
+  title: "General — Account — CodeTrawl",
   description: "Your profile basics.",
 };
 

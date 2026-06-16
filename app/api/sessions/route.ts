@@ -111,7 +111,7 @@ export async function POST(req: Request) {
     if (orgOrUser) {
       return NextResponse.json(
         {
-          error: `That looks like a GitHub organization or user URL (${orgOrUser}), not a specific repository. RepoJury analyzes one repo at a time — pick a repo from https://github.com/${orgOrUser}?tab=repositories and paste its URL.`,
+          error: `That looks like a GitHub organization or user URL (${orgOrUser}), not a specific repository. CodeTrawl analyzes one repo at a time — pick a repo from https://github.com/${orgOrUser}?tab=repositories and paste its URL.`,
         },
         { status: 400 }
       );

@@ -17,9 +17,9 @@ import {
 } from "@/components/legal/LegalShell";
 
 export const metadata: Metadata = {
-  title: "Refund & Cancellation — RepoJury",
+  title: "Refund & Cancellation — CodeTrawl",
   description:
-    "How RepoJury subscriptions, trials, cancellations, and refunds work, including EU withdrawal rights.",
+    "How CodeTrawl subscriptions, trials, cancellations, and refunds work, including EU withdrawal rights.",
 };
 
 const TOC: [string, string][] = [
@@ -86,7 +86,7 @@ export default function RefundsPage() {
           services, without giving a reason.
         </P>
         <P>
-          Because RepoJury is a digital service that starts immediately, by
+          Because CodeTrawl is a digital service that starts immediately, by
           starting a paid subscription you ask us to begin the service during the
           14-day period and acknowledge that you lose the right of withdrawal
           once it has been fully performed. Where the service has only partly

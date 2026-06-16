@@ -11,7 +11,7 @@ import { SettingsShell } from "@/components/account/SettingsShell";
 import { DangerPanel } from "@/components/account/DangerPanel";
 
 export const metadata = {
-  title: "Danger zone — Account — RepoJury",
+  title: "Danger zone — Account — CodeTrawl",
   description: "Permanent account actions.",
 };
 

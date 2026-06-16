@@ -4,9 +4,9 @@ import type { Metadata } from "next";
 import { HowItWorksView } from "@/components/chambers/HowItWorksView";
 
 export const metadata: Metadata = {
-  title: "How it works — RepoJury",
+  title: "How it works — CodeTrawl",
   description:
-    "How RepoJury reaches a verdict: four departments, ~20 deterministic signals, zero AI guessing.",
+    "How CodeTrawl reaches a verdict: four departments, ~20 deterministic signals, zero AI guessing.",
 };
 
 export default function HowItWorksPage() {

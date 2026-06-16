@@ -10,7 +10,7 @@ import { SettingsShell } from "@/components/account/SettingsShell";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 
 export const metadata = {
-  title: "Security — Account — RepoJury",
+  title: "Security — Account — CodeTrawl",
   description: "Manage your password and sign-in security.",
 };
 

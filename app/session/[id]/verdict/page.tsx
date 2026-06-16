@@ -1,6 +1,6 @@
 // /session/[id]/verdict — the Final grade page (v0.82+, Phase C).
 //
-// The climax of the RepoJury experience: each of the four jury
+// The climax of the CodeTrawl experience: each of the four jury
 // departments (Health, Security, Forensics, Supply) votes on the
 // codebase based on the deterministic signals from extractHealthSignals
 // + standalone security scanners. Their votes roll up into one of

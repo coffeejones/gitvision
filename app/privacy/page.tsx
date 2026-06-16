@@ -22,9 +22,9 @@ import {
 } from "@/components/legal/LegalShell";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — RepoJury",
+  title: "Privacy Policy — CodeTrawl",
   description:
-    "What personal data RepoJury collects, why, who we share it with, and your rights under GDPR.",
+    "What personal data CodeTrawl collects, why, who we share it with, and your rights under GDPR.",
 };
 
 const TOC: [string, string][] = [
@@ -45,7 +45,7 @@ export default function PrivacyPage() {
   return (
     <LegalShell title="Privacy Policy" updated="2026-05-30" toc={TOC}>
       <Intro>
-        This policy explains what personal data RepoJury collects when you use
+        This policy explains what personal data CodeTrawl collects when you use
         it, why we collect it, who we share it with, and the rights you have
         over it. We&rsquo;ve written it to match what the service actually does
         — no vague boilerplate.
@@ -54,12 +54,12 @@ export default function PrivacyPage() {
 
       <Section id="controller" num="1." title="Who we are">
         <P>
-          RepoJury (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is an early proof of
+          CodeTrawl (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is an early proof of
           concept, not yet run by a registered company. For the personal data
-          described below, the operator of RepoJury acts as the{" "}
+          described below, the operator of CodeTrawl acts as the{" "}
           <strong>data controller</strong>{" "}
           under the EU General Data Protection Regulation (GDPR). We&rsquo;ll
-          name that operator, and where it&rsquo;s registered, once RepoJury
+          name that operator, and where it&rsquo;s registered, once CodeTrawl
           launches commercially. Until then, reach us at{" "}
           <a href="mailto:support@repojury.com">support@repojury.com</a>.
         </P>
@@ -270,7 +270,7 @@ export default function PrivacyPage() {
 
       <Section id="children" num="9." title="Children">
         <P>
-          RepoJury is not directed at children under 16, and we don&rsquo;t
+          CodeTrawl is not directed at children under 16, and we don&rsquo;t
           knowingly collect their data. If you believe a child has given us
           personal data, contact us and we&rsquo;ll delete it.
         </P>

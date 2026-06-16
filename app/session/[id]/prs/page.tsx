@@ -4,7 +4,7 @@
 //   1. PRFlow — historical cycle-time sankey computed from the
 //      analyzed repo's pullRequests array
 //   2. PRBotCallout — "want this analysis on every new PR?"
-//      contextual nudge introducing the RepoJury GitHub App
+//      contextual nudge introducing the CodeTrawl GitHub App
 //
 // The bot callout sits BELOW the historical analysis so reviewers
 // see the data first, then the operational tool — the order follows

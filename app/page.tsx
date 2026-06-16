@@ -13,9 +13,9 @@ import { RepoJuryV2 } from "@/components/landing/repojury/RepoJuryV2";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "RepoJury — every repo has a verdict",
+  title: "CodeTrawl — every repo gets a grade",
   description:
-    "Put any GitHub repo on trial. Four departments examine health, security, forensics, and supply, then return a verdict you can defend — from one URL, in seconds.",
+    "Sweep any GitHub repo. Four lenses examine health, security, forensics, and supply, then settle on one grade you can defend — from one URL, in seconds.",
 };
 
 export default async function Home() {

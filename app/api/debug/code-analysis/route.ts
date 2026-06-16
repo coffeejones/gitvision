@@ -8,7 +8,7 @@
 //   POST /api/debug/code-analysis  body: { repoUrl: "https://github.com/.../..." }
 //
 // Auth: uses the server's GITHUB_TOKEN env var if set (5000/hr), otherwise
-// unauthenticated (60/hr). Same posture as the rest of RepoJury's API.
+// unauthenticated (60/hr). Same posture as the rest of CodeTrawl's API.
 //
 // Note: this is intentionally NOT mounted as a stable feature. It exists for
 // development feedback. In Phase 4 the same primitives will land on the
@@ -38,7 +38,7 @@ const PostBody = z.object({
 
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN || undefined,
-  userAgent: "RepoJury/0.1",
+  userAgent: "CodeTrawl/0.1",
 });
 
 /** Gate: never expose this endpoint in production. It runs the full

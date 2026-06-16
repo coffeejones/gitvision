@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 // Site-wide metadata. Per-page exports (in app/help/page.tsx,
 // app/legal/page.tsx, etc.) override title + description but
 // inherit OpenGraph + Twitter card config from here, so a deep-link
-// to /help shares with the RepoJury brand image instead of a
+// to /help shares with the CodeTrawl brand image instead of a
 // blank preview. The `metadataBase` makes relative og:image URLs
 // resolve against the current host — important for Railway preview
 // deploys where the URL changes per branch.
@@ -24,23 +24,23 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://repojury.com"
   ),
-  title: "RepoJury — map any GitHub repo",
+  title: "CodeTrawl — map any GitHub repo",
   description:
-    "Find what's risky, duplicated, or untested in any GitHub repo. Blast radius, structural duplicates, untested hotspots, and an AI health verdict — across 7 languages.",
+    "Find what's risky, duplicated, or untested in any GitHub repo. Blast radius, structural duplicates, untested hotspots, and an AI health grade — across 7 languages.",
   openGraph: {
-    title: "RepoJury — map any GitHub repo",
+    title: "CodeTrawl — map any GitHub repo",
     description:
-      "Blast radius, structural duplicates, untested hotspots, and an AI health verdict — across 7 languages. Paste a public GitHub URL to see your repo at a glance.",
+      "Blast radius, structural duplicates, untested hotspots, and an AI health grade — across 7 languages. Paste a public GitHub URL to see your repo at a glance.",
     type: "website",
-    siteName: "RepoJury",
+    siteName: "CodeTrawl",
     // Auto-discovered by Next.js: app/opengraph-image.tsx generates
     // the image at /opengraph-image and sets og:image automatically.
   },
   twitter: {
     card: "summary_large_image",
-    title: "RepoJury — map any GitHub repo",
+    title: "CodeTrawl — map any GitHub repo",
     description:
-      "Blast radius, structural duplicates, untested hotspots, and an AI health verdict — across 7 languages.",
+      "Blast radius, structural duplicates, untested hotspots, and an AI health grade — across 7 languages.",
     // Same convention: app/twitter-image.tsx populates twitter:image.
   },
 };

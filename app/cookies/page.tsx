@@ -19,9 +19,9 @@ import {
 } from "@/components/legal/LegalShell";
 
 export const metadata: Metadata = {
-  title: "Cookie Policy — RepoJury",
+  title: "Cookie Policy — CodeTrawl",
   description:
-    "The small set of cookies and browser storage RepoJury uses, and why. No tracking or advertising.",
+    "The small set of cookies and browser storage CodeTrawl uses, and why. No tracking or advertising.",
 };
 
 const TOC: [string, string][] = [
@@ -36,7 +36,7 @@ export default function CookiesPage() {
   return (
     <LegalShell title="Cookie Policy" updated="2026-05-30" toc={TOC}>
       <Intro>
-        RepoJury uses a small, deliberate set of cookies and browser storage —
+        CodeTrawl uses a small, deliberate set of cookies and browser storage —
         all of it either strictly necessary to run the service or functional to
         improve your experience. We don&rsquo;t use advertising cookies,
         tracking pixels, or fingerprinting.

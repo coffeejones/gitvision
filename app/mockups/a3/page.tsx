@@ -89,7 +89,7 @@ export default function MockupA3() {
           >
             GV
           </div>
-          <span className="font-semibold text-sm">RepoJury</span>
+          <span className="font-semibold text-sm">CodeTrawl</span>
           <span
             className="ml-auto text-[10px] font-mono"
             style={{ color: TOK.textMuted }}
@@ -436,7 +436,7 @@ export default function MockupA3() {
               className="pt-8 text-xs flex items-center justify-between border-t"
               style={{ borderColor: TOK.border, color: TOK.textMuted }}
             >
-              <span>RepoJury · v0.6</span>
+              <span>CodeTrawl · v0.6</span>
               <span>
                 Rate limit: 4,997/5,000 · resets in 41 min
               </span>

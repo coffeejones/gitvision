@@ -10,7 +10,7 @@ import { ConnectionsPanel } from "@/components/account/ConnectionsPanel";
 import { userHasRepoScope } from "@/lib/githubUserToken";
 
 export const metadata = {
-  title: "Connections — Account — RepoJury",
+  title: "Connections — Account — CodeTrawl",
   description: "Link external accounts for one-click sign-in.",
 };
 

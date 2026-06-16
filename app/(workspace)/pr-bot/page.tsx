@@ -7,9 +7,9 @@ import { PRBotView } from "@/components/chambers/PRBotView";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "PR-bot — RepoJury",
+  title: "PR-bot — CodeTrawl",
   description:
-    "RepoJury-PR: one grounded review comment on every pull request — the same deterministic signal layer as the workspace, zero LLM cost.",
+    "CodeTrawl-PR: one grounded review comment on every pull request — the same deterministic signal layer as the workspace, zero LLM cost.",
 };
 
 export default async function PRBotPage() {

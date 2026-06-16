@@ -14,7 +14,7 @@ import { CasesView } from "@/components/chambers/CasesView";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Cases — RepoJury",
+  title: "Cases — CodeTrawl",
 };
 
 /** Cap on cases projected server-side — each reads + verdicts one session. */
