@@ -72,7 +72,11 @@ export default function RootLayout({
     >
       <body
         className="min-h-full flex flex-col"
-        style={{ background: "var(--background)", color: "var(--foreground)" }}
+        // Background comes from CSS (globals.css `body`), NOT an inline style —
+        // an inline bg beats every stylesheet rule, which blocked the
+        // `body:has(.ct)` bitumen override and left a cool band on the landing's
+        // overscroll bounce. Colour stays inline (no per-surface override).
+        style={{ color: "var(--foreground)" }}
       >
         {children}
         {plausibleDomain && (

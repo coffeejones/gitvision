@@ -42,6 +42,15 @@ html:has(.ct) {
   background: #0c0b0a;
   overscroll-behavior-y: none;
 }
+/* The <body> sits between <html> and .ct and keeps the global (cool #14141B)
+   workspace background. Safari's elastic overscroll reveals the BODY's
+   background at the bounce, not <html>'s — so painting only <html> bitumen
+   (above) left a cool band "after the footer" on the landing in Safari. Paint
+   the body too so the bounce matches the page on every engine. */
+body:has(.ct) {
+  background: #0c0b0a;
+  overscroll-behavior-y: none;
+}
 
 .ct {
   --ct-bg: #0c0b0a;
