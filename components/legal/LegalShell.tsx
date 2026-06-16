@@ -1,10 +1,10 @@
 // Shared shell + building blocks for the legal documents (Phase P):
 // /privacy, /terms, /cookies, /refunds.
 //
-// Wraps each document in the RJSurface (forensic-dossier shell) so the
+// Wraps each document in CTSurface (the CodeTrawl shell) so the
 // legal pages read as part of the same brand as the landing, auth, and
 // pricing. Provides a constrained-measure container with readable
-// long-form typography (.legal-* classes in repojury.css) plus a back
+// long-form typography (.ct .legal-* classes in codetrawl.css) plus a back
 // link, a "not legal advice / draft" notice, and a footer.
 //
 // The exported sub-components (Section, P, UL, Placeholder, etc.) keep
@@ -15,8 +15,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { RJSurface } from "@/components/landing/repojury/RJSurface";
-import { CrestSeal } from "@/components/landing/repojury/seals";
+import { CTSurface } from "@/components/landing/codetrawl/CTSurface";
 
 interface ShellProps {
   /** Document title, e.g. "Privacy Policy". */
@@ -28,7 +27,7 @@ interface ShellProps {
   children: ReactNode;
 }
 
-/** Pre-launch notice shared by every document. RepoJury is an early
+/** Pre-launch notice shared by every document. CodeTrawl is an early
  *  proof of concept with no registered business behind it yet, so we
  *  say so plainly here rather than naming an operator/address/
  *  jurisdiction we don't have. When it launches commercially, a
@@ -37,11 +36,11 @@ export function DraftNotice() {
   return (
     <div className="legal-note">
       <b>Pre-launch notice.</b>{" "}
-      RepoJury is an early proof of concept, not yet a registered business.
+      CodeTrawl is an early proof of concept, not yet a registered business.
       This page describes honestly how the service handles data today — but
       there&rsquo;s no named operator, registered address, or chosen
       jurisdiction yet, and it hasn&rsquo;t been reviewed by a lawyer. Once
-      RepoJury launches commercially, a registered entity and a proper policy
+      CodeTrawl launches commercially, a registered entity and a proper policy
       will replace this. Questions:{" "}
       <a href="mailto:support@repojury.com">support@repojury.com</a>.
     </div>
@@ -50,12 +49,12 @@ export function DraftNotice() {
 
 export function LegalShell({ title, updated, toc, children }: ShellProps) {
   return (
-    <RJSurface>
+    <CTSurface>
       <div className="legal-shell">
         <main className="legal-main">
           <Link href="/" className="legal-back">
             <ArrowLeft size={13} />
-            Back to RepoJury
+            Back to CodeTrawl
           </Link>
 
           <header className="legal-head">
@@ -67,14 +66,9 @@ export function LegalShell({ title, updated, toc, children }: ShellProps) {
 
           <footer
             className="legal-meta"
-            style={{ marginTop: 48, marginBottom: 0, borderBottom: "none" }}
+            style={{ marginTop: 48, marginBottom: 0 }}
           >
-            <span
-              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
-            >
-              <CrestSeal size={16} />
-              RepoJury · pre-launch proof of concept
-            </span>
+            CodeTrawl · pre-launch proof of concept
           </footer>
         </main>
 
@@ -91,7 +85,7 @@ export function LegalShell({ title, updated, toc, children }: ShellProps) {
           </aside>
         )}
       </div>
-    </RJSurface>
+    </CTSurface>
   );
 }
 
@@ -140,7 +134,7 @@ export function Intro({ children }: { children: ReactNode }) {
 }
 
 /** Visually-loud placeholder for unfilled details. Renders [TOKEN] in
- *  a rose pill so it's impossible to miss in review — these must be
+ *  an orange pill so it's impossible to miss in review — these must be
  *  replaced before the docs are relied upon. */
 export function Placeholder({ children }: { children: ReactNode }) {
   return <span className="legal-ph">[{children}]</span>;

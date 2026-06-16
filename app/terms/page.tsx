@@ -61,11 +61,11 @@ export default function TermsPage() {
       <Section id="service" num="2." title="The service">
         <P>
           CodeTrawl analyzes GitHub repositories and returns a deterministic
-          &ldquo;verdict&rdquo; across four areas — health, security, forensics,
+          &ldquo;grade&rdquo; across four lenses — health, security, forensics,
           and supply — plus optional AI-generated commentary. Analysis is a
           best-effort estimate built from public signals and heuristics. It may
           be incomplete, out of date, or wrong. <strong>Don&rsquo;t treat a
-          verdict as a guarantee</strong> — verify anything important against
+          grade as a guarantee</strong> — verify anything important against
           the source.
         </P>
       </Section>

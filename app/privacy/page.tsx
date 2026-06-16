@@ -175,7 +175,7 @@ export default function PrivacyPage() {
             <tr>
               <td>Anthropic</td>
               <td>Repository snapshot (package names, paths, contributor logins)</td>
-              <td>AI briefing + verdict narrative</td>
+              <td>AI briefing + grade narrative</td>
             </tr>
             <tr>
               <td>Polar</td>
