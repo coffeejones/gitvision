@@ -48,7 +48,7 @@ export const user = sqliteTable("user", {
   // Null when tier === "open-case" (no subscription).
   subscriptionStatus: text("subscription_status"),
   // End of the current billing period. After this, the user either
-  // re-bills (active) or drops to scout (canceled / revoked).
+  // re-bills (active) or drops to Free (open-case) (canceled / revoked).
   currentPeriodEnd: integer("current_period_end", { mode: "timestamp" }),
   // True when user has scheduled cancellation but is still in the
   // paid period. UI shows "Plan ends on X" instead of "Renews on X".

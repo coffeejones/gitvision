@@ -139,7 +139,7 @@ export async function POST(req: Request) {
   let statusToSet: string;
 
   if (event.type === "subscription.revoked") {
-    // Payment failed irrecoverably — immediate downgrade to scout
+    // Payment failed irrecoverably — immediate downgrade to the Free tier (open-case)
     tierToSet = "open-case";
     statusToSet = "revoked";
   } else if (event.type === "subscription.canceled") {

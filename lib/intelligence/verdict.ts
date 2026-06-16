@@ -71,8 +71,7 @@ export interface DepartmentRuling {
 
 export interface Verdict {
   outcome: VerdictOutcome;
-  /** Full label: "Cleared", "Conditional", "Returned for
-   *  Revision". */
+  /** Display label: "Clear" / "Conditional" / "Flagged". */
   outcomeLabel: string;
   /** 0-100 composite score. The raw sum of the four department votes
    *  (pass 25 / conditional 15 / fail 5), then GATED by the outcome so the

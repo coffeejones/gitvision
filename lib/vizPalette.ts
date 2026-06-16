@@ -71,10 +71,12 @@ export const VIZ_SURFACE = {
 // authors is a POSITIVE signal, so the tile brightens (dark bitumen → warm
 // sand); no alarm orange. `text` is chosen for contrast on each fill.
 export const DIVERSITY_RAMP: { fill: string; text: string }[] = [
-  { fill: "#232220", text: "#c9c4be" },
-  { fill: "#3a352b", text: "#eceae8" },
-  { fill: "#6b5f3f", text: "#0c0b0b" },
-  { fill: "#b0a06a", text: "#0c0b0b" },
+  { fill: "#232220", text: "#c9c4be" }, // 9.8:1
+  { fill: "#3a352b", text: "#eceae8" }, // 10.2:1
+  // #6b5f3f is a mid-tone — near-black text was only 3.12:1 (fails AA); bone
+  // text clears it (5.3:1). Only the lightest bucket below takes dark text.
+  { fill: "#6b5f3f", text: "#eceae8" }, // 5.3:1
+  { fill: "#b0a06a", text: "#0c0b0b" }, // 7.6:1
 ];
 
 // PR cycle-time ramp: fast → slow. Fast is good (bone/neutral); slow is the

@@ -25,7 +25,7 @@ export const TOK = {
   textPrimary: CH.text,
   textSecondary: CH.textDim,
   textMuted: CH.textMuted,
-  // accent (emerald)
+  // accent (neutral bone)
   accent: CH.accent,
   accentOn: CH.accentText,
   accentSoft: CH.accentSoft,

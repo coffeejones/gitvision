@@ -7,10 +7,10 @@
 //           through to product)
 //   right — eyebrow, outcome label, micro-line, summary
 //
-// The seal is color-keyed to the outcome (Cleared = emerald,
-// Conditional = amber, Returned = rose). The same colour
-// drives the score-ring stroke so the visual reads as one composed
-// artefact rather than two stuck-together panels.
+// The seal is keyed to the outcome by TONE: Clear = neutral bone,
+// Conditional = neutral dim, Flagged = International Orange (the one
+// rationed heat). The same colour drives the score-ring stroke so the
+// visual reads as one composed artefact, not two stuck-together panels.
 //
 // Server-rendered. The ring is static SVG with strokeDasharray/
 // strokeDashoffset set from the score — no client component or
@@ -185,8 +185,12 @@ export function VerdictHero({ verdict }: Props) {
             Grade capped at {verdict.grade}: the raw vote-sum is{" "}
             {verdict.rawScore}/100, but a{" "}
             {verdict.outcome === "returned" ? "flagged" : "conditional"} grade
-            can&apos;t outrank itself — a lens was flagged, so the letter
-            stays in {verdict.outcome === "returned" ? "needs-work" : "non-clear"}{" "}
+            can&apos;t outrank itself —{" "}
+            {verdict.outcome === "returned"
+              ? "a lens failed"
+              : "a lens raised concerns"}
+            , so the letter stays in{" "}
+            {verdict.outcome === "returned" ? "needs-work" : "non-clear"}{" "}
             territory.
           </p>
         )}

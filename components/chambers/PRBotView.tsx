@@ -44,7 +44,7 @@ export function PRBotView({ canInstall }: { canInstall: boolean }) {
             style={{ background: CH.bg, border: `1px solid ${CH.border}`, color: CH.textDim }}
           >
             <div style={{ color: CH.text }}>
-              <strong>RepoJury Review</strong>
+              <strong>CodeTrawl Review</strong>
             </div>
             <div>Diff: 3 files · functions +5 / −2 · net complexity +4</div>
             <div className="mt-1.5" style={{ color: CH.textMuted }}>
