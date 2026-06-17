@@ -8,12 +8,34 @@
 //
 // No dependencies — Node 18+ global fetch only.
 
+import fs from "node:fs";
+import path from "node:path";
+
+// Plain `node` does NOT read .env.local (that's a Next.js-only thing), so load
+// it ourselves — the shell env still wins. Lets you keep METRICS_TOKEN in
+// .env.local and just run `npm run metrics`.
+function loadEnv(file) {
+  try {
+    for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+      if (line.trimStart().startsWith("#")) continue;
+      const m = line.match(/^\s*([\w.-]+)\s*=\s*(.*?)\s*$/);
+      if (!m) continue;
+      const val = m[2].replace(/^(['"])(.*)\1$/, "$2");
+      if (process.env[m[1]] === undefined) process.env[m[1]] = val;
+    }
+  } catch {
+    // No env file — fine, the shell env may still have what we need.
+  }
+}
+loadEnv(path.join(process.cwd(), ".env.local"));
+loadEnv(path.join(process.cwd(), ".env"));
+
 const TOKEN = process.env.METRICS_TOKEN;
 const BASE = (process.env.METRICS_URL ?? "https://codetrawl.com").replace(/\/+$/, "");
 
 if (!TOKEN) {
   console.error(
-    "Set METRICS_TOKEN (the secret you configured in Railway / .env.local).\n" +
+    "No METRICS_TOKEN found. Put it in .env.local (METRICS_TOKEN=…) or pass it inline:\n" +
       "  METRICS_TOKEN=… npm run metrics"
   );
   process.exit(1);

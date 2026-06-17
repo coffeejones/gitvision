@@ -7,9 +7,30 @@
 //
 // Reuses the same PII-free metrics + the app's email infra.
 
+import fs from "node:fs";
+import path from "node:path";
 import { computeMetrics } from "../lib/metrics";
 import { metricsDigestEmail } from "../lib/email/templates/metricsDigest";
 import { sendEmail } from "../lib/email/send";
+
+// tsx doesn't read .env.local either — load it so a local run picks up
+// ADMIN_EMAIL / RESEND_API_KEY. On Railway the cron has real env vars; this is
+// a harmless no-op there. Shell env still wins.
+function loadEnv(file: string) {
+  try {
+    for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+      if (line.trimStart().startsWith("#")) continue;
+      const m = line.match(/^\s*([\w.-]+)\s*=\s*(.*?)\s*$/);
+      if (!m) continue;
+      const val = m[2].replace(/^(['"])(.*)\1$/, "$2");
+      if (process.env[m[1]] === undefined) process.env[m[1]] = val;
+    }
+  } catch {
+    // No env file — fine.
+  }
+}
+loadEnv(path.join(process.cwd(), ".env.local"));
+loadEnv(path.join(process.cwd(), ".env"));
 
 async function main() {
   const dry = process.argv.includes("--dry");
