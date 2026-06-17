@@ -29,9 +29,15 @@ The whole product was re-skinned + re-voiced from **RepoJury** (a courtroom/"ver
 
 **`/` flipped to CodeTrawl** (commit `2faaf40`): `app/page.tsx` now renders `CodeTrawlLanding` (indexable; signed-in users still redirect to `/cases`). The former preview routes `/codetrawl` and `/landing-v2` redirect to `/` to avoid duplicate content. The old `RepoJuryV2` landing components stay on disk — still reachable via the `/landing-v3` WIP sandbox — but are unwired from every public route.
 
+**Live on codetrawl.com + a safe cleanup pass** (commits `5c61231`…`0cf7ab4`): an agent-driven, read-only discovery sweep — with adversarial re-verification of every deletion candidate (it correctly spared `CustodyCards`, kept alive by the untracked `/landing-v3` WIP) — drove four gated batches, each `tsc + 1389 tests + next build` green and committed separately:
+1. **Deleted 17 dead files**: the pre-CT auth surface (`AuthForm`/`AuthShell`/`ForgotPasswordForm`/`ResetPasswordForm`, superseded by `CT*`), orphans from the retired adaptive-home (`MarketingNav`, `Roadmap`, `ScrollReveal`, `SessionRow`, `SessionSearchPalette`, `LandingPanel`, `views/WorkspaceCard`), the dead `RepoJuryV2` composition, and stray `public/` assets (Next scaffold svgs + the old Baron marks).
+2. **Removed two dead lib modules** (`demoCard.ts`, `ownerIdServer.ts`) + un-exported an internal-only type. Kept `@types/d3-sankey` (the verify step caught that d3-sankey ships no own types, so PRFlow needs it) and the documented `LogoMark` standalone export.
+3. **Fixed a user-visible miss the rebrand audit didn't catch** — the PR-bot's GitHub comment heading was still `## RepoJury Review` (→ `## CodeTrawl Review`) — plus external User-Agent strings, and refreshed stale `RepoJury` mentions in comments.
+4. **Pointed every in-code `repojury.com` → `codetrawl.com`**: auth trusted-origin + billing + metadataBase fallbacks (all env-overridden in prod), the legal-page `support@` address, the email footer, README, `.env.example`, and test fixtures.
+
 **Deferred (NOT done — next session's menu):**
-- **Rename the GitHub App** "RepoJury-PR" / slug `repojury-pr` (Tier-E infra) + migrate the `repojury.com` domain / `support@repojury.com` inbox. This is the last user-visible "RepoJury" left.
-- **Retire the old landing components** (`components/landing/repojury/*`) + the `/landing-v3` sandbox once you're sure they're not needed for reference.
+- **Infra rename** (Tier-E, outside the repo): rename the GitHub App "RepoJury-PR" / slug `repojury-pr`; verify `codetrawl.com` on Resend + stand up the `support@codetrawl.com` inbox; set `BETTER_AUTH_URL` / `NEXT_PUBLIC_SITE_URL` / `EMAIL_FROM` to codetrawl.com in Railway (the in-code fallbacks already point there). The `repojury-pr` slug and the `repobaron:pr-review v2` comment marker are stable external/runtime ids — keep until a deliberate migration.
+- **Retire the rest of `components/landing/repojury/*`** + the `/landing-v3` sandbox once you're done with the WIP that still imports them.
 - Internal type/route renames (Tier B/C), if ever wanted.
 
 ---
