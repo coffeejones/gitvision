@@ -35,14 +35,17 @@ function tokenOk(provided: string | null): boolean {
 const notFound = () => new Response("Not found", { status: 404 });
 
 export async function GET(req: Request): Promise<Response> {
+  const u = new URL(req.url);
   const authz = req.headers.get("authorization");
   const bearer = authz?.startsWith("Bearer ") ? authz.slice(7) : null;
-  const queryToken = new URL(req.url).searchParams.get("token");
   // Prefer the header (stays out of URLs / access logs); allow ?token= for the
   // CLI's convenience.
-  if (!tokenOk(bearer ?? queryToken)) return notFound();
+  if (!tokenOk(bearer ?? u.searchParams.get("token"))) return notFound();
 
-  const metrics = await computeMetrics();
+  // ?detail=1 adds the PII-bearing lists (recent emails + per-repo dates) — only
+  // reachable here, behind the token, and only the local dashboard requests it.
+  const detail = u.searchParams.get("detail") === "1";
+  const metrics = await computeMetrics({ detail });
   return Response.json(metrics, {
     headers: { "cache-control": "no-store" },
   });

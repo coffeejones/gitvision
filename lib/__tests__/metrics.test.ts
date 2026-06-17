@@ -58,9 +58,37 @@ describe("aggregateMetrics", () => {
     expect(m.analysesByDay.reduce((s, d) => s + d.count, 0)).toBe(3);
   });
 
-  it("never leaks PII — output keys are counts only", () => {
+  it("never leaks PII by default — base output is counts only", () => {
     const json = JSON.stringify(m);
     expect(json).not.toMatch(/@/); // no emails
-    expect(Object.keys(m.accounts)).not.toContain("emails");
+    expect(m.detail).toBeUndefined();
+  });
+
+  it("emits last-activity timestamps in the base output", () => {
+    expect(m.lastSignupAt).toBe(new Date(NOW - 1 * D).toISOString()); // newest signup -1d
+    expect(m.lastAnalysisAt).toBe(new Date(NOW - 1 * D).toISOString()); // newest analysis -1d
+  });
+});
+
+describe("aggregateMetrics — detail mode", () => {
+  const withEmail = [
+    { createdAtMs: NOW - 1 * D, tier: "open-case", email: "newest@example.com" },
+    { createdAtMs: NOW - 9 * D, tier: "full-bench", email: "older@example.com" },
+  ];
+
+  it("adds recent accounts (email, newest-first) + per-repo dates when requested", () => {
+    const d = aggregateMetrics(withEmail, sessions, NOW, { detail: true });
+    expect(d.detail).toBeDefined();
+    expect(d.detail!.accounts[0].email).toBe("newest@example.com");
+    expect(d.detail!.accounts).toHaveLength(2);
+    const react = d.detail!.repos.find((r) => r.repo === "facebook/react");
+    expect(react?.count).toBe(2);
+    expect(react?.lastAnalyzed).toBe(new Date(NOW - 1 * D).toISOString());
+  });
+
+  it("stays PII-free without the detail flag", () => {
+    const base = aggregateMetrics(withEmail, sessions, NOW);
+    expect(base.detail).toBeUndefined();
+    expect(JSON.stringify(base)).not.toMatch(/@/);
   });
 });

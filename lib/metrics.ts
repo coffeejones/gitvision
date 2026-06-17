@@ -5,7 +5,10 @@
 // Split into a PURE aggregator (aggregateMetrics — fully unit-testable on
 // synthetic input) and a thin I/O wrapper (computeMetrics) that reads the two
 // real sources: the auth DB (accounts + tiers) and file storage (analyses).
-// Nothing here returns emails, ids, or any per-user data — only counts.
+// The default output is counts only — no PII. computeMetrics({ detail: true })
+// additionally returns recent signup emails + per-repo dates for the local
+// admin dashboard; that PII-bearing variant is reached only through the
+// token-gated endpoint + the dashboard's local proxy.
 //
 // Cheap enough to compute on demand at hobby scale; if the session count grows
 // into the thousands the file scan in computeMetrics() is the thing to cache.
@@ -40,6 +43,14 @@ export interface MetricPair {
   prevWeek: number;
 }
 
+/** PII-bearing detail, only populated when computeMetrics({ detail: true }). */
+export interface MetricsDetail {
+  /** Recent signups, newest first (capped at 100). Contains email — PII. */
+  accounts: { email: string; createdAt: string }[];
+  /** Every analyzed repo with its count + last-analyzed date. Public data. */
+  repos: { repo: string; count: number; lastAnalyzed: string }[];
+}
+
 export interface Metrics {
   generatedAt: string;
   accounts: MetricPair & {
@@ -58,11 +69,19 @@ export interface Metrics {
   /** Last 30 calendar days, oldest-first, zero-filled (for sparklines). */
   signupsByDay: { day: string; count: number }[];
   analysesByDay: { day: string; count: number }[];
+  /** ISO of the most recent signup / analysis ("last activity"). Null when
+   *  none. Not PII — just a timestamp. */
+  lastSignupAt: string | null;
+  lastAnalysisAt: string | null;
+  /** Present only when detail was requested (carries emails — PII). */
+  detail?: MetricsDetail;
 }
 
 interface UserRow {
   createdAtMs: number;
   tier: string;
+  /** Only carried through when detail is requested. */
+  email?: string;
 }
 interface SessionRow {
   createdAtMs: number;
@@ -97,59 +116,94 @@ function pair(items: { createdAtMs: number }[], nowMs: number): MetricPair {
   return { total: items.length, thisWeek, prevWeek };
 }
 
-/** Pure aggregation — no I/O. `nowMs` is injected so tests are deterministic. */
+/** Pure aggregation — no I/O. `nowMs` is injected so tests are deterministic.
+ *  With `detail`, also emits the recent-accounts (email) + per-repo-date lists. */
 export function aggregateMetrics(
   users: UserRow[],
   sessions: SessionRow[],
-  nowMs: number
+  nowMs: number,
+  opts: { detail?: boolean } = {}
 ): Metrics {
   const byTier: Record<string, number> = { Free: 0, Plus: 0, Pro: 0 };
   let paid = 0;
+  let lastSignupMs = 0;
   for (const u of users) {
     const label = TIER_LABEL[u.tier] ?? u.tier;
     byTier[label] = (byTier[label] ?? 0) + 1;
     if (PAID_LABELS.has(label)) paid++;
+    if (u.createdAtMs > lastSignupMs) lastSignupMs = u.createdAtMs;
   }
 
-  const repoCounts = new Map<string, number>();
+  // Per-repo: count + most-recent-analysis date.
+  const repoAgg = new Map<string, { count: number; lastMs: number }>();
   let refreshes = 0;
+  let lastAnalysisMs = 0;
   for (const s of sessions) {
-    repoCounts.set(s.repoFullName, (repoCounts.get(s.repoFullName) ?? 0) + 1);
+    const r = repoAgg.get(s.repoFullName) ?? { count: 0, lastMs: 0 };
+    r.count += 1;
+    if (s.createdAtMs > r.lastMs) r.lastMs = s.createdAtMs;
+    repoAgg.set(s.repoFullName, r);
     refreshes += Math.max(0, s.snapshotCount - 1);
+    if (s.createdAtMs > lastAnalysisMs) lastAnalysisMs = s.createdAtMs;
   }
-  const topRepos = [...repoCounts]
-    .map(([repo, count]) => ({ repo, count }))
-    .sort((a, b) => b.count - a.count || a.repo.localeCompare(b.repo))
-    .slice(0, 8);
+  const sortedRepos = [...repoAgg.entries()].sort(
+    (a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0])
+  );
+  const iso = (ms: number) => (ms > 0 ? new Date(ms).toISOString() : null);
 
-  return {
+  const metrics: Metrics = {
     generatedAt: new Date(nowMs).toISOString(),
-    accounts: {
-      ...pair(users, nowMs),
-      paid,
-      byTier,
-    },
+    accounts: { ...pair(users, nowMs), paid, byTier },
     analyses: {
       ...pair(sessions, nowMs),
-      uniqueRepos: repoCounts.size,
+      uniqueRepos: repoAgg.size,
       refreshes,
     },
-    topRepos,
+    topRepos: sortedRepos.slice(0, 8).map(([repo, v]) => ({ repo, count: v.count })),
     signupsByDay: byDay(users, nowMs),
     analysesByDay: byDay(sessions, nowMs),
+    lastSignupAt: iso(lastSignupMs),
+    lastAnalysisAt: iso(lastAnalysisMs),
   };
+
+  if (opts.detail) {
+    metrics.detail = {
+      accounts: [...users]
+        .sort((a, b) => b.createdAtMs - a.createdAtMs)
+        .slice(0, 100)
+        .map((u) => ({
+          email: u.email ?? "(unknown)",
+          createdAt: new Date(u.createdAtMs).toISOString(),
+        })),
+      repos: sortedRepos.map(([repo, v]) => ({
+        repo,
+        count: v.count,
+        lastAnalyzed: new Date(v.lastMs).toISOString(),
+      })),
+    };
+  }
+
+  return metrics;
 }
 
 /** Read the real sources and aggregate. Server-only (touches the SQLite handle
  *  + the file store). PII-free output. */
-export async function computeMetrics(): Promise<Metrics> {
+export async function computeMetrics(
+  opts: { detail?: boolean } = {}
+): Promise<Metrics> {
   const userRows = db
-    .select({ createdAt: schema.user.createdAt, tier: schema.user.tier })
+    .select({
+      createdAt: schema.user.createdAt,
+      tier: schema.user.tier,
+      email: schema.user.email,
+    })
     .from(schema.user)
     .all();
   const users: UserRow[] = userRows.map((u) => ({
     createdAtMs: u.createdAt instanceof Date ? u.createdAt.getTime() : Number(u.createdAt),
     tier: u.tier,
+    // Read but only surfaced in the output when detail is requested.
+    email: u.email,
   }));
 
   // listSessions() already excludes PR-bot sessions (installationId set), so
@@ -161,5 +215,5 @@ export async function computeMetrics(): Promise<Metrics> {
     snapshotCount: s.snapshotCount,
   }));
 
-  return aggregateMetrics(users, sessions, Date.now());
+  return aggregateMetrics(users, sessions, Date.now(), opts);
 }
