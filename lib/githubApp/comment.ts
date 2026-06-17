@@ -56,7 +56,7 @@ export function formatPrComment(
   let body: string;
   if (result.suggestions.length === 0) {
     body = [
-      "## RepoJury Review",
+      "## CodeTrawl Review",
       "",
       diffLine,
       "",
@@ -64,7 +64,7 @@ export function formatPrComment(
     ].join("\n");
   } else {
     const lines: string[] = [
-      "## RepoJury Review",
+      "## CodeTrawl Review",
       "",
       diffLine,
       "",

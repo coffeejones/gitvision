@@ -80,7 +80,7 @@ function makeDeps(
   const body =
     "commentBody" in overrides
       ? overrides.commentBody
-      : "## RepoJury Review\nhi";
+      : "## CodeTrawl Review\nhi";
   return {
     runAnalysisPipeline: vi.fn(
       async () => overrides.pipelineResult ?? makeOkPipelineResult(),
@@ -133,7 +133,7 @@ describe("runReview — happy path", () => {
 
   it("passes the rendered body + parsed owner/repo/pr to postPrComment", async () => {
     const deps = makeDeps({
-      commentBody: "## RepoJury Review\nbody",
+      commentBody: "## CodeTrawl Review\nbody",
       postResult: { action: "created", commentId: 5 },
     });
     await runReview(
@@ -147,7 +147,7 @@ describe("runReview — happy path", () => {
       owner: "octocat",
       repo: "hello-world",
       prNumber: 42,
-      body: "## RepoJury Review\nbody",
+      body: "## CodeTrawl Review\nbody",
     });
   });
 
@@ -287,7 +287,7 @@ describe("runReview — composition fidelity", () => {
     const deps = makeDeps({
       pipelineResult: makeOkPipelineResult(),
       commentBody:
-        "## RepoJury Review\n\nNothing notable on this PR ✅",
+        "## CodeTrawl Review\n\nNothing notable on this PR ✅",
     });
     await runReview(makeEvent(), deps);
 

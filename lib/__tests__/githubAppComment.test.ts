@@ -89,9 +89,9 @@ describe("formatPrComment — happy path", () => {
     expect(out!.startsWith(COMMENT_MARKER)).toBe(true);
   });
 
-  it("includes the RepoJury Review heading", () => {
+  it("includes the CodeTrawl Review heading", () => {
     const out = formatPrComment(okResult(), CTX);
-    expect(out).toContain("## RepoJury Review");
+    expect(out).toContain("## CodeTrawl Review");
   });
 
   it("renders all three suggestions with correct severity emoji", () => {

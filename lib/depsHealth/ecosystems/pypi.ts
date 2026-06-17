@@ -226,7 +226,7 @@ async function fetchPyPiMeta(
       `https://pypi.org/pypi/${encodeURIComponent(name)}/json`,
       {
         headers: {
-          "User-Agent": "RepoJury (https://github.com/coffeejones/repobaron)",
+          "User-Agent": "CodeTrawl (https://github.com/coffeejones/gitvision)",
           Accept: "application/json",
         },
       }

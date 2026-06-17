@@ -64,7 +64,7 @@ import type { SecretScanResult } from "./security/types";
 export function makeOctokit(token?: string | null): Octokit {
   return new Octokit({
     auth: token || undefined,
-    userAgent: "RepoJury/0.1",
+    userAgent: "CodeTrawl/0.1",
   });
 }
 

@@ -65,7 +65,7 @@ const INPUT = {
   owner: "alice",
   repo: "repo",
   prNumber: 7,
-  body: `${COMMENT_MARKER}\n## RepoJury Review\nblah`,
+  body: `${COMMENT_MARKER}\n## CodeTrawl Review\nblah`,
 };
 
 beforeEach(() => {
