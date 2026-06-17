@@ -7,7 +7,7 @@ import Link from "next/link";
 import { ArrowUpRight, ArrowRight, GitPullRequest, Lock, ShieldCheck } from "lucide-react";
 import { CH, CH_FOCUS } from "./theme";
 
-const INSTALL_URL = "https://github.com/apps/repojury-pr";
+const INSTALL_URL = "https://github.com/apps/codetrawl-pr";
 const LEARN_MORE_URL = "https://github.com/coffeejones/gitvision#pr-bot-github-app";
 
 export function PRBotView({ canInstall }: { canInstall: boolean }) {

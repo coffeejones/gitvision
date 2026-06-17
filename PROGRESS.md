@@ -35,10 +35,11 @@ The whole product was re-skinned + re-voiced from **RepoJury** (a courtroom/"ver
 3. **Fixed a user-visible miss the rebrand audit didn't catch** — the PR-bot's GitHub comment heading was still `## RepoJury Review` (→ `## CodeTrawl Review`) — plus external User-Agent strings, and refreshed stale `RepoJury` mentions in comments.
 4. **Pointed every in-code `repojury.com` → `codetrawl.com`**: auth trusted-origin + billing + metadataBase fallbacks (all env-overridden in prod), the legal-page `support@` address, the email footer, README, `.env.example`, and test fixtures.
 
+**Infra rename — DONE** (outside the repo, by Jonas): the GitHub App was renamed in place to slug **`codetrawl-pr`** (https://github.com/apps/codetrawl-pr — same app, updated links, not a new one), and the install URLs in `PRBotView` + `PRBotCallout` + README now point at it. Resend is configured for `codetrawl.com`. The `repobaron:pr-review v2` PR-comment marker stays as-is on purpose — it's the stable find-or-update key; changing it would orphan every existing PR comment.
+
 **Deferred (NOT done — next session's menu):**
-- **Infra rename** (Tier-E, outside the repo): rename the GitHub App "RepoJury-PR" / slug `repojury-pr`; verify `codetrawl.com` on Resend + stand up the `support@codetrawl.com` inbox; set `BETTER_AUTH_URL` / `NEXT_PUBLIC_SITE_URL` / `EMAIL_FROM` to codetrawl.com in Railway (the in-code fallbacks already point there). The `repojury-pr` slug and the `repobaron:pr-review v2` comment marker are stable external/runtime ids — keep until a deliberate migration.
 - **Retire the rest of `components/landing/repojury/*`** + the `/landing-v3` sandbox once you're done with the WIP that still imports them.
-- Internal type/route renames (Tier B/C), if ever wanted.
+- Internal type/route renames (Tier B/C: `DepartmentId`/`Verdict`/`Ruling` types, the `/cases` + `/verdict` routes, `ChambersShell`), if ever wanted. Purely cosmetic — they're never user-visible.
 
 ---
 
