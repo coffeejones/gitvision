@@ -13,6 +13,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "analyze": "tsx lib/codeAnalysis/cli.ts",
+    "metrics": "node scripts/metrics.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
