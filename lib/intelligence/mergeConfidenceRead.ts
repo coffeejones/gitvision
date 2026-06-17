@@ -73,8 +73,14 @@ const BIG_DIFF_FNS = 15;
 const BLAST_CAP = 60; // max functions we run the BFS on (bounds cost on huge diffs)
 const TOP_RISKIEST = 6;
 
+// Internal identity key. Both the untested Set (built from computeTestCoverage's
+// untestedHotspots OUTPUT objects) and the per-touched-function lookup go
+// through this same function, so it only needs internal consistency — it does
+// NOT need to match testCoverage's private key. We still use the codebase's
+// \x1E (record-separator) convention + file-name-container order so the key is
+// collision-proof and consistent with diffAware/blastRadius identity keys.
 function fnKey(filePath: string, name: string, containerType?: string): string {
-  return `${filePath}::${containerType ?? ""}::${name}`;
+  return `${filePath}\x1E${name}\x1E${containerType ?? ""}`;
 }
 
 /** Build the set of "no direct test caller" function keys for a graph. We pass
@@ -190,10 +196,15 @@ export function computeMergeConfidenceRead(
       (r.untested && r.callers >= MED_CALLERS) ||
       (r.status === "removed" && r.directCallers >= 1)
   ).length;
-  const lowRisk = touched.length - flagged;
+  // Count only the functions we ACTUALLY measured (blastTargets), never the
+  // un-analyzed long tail — otherwise a truncated diff would overstate safety.
+  const analyzed = blastTargets.length;
+  const lowRisk = analyzed - flagged;
   const safeParts =
     lowRisk > 0
-      ? `${lowRisk} of ${touched.length} touched function${touched.length === 1 ? "" : "s"} look low-risk.`
+      ? `${lowRisk} of ${analyzed} analyzed function${analyzed === 1 ? "" : "s"} look low-risk${
+          targets.length > BLAST_CAP ? " (the lower-complexity tail wasn't measured)" : ""
+        }.`
       : undefined;
 
   const riskiest = risky.slice(0, TOP_RISKIEST);

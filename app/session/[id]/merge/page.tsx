@@ -105,7 +105,7 @@ export default async function MergeConfidenceRoute({
   const headSnap = session.snapshots[session.snapshots.length - 1];
   const baseSnap = baseSession?.snapshots[baseSession.snapshots.length - 1];
 
-  if (!baseSession || !baseSnap) {
+  if (!baseSession || !baseSnap || !headSnap) {
     return shell(
       <Explain
         title="The base snapshot is no longer available."

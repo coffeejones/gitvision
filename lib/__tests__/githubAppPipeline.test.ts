@@ -194,6 +194,26 @@ describe("runAnalysisPipeline — happy path", () => {
     expect(mock.mock.calls[1]?.[0]).toMatchObject({ installationId: 99 });
   });
 
+  it("records prMetadata on the HEAD session so Merge Confidence can find the base", async () => {
+    const createSessionSpy = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "sess-base" })
+      .mockResolvedValueOnce({
+        id: "sess-head",
+      }) as unknown as PipelineDeps["createSession"];
+    const deps = makeDeps({ createSession: createSessionSpy });
+
+    await runAnalysisPipeline(makeEvent({ prNumber: 7 }), deps);
+
+    const mock = createSessionSpy as unknown as ReturnType<typeof vi.fn>;
+    // Base session is the diff target, not a PR view — no prMetadata.
+    expect(mock.mock.calls[0]?.[0]?.prMetadata).toBeUndefined();
+    // Head session points back at the base session + carries the PR number.
+    expect(mock.mock.calls[1]?.[0]).toMatchObject({
+      prMetadata: { baseSessionId: "sess-base", prNumber: 7 },
+    });
+  });
+
   it("caps suggestions at maxResults=3", async () => {
     const ruleSpy = vi.fn(() => FAKE_SUGGESTIONS) as unknown as PipelineDeps["evaluateVerificationRules"];
     const deps = makeDeps({ evaluateVerificationRules: ruleSpy });
