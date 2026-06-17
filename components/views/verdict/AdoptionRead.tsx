@@ -10,7 +10,11 @@
 
 import { Check, AlertCircle } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
-import type { AdoptionRead, AdoptionReadLevel } from "@/lib/intelligence/adoptionRead";
+import type {
+  AdoptionRead,
+  AdoptionReadLevel,
+  AdoptionReason,
+} from "@/lib/intelligence/adoptionRead";
 
 const READ_COLOR: Record<AdoptionReadLevel, string> = {
   ADOPT: TOK.accent,
@@ -24,7 +28,7 @@ function Reason({
   reason,
   critical,
 }: {
-  reason: AdoptionRead["safe"][number];
+  reason: AdoptionReason;
   critical?: boolean;
 }) {
   const dot = critical ? TOK.rose : TOK.textMuted;
@@ -52,6 +56,7 @@ export function AdoptionReadCard({ read }: { read: AdoptionRead }) {
     <section
       className="flex flex-col gap-5 rounded-xl p-6"
       style={{ background: TOK.surface, border: `1px solid ${TOK.border}` }}
+      aria-label={`The Read — adoption verdict: ${read.read}`}
     >
       {/* Eyebrow + reconcile grade chip */}
       <div className="flex items-start justify-between gap-4">
@@ -59,7 +64,7 @@ export function AdoptionReadCard({ read }: { read: AdoptionRead }) {
           <div className="flex items-center gap-2">
             <span
               className="shrink-0 rounded-full"
-              style={{ width: 7, height: 7, background: TOK.rose }}
+              style={{ width: 7, height: 7, background: headColor }}
             />
             <span
               className="text-[10px] uppercase tracking-[0.2em] font-medium"
@@ -118,7 +123,7 @@ export function AdoptionReadCard({ read }: { read: AdoptionRead }) {
             className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-medium"
             style={{ color: TOK.textMuted }}
           >
-            <Check size={14} style={{ color: TOK.accent }} />
+            <Check size={14} style={{ color: TOK.accent }} aria-hidden />
             Why it&rsquo;s safe
           </div>
           {read.safe.length > 0 ? (
@@ -134,7 +139,7 @@ export function AdoptionReadCard({ read }: { read: AdoptionRead }) {
             className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-medium"
             style={{ color: TOK.textMuted }}
           >
-            <AlertCircle size={14} style={{ color: hesitateColor }} />
+            <AlertCircle size={14} style={{ color: hesitateColor }} aria-hidden />
             Why we&rsquo;d hesitate
           </div>
           {read.hesitate.length > 0 ? (

@@ -87,22 +87,23 @@ const TAG_BY_ID: Record<string, string> = {
   "solo-project": "bus factor",
   stale: "cadence",
   "very-active": "activity",
-  "commit-cadence": "activity",
+  "consistent-cadence": "activity",
   "real-code-activity": "activity",
   "broad-ownership": "ownership",
-  "contributor-spread": "ownership",
+  "many-contributors": "ownership",
   "good-test-presence": "tests",
   "untested-hotspots": "tests",
   "vulnerable-deps": "supply",
   "deprecated-deps": "supply",
   "outdated-deps": "supply",
   "fresh-deps": "supply",
-  "known-incident": "supply",
   "cross-boundary-coupling": "architecture",
   "deep-dependency-chains": "architecture",
-  "pr-throughput": "throughput",
+  "healthy-pr-throughput": "throughput",
   "pr-backlog": "throughput",
-  "pr-cycle-time": "review",
+  "fast-pr-cycle": "review",
+  "slow-pr-cycle": "review",
+  "exposed-secrets": "security",
 };
 
 function tagFor(id: string): string {
@@ -125,10 +126,11 @@ function toReason(sig: HealthSignal): AdoptionReason {
 const SAFE_PRIORITY = [
   "fresh-deps",
   "broad-ownership",
+  "many-contributors",
   "very-active",
   "good-test-presence",
-  "contributor-spread",
-  "commit-cadence",
+  "healthy-pr-throughput",
+  "consistent-cadence",
   "real-code-activity",
 ];
 function safePriority(id: string): number {
@@ -235,10 +237,15 @@ export function computeAdoptionRead(
     } as HealthSignal);
   }
   const SEV_RANK = { high: 3, medium: 2, low: 1 } as const;
-  const isDealbreaker = (id: string) =>
-    id === "exposed-secrets" || id === "vulnerable-deps";
+  // Dealbreakers (the AVOID drivers) lead — secrets ahead of CVEs — then by
+  // severity. The leader becomes the single orange hesitation on an AVOID read.
+  const DEALBREAKER_RANK: Record<string, number> = {
+    "exposed-secrets": 2,
+    "vulnerable-deps": 1,
+  };
+  const dbRank = (id: string) => DEALBREAKER_RANK[id] ?? 0;
   hesitate.sort((a, b) => {
-    const d = Number(isDealbreaker(b.id)) - Number(isDealbreaker(a.id));
+    const d = dbRank(b.id) - dbRank(a.id);
     if (d !== 0) return d;
     return (
       (b.severity ? SEV_RANK[b.severity] : 0) -
@@ -271,7 +278,10 @@ export function computeAdoptionRead(
     hesitate: hesitateReasons,
     guardrails,
     reconcile: { grade: verdict.grade, score: verdict.score, why },
-    criticalReasonId: hesitateReasons[0]?.id,
+    // Orange is rationed: a critical (orange) hesitation appears only on an
+    // AVOID read. GUARDED / ADOPT show no orange — their worst risk reads in
+    // the dim tone, since "critical" is reserved for genuine dealbreakers.
+    criticalReasonId: read === "AVOID" ? hesitateReasons[0]?.id : undefined,
     scopeNote: snap.analyzedSubdir
       ? `Based on the ${snap.analyzedSubdir} subtree only.`
       : undefined,

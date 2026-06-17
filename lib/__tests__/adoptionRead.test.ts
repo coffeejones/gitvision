@@ -61,7 +61,7 @@ describe("computeAdoptionRead — base outcome mapping", () => {
 });
 
 describe("computeAdoptionRead — adoption-critical downgrades", () => {
-  it("caps a cleared repo at GUARDED when bus-factor-risk fired", () => {
+  it("caps a cleared repo at GUARDED when bus-factor-risk fired, with no orange", () => {
     const r = computeAdoptionRead(
       snap(),
       verdict("cleared", "A"),
@@ -69,7 +69,9 @@ describe("computeAdoptionRead — adoption-critical downgrades", () => {
     );
     expect(r.read).toBe("GUARDED");
     expect(r.reconcile.why).toContain("bus factor");
-    expect(r.criticalReasonId).toBe("bus-factor-risk");
+    // GUARDED is not a "genuine critical" — no orange hesitation.
+    expect(r.criticalReasonId).toBeUndefined();
+    expect(r.hesitate[0].id).toBe("bus-factor-risk");
   });
 
   it("caps a cleared repo at GUARDED when the project is stale", () => {
@@ -136,6 +138,32 @@ describe("computeAdoptionRead — adoption-critical downgrades", () => {
     expect(r.read).toBe("AVOID");
     expect(r.criticalReasonId).toBe("vulnerable-deps");
     expect(r.hesitate[0].id).toBe("vulnerable-deps");
+  });
+
+  it("prioritizes exposed-secrets over vulnerable-deps when both dealbreakers fire", () => {
+    const s = snap({
+      secretFindings: { scannedFiles: 1, findings: [{ severity: "high" } as never] } as never,
+    });
+    const r = computeAdoptionRead(
+      s,
+      verdict("returned", "F"),
+      signals({ needsWork: [sig("vulnerable-deps", "high")] })
+    );
+    expect(r.read).toBe("AVOID");
+    expect(r.hesitate[0].id).toBe("exposed-secrets");
+    expect(r.criticalReasonId).toBe("exposed-secrets");
+  });
+
+  it("shows NO orange on a GUARDED read whose only risk is slow-pr-cycle", () => {
+    const r = computeAdoptionRead(
+      snap(),
+      verdict("conditional", "C"),
+      signals({ needsWork: [sig("slow-pr-cycle", "medium")] })
+    );
+    expect(r.read).toBe("GUARDED");
+    expect(r.criticalReasonId).toBeUndefined();
+    expect(r.hesitate[0].id).toBe("slow-pr-cycle");
+    expect(r.hesitate[0].tag).toBe("review"); // TAG_BY_ID maps it, no raw kebab
   });
 });
 
