@@ -175,6 +175,10 @@ export async function runAnalysisPipeline(
       name: `${owner}/${repoName} @ ${headSha.slice(0, 8)} (PR #${prNumber})`,
       initialSnapshot: headSnapshot,
       installationId,
+      // Mode B: record the base session so the Merge Confidence view can
+      // reconstruct this PR's diff later. Head only — the base session is the
+      // diff target, not itself a PR view.
+      prMetadata: { baseSessionId: baseSession.id, prNumber },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

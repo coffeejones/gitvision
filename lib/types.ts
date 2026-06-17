@@ -339,6 +339,16 @@ export interface Session {
    *  installation.deleted to GC the right sessions when a user
    *  uninstalls the app — workspace-created sessions stay untouched. */
   installationId?: number;
+  /** PR-bot provenance for The Read — Merge Confidence (Mode B). Set only on
+   *  the HEAD session of a PR analysis so the merge view can find the base
+   *  session to diff against. Optional — older PR sessions and every
+   *  workspace ("paste a URL") session leave it undefined. */
+  prMetadata?: {
+    /** The sister session holding the PR's base ref. */
+    baseSessionId: string;
+    /** GitHub PR number, for display. */
+    prNumber?: number;
+  };
   // All snapshots kept for "since last visit" diffs. Latest = current view.
   snapshots: AnalysisSnapshot[];
 }

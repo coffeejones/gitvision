@@ -123,6 +123,16 @@ describe("formatPrComment — happy path", () => {
     );
   });
 
+  it("includes the merge-confidence deep link (Mode B)", () => {
+    const out = formatPrComment(
+      okResult({ headSessionId: "abc123def" }),
+      CTX,
+    )!;
+    expect(out).toContain(
+      "[Merge confidence ↗](https://codetrawl.com/session/abc123def/merge)",
+    );
+  });
+
   it("includes the deterministic-claim trust footer", () => {
     const out = formatPrComment(okResult(), CTX)!;
     expect(out).toContain("Signals computed deterministically");

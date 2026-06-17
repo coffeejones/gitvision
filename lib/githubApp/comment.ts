@@ -80,7 +80,7 @@ export function formatPrComment(
   const footer = [
     "",
     "---",
-    `[Full analysis ↗](${analysisLink}) · _Signals computed deterministically — no LLM in this comment_`,
+    `[Full analysis ↗](${analysisLink}) · [Merge confidence ↗](${analysisLink}/merge) · _Signals computed deterministically — no LLM in this comment_`,
   ].join("\n");
 
   return `${COMMENT_MARKER}\n${body}${footer}\n`;

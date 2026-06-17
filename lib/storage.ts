@@ -47,6 +47,9 @@ export async function createSession(params: {
    *  exactly the right sessions. Workspace-created sessions leave
    *  this undefined. */
   installationId?: number;
+  /** PR-bot Mode B provenance — set on the HEAD session of a PR analysis so
+   *  the Merge Confidence view can locate the base session. Optional. */
+  prMetadata?: Session["prMetadata"];
 }): Promise<Session> {
   await ensureDir();
   const now = new Date().toISOString();
@@ -57,6 +60,7 @@ export async function createSession(params: {
     ownerId: params.ownerId,
     userId: params.userId,
     installationId: params.installationId,
+    prMetadata: params.prMetadata,
     createdAt: now,
     updatedAt: now,
     snapshots: [params.initialSnapshot],
