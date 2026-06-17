@@ -1,6 +1,6 @@
 // Verdict computation (v0.82+, Phase C).
 //
-// The Final grade is the climax of the RepoJury narrative: each
+// The Final grade is the climax of the CodeTrawl narrative: each
 // of the four jury departments (Health, Security, Forensics, Supply)
 // votes on the codebase based on the deterministic signals from
 // extractHealthSignals() + the standalone security scanners on the

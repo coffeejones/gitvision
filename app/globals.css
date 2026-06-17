@@ -84,7 +84,7 @@ body {
   }
 }
 
-/* Scroll-reveal system used by the RepoJury landing (and any future
+/* Scroll-reveal system used by the CodeTrawl landing (and any future
    marketing surface that wants the same staggered fade-in). The
    Reveal helper component toggles `.in` via IntersectionObserver
    when an element enters the viewport. Delays are driven by the

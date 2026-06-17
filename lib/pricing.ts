@@ -1,4 +1,4 @@
-// Central pricing configuration for RepoJury tiers (v0.78).
+// Central pricing configuration for CodeTrawl tiers (v0.78).
 //
 // Single source of truth for tier pricing, features, and limits. The
 // /pricing page reads from here for display copy, the auth-gating

@@ -4,7 +4,7 @@
 // app/(workspace)). AuthForm calls router.refresh() after login so this
 // re-evaluates and the redirect fires without a manual reload.
 //
-// The old RepoJuryV2 landing was retired here when CodeTrawl became the root
+// The old RepoJury landing was retired here when CodeTrawl became the root
 // experience; the former preview routes (/codetrawl, /landing-v2) now redirect
 // to "/" to avoid serving duplicate content.
 

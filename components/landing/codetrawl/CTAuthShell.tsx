@@ -1,8 +1,7 @@
 // CTAuthShell — CodeTrawl-themed split shell for the auth surfaces (/login,
-// /signup, /forgot-password, /reset-password). Mirrors the RepoJury AuthShell
-// structure (brand tease left, form column right) but in the "SURFACE & DEPTH"
-// design system: bitumen, Schibsted Grotesk + Fragment Mono, hairlines. The
-// RepoJury AuthShell is left intact — pages import this one instead.
+// /signup, /forgot-password, /reset-password): a brand tease on the left, the
+// form column on the right, in the "SURFACE & DEPTH" design system (bitumen,
+// Schibsted Grotesk + Fragment Mono, hairlines).
 //
 // The form components reuse the same `.auth-*` class names, scoped here under
 // CTSurface's `.ct`, so codetrawl.css styles them. Mobile (<861px) collapses

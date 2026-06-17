@@ -171,7 +171,7 @@ function ClassCanvasInner({ codeGraph, scope }: Props) {
   // layout — visible nodes stay scattered across the wide original
   // bounding box, with hidden nodes leaving giant gaps. Re-layout
   // packs the visible-only set tightly, killing the "scroll for ages"
-  // problem that surfaced on RepoJury's own codebase (many isolated
+  // problem that surfaced on CodeTrawl's own codebase (many isolated
   // Props/State interfaces).
   const positions = useMemo(() => {
     if (visibleIds.size === rawNodes.length) {

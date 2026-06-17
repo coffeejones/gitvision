@@ -1,6 +1,6 @@
 // Cookie consent state (Phase P follow-up).
 //
-// RepoJury's storage splits into two buckets:
+// CodeTrawl's storage splits into two buckets:
 //
 //   - Essential — the auth session cookie (you can't be logged in
 //     without it) and storage strictly needed for an action the user

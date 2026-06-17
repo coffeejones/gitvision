@@ -5,7 +5,7 @@
 // Replaces the v0.3-era horizontal tab strip with a persistent left
 // sidebar. Each tab is now its own route under /session/[id]/<tab>;
 // the sidebar is the navigation. The change is bigger than it sounds:
-// it moves RepoJury from "dashboard you scroll" to "workspace you
+// it moves CodeTrawl from "dashboard you scroll" to "workspace you
 // inhabit", which is the right mental model for a tool you spend 20
 // minutes inside investigating a codebase.
 //

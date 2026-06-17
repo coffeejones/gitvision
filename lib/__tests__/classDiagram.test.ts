@@ -604,7 +604,7 @@ describe("generateClassDiagram · caps", () => {
   });
 
   it("default cap is high enough to render typical alpha-tier repos", () => {
-    // Real-world data point: RepoJury itself surfaces 173 classes.
+    // Real-world data point: CodeTrawl itself surfaces 173 classes.
     // Default cap must comfortably exceed that or we silently lie
     // about the architecture.
     const cg = emptyGraph();

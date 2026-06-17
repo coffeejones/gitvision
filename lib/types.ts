@@ -1,4 +1,4 @@
-// Shared types for RepoJury
+// Shared types for CodeTrawl
 
 import type { CodeGraph } from "./codeAnalysis/types";
 

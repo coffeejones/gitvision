@@ -1,5 +1,5 @@
-// /cases — the Chambers home: the caller's repositories on trial, each a
-// verdict dossier, ranked worst-first. Renders inside the workspace layout
+// /cases — the workspace home: the caller's analyzed repositories, each with
+// its grade, ranked worst-first. Renders inside the workspace layout
 // (which provides the sidebar), so this is content-only.
 
 import type { Metadata } from "next";
