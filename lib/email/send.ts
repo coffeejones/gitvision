@@ -11,8 +11,8 @@
 //   - Without a verified domain, sender must be `onboarding@resend.dev`
 //     AND recipient must be the Resend account's owner email.
 //     Good for local dev (Jonas tests on his own inbox).
-//   - For production we'll verify repojury.com in Phase D4 and
-//     switch FROM_ADDRESS to `noreply@repojury.com`.
+//   - For production we'll verify codetrawl.com in Phase D4 and
+//     switch FROM_ADDRESS to `noreply@codetrawl.com`.
 //
 // Server-only. Never import from a "use client" component — would
 // drag node:crypto into the browser bundle and leak the API key.
@@ -21,7 +21,7 @@ import { Resend } from "resend";
 
 /** Sender address. Falls back to Resend's onboarding domain when no
  *  custom from-address is configured. In production set
- *  EMAIL_FROM=noreply@repojury.com (or whatever verified address)
+ *  EMAIL_FROM=noreply@codetrawl.com (or whatever verified address)
  *  via Railway env after verifying the domain on Resend's dashboard. */
 function fromAddress(): string {
   return process.env.EMAIL_FROM ?? "CodeTrawl <onboarding@resend.dev>";

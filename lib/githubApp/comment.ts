@@ -28,7 +28,7 @@ import type { PipelineResult } from "./pipeline";
 export const COMMENT_MARKER = "<!-- repobaron:pr-review v2 -->";
 
 export interface FormatContext {
-  /** Base URL of the workspace (e.g. "https://repojury.com"). Used
+  /** Base URL of the workspace (e.g. "https://codetrawl.com"). Used
    *  to build the "Full analysis" link. Trailing slash is normalized. */
   workspaceBaseUrl: string;
 }

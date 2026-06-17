@@ -199,7 +199,7 @@ export default function TermsPage() {
       <Section id="contact" num="12." title="Contact">
         <P>
           Questions about these terms? Email{" "}
-          <a href="mailto:support@repojury.com">support@repojury.com</a>.
+          <a href="mailto:support@codetrawl.com">support@codetrawl.com</a>.
         </P>
       </Section>
     </LegalShell>

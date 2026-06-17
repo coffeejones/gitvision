@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   // checkout. We send the user to /account/billing where they can
   // see their new plan + confirmation message.
   const protocol = req.headers.get("x-forwarded-proto") ?? "https";
-  const host = req.headers.get("host") ?? "repojury.com";
+  const host = req.headers.get("host") ?? "codetrawl.com";
   const successUrl = `${protocol}://${host}/account/billing?upgraded=1`;
 
   try {

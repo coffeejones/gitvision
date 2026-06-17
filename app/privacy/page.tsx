@@ -61,7 +61,7 @@ export default function PrivacyPage() {
           under the EU General Data Protection Regulation (GDPR). We&rsquo;ll
           name that operator, and where it&rsquo;s registered, once CodeTrawl
           launches commercially. Until then, reach us at{" "}
-          <a href="mailto:support@repojury.com">support@repojury.com</a>.
+          <a href="mailto:support@codetrawl.com">support@codetrawl.com</a>.
         </P>
       </Section>
 
@@ -252,7 +252,7 @@ export default function PrivacyPage() {
         </UL>
         <P>
           To exercise any of these, email{" "}
-          <a href="mailto:support@repojury.com">support@repojury.com</a>.
+          <a href="mailto:support@codetrawl.com">support@codetrawl.com</a>.
           We&rsquo;ll respond within the timeframe the law requires.
         </P>
       </Section>
@@ -288,7 +288,7 @@ export default function PrivacyPage() {
       <Section id="contact" num="11." title="Contact">
         <P>
           Questions about this policy or your data? Email{" "}
-          <a href="mailto:support@repojury.com">support@repojury.com</a>{" "}
+          <a href="mailto:support@codetrawl.com">support@codetrawl.com</a>{" "}
           and we&rsquo;ll get back to you.
         </P>
       </Section>

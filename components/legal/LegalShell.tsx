@@ -42,7 +42,7 @@ export function DraftNotice() {
       jurisdiction yet, and it hasn&rsquo;t been reviewed by a lawyer. Once
       CodeTrawl launches commercially, a registered entity and a proper policy
       will replace this. Questions:{" "}
-      <a href="mailto:support@repojury.com">support@repojury.com</a>.
+      <a href="mailto:support@codetrawl.com">support@codetrawl.com</a>.
     </div>
   );
 }

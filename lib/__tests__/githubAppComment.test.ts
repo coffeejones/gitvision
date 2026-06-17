@@ -51,7 +51,7 @@ function okResult(overrides: OkResultOverrides = {}): PipelineResult {
   };
 }
 
-const CTX = { workspaceBaseUrl: "https://repojury.com" };
+const CTX = { workspaceBaseUrl: "https://codetrawl.com" };
 
 describe("formatPrComment — failed pipeline", () => {
   it("returns null when pipeline failed", () => {
@@ -119,7 +119,7 @@ describe("formatPrComment — happy path", () => {
       CTX,
     )!;
     expect(out).toContain(
-      "[Full analysis ↗](https://repojury.com/session/abc123def)",
+      "[Full analysis ↗](https://codetrawl.com/session/abc123def)",
     );
   });
 
@@ -132,10 +132,10 @@ describe("formatPrComment — happy path", () => {
   it("normalizes trailing slash on workspaceBaseUrl", () => {
     const out = formatPrComment(
       okResult({ headSessionId: "x" }),
-      { workspaceBaseUrl: "https://repojury.com///" },
+      { workspaceBaseUrl: "https://codetrawl.com///" },
     )!;
-    expect(out).toContain("https://repojury.com/session/x");
-    expect(out).not.toContain("https://repojury.com///session/x");
+    expect(out).toContain("https://codetrawl.com/session/x");
+    expect(out).not.toContain("https://codetrawl.com///session/x");
   });
 });
 

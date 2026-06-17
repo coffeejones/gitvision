@@ -104,7 +104,7 @@ function makeDeps(
       releaseConcurrencySlot:
         vi.fn() as RunReviewDeps["concurrency"]["releaseConcurrencySlot"],
     },
-    workspaceBaseUrl: "https://repojury.com",
+    workspaceBaseUrl: "https://codetrawl.com",
   };
 }
 
@@ -157,7 +157,7 @@ describe("runReview — happy path", () => {
 
     const fmtMock = deps.formatPrComment as unknown as ReturnType<typeof vi.fn>;
     expect(fmtMock.mock.calls[0]?.[1]).toEqual({
-      workspaceBaseUrl: "https://repojury.com",
+      workspaceBaseUrl: "https://codetrawl.com",
     });
   });
 });

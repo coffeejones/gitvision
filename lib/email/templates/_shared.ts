@@ -97,7 +97,7 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
     </div>
     <p style="margin: 16px 0 0; text-align: center; color: ${TEXT_MUTED}; font-size: 11px; line-height: 1.5;">
       CodeTrawl &middot;
-      <a href="https://repojury.com" style="color: ${TEXT_MUTED}; text-decoration: underline;">repojury.com</a>
+      <a href="https://codetrawl.com" style="color: ${TEXT_MUTED}; text-decoration: underline;">codetrawl.com</a>
     </p>
   </div>
 </body>

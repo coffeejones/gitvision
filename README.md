@@ -37,7 +37,7 @@ server-side. Zero hallucination room.
 
 ## Try it
 
-👉 **[repojury.com](https://repojury.com)** — 4 pre-analyzed demo repos load instantly. No signup, no setup.
+👉 **[codetrawl.com](https://codetrawl.com)** — 4 pre-analyzed demo repos load instantly. No signup, no setup.
 
 Or run it locally:
 
@@ -67,7 +67,7 @@ Node 20.9+ required (tested on 25.x).
 
 RepoJury delivers the same analysis through two different surfaces:
 
-**Workspace** — `repojury.com`. Paste a URL, get an explorable
+**Workspace** — `codetrawl.com`. Paste a URL, get an explorable
 dashboard with blast radius, untested hotspots, near-duplicates,
 architecture diagrams, dependency health, and a red / yellow / green
 verdict grounded in 17 deterministic signals. The destination for
@@ -84,7 +84,7 @@ Both surfaces share the same diff-aware AST analysis, the same
 calibrated rules engine, the same plugin architecture. Improvements
 to one improve the other.
 
-![Public roadmap section on repojury.com — recently-shipped items in green tags, upcoming work in muted tags](doc/screenshots/Roadmap.png)
+![Public roadmap section on codetrawl.com — recently-shipped items in green tags, upcoming work in muted tags](doc/screenshots/Roadmap.png)
 
 ## What you'll find
 
@@ -168,7 +168,7 @@ A comment like this on every PR:
 3. 🟢 **INFO** — Sizeable PR — touches 23 files with 109 function-level changes.
 
 ---
-[Full analysis ↗](https://repojury.com/session/…) · _Signals computed deterministically — no LLM in this comment_
+[Full analysis ↗](https://codetrawl.com/session/…) · _Signals computed deterministically — no LLM in this comment_
 ```
 
 When nothing crosses the calibrated thresholds, you still get a short

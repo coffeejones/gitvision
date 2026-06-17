@@ -62,7 +62,7 @@ export default function RefundsPage() {
         <P>
           You can cancel any time from your account billing settings, or by
           emailing{" "}
-          <a href="mailto:support@repojury.com">support@repojury.com</a>. When
+          <a href="mailto:support@codetrawl.com">support@codetrawl.com</a>. When
           you cancel:
         </P>
         <UL>
@@ -119,7 +119,7 @@ export default function RefundsPage() {
       <Section id="contact" num="5." title="Contact">
         <P>
           For cancellations, refunds, or billing questions, email{" "}
-          <a href="mailto:support@repojury.com">support@repojury.com</a>.
+          <a href="mailto:support@codetrawl.com">support@codetrawl.com</a>.
         </P>
       </Section>
     </LegalShell>

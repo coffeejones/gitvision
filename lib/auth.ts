@@ -39,14 +39,14 @@ const githubOAuthConfigured = !!(githubClientId && githubClientSecret);
 // port 3001/3002 because something else holds 3000.
 //
 // Locally we trust the common Next.js dev ports. In production
-// BETTER_AUTH_URL is the canonical entry (repojury.com), but we
+// BETTER_AUTH_URL is the canonical entry (codetrawl.com), but we
 // also include it here belt-and-suspenders so a misconfigured
 // BETTER_AUTH_URL doesn't bring the whole flow down.
 const trustedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:3002",
-  "https://repojury.com",
+  "https://codetrawl.com",
   // Honour an explicit override too — useful for Railway preview
   // deploys where the URL is branch-specific.
   ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
