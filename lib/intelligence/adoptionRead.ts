@@ -110,11 +110,12 @@ function tagFor(id: string): string {
 }
 
 function toReason(sig: HealthSignal): AdoptionReason {
-  const detail = sig.detail ? ` — ${sig.detail}` : "";
+  // The detail carries the specifics (counts, dates) that make the quote
+  // defensible; fall back to the title when a signal has no detail.
   return {
     id: sig.id,
     tag: tagFor(sig.id),
-    text: `${sig.title}${detail}`,
+    text: sig.detail || sig.title,
     severity: sig.severity,
   };
 }
@@ -212,18 +213,20 @@ export function computeAdoptionRead(
     .slice(0, 3)
     .map(toReason);
 
-  // Reasons to hesitate — needsWork (severity-sorted), plus the solo-project
-  // question if it drove the read but isn't already represented.
+  // Reasons to hesitate. Start from needsWork, add the solo-project question if
+  // it drove the read, and a synthetic line for exposed secrets. Then order so
+  // the dealbreakers that force an AVOID (runtime CVEs, secrets) lead — that's
+  // the single row the card paints orange — with the rest by severity.
   const hesitate: HealthSignal[] = [...needsWork];
   if (
     busFactorSig &&
     busFactorSig.id === "solo-project" &&
     !needsWork.some((s) => s.id === "bus-factor-risk")
   ) {
-    hesitate.unshift({ ...busFactorSig, severity: "medium" });
+    hesitate.push({ ...busFactorSig, severity: "medium" });
   }
   if (flags.secrets) {
-    hesitate.unshift({
+    hesitate.push({
       id: "exposed-secrets",
       title: `${escalatingSecrets.length} exposed secret${escalatingSecrets.length === 1 ? "" : "s"}`,
       detail: "credentials found in the source — a hard dealbreaker for a dependency.",
@@ -231,6 +234,17 @@ export function computeAdoptionRead(
       severity: "high",
     } as HealthSignal);
   }
+  const SEV_RANK = { high: 3, medium: 2, low: 1 } as const;
+  const isDealbreaker = (id: string) =>
+    id === "exposed-secrets" || id === "vulnerable-deps";
+  hesitate.sort((a, b) => {
+    const d = Number(isDealbreaker(b.id)) - Number(isDealbreaker(a.id));
+    if (d !== 0) return d;
+    return (
+      (b.severity ? SEV_RANK[b.severity] : 0) -
+      (a.severity ? SEV_RANK[a.severity] : 0)
+    );
+  });
   const hesitateReasons = hesitate.slice(0, 3).map(toReason);
 
   const guardrails = buildGuardrails(flags);

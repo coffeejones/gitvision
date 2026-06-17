@@ -119,6 +119,24 @@ describe("computeAdoptionRead — adoption-critical downgrades", () => {
     const r = computeAdoptionRead(snap(), verdict("returned", "E"), signals());
     expect(r.read).toBe("AVOID");
   });
+
+  it("makes the AVOID-driving dealbreaker the critical reason, not just the first high-severity signal", () => {
+    const r = computeAdoptionRead(
+      snap(),
+      verdict("returned", "F"),
+      // cross-boundary-coupling is pushed before vulnerable-deps in the engine,
+      // and both are high — but the CVE is the dealbreaker, so it must lead.
+      signals({
+        needsWork: [
+          sig("cross-boundary-coupling", "high"),
+          sig("vulnerable-deps", "high"),
+        ],
+      })
+    );
+    expect(r.read).toBe("AVOID");
+    expect(r.criticalReasonId).toBe("vulnerable-deps");
+    expect(r.hesitate[0].id).toBe("vulnerable-deps");
+  });
 });
 
 describe("computeAdoptionRead — reasons + guardrails", () => {

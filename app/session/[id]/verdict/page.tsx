@@ -27,9 +27,11 @@ import { getSession } from "@/lib/storage";
 import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
 import { computeVerdict } from "@/lib/intelligence/verdict";
+import { computeAdoptionRead } from "@/lib/intelligence/adoptionRead";
 import { generateVerdictNarrative } from "@/lib/intelligence/verdictNarrative";
 import { TOK } from "@/lib/sessionTheme";
 import { VerdictHero } from "@/components/views/verdict/VerdictHero";
+import { AdoptionReadCard } from "@/components/views/verdict/AdoptionRead";
 import { DepartmentRulingCard } from "@/components/views/verdict/DepartmentRulingCard";
 import { JudgeStatement } from "@/components/views/verdict/JudgeStatement";
 
@@ -46,6 +48,7 @@ export default async function VerdictRoute({
 
   const latest = session.snapshots[session.snapshots.length - 1];
   const verdict = computeVerdict(latest);
+  const adoption = computeAdoptionRead(latest, verdict);
   const sessionBase = `/session/${session.id}`;
 
   // Tier gate: AI bench statement is a Plus tier feature (same gate
@@ -92,6 +95,11 @@ export default async function VerdictRoute({
       </header>
 
       <VerdictHero verdict={verdict} />
+
+      {/* The Read — adoption. Free for everyone: a pure reweighting of the
+          deterministic verdict into an ADOPT / GUARDED / AVOID call. No AI,
+          no token cost, so it sits above the Plus-gated bench statement. */}
+      <AdoptionReadCard read={adoption} />
 
       {/* AI summary, when available. Plus tier gated +
           conditional on ANTHROPIC_API_KEY being set. Renders nothing
