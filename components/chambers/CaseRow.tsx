@@ -58,7 +58,7 @@ export interface CaseItem {
 
 /** Display shape for a verdict delta — lib/intelligence/cases.ts maps the
  *  raw VerdictDelta into this (department ids → titles, votes → statuses). */
-export interface CaseDelta {
+interface CaseDelta {
   direction: "improved" | "regressed" | "mixed" | "unchanged";
   /** Letter grades when they changed; null when the grade held. */
   grade: { from: string; to: string } | null;
