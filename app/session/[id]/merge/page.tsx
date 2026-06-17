@@ -63,22 +63,23 @@ export default async function MergeConfidenceRoute({
         className="text-[10px] uppercase tracking-[0.18em] font-medium"
         style={{ color: TOK.textMuted }}
       >
-        Merge confidence · would this change be safe to merge?
+        Merge confidence · is this pull request safe to merge?
       </span>
       <h1
         className="text-3xl sm:text-4xl font-semibold tracking-tight"
         style={{ color: TOK.textPrimary, letterSpacing: "-0.025em", lineHeight: 1.1 }}
       >
-        How far does this PR ripple?
+        How far would merging this ripple?
       </h1>
       <p
         className="text-sm sm:text-base max-w-2xl leading-relaxed"
         style={{ color: TOK.textSecondary }}
       >
-        The same blast-radius and test-coverage signals from the workspace,
-        scoped to one pull request: which touched functions are depended on,
-        which are untested, and where the risk concentrates. Every line is
-        computed from the diff — no AI.
+        This weighs the pull-request branch against the branch it merges into —
+        the same blast-radius and test-coverage signals from the workspace,
+        scoped to that one diff: which touched functions are depended on, which
+        are untested, and where the risk concentrates. Every line is computed
+        from the diff — no AI.
       </p>
     </header>
   );
