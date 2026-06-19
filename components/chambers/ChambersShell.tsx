@@ -2,12 +2,19 @@
 
 // ChambersShell — the post-login app shell.
 //
-// Sticky left sidebar (brand · user + tier · nav · settings/logout) +
-// a scrolling content area. Every logged-in view (Cases, PR-bot, …)
-// renders inside this so the sidebar is constant and each view is its
-// own route. Dark, cool-neutral records-room theme — see theme.ts.
+// Desktop (md+): a sticky left sidebar (brand · user + tier · nav ·
+// settings/logout) + a scrolling content area.
+//
+// Mobile (< md): the sidebar is hidden; a slim top bar with the brand and a
+// hamburger replaces it, opening the same nav as a slide-in drawer. Without
+// this, signed-in users on a phone had no way to reach PR-bot, Settings,
+// Upgrade, or Log out — the whole signed-in surface was a dead end.
+//
+// Every logged-in view (Cases, PR-bot, …) renders inside this so the nav is
+// constant and each view is its own route. Dark, warm-neutral theme — see
+// theme.ts.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -19,6 +26,8 @@ import {
   LogOut,
   Loader2,
   ArrowUpCircle,
+  Menu,
+  X,
 } from "lucide-react";
 import { authClient } from "@/lib/authClient";
 import { CH, CH_FOCUS } from "./theme";
@@ -58,37 +67,74 @@ function navFromPath(pathname: string): ChambersNav {
 export function ChambersShell({ active, user, children }: Props) {
   const pathname = usePathname();
   const current = active ?? navFromPath(pathname);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Close the drawer whenever the route changes (a nav tap navigates).
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
   return (
     <div className="flex min-h-screen w-full" style={{ background: CH.bg }}>
-      <Sidebar active={current} user={user} />
+      {/* Desktop sidebar — unchanged from the original layout. */}
+      <aside
+        className="sticky top-0 hidden md:flex h-screen w-[256px] flex-none flex-col"
+        style={{
+          background: CH.sidebar,
+          borderRight: `1px solid ${CH.border}`,
+        }}
+      >
+        <SidebarContent active={current} user={user} />
+      </aside>
 
-      <main className="flex-1 min-w-0">
-        {/* Fluid up to a ceiling so cases widen with the screen instead of
-         *  sitting narrow on large monitors. Tops out at 7xl (matches the
-         *  case-detail page, so no width jump on click-through) — wider than
-         *  that and the content-left / metadata-right rows read sparse. */}
-        <div className="mx-auto w-full max-w-6xl xl:max-w-7xl px-6 sm:px-10 py-10 sm:py-14">
-          {children}
-        </div>
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile top bar — only below md, where the sidebar is hidden. */}
+        <MobileTopBar onOpen={() => setDrawerOpen(true)} />
+
+        <main className="flex-1 min-w-0">
+          {/* Fluid up to a ceiling so cases widen with the screen instead of
+           *  sitting narrow on large monitors. Tops out at 7xl (matches the
+           *  case-detail page, so no width jump on click-through). */}
+          <div className="mx-auto w-full max-w-6xl xl:max-w-7xl px-6 sm:px-10 py-10 sm:py-14">
+            {children}
+          </div>
+        </main>
+      </div>
+
+      {/* Mobile drawer — the full sidebar nav, slid in over the content. */}
+      {drawerOpen && (
+        <MobileDrawer
+          active={current}
+          user={user}
+          onClose={() => setDrawerOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
-function Sidebar({ active, user }: { active: ChambersNav; user: User }) {
-  const initial = (user.name || user.username || "?").trim().charAt(0).toUpperCase();
+/** The brand + user + nav block, shared by the desktop sidebar and the
+ *  mobile drawer. `onNavigate` (drawer only) closes the drawer on a tap. */
+function SidebarContent({
+  active,
+  user,
+  onNavigate,
+}: {
+  active: ChambersNav;
+  user: User;
+  onNavigate?: () => void;
+}) {
+  const initial = (user.name || user.username || "?")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
 
   return (
-    <aside
-      className="sticky top-0 hidden md:flex h-screen w-[256px] flex-none flex-col"
-      style={{
-        background: CH.sidebar,
-        borderRight: `1px solid ${CH.border}`,
-      }}
-    >
+    <>
       {/* Brand */}
       <Link
         href="/cases"
+        onClick={onNavigate}
         className="flex items-center px-5 h-[68px] flex-none"
         style={{ borderBottom: `1px solid ${CH.border}` }}
       >
@@ -137,19 +183,19 @@ function Sidebar({ active, user }: { active: ChambersNav; user: User }) {
 
       {/* Nav */}
       <nav className="flex flex-1 flex-col gap-1 px-3 pt-4 pb-6 overflow-y-auto">
-        <NavLink href="/cases" icon={Layers} label="Surveys" activeNow={active === "cases"} />
-        <NavLink href="/pr-bot" icon={Bot} label="PR-bot" activeNow={active === "pr-bot"} />
+        <NavLink href="/cases" icon={Layers} label="Surveys" activeNow={active === "cases"} onNavigate={onNavigate} />
+        <NavLink href="/pr-bot" icon={Bot} label="PR-bot" activeNow={active === "pr-bot"} onNavigate={onNavigate} />
 
         <Divider />
 
-        <NavLink href="/how-it-works" icon={BookOpen} label="How it works" activeNow={active === "how"} />
-        <NavLink href="/news" icon={Newspaper} label="News" activeNow={active === "news"} />
+        <NavLink href="/how-it-works" icon={BookOpen} label="How it works" activeNow={active === "how"} onNavigate={onNavigate} />
+        <NavLink href="/news" icon={Newspaper} label="News" activeNow={active === "news"} onNavigate={onNavigate} />
 
         {/* Upgrade — only for free tiers. Unlike the others this leaves the
             workspace for /pricing (marketing + checkout), so it's never an
             "active" workspace route; it reads as a plain destination link. */}
         {!user.paid && (
-          <NavLink href="/pricing" icon={ArrowUpCircle} label="Upgrade" activeNow={false} />
+          <NavLink href="/pricing" icon={ArrowUpCircle} label="Upgrade" activeNow={false} onNavigate={onNavigate} />
         )}
 
         {/* push the account group to the bottom */}
@@ -157,10 +203,95 @@ function Sidebar({ active, user }: { active: ChambersNav; user: User }) {
 
         <Divider />
 
-        <NavLink href="/account" icon={Settings} label="Settings" activeNow={active === "settings"} />
+        <NavLink href="/account" icon={Settings} label="Settings" activeNow={active === "settings"} onNavigate={onNavigate} />
         <LogoutButton />
       </nav>
-    </aside>
+    </>
+  );
+}
+
+function MobileTopBar({ onOpen }: { onOpen: () => void }) {
+  return (
+    <header
+      className="md:hidden sticky top-0 z-30 flex items-center justify-between h-14 px-4 flex-none"
+      style={{
+        background: CH.sidebar,
+        borderBottom: `1px solid ${CH.border}`,
+      }}
+    >
+      <Link
+        href="/cases"
+        className="text-[17px] font-semibold tracking-tight"
+        style={{ color: CH.text, letterSpacing: "-0.02em" }}
+      >
+        CodeTrawl
+      </Link>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label="Open menu"
+        className={`flex h-9 w-9 items-center justify-center rounded-lg ${CH_FOCUS}`}
+        style={{ color: CH.textDim, border: `1px solid ${CH.border}` }}
+      >
+        <Menu size={18} />
+      </button>
+    </header>
+  );
+}
+
+function MobileDrawer({
+  active,
+  user,
+  onClose,
+}: {
+  active: ChambersNav;
+  user: User;
+  onClose: () => void;
+}) {
+  // Close on Escape; lock body scroll while open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  return (
+    <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true">
+      {/* Backdrop */}
+      <button
+        type="button"
+        aria-label="Close menu"
+        onClick={onClose}
+        className="absolute inset-0"
+        style={{ background: "rgba(0,0,0,0.55)" }}
+      />
+      {/* Panel */}
+      <div
+        className="absolute inset-y-0 left-0 flex w-[280px] max-w-[82vw] flex-col"
+        style={{
+          background: CH.sidebar,
+          borderRight: `1px solid ${CH.border}`,
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close menu"
+          className={`absolute right-3 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-lg ${CH_FOCUS}`}
+          style={{ color: CH.textDim }}
+        >
+          <X size={18} />
+        </button>
+        <SidebarContent active={active} user={user} onNavigate={onClose} />
+      </div>
+    </div>
   );
 }
 
@@ -175,15 +306,18 @@ function NavLink({
   icon: Icon,
   label,
   activeNow,
+  onNavigate,
 }: {
   href: string;
   icon: typeof Layers;
   label: string;
   activeNow: boolean;
+  onNavigate?: () => void;
 }) {
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] transition-colors ${CH_FOCUS}`}
       style={{
         // CodeTrawl active-state: brightness + a hairline rule, never an

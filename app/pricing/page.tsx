@@ -193,7 +193,16 @@ function FeatureComparison() {
         <span className="eyebrow">Every feature · plan by plan</span>
         <h2>Compare the plans.</h2>
       </div>
-      <div className="compare">
+      {/* cmp-scroll makes the table scroll horizontally below 760px (where it
+          gets min-width:640px) instead of being clipped by `.ct { overflow:
+          clip }` — otherwise the right-hand tier columns are cut off on a
+          phone right before the user decides to pay. */}
+      <div
+        className="compare cmp-scroll"
+        tabIndex={0}
+        role="region"
+        aria-label="Plan comparison table"
+      >
         <table>
           <thead>
             <tr>
