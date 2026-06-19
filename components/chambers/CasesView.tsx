@@ -12,6 +12,7 @@ import { Check, AlertTriangle, X, RefreshCw } from "lucide-react";
 import { WorkspaceInputBar } from "@/components/views/WorkspaceInputBar";
 import { CaseRow, type CaseItem } from "./CaseRow";
 import { PrivateRepos } from "./PrivateRepos";
+import { UpgradeCard } from "./UpgradeCard";
 import { CH, CH_FOCUS } from "./theme";
 
 interface Props {
@@ -19,9 +20,16 @@ interface Props {
   /** Analyzed private cases. The full "list every private repo from
    *  GitHub" table is a later enhancement. */
   privateCases?: CaseItem[];
+  /** Show the Plus upgrade card — set by the page only for logged-in free
+   *  accounts (hidden for paid + for anonymous viewers). */
+  showUpgrade?: boolean;
 }
 
-export function CasesView({ publicCases, privateCases = [] }: Props) {
+export function CasesView({
+  publicCases,
+  privateCases = [],
+  showUpgrade = false,
+}: Props) {
   const [tab, setTab] = useState<"public" | "private">("public");
 
   // Cheap "has anything changed upstream?" check (one light GitHub call
@@ -70,6 +78,8 @@ export function CasesView({ publicCases, privateCases = [] }: Props) {
           new one.
         </p>
       </header>
+
+      {showUpgrade && <UpgradeCard />}
 
       {/* Tabs */}
       <div

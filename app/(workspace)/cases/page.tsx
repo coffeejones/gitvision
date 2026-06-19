@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { listSessions } from "@/lib/storage";
 import { filterSessionsByUser } from "@/lib/ownerId";
+import { getUserTier } from "@/lib/billing/gates";
 import { getCases } from "@/lib/intelligence/cases";
 import { getSeenMap } from "@/lib/seen";
 import { CasesView } from "@/components/chambers/CasesView";
@@ -23,6 +24,10 @@ const CASE_CAP = 30;
 export default async function CasesPage() {
   const authSession = await auth.api.getSession({ headers: await headers() });
   const userId = authSession?.user?.id ?? null;
+
+  // Show the upgrade nudge only to logged-in free accounts. getUserTier maps
+  // legacy/unknown tiers to "open-case", so paid is correct for old rows too.
+  const paid = userId ? (await getUserTier(userId)) !== "open-case" : false;
 
   const sessions = await listSessions();
   const owned = filterSessionsByUser(sessions, userId);
@@ -43,6 +48,7 @@ export default async function CasesPage() {
     <CasesView
       publicCases={cases.filter((c) => !c.isPrivate)}
       privateCases={cases.filter((c) => c.isPrivate)}
+      showUpgrade={!!userId && !paid}
     />
   );
 }
