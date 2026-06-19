@@ -3,18 +3,12 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  Loader2,
-} from "lucide-react";
+import { ArrowUpRight, Check, Circle, Loader2 } from "lucide-react";
 import { parseDeepLinkSubdir } from "@/lib/githubUrl";
 import { pollJob } from "@/lib/jobsClient";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { TOK } from "@/lib/theme";
+import { AnalysisConfigModal } from "@/components/AnalysisConfigModal";
 
 /** Parse a GitHub-access error message emitted by lib/github.ts via
  *  the [gh:<code>] wire-format prefix. Used to decide whether to
@@ -124,31 +118,20 @@ export function RepoInputForm({
     ? "focus-visible:ring-1 focus-visible:ring-[#5f5a52] focus-visible:ring-offset-1 focus-visible:ring-offset-transparent"
     : "focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent";
   const [subdir, setSubdir] = useState("");
-  const [subdirOpen, setSubdirOpen] = useState(false);
-  const [autoFilledFromUrl, setAutoFilledFromUrl] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [configOpen, setConfigOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [stageIdx, setStageIdx] = useState(0);
   const [progress, setProgress] = useState(0);
   const router = useRouter();
   const startTime = useRef<number | null>(null);
 
-  // Auto-detect /tree/<branch>/<path> deep-links and lift the path into
-  // the subdir field. We open the disclosure too, so the auto-fill is
-  // visible (silent fills feel like magic-debug-hell).
+  // Auto-detect /tree/<branch>/<path> deep-links and pre-fill the subdir so
+  // the config box opens with the detected scope already in place. (The box
+  // is where the user confirms/edits branch + subdir before running.)
   useEffect(() => {
     const detected = parseDeepLinkSubdir(value);
-    if (detected && detected !== subdir) {
-      setSubdir(detected);
-      setSubdirOpen(true);
-      setAutoFilledFromUrl(true);
-    } else if (!detected && autoFilledFromUrl) {
-      // User cleared / changed the URL away from a deep-link — drop the
-      // auto-fill so we don't keep stale subdir state. Manual edits keep
-      // their value (autoFilledFromUrl flips to false on user input).
-      setSubdir("");
-      setAutoFilledFromUrl(false);
-    }
+    if (detected && detected !== subdir) setSubdir(detected);
     // Intentionally don't depend on subdir — that would loop on user edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
@@ -185,28 +168,34 @@ export function RepoInputForm({
     return () => clearInterval(interval);
   }, [pending]);
 
+  // Submitting opens the config box (branch + subdir) rather than running
+  // immediately — the branch becomes part of the analysis's identity, so the
+  // same repo can have several sessions, one per branch.
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    runAnalysis();
+    if (!value.trim() || pending) return;
+    setError(null);
+    setConfigOpen(true);
   }
 
   // Resume-after-signup: when the parent flips `autoRun` on with a prefilled
-  // value, run the stashed analysis exactly once. The ref guards against
-  // React StrictMode double-invoke and re-renders.
+  // value, run the stashed analysis exactly once on the default branch (the
+  // user already committed to it before signing up — no need to re-ask). The
+  // ref guards against React StrictMode double-invoke and re-renders.
   const autoRanRef = useRef(false);
   useEffect(() => {
     if (autoRun && !autoRanRef.current && value.trim() && !pending) {
       autoRanRef.current = true;
-      runAnalysis();
+      runAnalysis(null, subdir);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRun, value]);
 
-  function runAnalysis() {
+  function runAnalysis(ref: string | null, subdirArg: string) {
     setError(null);
     if (!value.trim()) return;
 
-    const trimmedSubdir = subdir.trim();
+    const trimmedSubdir = subdirArg.trim();
     startTransition(async () => {
       try {
         // POST returns immediately with a jobId — the actual analysis runs
@@ -222,6 +211,7 @@ export function RepoInputForm({
           body: JSON.stringify({
             repoUrl: value.trim(),
             ...(trimmedSubdir ? { subdir: trimmedSubdir } : {}),
+            ...(ref ? { ref } : {}),
           }),
         });
         let data: {
@@ -283,6 +273,7 @@ export function RepoInputForm({
   }
 
   return (
+    <>
     <form onSubmit={submit} className="flex flex-col gap-3">
       <div
         className={`flex items-center rounded-lg ${containerFocus}`}
@@ -330,74 +321,6 @@ export function RepoInputForm({
         </button>
       </div>
 
-      {/* Subdir disclosure — collapsed by default to keep first-impression
-       *  clean. Auto-opens when a /tree/<branch>/<path> URL is pasted so
-       *  the user sees the detected scope. */}
-      {!pending && (
-        <div className="flex flex-col gap-2 px-1">
-          <button
-            type="button"
-            onClick={() => setSubdirOpen((o) => !o)}
-            className="text-xs flex items-center gap-1 self-start transition rounded outline-none focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-            style={{ color: TOK.textMuted }}
-          >
-            {subdirOpen ? (
-              <ChevronDown size={11} />
-            ) : (
-              <ChevronRight size={11} />
-            )}
-            Analyze part of repo only?
-            {!subdirOpen && subdir && (
-              <span
-                className="ml-1 font-mono"
-                style={{ color: TOK.accent }}
-              >
-                · {subdir}
-              </span>
-            )}
-          </button>
-          {subdirOpen && (
-            <div className="flex flex-col gap-1.5">
-              <div
-                className="flex items-center rounded-md"
-                style={{
-                  background: TOK.surface,
-                  border: `1px solid ${TOK.border}`,
-                }}
-              >
-                <input
-                  type="text"
-                  value={subdir}
-                  onChange={(e) => {
-                    setSubdir(e.target.value);
-                    setAutoFilledFromUrl(false);
-                  }}
-                  placeholder="src/cmd  (optional · case-sensitive · no leading slash)"
-                  className="flex-1 bg-transparent h-9 px-3 text-sm rounded-md outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#10b981]"
-                  style={{ color: TOK.textPrimary }}
-                />
-              </div>
-              <p
-                className="text-[11px] leading-snug"
-                style={{ color: TOK.textMuted }}
-              >
-                {autoFilledFromUrl ? (
-                  <>
-                    Detected from URL. Clear this field to analyze the whole
-                    repo.
-                  </>
-                ) : (
-                  <>
-                    Useful for monorepos and very large repos. Root-level
-                    manifest files (package.json, go.mod, etc.) are still
-                    extracted so dep-health works.
-                  </>
-                )}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* v0.50: demo row removed — moved to LandingPanel's "Try a demo"
        *  card next to "Your sessions". The first-visit nudge ("First
@@ -523,5 +446,18 @@ export function RepoInputForm({
         </div>
       )}
     </form>
+      {configOpen && (
+        <AnalysisConfigModal
+          repo={value.trim()}
+          initialSubdir={subdir}
+          onRun={(ref, sd) => {
+            setConfigOpen(false);
+            setSubdir(sd);
+            runAnalysis(ref, sd);
+          }}
+          onClose={() => setConfigOpen(false)}
+        />
+      )}
+    </>
   );
 }
