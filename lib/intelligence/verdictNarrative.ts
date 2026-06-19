@@ -85,42 +85,61 @@ function compactVerdict(verdict: Verdict, repoFullName: string) {
 
 /** Generate the AI bench statement. Returns null when the
  *  ANTHROPIC_API_KEY env var is not set — callers should treat that
- *  as "AI is off, hide the panel" rather than as an error. */
+ *  as "AI is off, hide the panel" rather than as an error.
+ *
+ *  Also returns null on ANY Anthropic failure (429 rate-limit, 529
+ *  overloaded, network blip, invalid key, model deprecation). This is
+ *  called INLINE during the verdict page's server render — the first
+ *  page a paying user sees after a sweep — so an un-caught throw here
+ *  would crash the whole render into a raw 500. Callers already treat
+ *  null as "hide the panel" (verdict page only renders JudgeStatement
+ *  when narrative is truthy), so a transient AI outage degrades to
+ *  "no AI read" instead of a broken page. */
 export async function generateVerdictNarrative(
   verdict: Verdict,
   repoFullName: string
 ): Promise<VerdictNarrative | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
 
-  const client = new Anthropic();
-  const payload = compactVerdict(verdict, repoFullName);
+  try {
+    const client = new Anthropic();
+    const payload = compactVerdict(verdict, repoFullName);
 
-  const response = await client.messages.create({
-    model: VERDICT_NARRATIVE_MODEL,
-    max_tokens: MAX_TOKENS,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content:
-          `Verdict for ${repoFullName}:\n\n` + JSON.stringify(payload, null, 2),
+    const response = await client.messages.create({
+      model: VERDICT_NARRATIVE_MODEL,
+      max_tokens: MAX_TOKENS,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content:
+            `Verdict for ${repoFullName}:\n\n` +
+            JSON.stringify(payload, null, 2),
+        },
+      ],
+    });
+
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+
+    return {
+      text,
+      model: VERDICT_NARRATIVE_MODEL,
+      generatedAt: new Date().toISOString(),
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
       },
-    ],
-  });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("")
-    .trim();
-
-  return {
-    text,
-    model: VERDICT_NARRATIVE_MODEL,
-    generatedAt: new Date().toISOString(),
-    usage: {
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-    },
-  };
+    };
+  } catch (err) {
+    // Never let an AI hiccup take down the verdict page render.
+    console.error(
+      `[verdictNarrative] generation failed for ${repoFullName}:`,
+      err
+    );
+    return null;
+  }
 }

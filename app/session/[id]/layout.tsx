@@ -77,7 +77,13 @@ export default async function SessionLayout({
   const allowed = await requireSessionReadAccess(session);
   if (!allowed) notFound();
 
+  // A session with no snapshots is a corrupt/partial write — every
+  // downstream component (SessionToolbar, SessionShell) types `snapshot`
+  // as a non-optional AnalysisSnapshot and would crash the render reading
+  // `.repo.fullName` on undefined. Treat it as "not found" rather than a
+  // raw 500.
   const current = session.snapshots[session.snapshots.length - 1];
+  if (!current) notFound();
 
   return (
     <div className={`${ctDisplay.variable} ${ctMono.variable}`} style={FONT_VARS}>
