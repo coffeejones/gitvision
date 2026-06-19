@@ -52,6 +52,15 @@ describe("parseRepoUrl", () => {
     expect(parseRepoUrl("not a url")).toBeNull();
     expect(parseRepoUrl("just-one-segment")).toBeNull();
   });
+
+  it("rejects traversal-shaped and out-of-charset segments", () => {
+    // ".." as a repo segment must not slip through to the pipeline.
+    expect(parseRepoUrl("owner/..")).toBeNull();
+    expect(parseRepoUrl("owner/.")).toBeNull();
+    // URL-encoded slash / spaces / other junk in the owner/repo segments.
+    expect(parseRepoUrl("ow ner/repo")).toBeNull();
+    expect(parseRepoUrl("owner/re%2Fpo")).toBeNull();
+  });
 });
 
 describe("extractOrgOrUserFromUrl", () => {

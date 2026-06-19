@@ -183,14 +183,28 @@ function coerceGithubAccessError(
  */
 export function parseRepoUrl(input: string): { owner: string; repo: string } | null {
   const trimmed = input.trim().replace(/\.git$/, "").replace(/\/$/, "");
+  // Restrict owner/repo to GitHub's actual charset (owner: letters, digits,
+  // hyphens; repo: also "." and "_"). This rejects "..", URL-encoded slashes,
+  // and other junk at the cheap-validation layer before any value reaches the
+  // Octokit calls or the tarball-extract pipeline — tighter than the old
+  // [^/\s]+ which accepted arbitrary non-space characters.
+  const OWNER = "[A-Za-z0-9-]+";
+  const REPO = "[A-Za-z0-9._-]+";
   const patterns = [
-    /^https?:\/\/github\.com\/([^\/\s]+)\/([^\/\s]+)/,
-    /^github\.com\/([^\/\s]+)\/([^\/\s]+)/,
-    /^([^\/\s]+)\/([^\/\s]+)$/,
+    new RegExp(`^https?:\\/\\/github\\.com\\/(${OWNER})\\/(${REPO})`),
+    new RegExp(`^github\\.com\\/(${OWNER})\\/(${REPO})`),
+    new RegExp(`^(${OWNER})\\/(${REPO})$`),
   ];
   for (const p of patterns) {
     const m = trimmed.match(p);
-    if (m) return { owner: m[1], repo: m[2] };
+    if (m) {
+      const owner = m[1];
+      const repo = m[2];
+      // The charset still permits "." / ".." as a repo segment — reject those
+      // explicitly so a traversal-shaped name never flows downstream.
+      if (repo === "." || repo === "..") return null;
+      return { owner, repo };
+    }
   }
   return null;
 }

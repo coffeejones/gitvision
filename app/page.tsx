@@ -20,6 +20,10 @@ export const metadata: Metadata = {
   title: "CodeTrawl — see to the bottom of any codebase",
   description:
     "One deterministic sweep — git history, structure, security, supply chain — and a survey deep enough to dig into. Computed, never generated.",
+  // Pin the home canonical to the production origin so Railway preview /
+  // branch hosts (the metadataBase resolves per-host) don't get indexed as
+  // a duplicate of the landing page.
+  alternates: { canonical: "/" },
 };
 
 export default async function Home() {

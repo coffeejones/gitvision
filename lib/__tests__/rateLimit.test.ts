@@ -15,18 +15,33 @@ afterEach(() => {
 });
 
 describe("getClientIp", () => {
-  it("uses the first IP from x-forwarded-for", () => {
+  it("uses the LAST IP from x-forwarded-for (the real client, not the spoofable first hop)", () => {
     const req = new Request("http://x", {
       headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
     });
-    expect(getClientIp(req)).toBe("1.2.3.4");
+    // 5.6.7.8 is the IP Railway's edge appended; 1.2.3.4 is client-supplied.
+    expect(getClientIp(req)).toBe("5.6.7.8");
   });
 
-  it("trims whitespace around the first IP", () => {
+  it("trims whitespace around the last IP", () => {
     const req = new Request("http://x", {
-      headers: { "x-forwarded-for": "  1.2.3.4  , 5.6.7.8" },
+      headers: { "x-forwarded-for": "1.2.3.4 ,  5.6.7.8  " },
     });
-    expect(getClientIp(req)).toBe("1.2.3.4");
+    expect(getClientIp(req)).toBe("5.6.7.8");
+  });
+
+  it("ignores a trailing empty entry and uses the last real IP", () => {
+    const req = new Request("http://x", {
+      headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8, " },
+    });
+    expect(getClientIp(req)).toBe("5.6.7.8");
+  });
+
+  it("handles a single-IP header (first === last)", () => {
+    const req = new Request("http://x", {
+      headers: { "x-forwarded-for": "9.8.7.6" },
+    });
+    expect(getClientIp(req)).toBe("9.8.7.6");
   });
 
   it("falls back to x-real-ip when x-forwarded-for is missing", () => {

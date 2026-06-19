@@ -41,7 +41,9 @@ export const metadata: Metadata = {
     title: "CodeTrawl — map any GitHub repo",
     description:
       "Blast radius, structural duplicates, untested hotspots, and an AI health grade — across 7 languages.",
-    // Same convention: app/twitter-image.tsx populates twitter:image.
+    // No app/twitter-image.tsx: when an OG image exists and twitter.images
+    // is unset, Next.js reuses app/opengraph-image.tsx for twitter:image, so
+    // the summary_large_image card still renders the CodeTrawl share image.
   },
 };
 

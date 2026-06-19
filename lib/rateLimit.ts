@@ -16,7 +16,9 @@
 //   - Sophisticated rotating-proxy abuse. Out of scope for an alpha.
 //
 // Headers we trust to identify the caller (in priority order):
-//   - X-Forwarded-For: Railway's edge sets this. Take the first IP.
+//   - X-Forwarded-For: Railway's edge APPENDS the connecting IP rather
+//     than replacing a client-supplied header, so we trust the LAST hop
+//     (the real client) — not the spoofable first entry. See getClientIp.
 //   - X-Real-IP: fallback if X-Forwarded-For is missing.
 //   - "unknown": worst case — treat all anonymous callers as a single
 //     bucket. Strict, but avoids "no header → unlimited".
@@ -51,10 +53,21 @@ export interface RateLimitOpts {
 export function getClientIp(req: Request): string {
   const xff = req.headers.get("x-forwarded-for");
   if (xff) {
-    // X-Forwarded-For can be a comma-separated chain. The first IP is
-    // the original client; the rest are proxy hops.
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
+    // X-Forwarded-For is a chain "client, proxy1, proxy2, …". The LEFTMOST
+    // entry is attacker-controllable: Railway's edge appends (doesn't strip)
+    // a client-supplied header, so spoofing "X-Forwarded-For: <random>"
+    // would hand out a fresh rate-limit bucket on every request. The
+    // RIGHTMOST entry is the IP that actually connected to Railway's edge —
+    // the real client — and can't be forged. Trust that one.
+    //
+    // Assumes a single trusted hop (Railway's edge). If another reverse
+    // proxy is ever placed in front, this must account for the extra hop.
+    const parts = xff
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last) return last;
   }
   const real = req.headers.get("x-real-ip");
   if (real) return real.trim();
