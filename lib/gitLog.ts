@@ -105,7 +105,8 @@ const US = "\x1f";
  */
 export async function analyzeRepoHistory(
   owner: string,
-  repo: string
+  repo: string,
+  ref?: string | null
 ): Promise<GitLogResult> {
   const started = Date.now();
   const tmpDir = path.join(os.tmpdir(), `repobaron-git-${nanoid(8)}`);
@@ -148,6 +149,11 @@ export async function analyzeRepoHistory(
         "--no-merges",
         `--format=${formatStr}`,
         `--max-count=${MAX_COMMITS}`,
+        // The bare clone mirrors every branch's refs, so logging a specific
+        // ref needs no extra fetch. Passed as a positional revision after the
+        // options; unset → default branch (HEAD). The ref is validated
+        // upstream (isSafeGitRef) so it can't be a flag or contain spaces.
+        ...(ref ? [ref] : []),
       ],
       { cwd: tmpDir, timeoutMs: LOG_TIMEOUT_MS }
     );

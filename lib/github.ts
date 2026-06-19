@@ -556,12 +556,14 @@ export interface AnalyzeRepoOptions {
    *  repo — those signals don't make sense to scope. v0.24+. */
   subdir?: string | null;
   /** Git ref to analyze — branch name, tag, or commit SHA. When unset,
-   *  uses the repo's default branch (the common case). Required for
-   *  diff-aware workflows where the caller wants to compare a feature
-   *  branch against main: call analyze_repo twice with different refs,
-   *  then analyze_diff on the two session ids. Only affects the source
-   *  tarball used for codeAnalysis + secret-scan + file-graph; repo
-   *  metadata (stars, languages, etc.) is always whole-repo. v0.79+. */
+   *  uses the repo's default branch (the common case). Drives both the
+   *  diff-aware workflow (analyze a feature branch vs main, then
+   *  analyze_diff the two session ids) and the user-facing branch picker.
+   *  Scopes the code structure (tarball → codeAnalysis + secret-scan +
+   *  file-graph), the git history (git log <ref>), and dep-health (the
+   *  branch's manifests). Whole-repo metadata that isn't branch-specific —
+   *  stars, languages, contributors, PRs — stays repo-wide. Must be a safe
+   *  ref (validated via isSafeGitRef upstream). v0.79+. */
   ref?: string | null;
   /** GitHub OAuth access token for the calling user. When provided, all
    *  GitHub API calls during this analysis are authenticated against
@@ -616,9 +618,9 @@ export async function analyzeRepo(
     fetchLanguages(owner, repo, client),
     fetchRecentCommits(owner, repo, 3, client),
     fetchPullRequests(owner, repo, 2, client),
-    analyzeRepoHistory(owner, repo),
+    analyzeRepoHistory(owner, repo, explicitRef),
     fetchHasReadme(owner, repo, client),
-    analyzeDependencyHealth(client, owner, repo, "HEAD"),
+    analyzeDependencyHealth(client, owner, repo, explicitRef ?? "HEAD"),
   ]);
 
   const usingGitLog = history.commits.length > 0;

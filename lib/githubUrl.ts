@@ -19,3 +19,24 @@ export function parseDeepLinkSubdir(input: string): string | null {
   if (!candidate) return null;
   return candidate;
 }
+
+/** Is `ref` a safe git ref (branch / tag / SHA) to hand to git + the GitHub
+ *  API? The ref reaches a `git log <ref>` argv and Octokit calls, so we
+ *  reject anything that could be read as a flag or break ref-name rules:
+ *  control chars / spaces, the git-special set (~^:?*[\), a leading "-",
+ *  ".." or "//" sequences, a leading/trailing slash, "@{", and a ".lock"
+ *  suffix. Normal branch names (including slashes like "release/2026.04")
+ *  and 40-char SHAs pass. Used to validate the branch picked in the
+ *  pre-analysis config before it flows into the pipeline. */
+export function isSafeGitRef(ref: string): boolean {
+  if (!ref || ref.length > 255) return false;
+  if (/[\x00-\x20\x7f ~^:?*\[\\]/.test(ref)) return false;
+  if (ref.startsWith("-") || ref.startsWith("/") || ref.endsWith("/")) {
+    return false;
+  }
+  if (ref.includes("..") || ref.includes("//") || ref.includes("@{")) {
+    return false;
+  }
+  if (ref.endsWith(".lock")) return false;
+  return true;
+}

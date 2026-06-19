@@ -159,6 +159,7 @@ async function runCreateSession(job: Job): Promise<void> {
   const userToken = await getGithubTokenForUser(job.input.userId);
   const snapshot = await analyzeRepo(parsed.owner, parsed.repo, {
     subdir: job.input.subdir,
+    ref: job.input.ref ?? null,
     userToken,
   });
 
@@ -205,8 +206,14 @@ async function runRefreshSession(job: Job): Promise<void> {
   // this analysis. This matters for sessions of private repos: only
   // the original creator's token has the right scope.
   const userToken = await getGithubTokenForUser(session.userId);
+  // Re-analyze the SAME branch the session was created on — read it off the
+  // latest snapshot rather than the job input, so a refresh of a feature-
+  // branch session never silently falls back to the default branch.
+  const prevRef =
+    session.snapshots[session.snapshots.length - 1]?.analyzedRef ?? null;
   const snapshot = await analyzeRepo(parsed.owner, parsed.repo, {
     subdir: job.input.subdir,
+    ref: prevRef,
     userToken,
   });
   await appendSnapshot(sessionId, snapshot);

@@ -392,6 +392,10 @@ export type JobInput =
       kind: "create-session";
       repoUrl: string;
       subdir: string | null;
+      /** Git ref (branch/tag/SHA) to analyze, chosen in the pre-analysis
+       *  config. Null/absent → the repo's default branch. Validated via
+       *  isSafeGitRef before enqueue. */
+      ref?: string | null;
       sessionName?: string;
       /** Anonymous owner-id from the requester's X-Owner-Id header
        *  (v0.26+). Persisted on the resulting Session so future requests

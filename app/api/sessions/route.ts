@@ -10,6 +10,7 @@ import { auth } from "@/lib/auth";
 import { getUserTier } from "@/lib/billing/gates";
 import { TIER_CONFIG } from "@/lib/pricing";
 import { extractOrgOrUserFromUrl, parseRepoUrl } from "@/lib/github";
+import { isSafeGitRef } from "@/lib/githubUrl";
 import { validateSubdir } from "@/lib/graph";
 import { createJob, processJob } from "@/lib/jobs";
 import { filterSessionsByUser, OWNER_ID_HEADER } from "@/lib/ownerId";
@@ -28,6 +29,10 @@ const CreateSchema = z.object({
    *  side via validateSubdir — invalid values produce a 400. Empty
    *  strings are treated as "no subdir". */
   subdir: z.string().optional(),
+  /** Optional git ref (branch/tag/SHA) chosen in the pre-analysis config.
+   *  Absent/empty → the repo's default branch. Charset-validated below via
+   *  isSafeGitRef. */
+  ref: z.string().optional(),
 });
 
 export async function GET(req: Request) {
@@ -131,6 +136,19 @@ export async function POST(req: Request) {
     );
   }
 
+  // Optional branch/ref chosen in the pre-analysis config. Empty → null
+  // (analyze the default branch, same as before). Charset-validate so the
+  // value can't reach `git log <ref>` as a flag or a malformed ref. (This is
+  // also the natural seam for a future Plus-only branch gate.)
+  const refRaw = parsed.data.ref?.trim();
+  const ref = refRaw ? refRaw : null;
+  if (ref && !isSafeGitRef(ref)) {
+    return NextResponse.json(
+      { error: "Invalid branch name." },
+      { status: 400 }
+    );
+  }
+
   // Optional cookie ownerId — kept on new sessions as a historical
   // breadcrumb (which browser created this) but no longer used for
   // ownership decisions. authSession.user.id is the only thing the
@@ -173,6 +191,7 @@ export async function POST(req: Request) {
     repoUrl: parsed.data.repoUrl,
     sessionName: parsed.data.name,
     subdir,
+    ref,
     ownerId,
     userId,
   });
