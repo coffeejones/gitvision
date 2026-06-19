@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { Octokit } from "octokit";
 import { auth } from "@/lib/auth";
+import { canAccess } from "@/lib/billing/gates";
 import { getGithubTokenForUser } from "@/lib/githubUserToken";
 
 export const runtime = "nodejs";
@@ -26,6 +27,18 @@ export async function GET(req: Request): Promise<NextResponse> {
   const userId = session?.user.id ?? null;
   if (!userId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  // Tier gate: analyzing private repos is a Plus feature, so Free users
+  // shouldn't even see their private repo list. Signal `upgrade` (200) so the
+  // Private tab can render an upgrade prompt instead of the connect prompt.
+  if (!(await canAccess(userId, "privateRepos"))) {
+    return NextResponse.json({
+      connected: true,
+      upgrade: true,
+      repos: [],
+      hasMore: false,
+    });
   }
 
   const token = await getGithubTokenForUser(userId);

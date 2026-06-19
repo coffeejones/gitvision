@@ -4,6 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { consumeAiBudget } from "@/lib/aiBudget";
+import { requireAiInsights } from "@/lib/billing/aiGate";
 import { requireSessionOwnership } from "@/lib/ownership";
 import {
   RATE_LIMITS,
@@ -52,6 +53,11 @@ export async function POST(req: Request, ctx: Ctx) {
   }
   const denied = await requireSessionOwnership(session, req);
   if (denied) return denied;
+
+  // Tier gate: the AI Health Check is a Plus feature (page hides it for Free;
+  // enforce at the endpoint too).
+  const tierDenied = await requireAiInsights(req);
+  if (tierDenied) return tierDenied;
 
   const budget = consumeAiBudget();
   if (!budget.ok) {

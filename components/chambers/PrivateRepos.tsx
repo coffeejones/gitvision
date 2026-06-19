@@ -8,11 +8,13 @@
 // so they're filtered out here.
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Lock,
   Loader2,
   ArrowRight,
+  ArrowUpCircle,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -43,6 +45,7 @@ export function PrivateRepos({ analyzedRepos }: { analyzedRepos: Set<string> }) 
   const [allRepos, setAllRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(true);
+  const [needsUpgrade, setNeedsUpgrade] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -61,6 +64,10 @@ export function PrivateRepos({ analyzedRepos }: { analyzedRepos: Set<string> }) 
           const res = await fetch(`/api/github/repos?page=${p}`);
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.error ?? "Could not load repositories.");
+          if (data.upgrade) {
+            if (!cancelled) setNeedsUpgrade(true);
+            break;
+          }
           if (data.connected === false) {
             if (!cancelled) setConnected(false);
             break;
@@ -120,6 +127,32 @@ export function PrivateRepos({ analyzedRepos }: { analyzedRepos: Set<string> }) 
       setError(e instanceof Error ? e.message : "Could not start analysis.");
       setAnalyzing(null);
     }
+  }
+
+  if (needsUpgrade) {
+    return (
+      <div
+        className="flex flex-col items-center gap-3 rounded-xl px-5 py-9 text-center"
+        style={{ background: CH.panel, border: `1px solid ${CH.border}` }}
+      >
+        <Lock size={18} style={{ color: CH.textMuted }} />
+        <p className="text-[14px] font-medium" style={{ color: CH.text }}>
+          Private repositories are a Plus feature
+        </p>
+        <p className="max-w-sm text-[13px]" style={{ color: CH.textDim }}>
+          Upgrade to sweep your private repos — unlimited, with the same grade,
+          panels, and re-runs as public ones.
+        </p>
+        <Link
+          href="/pricing"
+          className={`mt-1 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-semibold transition-all hover:-translate-y-px ${CH_FOCUS}`}
+          style={{ background: CH.accent, color: CH.accentText }}
+        >
+          <ArrowUpCircle size={14} />
+          See plans
+        </Link>
+      </div>
+    );
   }
 
   if (!connected) {

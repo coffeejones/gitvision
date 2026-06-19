@@ -22,6 +22,7 @@ import { nanoid } from "nanoid";
 import { atomicWriteJson } from "./atomicWrite";
 import { GithubAccessError, analyzeRepo, parseRepoUrl } from "./github";
 import { getGithubTokenForUser } from "./githubUserToken";
+import { canAccess } from "./billing/gates";
 import { SubdirNotFoundError } from "./graph";
 import {
   appendSnapshot,
@@ -160,6 +161,20 @@ async function runCreateSession(job: Job): Promise<void> {
     subdir: job.input.subdir,
     userToken,
   });
+
+  // Tier backstop: analyzing PRIVATE repos is a Plus feature. The Private-repo
+  // tab is gated at the listing level, but a Free user could paste a private
+  // repo URL into the public input directly — enforce it here, where the
+  // repo's visibility is finally known, rather than saving the session.
+  if (snapshot.repo.private && job.input.userId) {
+    const allowed = await canAccess(job.input.userId, "privateRepos");
+    if (!allowed) {
+      throw new Error(
+        "Analyzing private repositories is a Plus feature. Upgrade at /pricing to sweep private repos.",
+      );
+    }
+  }
+
   const session = await createSession({
     repoUrl: job.input.repoUrl,
     name: job.input.sessionName || snapshot.repo.fullName,

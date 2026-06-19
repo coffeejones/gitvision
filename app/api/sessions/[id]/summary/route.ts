@@ -4,6 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { consumeAiBudget } from "@/lib/aiBudget";
+import { requireAiInsights } from "@/lib/billing/aiGate";
 import { requireSessionOwnership } from "@/lib/ownership";
 import {
   RATE_LIMITS,
@@ -55,6 +56,11 @@ export async function POST(req: Request, ctx: Ctx) {
   }
   const denied = await requireSessionOwnership(session, req);
   if (denied) return denied;
+
+  // Tier gate: AI Briefing is a Plus feature. Closes the direct-API bypass
+  // (the page hides the panel for Free, but the endpoint must enforce it too).
+  const tierDenied = await requireAiInsights(req);
+  if (tierDenied) return tierDenied;
 
   // Daily AI budget kill-switch (global, ALL callers combined).
   // Layered with the Anthropic console spending cap as defense in depth.
