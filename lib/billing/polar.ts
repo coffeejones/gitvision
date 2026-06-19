@@ -91,6 +91,13 @@ export async function createCheckoutSession(
       tier: input.tier,
       billing: input.billing,
     },
+    // Also stamp the userId on the CUSTOMER. Polar does not reliably copy
+    // checkout-level metadata onto a brand-new subscription's metadata, so
+    // the webhook reads customer.metadata.userId as a fallback when
+    // subscription.metadata is empty (see resolveUserId in the webhook).
+    customerMetadata: {
+      userId: input.userId,
+    },
   });
 
   return {
@@ -136,4 +143,62 @@ export function tierFromProductId(
     }
   }
   return null;
+}
+
+/** Outcome of mapping a subscription event to a DB write. `set` carries
+ *  the tier+status to persist; `skip` means "do not touch the row" with
+ *  a reason for logging. */
+export type SubscriptionUpdate =
+  | { kind: "set"; tier: Tier; status: string }
+  | { kind: "skip"; reason: string };
+
+/** Pure decision: given a Polar event type + subscription status +
+ *  product id, what tier/status (if any) should we write?
+ *
+ *  The critical rule — extracted here so it's unit-testable away from the
+ *  HTTP handler — is DO NOT silently downgrade a paying customer. If a
+ *  paid-state event arrives with a product id we don't recognise
+ *  (sandbox/prod mismatch, a Polar product that was renamed or recreated,
+ *  monthly/annual id drift), tierFromProductId returns null. The old code
+ *  fell back to "open-case", flipping a billed customer to Free with no
+ *  signal. We now skip the write instead and let the caller alert.
+ *
+ *  `revoked` is the one event that downgrades without needing the product:
+ *  payment is irrecoverably gone, so access must be removed regardless. */
+export function resolveSubscriptionUpdate(
+  eventType: string,
+  sub: { status: string; productId: string },
+): SubscriptionUpdate {
+  // Payment gone → remove access immediately, product id irrelevant.
+  if (eventType === "subscription.revoked") {
+    return { kind: "set", tier: "open-case", status: "revoked" };
+  }
+
+  const tierInfo = tierFromProductId(sub.productId);
+  if (!tierInfo) {
+    return {
+      kind: "skip",
+      reason: `unknown productId="${sub.productId}" for ${eventType} (status="${sub.status}") — refusing to downgrade a paying customer`,
+    };
+  }
+
+  if (eventType === "subscription.canceled") {
+    // Canceled but still inside the paid period — keep the tier, mark status.
+    return { kind: "set", tier: tierInfo.tier, status: "canceled" };
+  }
+  if (eventType === "subscription.past_due") {
+    // Grace period after a failed invoice — keep the tier, mark status.
+    return { kind: "set", tier: tierInfo.tier, status: "past_due" };
+  }
+  if (sub.status === "trialing") {
+    return { kind: "set", tier: tierInfo.tier, status: "trialing" };
+  }
+  if (sub.status === "active") {
+    return { kind: "set", tier: tierInfo.tier, status: "active" };
+  }
+
+  return {
+    kind: "skip",
+    reason: `unhandled status="${sub.status}" for ${eventType}`,
+  };
 }

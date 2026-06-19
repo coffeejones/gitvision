@@ -23,8 +23,7 @@ import {
 } from "@polar-sh/sdk/webhooks";
 import { db } from "@/lib/db";
 import { user } from "@/lib/db/schema";
-import { tierFromProductId } from "@/lib/billing/polar";
-import type { Tier } from "@/components/TierIcon";
+import { resolveSubscriptionUpdate } from "@/lib/billing/polar";
 
 /** Polar webhook event types we handle. Anything else returns 200
  *  (so Polar stops retrying) but performs no state change. */
@@ -83,8 +82,6 @@ export async function POST(req: Request) {
         headerKeys.map((k) => `${k}=${headers[k].slice(0, 12)}...`).join(", "),
         "\n  POLAR_WEBHOOK_SECRET length:",
         secret.length,
-        "\n  Secret prefix:",
-        secret.slice(0, 6) + "...",
       );
       return NextResponse.json(
         { error: "Invalid signature" },
@@ -104,8 +101,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, handled: false });
   }
 
-  // All subscription.* events have a .data with the subscription
-  // object — extract fields we care about. SDK guarantees the shape.
+  // All subscription.* events have a .data with the subscription object.
+  // SDK guarantees the core fields; `customer` is optional but feeds the
+  // userId fallback below.
   const sub = event.data as {
     id: string;
     status: string;
@@ -113,57 +111,49 @@ export async function POST(req: Request) {
     currentPeriodEnd?: string | Date | null;
     cancelAtPeriodEnd?: boolean | null;
     metadata?: Record<string, unknown> | null;
+    customer?: {
+      email?: string | null;
+      metadata?: Record<string, unknown> | null;
+    } | null;
   };
 
-  const userIdRaw = sub.metadata?.userId;
-  const userId = typeof userIdRaw === "string" ? userIdRaw : null;
+  // Map the payment back to a CodeTrawl user. See resolveUserId — tries
+  // subscription metadata, then customer metadata, then an email match,
+  // because Polar doesn't reliably copy checkout metadata onto a new
+  // subscription. Without the fallback, a paid checkout could strand the
+  // customer on Free with no recovery.
+  const userId = await resolveUserId(sub);
   if (!userId) {
     console.error(
-      `[polar/webhook] Event ${event.type} missing metadata.userId — subscription ${sub.id}`,
+      `[polar/webhook] Event ${event.type} could not resolve a user (no subscription/customer metadata.userId, no email match) — subscription ${sub.id}`,
     );
-    // Still return 200 so Polar doesn't retry forever — the issue is
-    // upstream (checkout didn't include metadata) and retrying won't
-    // help.
-    return NextResponse.json(
-      { ok: true, handled: false, reason: "missing userId" },
-    );
+    // Return 200 so Polar stops retrying — retrying won't supply the
+    // missing identity; this needs manual reconciliation.
+    return NextResponse.json({
+      ok: true,
+      handled: false,
+      reason: "unresolved user",
+    });
   }
 
-  // Resolve tier from product id via lib/pricing.ts — single source
-  // of truth so adding a new tier later doesn't require updating
-  // both places
-  const tierInfo = tierFromProductId(sub.productId);
-
-  // Decide what tier + status to write
-  let tierToSet: Tier;
-  let statusToSet: string;
-
-  if (event.type === "subscription.revoked") {
-    // Payment failed irrecoverably — immediate downgrade to the Free tier (open-case)
-    tierToSet = "open-case";
-    statusToSet = "revoked";
-  } else if (event.type === "subscription.canceled") {
-    // User canceled but still in paid period — keep tier, mark status
-    tierToSet = (tierInfo?.tier ?? "open-case") as Tier;
-    statusToSet = "canceled";
-  } else if (event.type === "subscription.past_due") {
-    // Grace period after failed invoice — keep tier, mark status
-    tierToSet = (tierInfo?.tier ?? "open-case") as Tier;
-    statusToSet = "past_due";
-  } else if (sub.status === "trialing") {
-    // Inside a Polar trial (if one is ever configured) — full access
-    tierToSet = (tierInfo?.tier ?? "open-case") as Tier;
-    statusToSet = "trialing";
-  } else if (sub.status === "active") {
-    tierToSet = (tierInfo?.tier ?? "open-case") as Tier;
-    statusToSet = "active";
-  } else {
-    // Unknown / unexpected status — log and skip update
+  // Decide what tier + status to write. Pure + unit-tested in
+  // lib/__tests__/polarWebhook.test.ts. Critically, it SKIPS the write
+  // (rather than downgrading to Free) when a paid-state event carries a
+  // product id we don't recognise — so a sandbox/prod mismatch can't
+  // silently demote a paying customer.
+  const decision = resolveSubscriptionUpdate(event.type, sub);
+  if (decision.kind === "skip") {
     console.warn(
-      `[polar/webhook] Skipping event ${event.type} with status="${sub.status}" for user ${userId}`,
+      `[polar/webhook] ${event.type} for user ${userId}: ${decision.reason}`,
     );
-    return NextResponse.json({ ok: true, handled: false });
+    return NextResponse.json({
+      ok: true,
+      handled: false,
+      reason: decision.reason,
+    });
   }
+  const tierToSet = decision.tier;
+  const statusToSet = decision.status;
 
   const currentPeriodEnd = sub.currentPeriodEnd
     ? new Date(sub.currentPeriodEnd)
@@ -194,4 +184,34 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+}
+
+/** Resolve the CodeTrawl user id for a Polar subscription event. Tries, in
+ *  order: subscription.metadata.userId → customer.metadata.userId → a lookup
+ *  by the customer's email. Returns null when none resolve, so the caller can
+ *  flag it for manual reconciliation instead of mutating the wrong row. */
+async function resolveUserId(sub: {
+  metadata?: Record<string, unknown> | null;
+  customer?: {
+    email?: string | null;
+    metadata?: Record<string, unknown> | null;
+  } | null;
+}): Promise<string | null> {
+  const fromSub = sub.metadata?.userId;
+  if (typeof fromSub === "string" && fromSub) return fromSub;
+
+  const fromCustomer = sub.customer?.metadata?.userId;
+  if (typeof fromCustomer === "string" && fromCustomer) return fromCustomer;
+
+  const email = sub.customer?.email;
+  if (email) {
+    const rows = await db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.email, email))
+      .limit(1);
+    if (rows[0]?.id) return rows[0].id;
+  }
+
+  return null;
 }
