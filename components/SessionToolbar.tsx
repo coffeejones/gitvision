@@ -26,6 +26,7 @@ import Link from "next/link";
 import {
   Camera,
   ChevronDown,
+  GitBranch,
   Gift,
   HelpCircle,
   MessageSquarePlus,
@@ -196,6 +197,18 @@ export function SessionToolbar({
           >
             {snapshot.repo.fullName}
           </span>
+          {snapshot.analyzedRef && (
+            <span
+              className="text-[11px] shrink-0 inline-flex items-center gap-1 font-mono"
+              style={{ color: TOK.textMuted }}
+              title={`Analyzed on branch ${snapshot.analyzedRef}`}
+            >
+              <GitBranch size={11} aria-hidden />
+              <span className="max-w-[160px] truncate">
+                {snapshot.analyzedRef}
+              </span>
+            </span>
+          )}
           <span
             className="text-[11px] shrink-0 inline-flex items-center gap-1"
             style={{ color: TOK.textMuted }}

@@ -9,6 +9,7 @@
 import Link from "next/link";
 import {
   Lock,
+  GitBranch,
   ChevronRight,
   CheckCircle2,
   AlertTriangle,
@@ -32,6 +33,10 @@ export interface CaseItem {
   name: string;
   repoFullName: string;
   isPrivate: boolean;
+  /** Branch the session was analyzed on, set only for non-default branches —
+   *  drives the row's branch chip so several sessions of the same repo are
+   *  distinguishable. Absent for default-branch sessions. */
+  branch?: string;
   /** Verdict. */
   grade: string; // "A−", "B", "D+"…
   score: number; // 0–100
@@ -148,6 +153,20 @@ export function CaseRow({ c }: { c: CaseItem }) {
             </span>
             {c.isPrivate && (
               <Lock size={11} style={{ color: CH.textMuted }} aria-label="private" />
+            )}
+            {c.branch && (
+              <span
+                className="inline-flex flex-none items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-medium"
+                style={{
+                  color: CH.textDim,
+                  background: CH.elevated,
+                  border: `1px solid ${CH.border}`,
+                }}
+                title={`Analyzed on branch ${c.branch}`}
+              >
+                <GitBranch size={10} aria-hidden />
+                <span className="max-w-[140px] truncate">{c.branch}</span>
+              </span>
             )}
             <RulingBadge ruling={c.ruling} tone={tone} />
           </span>

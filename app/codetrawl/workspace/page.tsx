@@ -62,6 +62,7 @@ const PUBLIC_CASES: CaseItem[] = [
     name: "flask",
     repoFullName: "pallets/flask",
     isPrivate: false,
+    branch: "release/3.1.x",
     grade: "B+",
     score: 80,
     ruling: "Conditional",

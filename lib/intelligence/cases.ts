@@ -110,6 +110,10 @@ export async function getCase(
     name: session.name || latest.repo.fullName,
     repoFullName: latest.repo.fullName,
     isPrivate: latest.repo.private ?? false,
+    // Only set for non-default branches, so the row carries a chip that
+    // distinguishes several sessions of the same repo. Default-branch
+    // sessions stay chip-free.
+    branch: latest.analyzedRef,
     grade: verdict.grade,
     score: verdict.score,
     ruling: OUTCOME_RULING[verdict.outcome],
