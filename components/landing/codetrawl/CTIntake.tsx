@@ -16,14 +16,9 @@ import { pollJob } from "@/lib/jobsClient";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { hasFunctionalConsent } from "@/lib/cookieConsent";
 import { authClient } from "@/lib/authClient";
+import { DEMO_SESSIONS } from "@/lib/demoSessions";
 
 const PENDING_REPO_KEY = "ct:pending-repo";
-
-const SAMPLES: { label: string; repo: string }[] = [
-  { label: "zod", repo: "colinhacks/zod" },
-  { label: "flask", repo: "pallets/flask" },
-  { label: "gin", repo: "gin-gonic/gin" },
-];
 
 /** Strip protocol / github.com so both "owner/repo" and full URLs work —
  *  the server does the real parsing. Exported so the survey panel can
@@ -114,6 +109,16 @@ export function CTIntake({ value, onChange }: Props) {
     }
   }
 
+  // Samples open a pre-analyzed PUBLIC demo session — a free, instant look at
+  // the product on a real repo for anyone, logged in or not, no signup. Falls
+  // back to the analyze flow only while that demo session id isn't configured
+  // yet (see lib/demoSessions.ts), so the buttons never dead-end.
+  function openSample(s: { repo: string; sessionId: string }) {
+    if (pending) return;
+    if (s.sessionId) router.push(`/session/${s.sessionId}`);
+    else runSweep(s.repo);
+  }
+
   // Resume-after-signup: same contract as the old landing.
   const resumedRef = useRef(false);
   useEffect(() => {
@@ -171,14 +176,14 @@ export function CTIntake({ value, onChange }: Props) {
         public repos · free account · zero config · survey in ~60s
       </div>
       <div className="samples">
-        <span>or try a sample —</span>
-        {SAMPLES.map((s) => (
+        <span>or see a live demo —</span>
+        {DEMO_SESSIONS.map((s) => (
           <button
             key={s.label}
             type="button"
             disabled={pending}
-            aria-label={`Analyze sample repository ${s.repo}`}
-            onClick={() => runSweep(s.repo)}
+            aria-label={`See a live CodeTrawl demo on ${s.repo} — no sign-up`}
+            onClick={() => openSample(s)}
           >
             {s.label}
           </button>
