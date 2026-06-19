@@ -91,6 +91,11 @@ interface RepoInputFormProps {
   accent?: string;
   /** Active button text colour, paired with `accent`. */
   accentOn?: string;
+  /** When true, auto-runs the analysis once on mount if `value` is non-empty.
+   *  Used by the workspace to resume the "stashed repo after signup" handoff:
+   *  the parent prefills `value` from sessionStorage and flips this on, so the
+   *  user's pasted repo runs without a second click. Fires at most once. */
+  autoRun?: boolean;
 }
 
 export function RepoInputForm({
@@ -102,6 +107,7 @@ export function RepoInputForm({
   flat = false,
   accent,
   accentOn,
+  autoRun = false,
 }: RepoInputFormProps) {
   // Flat (workspace) variant: the focus indicator lives on the CONTAINER
   // (focus-within) so a single minimal hairline ring wraps the whole bar —
@@ -179,8 +185,24 @@ export function RepoInputForm({
     return () => clearInterval(interval);
   }, [pending]);
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
+    runAnalysis();
+  }
+
+  // Resume-after-signup: when the parent flips `autoRun` on with a prefilled
+  // value, run the stashed analysis exactly once. The ref guards against
+  // React StrictMode double-invoke and re-renders.
+  const autoRanRef = useRef(false);
+  useEffect(() => {
+    if (autoRun && !autoRanRef.current && value.trim() && !pending) {
+      autoRanRef.current = true;
+      runAnalysis();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, value]);
+
+  function runAnalysis() {
     setError(null);
     if (!value.trim()) return;
 

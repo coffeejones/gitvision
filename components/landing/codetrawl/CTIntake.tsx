@@ -17,8 +17,7 @@ import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { hasFunctionalConsent } from "@/lib/cookieConsent";
 import { authClient } from "@/lib/authClient";
 import { DEMO_SESSIONS } from "@/lib/demoSessions";
-
-const PENDING_REPO_KEY = "ct:pending-repo";
+import { PENDING_REPO_KEY } from "@/lib/pendingRepo";
 
 /** Strip protocol / github.com so both "owner/repo" and full URLs work —
  *  the server does the real parsing. Exported so the survey panel can
@@ -96,7 +95,12 @@ export function CTIntake({ value, onChange }: Props) {
     } catch {
       /* sessionStorage unavailable — proceed to signup anyway */
     }
-    router.push("/signup");
+    // Send the user to the workspace after auth (not the default "/", which
+    // just bounces logged-in users to /cases anyway). The workspace input bar
+    // reads PENDING_REPO_KEY on mount and auto-runs the stashed analysis, so
+    // the repo they pasted isn't dropped. next= flows to both the email form
+    // and the GitHub OAuth callbackURL via CTAuthForm.
+    router.push("/signup?next=/cases");
   }
 
   function runSweep(repo: string) {
