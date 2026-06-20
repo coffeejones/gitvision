@@ -51,6 +51,20 @@ export async function getWatchForSession(
   return rows[0] ?? null;
 }
 
+/** Every non-paused watch across all users — the monitor's work list. */
+export async function listActiveWatches(): Promise<Watch[]> {
+  return db.select().from(schema.watch).where(eq(schema.watch.paused, false));
+}
+
+/** Persist monitor state after a sweep: the head we swept, when, and (when an
+ *  alert fired) the head we alerted on — for change-detect + dedup. */
+export async function updateWatchState(
+  id: string,
+  patch: Partial<Pick<Watch, "lastSweptAt" | "lastHeadSha" | "lastAlertedSha">>,
+): Promise<void> {
+  await db.update(schema.watch).set(patch).where(eq(schema.watch.id, id));
+}
+
 /** All of a user's watches, newest first. */
 export async function listWatchesForUser(userId: string): Promise<Watch[]> {
   return db

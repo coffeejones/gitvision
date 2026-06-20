@@ -1,0 +1,212 @@
+// Watch monitor — the engine behind regression alerts. For each active watch:
+//
+//   1. Cheap change-detect: is the repo's head SHA different from the one we
+//      last swept? (one light GitHub call). If not, skip — no waste.
+//   2. Re-sweep the session's exact scope (same branch + subdir).
+//   3. Diff the new verdict against the prior snapshot's (reusing diffVerdict).
+//   4. If the move is an alert-worthy regression we haven't already alerted on,
+//      emit a WatchAlert.
+//
+// This module COMPUTES alerts + persists watch state. Delivery (email) is a
+// separate concern (the cron entry / a later batch) so detection stays pure
+// and testable. `dryRun` skips all mutation (no snapshot append, no state
+// write) so a run can be inspected safely.
+//
+// Server-only — pulls the analysis pipeline + db. Invoked from the cron
+// entry script (scripts/run-watch-monitor.ts), never from a request handler.
+
+import type { AnalysisSnapshot } from "./types";
+import { analyzeRepo, parseRepoUrl } from "./github";
+import { getGithubTokenForUser } from "./githubUserToken";
+import { getUpstreamHead } from "./freshness";
+import { appendSnapshot, getSession } from "./storage";
+import { computeVerdict } from "./intelligence/verdict";
+import { diffVerdict, type VerdictDelta } from "./intelligence/verdictDelta";
+import { extractHealthSignals } from "./signals";
+import {
+  listActiveWatches,
+  updateWatchState,
+  type Watch,
+} from "./watches";
+
+const LENS_LABEL: Record<string, string> = {
+  health: "Health",
+  security: "Security",
+  forensics: "Forensics",
+  supply: "Supply",
+};
+
+export interface WatchAlert {
+  watchId: string;
+  userId: string;
+  sessionId: string;
+  repoFullName: string;
+  headSha: string;
+  severity: "critical" | "regression";
+  gradeFrom: string | null;
+  gradeTo: string | null;
+  scoreDelta: number;
+  criticalDelta: number;
+  lenses: string[];
+  /** One-line human summary, e.g. "B→C · +2 critical · Security regressed". */
+  summary: string;
+}
+
+export interface WatchMonitorResult {
+  checked: number;
+  swept: number;
+  skippedUnchanged: number;
+  alerts: WatchAlert[];
+  errors: { watchId: string; error: string }[];
+}
+
+/** High-severity finding count for a snapshot — same basis as the case-row
+ *  critical count (lib/intelligence/cases.ts). */
+function countCriticals(snap: AnalysisSnapshot): number {
+  return extractHealthSignals(snap).needsWork.filter(
+    (s) => s.severity === "high",
+  ).length;
+}
+
+/** Decide whether a verdict move is worth an alert, and how loud. Only
+ *  REGRESSIONS qualify; tiny score wobbles are filtered. New high-severity
+ *  findings (a fresh secret / critical CVE / high signal) are "critical";
+ *  a grade drop or a lens vote worsening is a "regression". */
+export function assessRegression(
+  delta: VerdictDelta,
+): { worthy: boolean; severity: WatchAlert["severity"] } {
+  if (delta.direction !== "regressed") {
+    return { worthy: false, severity: "regression" };
+  }
+  if (delta.criticalDelta > 0) return { worthy: true, severity: "critical" };
+  if (delta.grade || delta.departments.length > 0 || delta.scoreDelta <= -3) {
+    return { worthy: true, severity: "regression" };
+  }
+  return { worthy: false, severity: "regression" };
+}
+
+function summarize(delta: VerdictDelta, lenses: string[]): string {
+  const parts: string[] = [];
+  if (delta.grade) parts.push(`${delta.grade.from}→${delta.grade.to}`);
+  if (delta.criticalDelta > 0) parts.push(`+${delta.criticalDelta} critical`);
+  if (lenses.length) parts.push(`${lenses.join(", ")} regressed`);
+  if (!parts.length) parts.push(`score ${delta.scoreDelta}`);
+  return parts.join(" · ");
+}
+
+async function processWatch(
+  watch: Watch,
+  dryRun: boolean,
+): Promise<{ swept: boolean; skipped: boolean; alert: WatchAlert | null }> {
+  const session = await getSession(watch.sessionId);
+  if (!session) {
+    // The session was deleted out from under the watch — nothing to do.
+    return { swept: false, skipped: true, alert: null };
+  }
+  const prev = session.snapshots[session.snapshots.length - 1];
+  if (!prev) return { swept: false, skipped: true, alert: null };
+
+  const parsed = parseRepoUrl(session.repoUrl);
+  if (!parsed) return { swept: false, skipped: true, alert: null };
+
+  const token = await getGithubTokenForUser(session.userId);
+  const ref = prev.analyzedRef ?? null;
+
+  // 1. Cheap change-detect.
+  const head = await getUpstreamHead({
+    sessionId: watch.sessionId,
+    owner: parsed.owner,
+    repo: parsed.repo,
+    defaultBranch: ref ?? prev.repo.defaultBranch,
+    token: token ?? process.env.GITHUB_TOKEN ?? "",
+  });
+  if (!head) {
+    // Couldn't read the head (rate limit / access) — leave state, try later.
+    return { swept: false, skipped: true, alert: null };
+  }
+  if (head === watch.lastHeadSha) {
+    // No new commits since the last sweep — skip the expensive part.
+    if (!dryRun) await updateWatchState(watch.id, { lastSweptAt: new Date() });
+    return { swept: false, skipped: true, alert: null };
+  }
+
+  // 2. Re-sweep the exact scope.
+  const newSnap = await analyzeRepo(parsed.owner, parsed.repo, {
+    ref,
+    subdir: prev.analyzedSubdir ?? null,
+    userToken: token,
+  });
+  if (!dryRun) await appendSnapshot(watch.sessionId, newSnap);
+
+  // 3. Diff verdicts.
+  const delta = diffVerdict(
+    computeVerdict(prev),
+    computeVerdict(newSnap),
+    countCriticals(prev),
+    countCriticals(newSnap),
+  );
+  const { worthy, severity } = assessRegression(delta);
+
+  // 4. Persist state. Only mark alerted (for dedup) when we actually alert on
+  //    a head we haven't alerted on before.
+  const alerting = worthy && head !== watch.lastAlertedSha;
+  if (!dryRun) {
+    await updateWatchState(watch.id, {
+      lastSweptAt: new Date(),
+      lastHeadSha: head,
+      ...(alerting ? { lastAlertedSha: head } : {}),
+    });
+  }
+
+  if (!alerting) return { swept: true, skipped: false, alert: null };
+
+  const lenses = delta.departments.map((d) => LENS_LABEL[d.id] ?? d.id);
+  const alert: WatchAlert = {
+    watchId: watch.id,
+    userId: watch.userId,
+    sessionId: watch.sessionId,
+    repoFullName: watch.repoFullName,
+    headSha: head,
+    severity,
+    gradeFrom: delta.grade?.from ?? null,
+    gradeTo: delta.grade?.to ?? null,
+    scoreDelta: delta.scoreDelta,
+    criticalDelta: delta.criticalDelta,
+    lenses,
+    summary: summarize(delta, lenses),
+  };
+  return { swept: true, skipped: false, alert };
+}
+
+/** Run the monitor across every active watch. Returns the alerts produced
+ *  (delivery is the caller's job). With `dryRun`, re-sweeps in memory but
+ *  writes nothing — safe to inspect. */
+export async function runWatchMonitor(
+  opts: { dryRun?: boolean } = {},
+): Promise<WatchMonitorResult> {
+  const dryRun = !!opts.dryRun;
+  const watches = await listActiveWatches();
+  const result: WatchMonitorResult = {
+    checked: watches.length,
+    swept: 0,
+    skippedUnchanged: 0,
+    alerts: [],
+    errors: [],
+  };
+
+  for (const watch of watches) {
+    try {
+      const { swept, skipped, alert } = await processWatch(watch, dryRun);
+      if (swept) result.swept++;
+      if (skipped) result.skippedUnchanged++;
+      if (alert) result.alerts.push(alert);
+    } catch (err) {
+      result.errors.push({
+        watchId: watch.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return result;
+}
