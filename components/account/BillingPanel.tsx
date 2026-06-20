@@ -16,7 +16,15 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, ExternalLink, RefreshCw } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  ArrowLeftRight,
+  Ban,
+  ExternalLink,
+  RefreshCw,
+  RotateCcw,
+} from "lucide-react";
 import { TOK } from "@/components/account/theme";
 import { TierIcon, type Tier } from "@/components/TierIcon";
 import { tierFor, formatPrice } from "@/lib/pricing";
@@ -44,6 +52,10 @@ export function BillingPanel({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [portalLoading, setPortalLoading] = useState(false);
+  // Which in-app billing action is mid-flight, and which one is awaiting an
+  // inline confirm step. Both kept narrow so only one card can be "armed".
+  const [busy, setBusy] = useState<null | "change" | "cancel">(null);
+  const [confirm, setConfirm] = useState<null | "change" | "cancel">(null);
   const [flash, setFlash] = useState<Flash>(() => {
     if (searchParams.get("upgraded") === "1") {
       return {
@@ -59,6 +71,74 @@ export function BillingPanel({
   // returning undefined — so a stale DB tier can never crash this render.
   const tierConfig = tierFor(tier);
   const isPaid = tier !== "open-case";
+
+  // The "other" paid tier the user can switch to: Plus⇄Pro. Moving to
+  // full-bench (Pro) is the upgrade; moving to standing-docket is the switch.
+  const otherTier: Exclude<Tier, "open-case"> =
+    tier === "full-bench" ? "standing-docket" : "full-bench";
+  const otherConfig = tierFor(otherTier);
+  const isUpgrade = otherTier === "full-bench";
+
+  async function changePlan() {
+    setBusy("change");
+    setFlash({ kind: "none" });
+    try {
+      const res = await fetch("/api/billing/change-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier: otherTier }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Change failed (${res.status})`);
+      }
+      setConfirm(null);
+      setFlash({
+        kind: "success",
+        message: `You're now on ${otherConfig.name}. We kept your billing cycle and Polar prorates the difference automatically.`,
+      });
+      // Re-fetch the server component so the plan card reflects the new tier.
+      router.refresh();
+    } catch (err) {
+      setFlash({
+        kind: "error",
+        message: err instanceof Error ? err.message : "Change failed",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function setCancellation(resume: boolean) {
+    setBusy("cancel");
+    setFlash({ kind: "none" });
+    try {
+      const res = await fetch("/api/billing/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(resume ? { resume: true } : {}),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Request failed (${res.status})`);
+      }
+      setConfirm(null);
+      setFlash({
+        kind: "success",
+        message: resume
+          ? "Cancellation reversed — your subscription will keep renewing."
+          : "Your plan is scheduled to cancel at the end of the current period. You keep full access until then.",
+      });
+      router.refresh();
+    } catch (err) {
+      setFlash({
+        kind: "error",
+        message: err instanceof Error ? err.message : "Request failed",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function openPortal() {
     setPortalLoading(true);
@@ -164,11 +244,181 @@ export function BillingPanel({
         )}
       </SectionCard>
 
-      {/* Actions card */}
+      {/* Change-plan card — switch between the two paid tiers in-app */}
       {isPaid && hasSubscriptionId && (
         <SectionCard
-          title="Manage subscription"
-          description="Update billing info, view invoices, change plan, or cancel — all via your Polar customer portal."
+          title="Change plan"
+          description={
+            isUpgrade
+              ? `Move up to ${otherConfig.name} for more. We keep your billing cycle; Polar prorates the difference automatically.`
+              : `Switch to ${otherConfig.name}. We keep your billing cycle; the change applies from your next invoice with proration.`
+          }
+        >
+          <div className="pt-2">
+            {confirm === "change" ? (
+              <div className="flex flex-col gap-3">
+                <p
+                  className="text-sm"
+                  style={{ color: TOK.textSecondary }}
+                >
+                  Switch from{" "}
+                  <strong style={{ color: TOK.textPrimary }}>
+                    {tierConfig.name}
+                  </strong>{" "}
+                  to{" "}
+                  <strong style={{ color: TOK.textPrimary }}>
+                    {otherConfig.name}
+                  </strong>
+                  ? Your billing cycle stays the same and proration is handled
+                  for you.
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={changePlan}
+                    disabled={busy !== null}
+                    className="inline-flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ background: TOK.textPrimary, color: TOK.bg }}
+                  >
+                    {busy === "change" ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        Switching…
+                      </>
+                    ) : (
+                      <>Confirm switch to {otherConfig.name}</>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirm(null)}
+                    disabled={busy !== null}
+                    className="inline-flex items-center h-10 px-4 rounded-lg text-sm font-medium transition hover:opacity-80 disabled:opacity-50"
+                    style={{
+                      border: `1px solid ${TOK.border}`,
+                      color: TOK.textSecondary,
+                    }}
+                  >
+                    Keep current plan
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirm("change")}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: TOK.textPrimary, color: TOK.bg }}
+              >
+                {isUpgrade ? (
+                  <ArrowUpRight size={14} />
+                ) : (
+                  <ArrowLeftRight size={14} />
+                )}
+                {isUpgrade
+                  ? `Upgrade to ${otherConfig.name}`
+                  : `Switch to ${otherConfig.name}`}
+              </button>
+            )}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Cancel / resume card */}
+      {isPaid && hasSubscriptionId && (
+        <SectionCard
+          title={cancelAtPeriodEnd ? "Resume subscription" : "Cancel subscription"}
+          description={
+            cancelAtPeriodEnd
+              ? "Your plan is scheduled to cancel at the end of the current period. Resume to keep it renewing."
+              : "Cancel at the end of your current billing period. You keep full access until then — no immediate downgrade."
+          }
+        >
+          <div className="pt-2">
+            {cancelAtPeriodEnd ? (
+              <button
+                type="button"
+                onClick={() => setCancellation(true)}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: TOK.textPrimary, color: TOK.bg }}
+              >
+                {busy === "cancel" ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <RotateCcw size={14} />
+                )}
+                Resume subscription
+              </button>
+            ) : confirm === "cancel" ? (
+              <div className="flex flex-col gap-3">
+                <p
+                  className="text-sm"
+                  style={{ color: TOK.textSecondary }}
+                >
+                  Cancel{" "}
+                  <strong style={{ color: TOK.textPrimary }}>
+                    {tierConfig.name}
+                  </strong>
+                  ? You'll keep access until{" "}
+                  {currentPeriodEnd
+                    ? formatDate(currentPeriodEnd)
+                    : "the period ends"}
+                  , then move to Free.
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setCancellation(false)}
+                    disabled={busy !== null}
+                    className="inline-flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ background: TOK.rose, color: "#fff" }}
+                  >
+                    {busy === "cancel" ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        Canceling…
+                      </>
+                    ) : (
+                      <>Confirm cancellation</>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirm(null)}
+                    disabled={busy !== null}
+                    className="inline-flex items-center h-10 px-4 rounded-lg text-sm font-medium transition hover:opacity-80 disabled:opacity-50"
+                    style={{
+                      border: `1px solid ${TOK.border}`,
+                      color: TOK.textSecondary,
+                    }}
+                  >
+                    Never mind
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirm("cancel")}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-medium transition hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ border: `1px solid ${TOK.rose}`, color: TOK.rose }}
+              >
+                <Ban size={14} />
+                Cancel subscription
+              </button>
+            )}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Billing & invoices — Polar customer portal */}
+      {isPaid && hasSubscriptionId && (
+        <SectionCard
+          title="Billing & invoices"
+          description="Update your payment method, download invoices, or view your full billing history in the Polar customer portal."
         >
           <div className="pt-2">
             <button
@@ -177,8 +427,8 @@ export function BillingPanel({
               disabled={portalLoading}
               className="inline-flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                background: TOK.textPrimary,
-                color: TOK.bg,
+                border: `1px solid ${TOK.border}`,
+                color: TOK.textPrimary,
               }}
             >
               {portalLoading ? (

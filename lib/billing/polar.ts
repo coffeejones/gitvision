@@ -87,7 +87,7 @@ function resolvedProductId(
 /** Resolve the Polar product id for a (tier, billing) — env override first,
  *  then the lib/pricing.ts default. Throws if neither is configured
  *  (defensive — prevents sending users to an empty checkout). */
-function productIdFor(
+export function productIdFor(
   tier: Exclude<Tier, "open-case">,
   billing: "monthly" | "annual",
 ): string {
@@ -154,6 +154,40 @@ export async function createCustomerPortalSession(
     customerId,
   });
   return session.customerPortalUrl;
+}
+
+/** Switch an existing subscription to a different product (plan change).
+ *  Used by the in-app "Upgrade to Pro" / "Switch to Plus" buttons. We pass
+ *  ONLY the productId so Polar applies the organisation's default proration
+ *  behaviour — Jonas's explicit choice, so prorating is configured in one
+ *  place (the Polar dashboard) rather than hardcoded here. The
+ *  subscription.updated webhook mirrors the new tier into our user row;
+ *  the route also writes optimistically for instant UI feedback. */
+export async function changeSubscriptionProduct(
+  subscriptionId: string,
+  productId: string,
+) {
+  const client = polarClient();
+  return await client.subscriptions.update({
+    id: subscriptionId,
+    subscriptionUpdate: { productId },
+  });
+}
+
+/** Cancel (or un-cancel) a subscription at the end of the current billing
+ *  period. `cancel: true` schedules cancellation — the user keeps their tier
+ *  until the period ends, then drops to Free. `cancel: false` reverses a
+ *  pending cancellation (the in-app "Resume" button). We deliberately do NOT
+ *  revoke immediately: a paying customer keeps what they paid for. */
+export async function setSubscriptionCancelAtPeriodEnd(
+  subscriptionId: string,
+  cancel: boolean,
+) {
+  const client = polarClient();
+  return await client.subscriptions.update({
+    id: subscriptionId,
+    subscriptionUpdate: { cancelAtPeriodEnd: cancel },
+  });
 }
 
 /** Map a Polar product id back to (tier, billing). Used by webhook
