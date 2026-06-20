@@ -40,6 +40,7 @@ import type { AnalysisSnapshot } from "@/lib/types";
 import { pollJob } from "@/lib/jobsClient";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { TOK } from "@/lib/sessionTheme";
+import { WatchToggle } from "@/components/WatchToggle";
 import { ShareCardModal } from "./ShareCardModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
 import { FeedbackModal } from "./FeedbackModal";
@@ -289,6 +290,8 @@ export function SessionToolbar({
            *  stays the only green action in the toolbar. Beta testers
            *  still see a dedicated pill, just without the colour
            *  conflict. */}
+          <WatchToggle sessionId={sessionId} />
+
           <button
             onClick={() => setFeedbackOpen(true)}
             className="h-8 px-3 rounded-md text-xs transition flex items-center gap-1.5 hover:bg-white/5"
