@@ -1,0 +1,49 @@
+name: Watch monitor
+
+# Daily scheduler for the Watch regression-alert feature. The actual work runs
+# on the Railway server (the monitor needs the full analysis pipeline) — this
+# job just POKES the endpoint once a day. It carries no app logic and no data;
+# it only sends an authenticated POST.
+#
+# Setup (one-time):
+#   1. Repo → Settings → Secrets and variables → Actions → New repository secret
+#      → name: CRON_SECRET, value: the SAME value set as CRON_SECRET in Railway.
+#   2. (Optional) Add a repo variable SITE_URL if the production URL ever
+#      changes; otherwise it defaults to https://codetrawl.com.
+#
+# Notes:
+#   - Scheduled workflows only run from the DEFAULT branch (main).
+#   - GitHub may delay scheduled runs under load; "daily-ish" is fine here.
+#   - Use "Run workflow" (workflow_dispatch) to trigger a run by hand.
+
+on:
+  schedule:
+    # 07:00 UTC daily. GitHub Actions cron is always UTC (≈ 08:00–09:00 in DK).
+    - cron: "0 7 * * *"
+  workflow_dispatch: {}
+
+# Never let two runs overlap if one is slow.
+concurrency:
+  group: watch-monitor
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the watch monitor
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://codetrawl.com' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repo secret is not set — add it under Settings → Secrets → Actions."
+            exit 1
+          fi
+          # -f fails the job on a non-2xx response (e.g. 404 = wrong secret), so
+          # a misconfiguration shows up red in the Actions tab. The endpoint
+          # returns 202 (work runs detached on the server).
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_URL/api/cron/watch-monitor"
+          echo "Watch monitor triggered."
