@@ -28,6 +28,10 @@ import {
   updateWatchState,
   type Watch,
 } from "./watches";
+import { eq } from "drizzle-orm";
+import { db, schema } from "./db";
+import { sendEmail } from "./email/send";
+import { watchAlertEmail } from "./email/templates/watchAlert";
 
 const LENS_LABEL: Record<string, string> = {
   health: "Health",
@@ -209,4 +213,46 @@ export async function runWatchMonitor(
   }
 
   return result;
+}
+
+/** Deliver the alerts from a monitor run by email — one email per user,
+ *  batching all of that user's regressions into a single message (a noisy
+ *  day is one email, not ten). sendEmail never throws + no-ops cleanly when
+ *  RESEND_API_KEY is unset, so this is safe to call unconditionally. */
+export async function deliverWatchAlerts(
+  alerts: WatchAlert[],
+): Promise<{ sent: number; failed: number; skipped: number }> {
+  const out = { sent: 0, failed: 0, skipped: 0 };
+  if (alerts.length === 0) return out;
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://codetrawl.com";
+
+  const byUser = new Map<string, WatchAlert[]>();
+  for (const a of alerts) {
+    const arr = byUser.get(a.userId);
+    if (arr) arr.push(a);
+    else byUser.set(a.userId, [a]);
+  }
+
+  for (const [userId, userAlerts] of byUser) {
+    const rows = await db
+      .select({ email: schema.user.email })
+      .from(schema.user)
+      .where(eq(schema.user.id, userId))
+      .limit(1);
+    const email = rows[0]?.email;
+    if (!email) {
+      out.skipped++;
+      continue;
+    }
+    const { subject, html, text } = watchAlertEmail({
+      alerts: userAlerts,
+      siteUrl,
+    });
+    const res = await sendEmail({ to: email, subject, html, text });
+    if (res.ok) out.sent++;
+    else out.failed++;
+  }
+
+  return out;
 }

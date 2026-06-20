@@ -17,7 +17,7 @@
 
 import { after } from "next/server";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { runWatchMonitor } from "@/lib/watchMonitor";
+import { deliverWatchAlerts, runWatchMonitor } from "@/lib/watchMonitor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +51,15 @@ async function runAndLog(dryRun: boolean) {
   for (const e of res.errors) {
     console.warn(`  ERROR watch ${e.watchId}: ${e.error}`);
   }
+
+  // Deliver by email — real runs only (dry inspects without notifying).
+  if (!dryRun && res.alerts.length > 0) {
+    const d = await deliverWatchAlerts(res.alerts);
+    console.log(
+      `[watch-monitor] email: sent ${d.sent} · failed ${d.failed} · skipped ${d.skipped}`,
+    );
+  }
+
   return res;
 }
 
