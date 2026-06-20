@@ -27,6 +27,9 @@ export interface TierLimits {
   refreshesPerDay: number;
   /** PR-bot can install on this many repos. -1 = unlimited */
   prBotRepos: number;
+  /** Repos that can be put on Watch (re-sweep + regression alerts).
+   *  0 = feature off for this tier. -1 = unlimited */
+  watchedRepos: number;
   /** Allow private GitHub repos for analysis */
   privateRepos: boolean;
   /** AI Briefing + Health Check unlocked */
@@ -85,6 +88,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       savedSessions: 1,
       refreshesPerDay: 5,
       prBotRepos: 0,
+      watchedRepos: 0,
       privateRepos: false,
       aiInsights: false,
       architectureDiagrams: false,
@@ -116,6 +120,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       savedSessions: -1,
       refreshesPerDay: -1,
       prBotRepos: 5,
+      watchedRepos: 5,
       privateRepos: true,
       aiInsights: true,
       architectureDiagrams: true,
@@ -147,6 +152,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       savedSessions: -1,
       refreshesPerDay: -1,
       prBotRepos: -1,
+      watchedRepos: -1,
       privateRepos: true,
       aiInsights: true,
       architectureDiagrams: true,

@@ -99,7 +99,8 @@ export async function withinQuota(
 export type QuotaFeature =
   | "savedSessions"
   | "refreshesPerDay"
-  | "prBotRepos";
+  | "prBotRepos"
+  | "watchedRepos";
 
 /** Format a tier name for display (capitalized) — used by gates +
  *  upgrade prompts so we don't have to repeat the same conversion
