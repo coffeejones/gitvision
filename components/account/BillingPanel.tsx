@@ -13,7 +13,7 @@
 // Polar-hosted URL where the user can update billing info, view
 // invoices, cancel, or upgrade. We don't build any of that ourselves.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -56,6 +56,11 @@ export function BillingPanel({
   // inline confirm step. Both kept narrow so only one card can be "armed".
   const [busy, setBusy] = useState<null | "change" | "cancel">(null);
   const [confirm, setConfirm] = useState<null | "change" | "cancel">(null);
+  // Synchronous re-entry guard. `disabled={busy !== null}` is only a visual
+  // affordance — busy is set via an async setState, so a programmatic rapid
+  // double-fire could slip a second POST through before the re-render. The
+  // ref closes that window the instant the first handler runs.
+  const inFlight = useRef(false);
   const [flash, setFlash] = useState<Flash>(() => {
     if (searchParams.get("upgraded") === "1") {
       return {
@@ -80,6 +85,8 @@ export function BillingPanel({
   const isUpgrade = otherTier === "full-bench";
 
   async function changePlan() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy("change");
     setFlash({ kind: "none" });
     try {
@@ -106,10 +113,13 @@ export function BillingPanel({
       });
     } finally {
       setBusy(null);
+      inFlight.current = false;
     }
   }
 
   async function setCancellation(resume: boolean) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy("cancel");
     setFlash({ kind: "none" });
     try {
@@ -244,8 +254,11 @@ export function BillingPanel({
         )}
       </SectionCard>
 
-      {/* Change-plan card — switch between the two paid tiers in-app */}
-      {isPaid && hasSubscriptionId && (
+      {/* Change-plan card — switch between the two paid tiers in-app.
+          Hidden while a cancellation is pending: the user resumes first, so
+          we never switch a plan that's mid-cancellation (keeps the optimistic
+          cancelAtPeriodEnd mirror coherent). */}
+      {isPaid && hasSubscriptionId && !cancelAtPeriodEnd && (
         <SectionCard
           title="Change plan"
           description={
@@ -277,6 +290,7 @@ export function BillingPanel({
                     type="button"
                     onClick={changePlan}
                     disabled={busy !== null}
+                    aria-busy={busy === "change"}
                     className="inline-flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ background: TOK.textPrimary, color: TOK.bg }}
                   >
@@ -341,15 +355,21 @@ export function BillingPanel({
                 type="button"
                 onClick={() => setCancellation(true)}
                 disabled={busy !== null}
+                aria-busy={busy === "cancel"}
                 className="inline-flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: TOK.textPrimary, color: TOK.bg }}
               >
                 {busy === "cancel" ? (
-                  <RefreshCw size={14} className="animate-spin" />
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Resuming…
+                  </>
                 ) : (
-                  <RotateCcw size={14} />
+                  <>
+                    <RotateCcw size={14} />
+                    Resume subscription
+                  </>
                 )}
-                Resume subscription
               </button>
             ) : confirm === "cancel" ? (
               <div className="flex flex-col gap-3">
@@ -372,6 +392,7 @@ export function BillingPanel({
                     type="button"
                     onClick={() => setCancellation(false)}
                     disabled={busy !== null}
+                    aria-busy={busy === "cancel"}
                     className="inline-flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ background: TOK.rose, color: "#fff" }}
                   >
@@ -425,6 +446,7 @@ export function BillingPanel({
               type="button"
               onClick={openPortal}
               disabled={portalLoading}
+              aria-busy={portalLoading}
               className="inline-flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-medium transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 border: `1px solid ${TOK.border}`,

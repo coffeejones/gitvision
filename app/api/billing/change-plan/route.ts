@@ -54,6 +54,8 @@ export async function POST(req: Request) {
     .select({
       tier: schema.user.tier,
       polarSubscriptionId: schema.user.polarSubscriptionId,
+      subscriptionStatus: schema.user.subscriptionStatus,
+      cancelAtPeriodEnd: schema.user.cancelAtPeriodEnd,
     })
     .from(schema.user)
     .where(eq(schema.user.id, session.user.id))
@@ -76,6 +78,25 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  // Defense-in-depth on the money path: only switch a subscription that's in
+  // a healthy, billable state. A past_due / canceled / revoked subscription
+  // must not be optimistically upgraded while its payment is unresolved.
+  const status = current?.subscriptionStatus;
+  if (status && status !== "active" && status !== "trialing") {
+    return NextResponse.json(
+      { error: "Resolve your billing status before changing plans." },
+      { status: 409 },
+    );
+  }
+  // A cancellation already scheduled? Make the user resume first — keeps the
+  // local cancelAtPeriodEnd mirror coherent and avoids quietly upgrading a
+  // plan they're in the middle of leaving.
+  if (current?.cancelAtPeriodEnd) {
+    return NextResponse.json(
+      { error: "Resume your subscription before changing plans." },
+      { status: 409 },
+    );
+  }
 
   try {
     // Read the live subscription to learn the current billing cycle, so the
@@ -85,9 +106,30 @@ export async function POST(req: Request) {
       typeof subscription.productId === "string"
         ? subscription.productId
         : subscription.product?.id;
-    const currentBilling =
-      (currentProductId && tierFromProductId(currentProductId)?.billing) ||
-      "monthly";
+    // Preserve the billing cycle — but NEVER guess it. If we can't positively
+    // map the live product to monthly/annual (env/prod id drift, a rotated or
+    // recreated Polar product), abort rather than risk moving an annual
+    // customer onto a monthly product (wrong cadence + wrong price). This
+    // mirrors the webhook's "skip, don't guess" stance in
+    // resolveSubscriptionUpdate — the two halves of the money path must share
+    // the same defensive posture.
+    const currentBilling = currentProductId
+      ? tierFromProductId(currentProductId)?.billing
+      : undefined;
+    if (!currentBilling) {
+      console.error(
+        `[billing/change-plan] Could not resolve billing cycle for subscription ${subscriptionId} (productId=${
+          currentProductId ?? "none"
+        }). Refusing to guess.`,
+      );
+      return NextResponse.json(
+        {
+          error:
+            "We couldn't confirm your current billing cycle. Please contact support before changing plans.",
+        },
+        { status: 409 },
+      );
+    }
 
     const targetProductId = productIdFor(targetTier, currentBilling);
 

@@ -235,7 +235,9 @@ export function FlashBanner({
         border: `1px solid ${color}55`,
         color,
       }}
-      role="status"
+      // Errors are announced assertively so a screen-reader user hears a
+      // failure promptly; success stays polite.
+      role={isSuccess ? "status" : "alert"}
     >
       {isSuccess ? (
         <CheckCircle2 size={14} style={{ marginTop: 1, flexShrink: 0 }} />
