@@ -51,22 +51,50 @@ interface CreateCheckoutResult {
   checkoutId: string;
 }
 
-/** Resolve the Polar product id for a (tier, billing) combination
- *  from our central pricing config. Throws if the product hasn't
- *  been configured yet (defensive — prevents accidentally sending
- *  users to an empty checkout). */
+/** Per-(tier, billing) env var that overrides the hardcoded product id in
+ *  lib/pricing.ts. Lets each environment (production vs sandbox) point at its
+ *  own Polar products without a code change, and is the recommended seam for
+ *  fixing a wrong / rotated product id: set the env var and redeploy — no
+ *  code edit. (This also closes the audit's hardcoded-id risk.) */
+const PRODUCT_ENV: Record<
+  Exclude<Tier, "open-case">,
+  { monthly: string; annual: string }
+> = {
+  "standing-docket": {
+    monthly: "POLAR_PRODUCT_PLUS_MONTHLY",
+    annual: "POLAR_PRODUCT_PLUS_ANNUAL",
+  },
+  "full-bench": {
+    monthly: "POLAR_PRODUCT_PRO_MONTHLY",
+    annual: "POLAR_PRODUCT_PRO_ANNUAL",
+  },
+};
+
+/** The configured Polar product id for a (tier, billing): the env override
+ *  when set, else the lib/pricing.ts default. "" only when neither is set. */
+function resolvedProductId(
+  tier: Exclude<Tier, "open-case">,
+  billing: "monthly" | "annual",
+): string {
+  const fromEnv = process.env[PRODUCT_ENV[tier][billing]]?.trim();
+  if (fromEnv) return fromEnv;
+  const config = TIER_CONFIG[tier];
+  return billing === "monthly"
+    ? config.polarProductIdMonthly
+    : config.polarProductIdAnnual;
+}
+
+/** Resolve the Polar product id for a (tier, billing) — env override first,
+ *  then the lib/pricing.ts default. Throws if neither is configured
+ *  (defensive — prevents sending users to an empty checkout). */
 function productIdFor(
   tier: Exclude<Tier, "open-case">,
   billing: "monthly" | "annual",
 ): string {
-  const config = TIER_CONFIG[tier];
-  const id =
-    billing === "monthly"
-      ? config.polarProductIdMonthly
-      : config.polarProductIdAnnual;
+  const id = resolvedProductId(tier, billing);
   if (!id) {
     throw new Error(
-      `No Polar product id configured for tier="${tier}" billing="${billing}". Update lib/pricing.ts.`,
+      `No Polar product id for tier="${tier}" billing="${billing}". Set ${PRODUCT_ENV[tier][billing]} or update lib/pricing.ts.`,
     );
   }
   return id;
@@ -134,12 +162,16 @@ export async function createCustomerPortalSession(
 export function tierFromProductId(
   productId: string,
 ): { tier: Tier; billing: "monthly" | "annual" } | null {
-  for (const tier of Object.values(TIER_CONFIG)) {
-    if (tier.polarProductIdMonthly === productId) {
-      return { tier: tier.id, billing: "monthly" };
+  if (!productId) return null;
+  // Match against the ENV-resolved ids so a webhook event carrying the
+  // env-configured product resolves to the right tier (not just the
+  // hardcoded defaults).
+  for (const tier of ["standing-docket", "full-bench"] as const) {
+    if (resolvedProductId(tier, "monthly") === productId) {
+      return { tier, billing: "monthly" };
     }
-    if (tier.polarProductIdAnnual === productId) {
-      return { tier: tier.id, billing: "annual" };
+    if (resolvedProductId(tier, "annual") === productId) {
+      return { tier, billing: "annual" };
     }
   }
   return null;

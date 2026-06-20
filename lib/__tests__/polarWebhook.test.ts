@@ -2,7 +2,7 @@
 // financially critical path in the app, previously untested. We test the
 // pure decision functions (no HTTP, no DB) extracted into lib/billing/polar.ts.
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import {
   resolveSubscriptionUpdate,
   tierFromProductId,
@@ -31,6 +31,28 @@ describe("tierFromProductId", () => {
 
   it("returns null for an unknown product id", () => {
     expect(tierFromProductId("not-a-real-product")).toBeNull();
+  });
+});
+
+describe("tierFromProductId env override", () => {
+  const KEY = "POLAR_PRODUCT_PLUS_MONTHLY";
+  afterEach(() => {
+    delete process.env[KEY];
+  });
+
+  it("resolves an env-configured product id to its tier", () => {
+    process.env[KEY] = "env-plus-monthly-id";
+    expect(tierFromProductId("env-plus-monthly-id")).toEqual({
+      tier: "standing-docket",
+      billing: "monthly",
+    });
+  });
+
+  it("falls back to the hardcoded pricing id when the env is unset", () => {
+    expect(tierFromProductId(PLUS_MONTHLY)).toEqual({
+      tier: "standing-docket",
+      billing: "monthly",
+    });
   });
 });
 
