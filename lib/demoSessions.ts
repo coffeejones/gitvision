@@ -20,7 +20,7 @@ export interface DemoSession {
 }
 
 export const DEMO_SESSIONS: DemoSession[] = [
-  { label: "zod", repo: "colinhacks/zod", sessionId: "" },
-  { label: "flask", repo: "pallets/flask", sessionId: "" },
-  { label: "gin", repo: "gin-gonic/gin", sessionId: "" },
+  { label: "zod", repo: "colinhacks/zod", sessionId: "qRUWdkTNh-" },
+  { label: "flask", repo: "pallets/flask", sessionId: "2W8VJwPfzl" },
+  { label: "gin", repo: "gin-gonic/gin", sessionId: "zHpVZ1Ybto" },
 ];
