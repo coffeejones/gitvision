@@ -41,6 +41,7 @@ import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
+import { isDemoSession } from "@/lib/demoSessions";
 import {
   ArrowRight,
   Boxes,
@@ -193,10 +194,14 @@ export default async function OverviewPage({
   // show — small refreshes that touched no code don't need a panel.
   // v0.78: gated to Plus+ — Free sees the SinceLastVisit aggregate
   // diff but not the per-function semantic deltas.
+  // Public demo sessions bypass the gate so logged-out visitors see the
+  // per-function semantic diff too.
   const authSession = await getAuthSession();
-  const hasStructuralDiff = authSession
-    ? await canAccess(authSession.user.id, "structuralDiff")
-    : false;
+  const hasStructuralDiff =
+    isDemoSession(id) ||
+    (authSession
+      ? await canAccess(authSession.user.id, "structuralDiff")
+      : false);
   const structDiff = previous ? structuralDiff(previous, current) : null;
   const showStructuralDiff =
     hasStructuralDiff &&

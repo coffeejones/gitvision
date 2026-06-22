@@ -15,6 +15,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
 import { getAuthSession } from "@/lib/authSession";
 import { getUserTier } from "@/lib/billing/gates";
+import { isDemoSession } from "@/lib/demoSessions";
 import { PRFlow } from "@/components/views/PRFlow";
 import { PRBotCallout } from "@/components/views/PRBotCallout";
 
@@ -32,11 +33,15 @@ export default async function PRsRoute({
 
   // The PR-flow historical analysis is free for all tiers. The
   // PR-bot installation callout below is tier-gated — Free sees
-  // "Upgrade to install" instead of the Install CTA.
+  // "Upgrade to install" instead of the Install CTA. Public demo
+  // sessions present the callout in its full (paid) form so visitors
+  // see the feature, not an upsell.
   const authSession = await getAuthSession();
-  const userTier = authSession
-    ? await getUserTier(authSession.user.id)
-    : "open-case";
+  const userTier = isDemoSession(id)
+    ? "full-bench"
+    : authSession
+      ? await getUserTier(authSession.user.id)
+      : "open-case";
 
   return (
     <main className="px-8 py-8 flex flex-col gap-4 max-w-7xl mx-auto w-full">

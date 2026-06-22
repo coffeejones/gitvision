@@ -23,9 +23,11 @@
 // vote as misclassified.
 
 import { notFound } from "next/navigation";
-import { getSession } from "@/lib/storage";
+import { getSession, patchLatestSnapshot } from "@/lib/storage";
 import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
+import { isDemoSession } from "@/lib/demoSessions";
+import { consumeAiBudget } from "@/lib/aiBudget";
 import { computeVerdict } from "@/lib/intelligence/verdict";
 import { computeAdoptionRead } from "@/lib/intelligence/adoptionRead";
 import { generateVerdictNarrative } from "@/lib/intelligence/verdictNarrative";
@@ -54,15 +56,34 @@ export default async function VerdictRoute({
   // Tier gate: AI bench statement is a Plus tier feature (same gate
   // as /insights). Free users still see the deterministic verdict
   // hero + department rulings — only the AI prose layer is hidden.
-  // Skip the Anthropic call entirely for free users so we don't
-  // burn tokens on impressions that won't see the output.
   const authSession = await getAuthSession();
-  const hasAi = authSession
-    ? await canAccess(authSession.user.id, "aiInsights")
-    : false;
-  const narrative = hasAi
-    ? await generateVerdictNarrative(verdict, latest.repo.fullName)
-    : null;
+  const isDemo = isDemoSession(id);
+  const hasAi =
+    isDemo ||
+    (authSession ? await canAccess(authSession.user.id, "aiInsights") : false);
+
+  // Read-through cache: the bench statement is a stable function of the
+  // snapshot, so persist it on first generation and reuse it — paid users
+  // don't re-spend on repeat views. Public demo sessions serve a PRE-BAKED
+  // narrative (see /api/admin/bake-demo-ai) and never generate on a view.
+  //
+  // CRITICAL: scope `narrative` to ENTITLED viewers (hasAi), not merely "a
+  // cached narrative exists". A public session's cache is seeded the first
+  // time any paid user views it; reading it unconditionally would leak the
+  // Plus-only bench statement to free/anonymous viewers of that same public
+  // session (the JudgeStatement render keys off `narrative`). So a non-entitled
+  // viewer gets null here regardless of what's cached.
+  let narrative = hasAi ? (latest.verdictNarrative ?? null) : null;
+  // Generate only for a paid (non-demo) viewer on a cache miss, and only if the
+  // global daily AI budget allows — same kill-switch the POST AI routes honor,
+  // so the inline path can't outrun the cap. Budget is consumed lazily (short-
+  // circuit) so demo/free/cached views never touch it.
+  if (!narrative && hasAi && !isDemo && consumeAiBudget().ok) {
+    narrative = await generateVerdictNarrative(verdict, latest.repo.fullName);
+    if (narrative) {
+      await patchLatestSnapshot(session.id, { verdictNarrative: narrative });
+    }
+  }
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-5xl mx-auto w-full">

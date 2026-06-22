@@ -21,6 +21,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
 import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
+import { isDemoSession } from "@/lib/demoSessions";
 import {
   computeScopeOptions,
   generateClassDiagram,
@@ -46,11 +47,14 @@ export default async function ArchitectureRoute({
 
   // Tier gate: Architecture diagrams unlock from Plus tier up.
   // Free still gets the editorial hero (so the upgrade prompt has
-  // context), but the actual diagram is hidden.
+  // context), but the actual diagram is hidden. Public demo sessions
+  // bypass the gate so logged-out visitors see the full diagram.
   const authSession = await getAuthSession();
-  const hasArchitecture = authSession
-    ? await canAccess(authSession.user.id, "architectureDiagrams")
-    : false;
+  const hasArchitecture =
+    isDemoSession(id) ||
+    (authSession
+      ? await canAccess(authSession.user.id, "architectureDiagrams")
+      : false);
 
   const codeGraph = current.codeGraph;
 

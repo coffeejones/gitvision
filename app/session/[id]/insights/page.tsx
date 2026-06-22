@@ -19,6 +19,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
 import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
+import { isDemoSession } from "@/lib/demoSessions";
 import { TOK } from "@/lib/sessionTheme";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
 import { HealthPanel } from "@/components/HealthPanel";
@@ -39,11 +40,17 @@ export default async function InsightsRoute({
   // Tier gate: AI Insights is unlocked from Plus tier up. Free
   // users land on the upgrade prompt instead of the panels — we
   // don't want to spend Anthropic tokens on free users + this is
-  // the strongest conversion hook in the product
+  // the strongest conversion hook in the product. Public demo
+  // sessions bypass the gate and render the panels read-only on
+  // PRE-BAKED output (see /api/admin/bake-demo-ai) — so a logged-out
+  // visitor sees the AI layer without ever triggering generation.
+  const isDemo = isDemoSession(id);
   const authSession = await getAuthSession();
-  const hasAiInsights = authSession
-    ? await canAccess(authSession.user.id, "aiInsights")
-    : false;
+  const hasAiInsights =
+    isDemo ||
+    (authSession
+      ? await canAccess(authSession.user.id, "aiInsights")
+      : false);
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-7xl mx-auto w-full">
@@ -77,8 +84,16 @@ export default async function InsightsRoute({
       <div id="screenshot-target" className="flex flex-col gap-8">
         {hasAiInsights ? (
           <>
-            <AiSummaryPanel sessionId={session.id} snapshot={current} />
-            <HealthPanel sessionId={session.id} snapshot={current} />
+            <AiSummaryPanel
+              sessionId={session.id}
+              snapshot={current}
+              readOnly={isDemo}
+            />
+            <HealthPanel
+              sessionId={session.id}
+              snapshot={current}
+              readOnly={isDemo}
+            />
           </>
         ) : (
           <UpgradePrompt

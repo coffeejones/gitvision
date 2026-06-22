@@ -24,3 +24,19 @@ export const DEMO_SESSIONS: DemoSession[] = [
   { label: "flask", repo: "pallets/flask", sessionId: "2W8VJwPfzl" },
   { label: "gin", repo: "gin-gonic/gin", sessionId: "zHpVZ1Ybto" },
 ];
+
+/** Configured (non-empty) demo-session ids. */
+const DEMO_SESSION_IDS = new Set(
+  DEMO_SESSIONS.map((d) => d.sessionId).filter(Boolean),
+);
+
+/** True for the pre-analyzed PUBLIC demo sessions linked from the landing.
+ *  These bypass the per-feature tier gates in the session view so a logged-out
+ *  visitor sees the COMPLETE product — architecture diagram, structural diff,
+ *  AI briefing, health check, verdict bench statement — which is the whole
+ *  point of a demo. The bypass is scoped to exactly these ids; every other
+ *  session keeps its normal paywall. AI output for these sessions is pre-baked
+ *  (never generated on an anonymous view) via /api/admin/bake-demo-ai. */
+export function isDemoSession(id: string): boolean {
+  return DEMO_SESSION_IDS.has(id);
+}

@@ -88,9 +88,16 @@ function useAnchorFlash() {
 interface Props {
   sessionId: string;
   snapshot: AnalysisSnapshot;
+  /** Read-only display: cached health check, no generate / regenerate
+   *  control. Used on the public demo sessions (pre-baked, anonymous). */
+  readOnly?: boolean;
 }
 
-export function HealthPanel({ sessionId, snapshot }: Props) {
+export function HealthPanel({
+  sessionId,
+  snapshot,
+  readOnly = false,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +105,10 @@ export function HealthPanel({ sessionId, snapshot }: Props) {
   // Pulse the deep-linked column on hash navigation. Lives at panel
   // level (not per-column) so we only register one effect.
   useAnchorFlash();
+
+  // Read-only with nothing baked yet — render nothing rather than an empty
+  // shell or a control the viewer can't use.
+  if (readOnly && !analysis) return null;
 
   function generate() {
     startTransition(async () => {
@@ -154,35 +165,37 @@ export function HealthPanel({ sessionId, snapshot }: Props) {
             </span>
           )}
         </div>
-        <button
-          onClick={generate}
-          disabled={pending}
-          className="text-xs transition disabled:opacity-40 flex items-center gap-1.5"
-          style={{ color: analysis ? TOK.textSecondary : TOK.accent }}
-        >
-          {pending ? (
-            <>
-              <span
-                className="h-1.5 w-1.5 rounded-full animate-pulse"
-                style={{ background: TOK.accent }}
-              />
-              <span>Analyzing…</span>
-            </>
-          ) : analysis ? (
-            <>
-              <RotateCw size={12} />
-              <span>Regenerate</span>
-            </>
-          ) : (
-            <>
-              <Stethoscope size={12} />
-              <span>Run health check</span>
-            </>
-          )}
-        </button>
+        {!readOnly && (
+          <button
+            onClick={generate}
+            disabled={pending}
+            className="text-xs transition disabled:opacity-40 flex items-center gap-1.5"
+            style={{ color: analysis ? TOK.textSecondary : TOK.accent }}
+          >
+            {pending ? (
+              <>
+                <span
+                  className="h-1.5 w-1.5 rounded-full animate-pulse"
+                  style={{ background: TOK.accent }}
+                />
+                <span>Analyzing…</span>
+              </>
+            ) : analysis ? (
+              <>
+                <RotateCw size={12} />
+                <span>Regenerate</span>
+              </>
+            ) : (
+              <>
+                <Stethoscope size={12} />
+                <span>Run health check</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
 
-      {!analysis && !pending && (
+      {!readOnly && !analysis && !pending && (
         <p className="text-xs" style={{ color: TOK.textMuted }}>
           Claude reads the 20 signals already computed for the Overview strip
           and writes a verdict you can act on — what works, where to dig

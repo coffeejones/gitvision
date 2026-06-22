@@ -1,6 +1,7 @@
 // Shared types for CodeTrawl
 
 import type { CodeGraph } from "./codeAnalysis/types";
+import type { VerdictNarrative } from "./intelligence/verdictNarrative";
 
 export interface RepoMeta {
   owner: string;
@@ -247,6 +248,13 @@ export interface AnalysisSnapshot {
   };
   // Rule-based + AI health check. Lazy-populated — generated on button click.
   healthAnalysis?: HealthAnalysis;
+  // AI bench statement for the verdict page. Read-through cached here on first
+  // generation (the narrative is a stable function of the snapshot), so paid
+  // users don't re-spend on repeat views and the public demo sessions can
+  // serve a pre-baked narrative without generating on an anonymous view.
+  // References the canonical VerdictNarrative (type-only import, erased at
+  // runtime) so the shape can't drift from the generator's output.
+  verdictNarrative?: VerdictNarrative;
   // Summary of what source drove the history (useful for UI + debugging)
   historySource?: {
     kind: "git-log" | "rest-sample";
