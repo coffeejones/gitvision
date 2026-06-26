@@ -30,12 +30,14 @@ import { isDemoSession } from "@/lib/demoSessions";
 import { consumeAiBudget } from "@/lib/aiBudget";
 import { computeVerdict } from "@/lib/intelligence/verdict";
 import { computeAdoptionRead } from "@/lib/intelligence/adoptionRead";
+import { generateRecommendations } from "@/lib/recommendations";
 import { generateVerdictNarrative } from "@/lib/intelligence/verdictNarrative";
 import { TOK } from "@/lib/sessionTheme";
 import { VerdictHero } from "@/components/views/verdict/VerdictHero";
 import { AdoptionReadCard } from "@/components/views/verdict/AdoptionRead";
 import { DepartmentRulingCard } from "@/components/views/verdict/DepartmentRulingCard";
 import { JudgeStatement } from "@/components/views/verdict/JudgeStatement";
+import { RecommendationsPanel } from "@/components/views/verdict/RecommendationsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +53,9 @@ export default async function VerdictRoute({
   const latest = session.snapshots[session.snapshots.length - 1];
   const verdict = computeVerdict(latest);
   const adoption = computeAdoptionRead(latest, verdict);
+  // Deterministic, prioritized "what to fix" — free for everyone (rule-based,
+  // no AI), same as the hero and adoption read.
+  const recommendations = generateRecommendations(latest);
   const sessionBase = `/session/${session.id}`;
 
   // Tier gate: AI bench statement is a Plus tier feature (same gate
@@ -130,6 +135,10 @@ export default async function VerdictRoute({
       {narrative && (
         <JudgeStatement text={narrative.text} model={narrative.model} />
       )}
+
+      {/* What to fix — the actionable payoff. Deterministic + free for all
+          (incl. demo viewers); sits high, with the per-lens detail below. */}
+      <RecommendationsPanel recommendations={recommendations} />
 
       <section className="flex flex-col gap-4">
         <span
