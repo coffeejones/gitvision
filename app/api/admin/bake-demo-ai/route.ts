@@ -21,6 +21,8 @@ import { generateRepoSummary } from "@/lib/aiSummary";
 import { generateHealthAnalysis } from "@/lib/healthAnalysis";
 import { computeVerdict } from "@/lib/intelligence/verdict";
 import { generateVerdictNarrative } from "@/lib/intelligence/verdictNarrative";
+import { generateRecommendations } from "@/lib/recommendations";
+import { generateRecommendationNarrative } from "@/lib/intelligence/recommendationNarrative";
 import type { AnalysisSnapshot } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -130,6 +132,22 @@ export async function POST(req: Request): Promise<Response> {
     }
   } catch (err) {
     failed.push({ feature: "verdictNarrative", error: err instanceof Error ? err.message : "unknown" });
+  }
+
+  // Recommendations "where to start" note. A clean repo has nothing to
+  // summarize (generator returns null on an empty list) — that's a skip, not a
+  // failure, so we only record a failure when there WERE recommendations.
+  try {
+    const recs = generateRecommendations(snap);
+    const recNarrative = await generateRecommendationNarrative(recs, snap.repo.fullName);
+    if (recNarrative) {
+      patch.recommendationNarrative = recNarrative;
+      baked.push("recommendationNarrative");
+    } else if (recs.items.length > 0) {
+      failed.push({ feature: "recommendationNarrative", error: "generator returned no content" });
+    }
+  } catch (err) {
+    failed.push({ feature: "recommendationNarrative", error: err instanceof Error ? err.message : "unknown" });
   }
 
   if (baked.length > 0) {

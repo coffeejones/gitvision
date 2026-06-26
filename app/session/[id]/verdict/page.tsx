@@ -31,6 +31,7 @@ import { consumeAiBudget } from "@/lib/aiBudget";
 import { computeVerdict } from "@/lib/intelligence/verdict";
 import { computeAdoptionRead } from "@/lib/intelligence/adoptionRead";
 import { generateRecommendations } from "@/lib/recommendations";
+import { generateRecommendationNarrative } from "@/lib/intelligence/recommendationNarrative";
 import { generateVerdictNarrative } from "@/lib/intelligence/verdictNarrative";
 import { TOK } from "@/lib/sessionTheme";
 import { VerdictHero } from "@/components/views/verdict/VerdictHero";
@@ -90,6 +91,28 @@ export default async function VerdictRoute({
     }
   }
 
+  // Same Plus-gated, read-through-cached treatment for the recommendations
+  // "where to start" prose. Only entitled viewers see it; only generated for a
+  // paid non-demo viewer when there's something to summarize and budget allows.
+  let recNarrative = hasAi ? (latest.recommendationNarrative ?? null) : null;
+  if (
+    !recNarrative &&
+    hasAi &&
+    !isDemo &&
+    recommendations.items.length > 0 &&
+    consumeAiBudget().ok
+  ) {
+    recNarrative = await generateRecommendationNarrative(
+      recommendations,
+      latest.repo.fullName,
+    );
+    if (recNarrative) {
+      await patchLatestSnapshot(session.id, {
+        recommendationNarrative: recNarrative,
+      });
+    }
+  }
+
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-5xl mx-auto w-full">
       <header className="flex flex-col gap-4">
@@ -136,9 +159,13 @@ export default async function VerdictRoute({
         <JudgeStatement text={narrative.text} model={narrative.model} />
       )}
 
-      {/* What to fix — the actionable payoff. Deterministic + free for all
-          (incl. demo viewers); sits high, with the per-lens detail below. */}
-      <RecommendationsPanel recommendations={recommendations} />
+      {/* What to fix — the actionable payoff. The cards are deterministic +
+          free for all (incl. demo viewers); the optional AI "where to start"
+          lead-in is Plus-gated (narrative is null for free viewers). */}
+      <RecommendationsPanel
+        recommendations={recommendations}
+        narrative={recNarrative}
+      />
 
       <section className="flex flex-col gap-4">
         <span

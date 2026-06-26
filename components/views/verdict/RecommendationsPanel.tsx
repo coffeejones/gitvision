@@ -20,6 +20,7 @@ import {
   Network,
   Package,
   ShieldAlert,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
@@ -117,8 +118,12 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
 
 export function RecommendationsPanel({
   recommendations,
+  narrative,
 }: {
   recommendations: Recommendations;
+  /** Optional Plus-tier AI "where to start" lead-in. Null for free/anonymous
+   *  viewers — the deterministic cards below carry the section on their own. */
+  narrative?: { text: string; model: string } | null;
 }) {
   const { items } = recommendations;
   return (
@@ -136,6 +141,30 @@ export function RecommendationsPanel({
             : "Nothing urgent surfaced — the deterministic checks didn't flag anything to fix right now."}
         </p>
       </div>
+
+      {narrative && items.length > 0 && (
+        <div
+          className="flex flex-col gap-2 rounded-xl p-5"
+          style={{
+            background: TOK.surfaceElevated,
+            border: `1px solid ${TOK.border}`,
+          }}
+        >
+          <div
+            className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em]"
+            style={{ color: TOK.textMuted }}
+          >
+            <Sparkles size={11} style={{ color: TOK.accent }} />
+            <span>Where to start · grounded in the actions below</span>
+          </div>
+          <p
+            className="text-[14.5px] leading-relaxed whitespace-pre-wrap"
+            style={{ color: TOK.textPrimary }}
+          >
+            {narrative.text}
+          </p>
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div

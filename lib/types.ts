@@ -2,6 +2,7 @@
 
 import type { CodeGraph } from "./codeAnalysis/types";
 import type { VerdictNarrative } from "./intelligence/verdictNarrative";
+import type { RecommendationNarrative } from "./intelligence/recommendationNarrative";
 
 export interface RepoMeta {
   owner: string;
@@ -255,6 +256,9 @@ export interface AnalysisSnapshot {
   // References the canonical VerdictNarrative (type-only import, erased at
   // runtime) so the shape can't drift from the generator's output.
   verdictNarrative?: VerdictNarrative;
+  // AI "where to start" note over the deterministic recommendations. Same
+  // read-through cache + Plus gate as verdictNarrative; pre-baked for demos.
+  recommendationNarrative?: RecommendationNarrative;
   // Summary of what source drove the history (useful for UI + debugging)
   historySource?: {
     kind: "git-log" | "rest-sample";
