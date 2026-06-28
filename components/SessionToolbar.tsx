@@ -41,6 +41,7 @@ import { pollJob } from "@/lib/jobsClient";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { TOK } from "@/lib/sessionTheme";
 import { WatchToggle } from "@/components/WatchToggle";
+import { RefineScope } from "@/components/RefineScope";
 import { ShareCardModal } from "./ShareCardModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
 import { FeedbackModal } from "./FeedbackModal";
@@ -291,6 +292,11 @@ export function SessionToolbar({
            *  still see a dedicated pill, just without the colour
            *  conflict. */}
           <WatchToggle sessionId={sessionId} />
+
+          <RefineScope
+            sessionId={sessionId}
+            current={snapshot.analyzedExcludeFolders}
+          />
 
           <button
             onClick={() => setFeedbackOpen(true)}
