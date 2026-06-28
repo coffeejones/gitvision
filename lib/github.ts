@@ -832,7 +832,8 @@ export async function analyzeRepo(
       client,
       owner,
       repo,
-      explicitRef ?? repoMeta.defaultBranch
+      explicitRef ?? repoMeta.defaultBranch,
+      { subdir, excludeFolders }
     );
     codeGraph = undefined;
     codeGraphSkipReason = `Tarball extraction failed: ${

@@ -38,6 +38,7 @@ const PostBody = z.object({
   repoUrl: z.string().min(1),
   ref: z.string().optional(),
   subdir: z.string().optional(),
+  exclude: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
 const octokit = new Octokit({
@@ -90,7 +91,18 @@ export async function POST(req: Request): Promise<Response> {
       { status: 400 }
     );
   }
-  return runAnalysis(parsed.data.repoUrl, parsed.data.ref, parsed.data.subdir);
+  const exc = parsed.data.exclude;
+  const excludeArr = Array.isArray(exc)
+    ? exc
+    : exc
+      ? exc.split(",")
+      : undefined;
+  return runAnalysis(
+    parsed.data.repoUrl,
+    parsed.data.ref,
+    parsed.data.subdir,
+    excludeArr
+  );
 }
 
 async function runAnalysis(

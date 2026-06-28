@@ -51,6 +51,7 @@ export function RefineScope({
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -63,6 +64,20 @@ export function RefineScope({
     return () => window.removeEventListener("mousedown", onClick);
   }, [open]);
 
+  // Re-sync the textarea to the live scope (and clear any stale error) each
+  // time the popover opens — after a re-sweep `current` updates via
+  // router.refresh, so reopening should always reflect the persisted scope.
+  useEffect(() => {
+    if (open) {
+      setValue((current ?? []).join(", "));
+      setMessage(null);
+    }
+  }, [open, current]);
+
+  // Abort an in-flight poll if the component unmounts (navigation mid-sweep)
+  // so we don't setState / router.refresh on an unmounted tree.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   function addChip(s: string) {
     const cur = parseFolders(value);
     if (!cur.includes(s)) setValue([...cur, s].join(", "));
@@ -72,6 +87,8 @@ export function RefineScope({
     if (pending) return;
     startTransition(async () => {
       setMessage(null);
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
         const ownerId = getOrCreateOwnerId();
         const res = await fetch(`/api/sessions/${sessionId}/refresh`, {
@@ -81,6 +98,7 @@ export function RefineScope({
             ...(ownerId ? { [OWNER_ID_HEADER]: ownerId } : {}),
           },
           body: JSON.stringify({ excludeFolders: parseFolders(value) }),
+          signal: controller.signal,
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -91,10 +109,11 @@ export function RefineScope({
           setMessage("Re-sweep enqueued but no job id returned.");
           return;
         }
-        await pollJob(data.jobId, () => {});
+        await pollJob(data.jobId, () => {}, { signal: controller.signal });
         setOpen(false);
         router.refresh();
       } catch (err) {
+        if (controller.signal.aborted) return;
         setMessage(err instanceof Error ? err.message : "Re-sweep failed");
       }
     });

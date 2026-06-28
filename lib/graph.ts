@@ -137,7 +137,12 @@ export function validateExcludeFolders(
   const seen = new Set<string>();
   for (const raw of input) {
     if (typeof raw !== "string") continue;
-    const trimmed = raw.trim().replace(/^\/+|\/+$/g, "");
+    // Normalize backslashes to forward slashes first so a Windows-style
+    // "..\etc" is caught by the same traversal guard below.
+    const trimmed = raw
+      .trim()
+      .replace(/\\/g, "/")
+      .replace(/^\/+|\/+$/g, "");
     if (trimmed === "") continue;
     if (trimmed.length > 200) {
       throw new Error("Exclude path is too long (max 200 chars)");
@@ -161,7 +166,10 @@ export function validateExcludeFolders(
 /** Build a predicate over repo-relative paths: returns true when the path
  *  falls under an excluded folder. A bare-name entry ("tests") matches if any
  *  path segment equals it; a multi-segment entry ("packages/legacy") matches
- *  as a path prefix. Expects already-validated entries. */
+ *  as a path prefix. The matcher works on path SEGMENTS, not dir-vs-file, so a
+ *  bare name also matches an extension-less file whose full name equals the
+ *  entry (e.g. "config" drops both a config/ dir and a top-level "config"
+ *  file) — a negligible, acceptable edge. Expects already-validated entries. */
 export function makeExcludeMatcher(
   excludeFolders: string[]
 ): (relPath: string) => boolean {
@@ -1227,11 +1235,16 @@ export async function buildFileGraph(
   octokit: Octokit,
   owner: string,
   repo: string,
-  defaultBranch: string
+  defaultBranch: string,
+  opts: DownloadAndExtractOptions = {}
 ): Promise<FileGraph> {
   let cleanup: (() => Promise<void>) | null = null;
   try {
-    const extracted = await downloadAndExtract(octokit, owner, repo, defaultBranch);
+    // Forward subdir + excludeFolders so the fallback path (analyzeRepo's
+    // catch branch) produces a fileGraph that honors the same scope as the
+    // happy path — otherwise an excluded folder would reappear in the only
+    // structural view present on that degraded run.
+    const extracted = await downloadAndExtract(octokit, owner, repo, defaultBranch, opts);
     cleanup = extracted.cleanup;
     return await buildFileGraphFromDir(extracted.extractDir);
   } catch (err) {
