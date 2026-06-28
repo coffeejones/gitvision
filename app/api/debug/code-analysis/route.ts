@@ -18,7 +18,11 @@ import { NextResponse } from "next/server";
 import { Octokit } from "octokit";
 import { z } from "zod";
 import { parseRepoUrl, fetchRepoMeta } from "@/lib/github";
-import { downloadAndExtract, validateSubdir } from "@/lib/graph";
+import {
+  downloadAndExtract,
+  validateSubdir,
+  validateExcludeFolders,
+} from "@/lib/graph";
 import { analyzeDirectory } from "@/lib/codeAnalysis/analyze";
 import { csharpPlugin } from "@/lib/codeAnalysis/plugins/csharp";
 import { goPlugin } from "@/lib/codeAnalysis/plugins/go";
@@ -65,10 +69,12 @@ export async function GET(req: Request): Promise<Response> {
       { status: 400 }
     );
   }
+  const excludeParam = url.searchParams.get("exclude");
   return runAnalysis(
     repo,
     url.searchParams.get("ref") ?? undefined,
-    url.searchParams.get("subdir") ?? undefined
+    url.searchParams.get("subdir") ?? undefined,
+    excludeParam ? excludeParam.split(",") : undefined
   );
 }
 
@@ -90,7 +96,8 @@ export async function POST(req: Request): Promise<Response> {
 async function runAnalysis(
   input: string,
   requestedRef?: string,
-  requestedSubdir?: string
+  requestedSubdir?: string,
+  requestedExclude?: string[]
 ): Promise<Response> {
   const parsed = parseRepoUrl(input);
   if (!parsed) {
@@ -101,11 +108,13 @@ async function runAnalysis(
   }
 
   let subdir: string | null;
+  let excludeFolders: string[];
   try {
     subdir = validateSubdir(requestedSubdir);
+    excludeFolders = validateExcludeFolders(requestedExclude);
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Invalid subdir" },
+      { error: err instanceof Error ? err.message : "Invalid scope" },
       { status: 400 }
     );
   }
@@ -123,7 +132,7 @@ async function runAnalysis(
       parsed.owner,
       parsed.repo,
       ref,
-      { subdir }
+      { subdir, excludeFolders }
     );
     cleanup = extracted.cleanup;
     const tarballMs = Date.now() - tarballStart;

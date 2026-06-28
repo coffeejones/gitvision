@@ -302,6 +302,10 @@ export interface AnalysisSnapshot {
    *  ref — used by analyze_diff to pair base vs head snapshots of the
    *  same repo. v0.79+. */
   analyzedRef?: string;
+  /** Folders the user excluded from the code-structure analysis ("point only
+   *  at the real code"). Re-applied on refresh and surfaced in the UI so the
+   *  scope is visible. Absent when nothing was excluded. */
+  analyzedExcludeFolders?: string[];
   /** Secret-scan results from the analyze pipeline (v0.61+). Pure
    *  regex-based pass over .env / config / source files at refresh
    *  time. Only stores redacted previews — the raw credential never
@@ -423,6 +427,11 @@ export type JobInput =
       sessionId: string;
       repoUrl: string;
       subdir: string | null;
+      /** Folders to exclude from the code-structure analysis. Resolved by the
+       *  refresh route: the user's new selection when re-scoping, else the
+       *  previous snapshot's analyzedExcludeFolders (so a plain refresh keeps
+       *  the same scope). Null/absent = no exclusion. */
+      excludeFolders?: string[] | null;
     };
 
 export interface Job {

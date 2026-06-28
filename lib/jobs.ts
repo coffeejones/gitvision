@@ -215,6 +215,7 @@ async function runRefreshSession(job: Job): Promise<void> {
     subdir: job.input.subdir,
     ref: prevRef,
     userToken,
+    excludeFolders: job.input.excludeFolders ?? null,
   });
   await appendSnapshot(sessionId, snapshot);
   await patchJob(job.id, { status: "done", sessionId });

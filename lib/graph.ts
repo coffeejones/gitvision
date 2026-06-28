@@ -118,6 +118,72 @@ export function validateSubdir(
   return trimmed;
 }
 
+/** Max distinct exclude entries — guards against an abusive payload turning
+ *  the per-file matcher into a hot loop. */
+const MAX_EXCLUDE_FOLDERS = 50;
+
+/** Normalize + validate a user-supplied list of folders to exclude from
+ *  analysis ("point only at the real code" — drop generated/vendored/test
+ *  dirs the auto-skip list doesn't cover). Each entry is either a bare folder
+ *  NAME (matched as a path segment anywhere, e.g. "tests") or a PATH prefix
+ *  (e.g. "packages/legacy"). Mirrors validateSubdir's rules: trims, strips
+ *  slashes, rejects empty segments + path traversal, dedupes, caps the count.
+ *  Returns [] for empty/absent input. */
+export function validateExcludeFolders(
+  input: string[] | null | undefined
+): string[] {
+  if (!input || !Array.isArray(input)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of input) {
+    if (typeof raw !== "string") continue;
+    const trimmed = raw.trim().replace(/^\/+|\/+$/g, "");
+    if (trimmed === "") continue;
+    if (trimmed.length > 200) {
+      throw new Error("Exclude path is too long (max 200 chars)");
+    }
+    for (const seg of trimmed.split("/")) {
+      if (seg === "" || seg === "." || seg === "..") {
+        throw new Error(
+          `Invalid exclude "${raw}" — empty segments and path traversal are not allowed`
+        );
+      }
+    }
+    if (!seen.has(trimmed)) {
+      seen.add(trimmed);
+      out.push(trimmed);
+      if (out.length >= MAX_EXCLUDE_FOLDERS) break;
+    }
+  }
+  return out;
+}
+
+/** Build a predicate over repo-relative paths: returns true when the path
+ *  falls under an excluded folder. A bare-name entry ("tests") matches if any
+ *  path segment equals it; a multi-segment entry ("packages/legacy") matches
+ *  as a path prefix. Expects already-validated entries. */
+export function makeExcludeMatcher(
+  excludeFolders: string[]
+): (relPath: string) => boolean {
+  const names = new Set<string>();
+  const prefixes: string[] = [];
+  for (const e of excludeFolders) {
+    if (e.includes("/")) prefixes.push(e);
+    else names.add(e);
+  }
+  return (relPath: string) => {
+    if (names.size > 0) {
+      for (const seg of relPath.split("/")) {
+        if (names.has(seg)) return true;
+      }
+    }
+    for (const p of prefixes) {
+      if (relPath === p || relPath.startsWith(p + "/")) return true;
+    }
+    return false;
+  };
+}
+
 /** Build the tar-extract filter callback. Allows entries inside `subdir`
  *  through, plus root-level manifest files. Everything else is skipped.
  *
@@ -203,6 +269,12 @@ export interface DownloadAndExtractOptions {
    *  `validateSubdir` — this function throws if it doesn't exist in
    *  the extracted tarball. */
   subdir?: string | null;
+  /** Folders to drop from extraction entirely (validated via
+   *  validateExcludeFolders). Applied alongside any subdir scope — an
+   *  excluded folder is skipped even when it lives inside the subdir. Lets a
+   *  user point analysis at only the real code. Empty/undefined = no
+   *  exclusion. */
+  excludeFolders?: string[] | null;
 }
 
 /** Download a GitHub repo tarball, extract it to a temp dir, return the
@@ -222,6 +294,7 @@ export async function downloadAndExtract(
   opts: DownloadAndExtractOptions = {}
 ): Promise<{ extractDir: string; cleanup: () => Promise<void> }> {
   const subdir = opts.subdir ?? null;
+  const excludeFolders = opts.excludeFolders ?? [];
   const tmpRoot = path.join(os.tmpdir(), `repojury-${nanoid(8)}`);
   await fs.mkdir(tmpRoot, { recursive: true });
 
@@ -241,14 +314,27 @@ export async function downloadAndExtract(
   await fs.mkdir(extractDir, { recursive: true });
 
   // GitHub tarballs have one top-level dir like `owner-repo-<sha>/`. Strip
-  // it. When a subdir is set, we additionally filter to keep only relevant
-  // entries.
+  // it. When a subdir and/or exclude-folders are set, we additionally filter
+  // to keep only relevant entries. Exclusion is checked first (on the
+  // repo-relative path) so a dropped folder is dropped even inside the subdir.
+  const subdirFilter = subdir ? buildSubdirExtractFilter(subdir) : null;
+  const isExcluded =
+    excludeFolders.length > 0 ? makeExcludeMatcher(excludeFolders) : null;
+  const extractFilter =
+    subdirFilter || isExcluded
+      ? (entryPath: string) => {
+          const slashIdx = entryPath.indexOf("/");
+          const stripped = slashIdx < 0 ? "" : entryPath.slice(slashIdx + 1);
+          if (isExcluded && stripped && isExcluded(stripped)) return false;
+          return subdirFilter ? subdirFilter(entryPath) : true;
+        }
+      : undefined;
   try {
     await tar.x({
       file: tarballPath,
       cwd: extractDir,
       strip: 1,
-      filter: subdir ? buildSubdirExtractFilter(subdir) : undefined,
+      filter: extractFilter,
     });
     if (subdir) await ensureSubdirExtracted(extractDir, subdir);
     await fs.unlink(tarballPath).catch(() => {});

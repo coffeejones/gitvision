@@ -9,6 +9,7 @@ import { headers as nextHeaders } from "next/headers";
 import { auth } from "@/lib/auth";
 import { checkAndIncrementRefresh } from "@/lib/billing/refreshQuota";
 import { parseRepoUrl } from "@/lib/github";
+import { validateExcludeFolders } from "@/lib/graph";
 import { createJob, processJob } from "@/lib/jobs";
 import { requireSessionOwnership } from "@/lib/ownership";
 import {
@@ -85,11 +86,31 @@ export async function POST(req: Request, ctx: Ctx) {
   const prev = session.snapshots[session.snapshots.length - 1];
   const subdir = prev?.analyzedSubdir ?? null;
 
+  // Exclude-folders: the "refine scope" action sends a new selection in the
+  // body; a plain refresh omits it and keeps the previous snapshot's scope.
+  // An explicitly-provided empty array clears the exclusions.
+  const body = (await req.json().catch(() => ({}))) as {
+    excludeFolders?: unknown;
+  };
+  let excludeFolders: string[] | null;
+  try {
+    excludeFolders =
+      body.excludeFolders !== undefined
+        ? validateExcludeFolders(body.excludeFolders as string[])
+        : (prev?.analyzedExcludeFolders ?? null);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Invalid exclude folders" },
+      { status: 400 },
+    );
+  }
+
   const job = await createJob({
     kind: "refresh-session",
     sessionId: id,
     repoUrl: session.repoUrl,
     subdir,
+    excludeFolders,
   });
   after(() => processJob(job.id));
   return NextResponse.json({ jobId: job.id });

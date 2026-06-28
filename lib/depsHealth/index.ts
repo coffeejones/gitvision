@@ -22,6 +22,7 @@ import type {
 import { fetchRepoTree } from "./tree";
 import { fetchOsvBatch } from "./osv";
 import { mapWithConcurrency } from "./pool";
+import { makeExcludeMatcher } from "../graph";
 import type { EcosystemPlugin, DeclaredPackage } from "./types";
 
 // Ecosystem plugins — add new ones here and nothing else changes.
@@ -53,14 +54,22 @@ export async function analyzeDependencyHealth(
   octokit: Octokit,
   owner: string,
   repo: string,
-  ref = "HEAD"
+  ref = "HEAD",
+  excludeFolders: string[] = []
 ): Promise<DependencyHealth[]> {
   const tree = await fetchRepoTree(octokit, owner, repo, ref);
   if (tree.length === 0) return [];
 
+  // Respect exclude-folders: a manifest under an excluded dir (a vendored
+  // example, a deprecated package) shouldn't contribute to dep-health.
+  const isExcluded =
+    excludeFolders.length > 0 ? makeExcludeMatcher(excludeFolders) : null;
+
   const results: DependencyHealth[] = [];
   for (const plugin of PLUGINS) {
-    const manifestPaths = tree.filter((p) => plugin.isManifest(p));
+    const manifestPaths = tree.filter(
+      (p) => plugin.isManifest(p) && !(isExcluded && isExcluded(p))
+    );
     if (manifestPaths.length === 0) continue;
     const capped = manifestPaths
       .sort((a, b) => a.split("/").length - b.split("/").length) // root-first

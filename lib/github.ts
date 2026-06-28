@@ -37,6 +37,8 @@ import {
   buildFileGraphFromDir,
   downloadAndExtract,
   SubdirNotFoundError,
+  validateExcludeFolders,
+  makeExcludeMatcher,
 } from "./graph";
 import { analyzeRepoHistory, type GitLogCommit } from "./gitLog";
 import { analyzeDependencyHealth } from "./depsHealth/index";
@@ -577,6 +579,14 @@ export interface AnalyzeRepoOptions {
    *  When unset, falls back to the module-level `octokit` (env-PAT or
    *  unauthenticated). v0.81+. */
   userToken?: string | null;
+  /** Folders to drop from the code-structure analysis ("point only at the
+   *  real code"). Threaded into tarball extraction (codeAnalysis, file-graph,
+   *  secret-scan), the git-history hotspots/co-change, and dep-health manifest
+   *  discovery — so an excluded folder disappears from every structural view.
+   *  Stored on the snapshot as `analyzedExcludeFolders` and re-applied on
+   *  refresh. Whole-repo metadata (stars, languages, contributors, PRs) stays
+   *  repo-wide. */
+  excludeFolders?: string[] | null;
 }
 
 export async function analyzeRepo(
@@ -586,6 +596,9 @@ export async function analyzeRepo(
 ): Promise<AnalysisSnapshot> {
   const subdir = opts.subdir ?? null;
   const explicitRef = opts.ref ?? null;
+  // Re-validate defensively (callers should pass validated input, but this is
+  // a public entry point). Empty list = no exclusion.
+  const excludeFolders = validateExcludeFolders(opts.excludeFolders);
   // Build a request-scoped Octokit if the caller supplied a user-token;
   // otherwise reuse the module-level default. Threaded through every
   // helper below so the entire analysis runs against a single token.
@@ -620,7 +633,7 @@ export async function analyzeRepo(
     fetchPullRequests(owner, repo, 2, client),
     analyzeRepoHistory(owner, repo, explicitRef),
     fetchHasReadme(owner, repo, client),
-    analyzeDependencyHealth(client, owner, repo, explicitRef ?? "HEAD"),
+    analyzeDependencyHealth(client, owner, repo, explicitRef ?? "HEAD", excludeFolders),
   ]);
 
   const usingGitLog = history.commits.length > 0;
@@ -669,6 +682,17 @@ export async function analyzeRepo(
     };
   }
 
+  // Apply exclude-folders to the git-history file set so hotspots, co-change,
+  // and activity reflect only the real code. The tarball extraction is filtered
+  // separately (codeAnalysis/file-graph); history paths come from git log, not
+  // the extracted tree, so they need the filter applied here too.
+  if (excludeFolders.length > 0) {
+    const isExcluded = makeExcludeMatcher(excludeFolders);
+    for (const entry of perCommitFiles.values()) {
+      entry.files = entry.files.filter((f) => !isExcluded(f));
+    }
+  }
+
   const allHotspots = computeHotspots(perCommitFiles);
   const hotspots = allHotspots.slice(0, 120); // top 120 files is plenty for visuals
   const allowedFiles = new Set(hotspots.map((h) => h.path));
@@ -711,7 +735,7 @@ export async function analyzeRepo(
       owner,
       repo,
       explicitRef ?? repoMeta.defaultBranch,
-      { subdir }
+      { subdir, excludeFolders }
     );
     cleanup = extracted.cleanup;
 
@@ -851,6 +875,7 @@ export async function analyzeRepo(
     dependencyHealths: dependencyHealths.length > 0 ? dependencyHealths : undefined,
     analyzedSubdir: subdir ?? undefined,
     analyzedRef: explicitRef ?? undefined,
+    analyzedExcludeFolders: excludeFolders.length > 0 ? excludeFolders : undefined,
     secretFindings,
     riskyPatternFindings,
     rateLimitInfo,
