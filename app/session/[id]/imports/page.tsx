@@ -5,8 +5,14 @@ import { Network } from "lucide-react";
 import { getSession } from "@/lib/storage";
 import { TOK } from "@/lib/sessionTheme";
 import { DependencyCanvas } from "@/components/views/DependencyCanvas";
+import { ImpactExplorer } from "@/components/views/ImpactExplorer";
 import { HelpHint } from "@/components/HelpHint";
 import { EmptyPanel } from "@/components/EmptyPanel";
+
+// Cap the code-graph payload shipped to the client for the interactive impact
+// tool. The blast BFS is already node-capped, so this only bounds the SSR
+// payload for mega-repos; above it, the tool is hidden (canvas still renders).
+const IMPACT_EDGE_LIMIT = 40_000;
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +25,14 @@ export default async function ImportsPage({
   const session = await getSession(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
+
+  // Impact tool graph — trim the heavy `functions` array (file-level blast
+  // reads only imports + calls) and skip entirely on very large graphs.
+  const cg = current.codeGraph;
+  const impactGraph =
+    cg && cg.imports.length + cg.calls.length <= IMPACT_EDGE_LIMIT
+      ? { ...cg, functions: [] }
+      : null;
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-8 max-w-7xl mx-auto w-full">
@@ -54,6 +68,8 @@ export default async function ImportsPage({
           />
         </p>
       </header>
+      {impactGraph && <ImpactExplorer graph={impactGraph} />}
+
       <div id="screenshot-target" className="flex flex-col gap-4">
         {current.fileGraph && current.fileGraph.nodes.length > 0 ? (
           <DependencyCanvas graph={current.fileGraph} />
