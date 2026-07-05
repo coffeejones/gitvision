@@ -463,6 +463,16 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
     if (highlightTarget) setOverlayOn(true);
   }, [highlightTarget]);
 
+  // Defensive: a graph prop swap (e.g. Refresh loads a newer snapshot) can
+  // leave `selected` pointing at a file that no longer exists. Focus mode would
+  // then prune to an empty set and blank the canvas until a pane click. Reset
+  // the stale selection instead — mirrors the ImpactExplorer guard.
+  useEffect(() => {
+    if (selected && !graph.nodes.some((n) => n.path === selected)) {
+      setSelected(null);
+    }
+  }, [graph, selected]);
+
   const nodes: Node[] = useMemo(
     () =>
       graph.nodes
