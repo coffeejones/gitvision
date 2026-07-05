@@ -89,6 +89,80 @@ export function rankFilesByFanIn(
     .slice(0, Math.max(0, topN));
 }
 
+export interface FunctionImpactRank {
+  /** Function name as captured by the parser. */
+  name: string;
+  /** Container (class/struct) when known — distinguishes overloads. */
+  containerType?: string;
+  /** Distinct calling functions (across all files) — direct fan-in. */
+  callers: number;
+}
+
+/** Rank the functions defined in `file` by direct caller count, descending —
+ *  seeds the "drill into a function" chips for the selected file. Functions
+ *  never called still appear (callers: 0) so module entry points aren't
+ *  hidden; ties break alphabetically for a stable UI. */
+export function rankFunctionsInFile(
+  cg: CodeGraph,
+  file: string,
+  topN = 12
+): FunctionImpactRank[] {
+  // Distinct caller ids per (name, container) key within the target file.
+  const callers = new Map<string, Set<string>>();
+  for (const c of cg.calls) {
+    if (c.toFile !== file || !c.toFunction || c.fromFunction === null) continue;
+    const key = `${c.toFunction}\x1E${c.toContainerType ?? ""}`;
+    let set = callers.get(key);
+    if (!set) {
+      set = new Set<string>();
+      callers.set(key, set);
+    }
+    set.add(`${c.fromFile}\x1E${c.fromFunction}`);
+  }
+
+  const seen = new Set<string>();
+  const ranked: FunctionImpactRank[] = [];
+  for (const fn of cg.functions) {
+    if (fn.filePath !== file) continue;
+    const key = `${fn.name}\x1E${fn.containerType ?? ""}`;
+    if (seen.has(key)) continue; // overload rows collapse to one chip
+    seen.add(key);
+    ranked.push({
+      name: fn.name,
+      containerType: fn.containerType,
+      callers: callers.get(key)?.size ?? 0,
+    });
+  }
+  ranked.sort(
+    (a, b) => b.callers - a.callers || a.name.localeCompare(b.name)
+  );
+  return ranked.slice(0, Math.max(0, topN));
+}
+
+/** The impact overlay handed to the dependency canvas: the changed file plus
+ *  every file the change reaches, with the minimum hop distance per file. */
+export interface ImpactHighlight {
+  target: string;
+  /** file path → min hop (1 = direct dependent). Excludes the target. */
+  impacted: Map<string, number>;
+}
+
+/** Collapse blast entries (file- or function-level) to a per-file min-hop map
+ *  for the canvas overlay. Function entries in the target file itself are
+ *  dropped — the target is highlighted separately. */
+export function toFileHighlight(
+  target: string,
+  entries: { filePath: string; hop: number }[]
+): ImpactHighlight {
+  const impacted = new Map<string, number>();
+  for (const e of entries) {
+    if (e.filePath === target) continue;
+    const prev = impacted.get(e.filePath);
+    if (prev === undefined || e.hop < prev) impacted.set(e.filePath, e.hop);
+  }
+  return { target, impacted };
+}
+
 /** Distinct non-test files present in the graph (as an edge endpoint), sorted
  *  — the population the file selector picks from. */
 export function impactFileList(cg: CodeGraph): string[] {

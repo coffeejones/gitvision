@@ -6,15 +6,24 @@ import {
   isTestPath,
   deriveTestedFiles,
   rankFilesByFanIn,
+  rankFunctionsInFile,
+  toFileHighlight,
   impactFileList,
 } from "../impact";
 import type { CodeGraph } from "../codeAnalysis/types";
 
 function graph(
   imports: { from: string; to: string }[],
-  calls: { fromFile: string; toFile: string | null }[] = []
+  calls: {
+    fromFile: string;
+    toFile: string | null;
+    fromFunction?: string | null;
+    toFunction?: string | null;
+    toContainerType?: string;
+  }[] = [],
+  functions: { filePath: string; name: string; containerType?: string }[] = []
 ): CodeGraph {
-  return { imports, calls, functions: [] } as unknown as CodeGraph;
+  return { imports, calls, functions } as unknown as CodeGraph;
 }
 
 describe("isTestPath", () => {
@@ -91,6 +100,56 @@ describe("rankFilesByFanIn", () => {
       to: `src/target${i % 5}.ts`,
     }));
     expect(rankFilesByFanIn(graph(imports), 3)).toHaveLength(3);
+  });
+});
+
+describe("rankFunctionsInFile", () => {
+  const fns = [
+    { filePath: "src/core.ts", name: "init" },
+    { filePath: "src/core.ts", name: "parse", containerType: "Parser" },
+    { filePath: "src/core.ts", name: "helper" },
+    { filePath: "src/other.ts", name: "elsewhere" },
+  ];
+  const calls = [
+    // parse: two distinct callers
+    { fromFile: "src/a.ts", fromFunction: "fa", toFile: "src/core.ts", toFunction: "parse", toContainerType: "Parser" },
+    { fromFile: "src/b.ts", fromFunction: "fb", toFile: "src/core.ts", toFunction: "parse", toContainerType: "Parser" },
+    // init: one caller, counted once despite duplicate edges
+    { fromFile: "src/a.ts", fromFunction: "fa", toFile: "src/core.ts", toFunction: "init" },
+    { fromFile: "src/a.ts", fromFunction: "fa", toFile: "src/core.ts", toFunction: "init" },
+    // module-scope call — no source-side fn id, must not count
+    { fromFile: "src/c.ts", fromFunction: null, toFile: "src/core.ts", toFunction: "helper" },
+  ];
+
+  it("ranks by distinct callers with uncalled functions included last", () => {
+    const ranked = rankFunctionsInFile(graph([], calls, fns), "src/core.ts");
+    expect(ranked.map((r) => [r.name, r.callers])).toEqual([
+      ["parse", 2],
+      ["init", 1],
+      ["helper", 0],
+    ]);
+    expect(ranked[0].containerType).toBe("Parser");
+  });
+
+  it("only lists functions defined in the target file, respecting topN", () => {
+    const ranked = rankFunctionsInFile(graph([], calls, fns), "src/core.ts", 2);
+    expect(ranked).toHaveLength(2);
+    expect(ranked.some((r) => r.name === "elsewhere")).toBe(false);
+  });
+});
+
+describe("toFileHighlight", () => {
+  it("collapses entries to per-file min hop and drops the target itself", () => {
+    const h = toFileHighlight("src/core.ts", [
+      { filePath: "src/a.ts", hop: 2 },
+      { filePath: "src/a.ts", hop: 1 }, // min wins
+      { filePath: "src/core.ts", hop: 1 }, // same-file entry dropped
+      { filePath: "src/b.ts", hop: 3 },
+    ]);
+    expect(h.target).toBe("src/core.ts");
+    expect(h.impacted.get("src/a.ts")).toBe(1);
+    expect(h.impacted.get("src/b.ts")).toBe(3);
+    expect(h.impacted.has("src/core.ts")).toBe(false);
   });
 });
 

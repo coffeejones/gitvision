@@ -1,13 +1,15 @@
 "use client";
 
-// Interactive impact analysis — "what breaks if I change this file?"
+// Interactive impact analysis — "what breaks if I change this?"
 //
-// The blast-radius engine (computeBlastRadius) is pure over the CodeGraph and
-// built to recompute in the client on every selection, so this is a fully
-// client-side tool: pick a file → instantly see its incoming set (what depends
-// on it, i.e. what breaks) and outgoing set (what it depends on), grouped by
-// hop distance, with the two risk signals the analysis already knows —
-// cross-module callers and, crucially, dependents that HAVE NO TEST.
+// The blast-radius engine (computeBlastRadius / computeFunctionBlastRadius) is
+// pure over the CodeGraph and built to recompute in the client on every
+// selection, so this is a fully client-side tool: pick a file → instantly see
+// its incoming set (what depends on it, i.e. what breaks) and outgoing set
+// (what it depends on), grouped by hop distance, with the two risk signals the
+// analysis already knows — cross-module callers and, crucially, dependents
+// that HAVE NO TEST. From the file view you can drill into a single function
+// for the sharper question: "what calls parse(), specifically?"
 //
 // Free for everyone. The "most depended-on files" shortlist seeds the tool as
 // the scariest things to touch.
@@ -20,15 +22,18 @@ import {
   Search,
   ShieldCheck,
   TriangleAlert,
+  X,
 } from "lucide-react";
 import {
   computeBlastRadius,
-  type BlastRadiusEntry,
+  computeFunctionBlastRadius,
 } from "@/lib/codeAnalysis/blastRadius";
 import {
   deriveTestedFiles,
   impactFileList,
   rankFilesByFanIn,
+  rankFunctionsInFile,
+  type FunctionImpactRank,
 } from "@/lib/impact";
 import type { CodeGraph } from "@/lib/codeAnalysis/types";
 import { TOK } from "@/lib/sessionTheme";
@@ -43,11 +48,25 @@ function hopLabel(hop: number): string {
   return hop === 1 ? "direct" : `${hop} hops`;
 }
 
+function fnLabel(name: string, containerType?: string): string {
+  return containerType ? `${containerType}.${name}` : name;
+}
+
+/** Unified row shape for both granularities: file entries have no label;
+ *  function entries carry `label` (Container.name) with the path demoted to
+ *  the secondary slot. */
+interface RowEntry {
+  filePath: string;
+  hop: number;
+  crossModule: boolean;
+  label?: string;
+}
+
 function EntryRow({
   entry,
   untested,
 }: {
-  entry: BlastRadiusEntry;
+  entry: RowEntry;
   untested?: boolean;
 }) {
   return (
@@ -55,18 +74,30 @@ function EntryRow({
       className="flex items-center gap-2 py-1.5 px-2 rounded text-[13px]"
       style={{ borderBottom: `1px solid ${TOK.border}` }}
     >
-      <span
-        className="truncate flex-1 min-w-0"
-        style={{ ...MONO, color: TOK.textSecondary }}
-        title={entry.filePath}
-      >
-        {entry.filePath}
-      </span>
+      {entry.label ? (
+        <span className="truncate flex-1 min-w-0" title={`${entry.label} — ${entry.filePath}`}>
+          <span style={{ ...MONO, color: TOK.textPrimary }}>{entry.label}</span>
+          <span
+            className="ml-2 text-[11px]"
+            style={{ ...MONO, color: TOK.textMuted }}
+          >
+            {entry.filePath}
+          </span>
+        </span>
+      ) : (
+        <span
+          className="truncate flex-1 min-w-0"
+          style={{ ...MONO, color: TOK.textSecondary }}
+          title={entry.filePath}
+        >
+          {entry.filePath}
+        </span>
+      )}
       {untested && (
         <span
           className="shrink-0 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded"
           style={{ background: TOK.roseSoft, color: TOK.rose }}
-          title="No test file reaches this dependent — a regression here is unguarded"
+          title="No test file reaches this dependent's file — a regression here is unguarded"
         >
           <TriangleAlert size={10} /> untested
         </span>
@@ -100,13 +131,16 @@ function Column({
 }: {
   title: string;
   icon: React.ReactNode;
-  entries: BlastRadiusEntry[];
+  entries: RowEntry[];
   emptyLabel: string;
   tested: Set<string>;
   showUntested: boolean;
 }) {
   const sorted = [...entries].sort(
-    (a, b) => a.hop - b.hop || a.filePath.localeCompare(b.filePath)
+    (a, b) =>
+      a.hop - b.hop ||
+      a.filePath.localeCompare(b.filePath) ||
+      (a.label ?? "").localeCompare(b.label ?? "")
   );
   return (
     <div className="flex flex-col gap-2 min-w-0">
@@ -125,9 +159,9 @@ function Column({
         </p>
       ) : (
         <div className="flex flex-col">
-          {sorted.slice(0, 60).map((e) => (
+          {sorted.slice(0, 60).map((e, i) => (
             <EntryRow
-              key={`${e.filePath}:${e.hop}`}
+              key={`${e.filePath}:${e.label ?? ""}:${e.hop}:${i}`}
               entry={e}
               untested={showUntested && !tested.has(e.filePath)}
             />
@@ -145,11 +179,28 @@ export function ImpactExplorer({ graph }: { graph: CodeGraph }) {
   const [selected, setSelected] = useState<string | null>(
     topFiles[0]?.file ?? allFiles[0] ?? null
   );
+  const [selectedFn, setSelectedFn] = useState<FunctionImpactRank | null>(null);
   const [query, setQuery] = useState("");
 
   const blast = useMemo(
     () => (selected ? computeBlastRadius(graph, selected) : null),
     [graph, selected]
+  );
+
+  // Drill-down candidates: the selected file's functions, most-called first.
+  const fnRanks = useMemo(
+    () => (selected ? rankFunctionsInFile(graph, selected, 12) : []),
+    [graph, selected]
+  );
+
+  const fnBlast = useMemo(
+    () =>
+      selected && selectedFn
+        ? computeFunctionBlastRadius(graph, selected, selectedFn.name, {
+            targetContainerType: selectedFn.containerType,
+          })
+        : null,
+    [graph, selected, selectedFn]
   );
 
   const matches = useMemo(() => {
@@ -158,14 +209,39 @@ export function ImpactExplorer({ graph }: { graph: CodeGraph }) {
     return allFiles.filter((f) => f.toLowerCase().includes(q)).slice(0, 40);
   }, [query, allFiles]);
 
-  const untestedCount = blast
-    ? blast.incoming.filter((e) => !tested.has(e.filePath)).length
-    : 0;
-
   function pick(file: string) {
     setSelected(file);
+    setSelectedFn(null);
     setQuery("");
   }
+
+  // Active entries for the two columns — function mode maps FunctionBlastEntry
+  // into the unified row shape (label = Container.name).
+  const mode: "file" | "function" = fnBlast ? "function" : "file";
+  const incoming: RowEntry[] = fnBlast
+    ? fnBlast.incoming.map((e) => ({
+        filePath: e.filePath,
+        hop: e.hop,
+        crossModule: e.crossModule,
+        label: fnLabel(e.name, e.containerType),
+      }))
+    : (blast?.incoming ?? []);
+  const outgoing: RowEntry[] = fnBlast
+    ? fnBlast.outgoing.map((e) => ({
+        filePath: e.filePath,
+        hop: e.hop,
+        crossModule: e.crossModule,
+        label: fnLabel(e.name, e.containerType),
+      }))
+    : (blast?.outgoing ?? []);
+
+  const untestedCount = incoming.filter((e) => !tested.has(e.filePath)).length;
+  const crossModuleCount = incoming.filter((e) => e.crossModule).length;
+  const impactedFileCount =
+    mode === "function"
+      ? new Set(incoming.map((e) => e.filePath)).size
+      : incoming.length;
+  const truncated = fnBlast ? fnBlast.truncated : blast?.truncated;
 
   return (
     <section className="flex flex-col gap-4" aria-label="Impact analysis">
@@ -177,7 +253,8 @@ export function ImpactExplorer({ graph }: { graph: CodeGraph }) {
           Impact analysis
         </span>
         <p className="text-sm" style={{ color: TOK.textSecondary }}>
-          Pick a file to see what breaks if you change it — before you touch it.
+          Pick a file to see what breaks if you change it — before you touch
+          it. Drill into a function for the exact call chain.
         </p>
       </div>
 
@@ -269,17 +346,27 @@ export function ImpactExplorer({ graph }: { graph: CodeGraph }) {
             <div className="flex flex-col gap-1 min-w-0">
               <div className="text-[13px]" style={{ color: TOK.textMuted }}>
                 Changing{" "}
+                {mode === "function" && selectedFn && (
+                  <>
+                    <span style={{ ...MONO, color: TOK.accent }}>
+                      {fnLabel(selectedFn.name, selectedFn.containerType)}()
+                    </span>{" "}
+                    in{" "}
+                  </>
+                )}
                 <span style={{ ...MONO, color: TOK.textPrimary }}>
                   {selected}
                 </span>
               </div>
-              {blast.incoming.length === 0 ? (
+              {incoming.length === 0 ? (
                 <div
                   className="inline-flex items-center gap-1.5 text-[15px] font-semibold"
                   style={{ color: TOK.accent }}
                 >
-                  <ShieldCheck size={16} /> Nothing depends on this — safe to
-                  change in isolation.
+                  <ShieldCheck size={16} />
+                  {mode === "function"
+                    ? "No tracked callers — safe to change in isolation."
+                    : "Nothing depends on this — safe to change in isolation."}
                 </div>
               ) : (
                 <div className="flex items-baseline gap-2 flex-wrap">
@@ -287,11 +374,17 @@ export function ImpactExplorer({ graph }: { graph: CodeGraph }) {
                     className="text-[17px] font-semibold"
                     style={{ color: TOK.textPrimary }}
                   >
-                    {blast.incoming.length} file
-                    {blast.incoming.length === 1 ? "" : "s"} break
+                    {incoming.length}{" "}
+                    {mode === "function"
+                      ? `function${incoming.length === 1 ? "" : "s"} break`
+                      : `file${incoming.length === 1 ? "" : "s"} break`}
                   </span>
                   <span className="text-[13px]" style={{ color: TOK.textMuted }}>
-                    {blast.crossModuleCounts.incoming} cross-module
+                    {mode === "function" && (
+                      <>across {impactedFileCount} file
+                      {impactedFileCount === 1 ? "" : "s"} · </>
+                    )}
+                    {crossModuleCount} cross-module
                     {untestedCount > 0 && (
                       <>
                         {" · "}
@@ -306,28 +399,86 @@ export function ImpactExplorer({ graph }: { graph: CodeGraph }) {
             </div>
           </div>
 
+          {/* Function drill-down chips */}
+          {fnRanks.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span
+                className="text-[10px] uppercase tracking-[0.1em] mr-1"
+                style={{ color: TOK.textMuted }}
+              >
+                Drill into:
+              </span>
+              {fnRanks.map((fr) => {
+                const active =
+                  selectedFn?.name === fr.name &&
+                  selectedFn?.containerType === fr.containerType;
+                return (
+                  <button
+                    key={`${fr.containerType ?? ""}.${fr.name}`}
+                    type="button"
+                    onClick={() => setSelectedFn(active ? null : fr)}
+                    className="text-[11px] px-2 py-0.5 rounded transition hover:opacity-80"
+                    style={{
+                      ...MONO,
+                      background: active ? TOK.accentSoft : "transparent",
+                      border: `1px solid ${active ? TOK.accent : TOK.border}`,
+                      color: active ? TOK.accent : TOK.textSecondary,
+                    }}
+                    title={`${fnLabel(fr.name, fr.containerType)} — ${fr.callers} direct caller${fr.callers === 1 ? "" : "s"}`}
+                  >
+                    {fnLabel(fr.name, fr.containerType)}
+                    {fr.callers > 0 && (
+                      <span style={{ color: TOK.textMuted }}> {fr.callers}</span>
+                    )}
+                  </button>
+                );
+              })}
+              {selectedFn && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedFn(null)}
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition hover:opacity-80"
+                  style={{
+                    border: `1px solid ${TOK.border}`,
+                    color: TOK.textMuted,
+                  }}
+                >
+                  <X size={10} /> file view
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Column
               title="What breaks (depends on this)"
               icon={<ArrowDownToLine size={12} />}
-              entries={blast.incoming}
-              emptyLabel="Nothing imports or calls into this file."
+              entries={incoming}
+              emptyLabel={
+                mode === "function"
+                  ? "No resolved calls into this function."
+                  : "Nothing imports or calls into this file."
+              }
               tested={tested}
               showUntested
             />
             <Column
               title="What it depends on"
               icon={<ArrowUpFromLine size={12} />}
-              entries={blast.outgoing}
-              emptyLabel="This file doesn't import or call into anything tracked."
+              entries={outgoing}
+              emptyLabel={
+                mode === "function"
+                  ? "This function doesn't call into anything tracked."
+                  : "This file doesn't import or call into anything tracked."
+              }
               tested={tested}
               showUntested={false}
             />
           </div>
 
-          {blast.truncated && (
+          {truncated && (
             <p className="text-[11px]" style={{ color: TOK.textMuted }}>
-              {blast.truncated}
+              {truncated}
             </p>
           )}
         </div>

@@ -26,12 +26,23 @@ export default async function ImportsPage({
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 
-  // Impact tool graph — trim the heavy `functions` array (file-level blast
-  // reads only imports + calls) and skip entirely on very large graphs.
+  // Impact tool graph — trim the functions array to the fields the tool needs
+  // (name/container for drill-down chips + blast decoration; rows/bodyHash
+  // dropped) and skip entirely on very large graphs.
   const cg = current.codeGraph;
   const impactGraph =
     cg && cg.imports.length + cg.calls.length <= IMPACT_EDGE_LIMIT
-      ? { ...cg, functions: [] }
+      ? {
+          ...cg,
+          functions: cg.functions.map((f) => ({
+            filePath: f.filePath,
+            name: f.name,
+            containerType: f.containerType,
+            complexity: f.complexity,
+            startRow: 0,
+            endRow: 0,
+          })),
+        }
       : null;
 
   return (
