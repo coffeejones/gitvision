@@ -14,11 +14,13 @@
 // Free for everyone. The "most depended-on files" shortlist seeds the tool as
 // the scariest things to touch.
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Crosshair,
   Search,
   ShieldCheck,
@@ -124,6 +126,22 @@ function EntryRow({
   );
 }
 
+// Risk tiers for the "what breaks" column, most-severe first:
+//   0 = untested (a regression here is unguarded — the scariest)
+//   1 = tested but cross-module (a surprising ripple, still caught by a test)
+//   2 = tested, same module (the expected, lowest-concern case)
+const TIER_LABEL = [
+  "Untested — no test guards a regression",
+  "Cross-module ripple",
+  "Same module",
+] as const;
+
+const COLLAPSED_ROWS = 25;
+
+function isUntested(e: RowEntry, tested: Set<string>): boolean {
+  return !isTestPath(e.filePath) && !tested.has(e.filePath);
+}
+
 function Column({
   title,
   icon,
@@ -131,6 +149,8 @@ function Column({
   emptyLabel,
   tested,
   showUntested,
+  riskTiered = false,
+  headerless = false,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -138,24 +158,51 @@ function Column({
   emptyLabel: string;
   tested: Set<string>;
   showUntested: boolean;
+  /** Sort by risk (untested → cross-module → rest) with tier headers, turning
+   *  the flat list into a ranked risk story. Used for the primary column. */
+  riskTiered?: boolean;
+  /** Skip the built-in header — the caller renders its own (a disclosure). */
+  headerless?: boolean;
 }) {
-  const sorted = [...entries].sort(
-    (a, b) =>
+  const [expanded, setExpanded] = useState(false);
+
+  const tierOf = (e: RowEntry): 0 | 1 | 2 =>
+    showUntested && isUntested(e, tested) ? 0 : e.crossModule ? 1 : 2;
+
+  const sorted = [...entries].sort((a, b) => {
+    if (riskTiered) {
+      const d = tierOf(a) - tierOf(b);
+      if (d !== 0) return d;
+    }
+    return (
       a.hop - b.hop ||
       a.filePath.localeCompare(b.filePath) ||
       (a.label ?? "").localeCompare(b.label ?? "")
+    );
+  });
+
+  const tierCounts = [0, 1, 2].map(
+    (t) => sorted.filter((e) => tierOf(e) === t).length
   );
+  // Only group when it earns its keep: a genuinely large list with >1 tier.
+  const grouped =
+    riskTiered && sorted.length >= 6 && tierCounts.filter((c) => c > 0).length > 1;
+
+  const visible = expanded ? sorted : sorted.slice(0, COLLAPSED_ROWS);
+
   return (
     <div className="flex flex-col gap-2 min-w-0">
-      <div
-        className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em]"
-        style={{ color: TOK.textMuted }}
-      >
-        {icon}
-        <span>
-          {title} · {entries.length}
-        </span>
-      </div>
+      {!headerless && (
+        <div
+          className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em]"
+          style={{ color: TOK.textMuted }}
+        >
+          {icon}
+          <span>
+            {title} · {entries.length}
+          </span>
+        </div>
+      )}
       {sorted.length === 0 ? (
         <p className="text-[13px] py-2" style={{ color: TOK.textMuted }}>
           {emptyLabel}
@@ -165,22 +212,44 @@ function Column({
         // dependency canvas ~6 screens down — the two coupled views stay
         // close enough to see the canvas react to a selection.
         <div className="flex flex-col max-h-[42vh] overflow-y-auto pr-1">
-          {sorted.slice(0, 60).map((e, i) => (
-            <EntryRow
-              key={`${e.filePath}:${e.label ?? ""}:${e.hop}:${i}`}
-              entry={e}
-              untested={
-                showUntested && !isTestPath(e.filePath) && !tested.has(e.filePath)
-              }
-            />
-          ))}
-          {sorted.length > 60 && (
-            <p
-              className="text-[11px] py-1.5 px-2"
-              style={{ color: TOK.textMuted }}
+          {visible.map((e, i) => {
+            const tier = tierOf(e);
+            const showHeader =
+              grouped && (i === 0 || tierOf(visible[i - 1]) !== tier);
+            return (
+              <Fragment key={`${e.filePath}:${e.label ?? ""}:${e.hop}:${i}`}>
+                {showHeader && (
+                  <div
+                    className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] pt-2 pb-1 px-2 sticky top-0"
+                    style={{
+                      color: tier === 0 ? TOK.rose : TOK.textMuted,
+                      background: TOK.surface,
+                    }}
+                  >
+                    {tier === 0 && <TriangleAlert size={10} />}
+                    <span>
+                      {TIER_LABEL[tier]} · {tierCounts[tier]}
+                    </span>
+                  </div>
+                )}
+                <EntryRow
+                  entry={e}
+                  untested={showUntested && isUntested(e, tested)}
+                />
+              </Fragment>
+            );
+          })}
+          {sorted.length > COLLAPSED_ROWS && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="text-[11px] py-1.5 px-2 text-left hover:opacity-80 transition"
+              style={{ color: TOK.accent }}
             >
-              + {sorted.length - 60} more not shown
-            </p>
+              {expanded
+                ? "Show less"
+                : `Show all ${sorted.length}`}
+            </button>
           )}
         </div>
       )}
@@ -208,6 +277,9 @@ export function ImpactExplorer({
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedFn, setSelectedFn] = useState<FunctionImpactRank | null>(null);
   const [query, setQuery] = useState("");
+  // "What it depends on" is the secondary question — collapsed by default so
+  // the view leads with "what breaks?".
+  const [depsOpen, setDepsOpen] = useState(false);
 
   const blast = useMemo(
     () => (selected ? computeBlastRadius(graph, selected) : null),
@@ -573,9 +645,10 @@ export function ImpactExplorer({
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="flex flex-col gap-4">
+            {/* Primary question: what breaks, ranked by risk */}
             <Column
-              title="What breaks (depends on this)"
+              title="What breaks if this changes"
               icon={<ArrowDownToLine size={12} />}
               entries={incoming}
               emptyLabel={
@@ -585,19 +658,44 @@ export function ImpactExplorer({
               }
               tested={tested}
               showUntested
+              riskTiered
             />
-            <Column
-              title="What it depends on"
-              icon={<ArrowUpFromLine size={12} />}
-              entries={outgoing}
-              emptyLabel={
-                mode === "function"
-                  ? "This function doesn't call into anything tracked."
-                  : "This file doesn't import or call into anything tracked."
-              }
-              tested={tested}
-              showUntested={false}
-            />
+
+            {/* Secondary question: what it depends on — collapsed by default */}
+            {outgoing.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDepsOpen((v) => !v)}
+                  className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] hover:opacity-80 transition self-start"
+                  style={{ color: TOK.textMuted }}
+                  aria-expanded={depsOpen}
+                >
+                  {depsOpen ? (
+                    <ChevronDown size={12} />
+                  ) : (
+                    <ChevronRight size={12} />
+                  )}
+                  <ArrowUpFromLine size={12} />
+                  What it depends on · {outgoing.length}
+                </button>
+                {depsOpen && (
+                  <Column
+                    headerless
+                    title="What it depends on"
+                    icon={<ArrowUpFromLine size={12} />}
+                    entries={outgoing}
+                    emptyLabel={
+                      mode === "function"
+                        ? "This function doesn't call into anything tracked."
+                        : "This file doesn't import or call into anything tracked."
+                    }
+                    tested={tested}
+                    showUntested={false}
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           {truncated && (
