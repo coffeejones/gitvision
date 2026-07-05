@@ -771,12 +771,22 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           // Emit the call edge
           let calleeName: string | null = null;
           let calleeType: string | undefined;
+          // A member call (`obj.method()`) has a receiver. That MUST be
+          // recorded: when we can't resolve the receiver's type (library
+          // objects like a tree-sitter Query, or untyped locals), the
+          // resolver's strict-receiver guard is the only thing stopping a
+          // call to a common method name (`.matches()`, `.find()`, `.get()`)
+          // from binding to some unrelated single function that happens to
+          // share the name. Without hasReceiver those became false
+          // cross-module dependency edges (parse.ts → SignalsPanel.tsx).
+          let hasReceiver = false;
           if (fnNode.type === "identifier") {
             calleeName = fnNode.text;
             // JS does NOT have implicit-this — bare calls inside methods
             // are global / closure refs, not class methods. Leave
             // calleeType undefined.
           } else if (fnNode.type === "member_expression") {
+            hasReceiver = true;
             const propNode = fnNode.childForFieldName("property");
             const objNode = fnNode.childForFieldName("object");
             if (propNode?.type === "property_identifier") {
@@ -791,6 +801,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
               calleeName,
               inFunction: currentMethod()?.name ?? null,
               calleeType,
+              hasReceiver,
             });
           }
         }

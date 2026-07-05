@@ -785,6 +785,10 @@ function parseCSharpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
               calleeName,
               inFunction: currentMethod()?.name ?? null,
               calleeType: resolveCalleeType(receiver),
+              // An explicit receiver (obj.Method(), obj?.Method()) engages the
+              // resolver's strict guard against false name-collision matches on
+              // untyped receivers; a bare Method() keeps the old behavior.
+              hasReceiver: !!receiver,
             });
           }
         }
@@ -802,6 +806,9 @@ function parseCSharpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
               calleeName: typeName,
               inFunction: currentMethod()?.name ?? null,
               calleeType: typeName,
+              // Constructor call — resolve strictly by type; never fall back
+              // to a top-level function that happens to share the class name.
+              hasReceiver: true,
             });
           }
         }

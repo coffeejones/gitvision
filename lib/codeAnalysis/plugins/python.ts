@@ -815,10 +815,15 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         if (fnNode) {
           let calleeName: string | null = null;
           let calleeType: string | undefined;
+          // A method call (obj.attr()) has a receiver. Record it so the
+          // resolver's strict-receiver guard blocks single-candidate matches
+          // of common method names on untyped receivers (see javascript.ts).
+          let hasReceiver = false;
           if (fnNode.type === "identifier") {
             calleeName = fnNode.text;
             // Python doesn't have implicit self — bare call is global
           } else if (fnNode.type === "attribute") {
+            hasReceiver = true;
             const attrNode = fnNode.childForFieldName("attribute");
             const objNode = fnNode.childForFieldName("object");
             if (attrNode?.type === "identifier") calleeName = attrNode.text;
@@ -829,6 +834,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
               calleeName,
               inFunction: currentMethod()?.name ?? null,
               calleeType,
+              hasReceiver,
             });
           }
         }

@@ -639,6 +639,10 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
             calleeName,
             inFunction: currentMethod()?.name ?? null,
             calleeType: resolveCalleeType(objectNode),
+            // An explicit receiver (obj.method()) engages the resolver's
+            // strict guard against false name-collision matches on untyped
+            // receivers; a bare foo() (implicit this) keeps the old behavior.
+            hasReceiver: !!objectNode,
           });
         }
         for (const child of node.namedChildren) visit(child);
@@ -656,6 +660,9 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
               calleeName: typeName,
               inFunction: currentMethod()?.name ?? null,
               calleeType: typeName,
+              // Constructor call — resolve strictly by type; never fall back
+              // to a top-level function that happens to share the class name.
+              hasReceiver: true,
             });
           }
         }

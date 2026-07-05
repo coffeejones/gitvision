@@ -485,6 +485,34 @@ describe("parseFile — JavaScript extraction", () => {
     expect(names).toContain("handle");
   });
 
+  it("marks member calls with a receiver so the resolver can't false-match names", () => {
+    // Regression: member calls (obj.method()) must carry hasReceiver so the
+    // resolver's strict-receiver guard blocks single-candidate matches of
+    // common method names on untyped receivers. Without this, a call to
+    // .matches()/.find()/.get() bound to a unique unrelated function and
+    // produced false cross-module dependency edges (parse.ts → SignalsPanel).
+    const file: SourceFile = {
+      rel: "src/parser.ts",
+      ext: "ts",
+      content: `
+        function run(query, arr) {
+          const m = query.matches(node); // library method — receiver present
+          const f = arr.find((x) => x);  // built-in — receiver present
+          helper();                       // bare call — no receiver
+        }
+        function helper() { return 1; }
+      `,
+    };
+    const ix = makeIndex([file]);
+    const parsed = parseFile(javascriptPlugin, file, ix);
+    const byName = (n: string) => parsed.calls.find((c) => c.calleeName === n);
+    expect(byName("matches")?.hasReceiver).toBe(true);
+    expect(byName("find")?.hasReceiver).toBe(true);
+    // A bare call keeps hasReceiver falsy so legitimate single-candidate
+    // resolution of top-level helpers still works.
+    expect(byName("helper")?.hasReceiver).toBeFalsy();
+  });
+
   it("computes cyclomatic complexity from decision points", () => {
     const file: SourceFile = {
       rel: "src/complex.ts",

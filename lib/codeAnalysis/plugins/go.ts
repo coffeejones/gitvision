@@ -697,6 +697,11 @@ function parseGoDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         if (fnNode) {
           let calleeName: string | null = null;
           let calleeType: string | undefined;
+          // Only an explicit selector (x.Method()) has a receiver. A bare
+          // identifier call keeps hasReceiver=false even though we set
+          // calleeType as a hint, so the resolver's !hasReceiver fallthrough
+          // can still bind Go's bare package-level calls (see pickCallTarget).
+          let hasReceiver = false;
 
           if (fnNode.type === "identifier") {
             calleeName = fnNode.text;
@@ -704,6 +709,7 @@ function parseGoDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             const m = currentMethod();
             if (m?.receiverType) calleeType = m.receiverType;
           } else if (fnNode.type === "selector_expression") {
+            hasReceiver = true;
             const operand = fnNode.childForFieldName("operand");
             const field = fnNode.childForFieldName("field");
             if (field) calleeName = field.text;
@@ -715,6 +721,7 @@ function parseGoDirect(file: SourceFile, ix: FileIndex): ParsedFile {
               calleeName,
               inFunction: currentMethod()?.name ?? null,
               calleeType,
+              hasReceiver,
             });
           }
         }

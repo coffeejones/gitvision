@@ -790,6 +790,9 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
             calleeName,
             inFunction: currentMethod()?.name ?? null,
             calleeType: resolveMemberCallType(receiver),
+            // Explicit receiver — engage the resolver's strict guard so an
+            // untyped $obj->foo() can't false-match a unique unrelated foo().
+            hasReceiver: true,
           });
         }
         for (const child of node.namedChildren) visit(child);
@@ -805,6 +808,9 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
             calleeName,
             inFunction: currentMethod()?.name ?? null,
             calleeType: resolveScopedCallType(scope),
+            // Explicit scope (Foo::/self::/static::) — a receiver, so engage
+            // the resolver's strict guard against false name-collision matches.
+            hasReceiver: true,
           });
         }
         for (const child of node.namedChildren) visit(child);
@@ -855,6 +861,9 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
             calleeName: typeName,
             inFunction: currentMethod()?.name ?? null,
             calleeType: typeName,
+            // Constructor call — resolve strictly by type; never fall back to
+            // a top-level function that happens to share the class name.
+            hasReceiver: true,
           });
         }
         for (const child of node.namedChildren) visit(child);
