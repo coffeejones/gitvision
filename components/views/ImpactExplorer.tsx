@@ -18,11 +18,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  ChevronLeft,
   Crosshair,
   Search,
   ShieldCheck,
   TriangleAlert,
-  X,
 } from "lucide-react";
 import {
   computeBlastRadius,
@@ -161,7 +161,10 @@ function Column({
           {emptyLabel}
         </p>
       ) : (
-        <div className="flex flex-col">
+        // Capped with internal scroll so a 200-row blast doesn't push the
+        // dependency canvas ~6 screens down — the two coupled views stay
+        // close enough to see the canvas react to a selection.
+        <div className="flex flex-col max-h-[42vh] overflow-y-auto pr-1">
           {sorted.slice(0, 60).map((e, i) => (
             <EntryRow
               key={`${e.filePath}:${e.label ?? ""}:${e.hop}:${i}`}
@@ -199,9 +202,10 @@ export function ImpactExplorer({
   const tested = useMemo(() => deriveTestedFiles(graph), [graph]);
   const topFiles = useMemo(() => rankFilesByFanIn(graph, 8), [graph]);
   const allFiles = useMemo(() => impactFileList(graph), [graph]);
-  const [selected, setSelected] = useState<string | null>(
-    topFiles[0]?.file ?? allFiles[0] ?? null
-  );
+  // Cold-boot with nothing selected: auto-selecting the heaviest file dumped a
+  // ~3800px wall of rows before the user did anything. Start with a compact
+  // invitation instead; the "Most depended-on" chips are the entry point.
+  const [selected, setSelected] = useState<string | null>(null);
   const [selectedFn, setSelectedFn] = useState<FunctionImpactRank | null>(null);
   const [query, setQuery] = useState("");
 
@@ -329,8 +333,9 @@ export function ImpactExplorer({
           Impact analysis
         </span>
         <p className="text-sm" style={{ color: TOK.textSecondary }}>
-          Pick a file to see what could break if you change it — before you
-          touch it. Drill into a function for the exact call chain.
+          Pick a file to see what could break if you change it — the dependency
+          canvas below highlights the impacted files. Drill into a function to
+          see which functions call it directly.
         </p>
       </div>
 
@@ -408,6 +413,21 @@ export function ImpactExplorer({
           )
         )}
       </div>
+
+      {/* Cold-boot guidance — nothing selected yet */}
+      {!selected && (
+        <div
+          className="rounded-xl p-4 flex items-center gap-3"
+          style={{ background: TOK.surface, border: `1px dashed ${TOK.border}` }}
+        >
+          <Crosshair size={15} style={{ color: TOK.textMuted }} />
+          <p className="text-[13px]" style={{ color: TOK.textSecondary }}>
+            Pick a file — search above, or start with the{" "}
+            <span style={{ color: TOK.textPrimary }}>most depended-on</span>{" "}
+            files, the scariest to change.
+          </p>
+        </div>
+      )}
 
       {/* Blast display */}
       {selected && blast && (
@@ -547,7 +567,7 @@ export function ImpactExplorer({
                     color: TOK.textMuted,
                   }}
                 >
-                  <X size={10} /> file view
+                  <ChevronLeft size={11} /> Back to file
                 </button>
               )}
             </div>

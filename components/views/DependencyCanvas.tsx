@@ -669,7 +669,7 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
                   className="px-1.5 py-0.5 text-[10px] transition"
                   style={{
                     background: direction === d ? TOK.accent : "transparent",
-                    color: direction === d ? "#0a0a0c" : TOK.textSecondary,
+                    color: direction === d ? TOK.accentOn : TOK.textSecondary,
                   }}
                 >
                   {d}
@@ -817,9 +817,12 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
         <div
           className="absolute z-10 top-3 right-3 backdrop-blur rounded-lg px-3 py-2 text-[11px] border shadow-lg flex items-center gap-1.5"
           style={{
-            background: "rgba(120, 70, 10, 0.85)",
-            color: "rgba(253, 224, 171, 0.95)",
-            borderColor: "rgba(253, 186, 116, 0.25)",
+            // A truncation notice is a mid-severity warning, not a critical —
+            // use the theme's neutral-dim (amber) tokens so it doesn't read as
+            // an orange alarm (orange is rationed to genuine criticals).
+            background: TOK.amberSoft,
+            color: TOK.amber,
+            borderColor: TOK.border,
           }}
         >
           <AlertTriangle size={11} />
