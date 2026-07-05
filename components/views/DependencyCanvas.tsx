@@ -373,6 +373,30 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
   const impactActive =
     !selected && overlayOn && impactHighlight ? impactHighlight : null;
 
+  // How much of the highlight is actually on screen — the canvas filters
+  // (text filter, hide-isolated) can hide impacted nodes or even the target,
+  // so the toolbar count must report shown-vs-total instead of overstating.
+  const impactShown = useMemo(() => {
+    if (!impactHighlight) return { shown: 0, total: 0, targetHidden: false };
+    let shown = 0;
+    for (const p of impactHighlight.impacted.keys()) {
+      if (visibleIds.has(p)) shown++;
+    }
+    return {
+      shown,
+      total: impactHighlight.impacted.size,
+      targetHidden: !visibleIds.has(impactHighlight.target),
+    };
+  }, [impactHighlight, visibleIds]);
+
+  // A fresh explorer pick (target changes) re-enables the overlay, so a toggle
+  // the user left off doesn't silently swallow their next selection. Drilling
+  // into a function keeps the same target file, so it won't fight the toggle.
+  const highlightTarget = impactHighlight?.target ?? null;
+  useEffect(() => {
+    if (highlightTarget) setOverlayOn(true);
+  }, [highlightTarget]);
+
   const nodes: Node[] = useMemo(
     () =>
       graph.nodes
@@ -533,7 +557,15 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
         {impactHighlight && (
           <label
             className="flex items-center gap-1.5 cursor-pointer"
-            title={`Dim everything the selected change doesn't reach — ${impactHighlight.target} plus ${impactHighlight.impacted.size} impacted file${impactHighlight.impacted.size === 1 ? "" : "s"}`}
+            title={
+              `Dim everything the selected change doesn't reach — ${impactHighlight.target} plus ${impactHighlight.impacted.size} impacted file${impactHighlight.impacted.size === 1 ? "" : "s"}` +
+              (impactShown.shown !== impactShown.total
+                ? ` (${impactShown.total - impactShown.shown} hidden by the canvas filters)`
+                : "") +
+              (impactShown.targetHidden
+                ? " — the target itself is filtered out of the canvas"
+                : "")
+            }
           >
             <input
               type="checkbox"
@@ -542,7 +574,9 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
             />
             <span style={{ color: overlayOn ? TOK.accent : TOK.textSecondary }}>
               Impact: {impactHighlight.target.split("/").pop()} →{" "}
-              {impactHighlight.impacted.size}
+              {impactShown.shown === impactShown.total
+                ? impactShown.total
+                : `${impactShown.shown} / ${impactShown.total}`}
             </span>
           </label>
         )}

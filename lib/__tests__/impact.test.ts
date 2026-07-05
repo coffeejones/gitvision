@@ -37,6 +37,21 @@ describe("isTestPath", () => {
     expect(isTestPath("test_helpers.py")).toBe(true);
   });
 
+  // Regression guard: the untested signal delegates to the canonical
+  // isTestFile, which covers layouts the old local regex set silently missed.
+  // If these ever go red, the signal has drifted from the rest of the app.
+  it("matches the .NET / JVM / PHP / Python / esm layouts the old set missed", () => {
+    expect(isTestPath("src/Widget.Tests.cs")).toBe(true); // .NET suffix
+    expect(isTestPath("src/WidgetTest.cs")).toBe(true);
+    expect(isTestPath("services/UserServiceTest.java")).toBe(true);
+    expect(isTestPath("app/FooTests.kt")).toBe(true); // Kotlin
+    expect(isTestPath("app/UserTest.php")).toBe(true);
+    expect(isTestPath("app_test.py")).toBe(true); // _test.py, not just test_*
+    expect(isTestPath("src/app.test.mjs")).toBe(true);
+    expect(isTestPath("src/app.test.cjs")).toBe(true);
+    expect(isTestPath("packages/x/specs/foo.ts")).toBe(true); // /specs/ segment
+  });
+
   it("does not match real source files", () => {
     expect(isTestPath("src/app.ts")).toBe(false);
     expect(isTestPath("src/latest.ts")).toBe(false); // "test" substring, not a test
@@ -135,6 +150,20 @@ describe("rankFunctionsInFile", () => {
     const ranked = rankFunctionsInFile(graph([], calls, fns), "src/core.ts", 2);
     expect(ranked).toHaveLength(2);
     expect(ranked.some((r) => r.name === "elsewhere")).toBe(false);
+  });
+
+  it("does not count self-recursion as a caller", () => {
+    // The blast engine drops self-edges, so a recursive call must not inflate
+    // the chip count (else the chip says "walk 1" but drilling shows 0 callers).
+    const recFns = [{ filePath: "src/core.ts", name: "walk" }];
+    const recCalls = [
+      { fromFile: "src/core.ts", fromFunction: "walk", toFile: "src/core.ts", toFunction: "walk" },
+      { fromFile: "src/a.ts", fromFunction: "fa", toFile: "src/core.ts", toFunction: "walk" },
+    ];
+    const ranked = rankFunctionsInFile(graph([], recCalls, recFns), "src/core.ts");
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0].name).toBe("walk");
+    expect(ranked[0].callers).toBe(1); // only the external caller, not itself
   });
 });
 

@@ -31,6 +31,7 @@ import {
 import {
   deriveTestedFiles,
   impactFileList,
+  isTestPath,
   rankFilesByFanIn,
   rankFunctionsInFile,
   toFileHighlight,
@@ -99,7 +100,7 @@ function EntryRow({
         <span
           className="shrink-0 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded"
           style={{ background: TOK.roseSoft, color: TOK.rose }}
-          title="No test file reaches this dependent's file — a regression here is unguarded"
+          title="No test file directly imports or calls into this file — no direct test guards a regression here"
         >
           <TriangleAlert size={10} /> untested
         </span>
@@ -108,7 +109,7 @@ function EntryRow({
         <span
           className="shrink-0 text-[10px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded"
           style={{ background: TOK.amberSoft, color: TOK.amber }}
-          title="Lives outside the target's module — a more surprising ripple"
+          title="Lives in a different directory than the target — a ripple beyond the module being edited is more surprising"
         >
           cross-module
         </span>
@@ -165,9 +166,19 @@ function Column({
             <EntryRow
               key={`${e.filePath}:${e.label ?? ""}:${e.hop}:${i}`}
               entry={e}
-              untested={showUntested && !tested.has(e.filePath)}
+              untested={
+                showUntested && !isTestPath(e.filePath) && !tested.has(e.filePath)
+              }
             />
           ))}
+          {sorted.length > 60 && (
+            <p
+              className="text-[11px] py-1.5 px-2"
+              style={{ color: TOK.textMuted }}
+            >
+              + {sorted.length - 60} more not shown
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -205,6 +216,19 @@ export function ImpactExplorer({
     [graph, selected]
   );
 
+  // Total distinct functions in the file — lets us flag when the 12-chip cap
+  // hides some, rather than silently truncating the drill-down list.
+  const fnTotal = useMemo(() => {
+    if (!selected) return 0;
+    const keys = new Set<string>();
+    for (const fn of graph.functions) {
+      if (fn.filePath === selected) {
+        keys.add(`${fn.name}\x1E${fn.containerType ?? ""}`);
+      }
+    }
+    return keys.size;
+  }, [graph, selected]);
+
   const fnBlast = useMemo(
     () =>
       selected && selectedFn
@@ -227,6 +251,28 @@ export function ImpactExplorer({
   useEffect(() => {
     onImpactChange?.(highlight);
   }, [highlight, onImpactChange]);
+
+  // A graph swap (e.g. Refresh loads a newer snapshot) can leave `selected` or
+  // `selectedFn` pointing at a file/function that no longer exists. Without
+  // this reset the tool would render a false "no tracked dependents" and dim
+  // the whole canvas. Re-seed to the most-depended-on file when that happens.
+  useEffect(() => {
+    if (selected && !allFiles.includes(selected)) {
+      setSelected(topFiles[0]?.file ?? allFiles[0] ?? null);
+      setSelectedFn(null);
+      return;
+    }
+    if (
+      selectedFn &&
+      !fnRanks.some(
+        (r) =>
+          r.name === selectedFn.name &&
+          r.containerType === selectedFn.containerType
+      )
+    ) {
+      setSelectedFn(null);
+    }
+  }, [allFiles, topFiles, fnRanks, selected, selectedFn]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -260,13 +306,18 @@ export function ImpactExplorer({
       }))
     : (blast?.outgoing ?? []);
 
-  const untestedCount = incoming.filter((e) => !tested.has(e.filePath)).length;
+  const truncated = fnBlast ? fnBlast.truncated : blast?.truncated;
+  const untestedCount = incoming.filter(
+    (e) => !isTestPath(e.filePath) && !tested.has(e.filePath)
+  ).length;
   const crossModuleCount = incoming.filter((e) => e.crossModule).length;
+  // Exact count out of context, but a floor when the BFS was capped.
+  const countLabel = truncated ? `${incoming.length}+` : `${incoming.length}`;
+  const plural = incoming.length !== 1 || !!truncated;
   const impactedFileCount =
     mode === "function"
       ? new Set(incoming.map((e) => e.filePath)).size
       : incoming.length;
-  const truncated = fnBlast ? fnBlast.truncated : blast?.truncated;
 
   return (
     <section className="flex flex-col gap-4" aria-label="Impact analysis">
@@ -278,8 +329,8 @@ export function ImpactExplorer({
           Impact analysis
         </span>
         <p className="text-sm" style={{ color: TOK.textSecondary }}>
-          Pick a file to see what breaks if you change it — before you touch
-          it. Drill into a function for the exact call chain.
+          Pick a file to see what could break if you change it — before you
+          touch it. Drill into a function for the exact call chain.
         </p>
       </div>
 
@@ -293,13 +344,22 @@ export function ImpactExplorer({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && matches[0]) pick(matches[0]);
+              else if (e.key === "Escape") setQuery("");
+            }}
+            aria-label="Search files for impact analysis"
             placeholder="Search a file…"
             className="flex-1 bg-transparent outline-none text-[13px]"
             style={{ ...MONO, color: TOK.textPrimary }}
           />
         </div>
 
-        {matches.length > 0 ? (
+        {query.trim() && matches.length === 0 ? (
+          <p className="text-[13px] px-1 py-1" style={{ color: TOK.textMuted }}>
+            No files match “{query.trim()}”.
+          </p>
+        ) : matches.length > 0 ? (
           <div
             className="flex flex-col rounded-lg overflow-hidden"
             style={{ border: `1px solid ${TOK.border}` }}
@@ -384,14 +444,24 @@ export function ImpactExplorer({
                 </span>
               </div>
               {incoming.length === 0 ? (
-                <div
-                  className="inline-flex items-center gap-1.5 text-[15px] font-semibold"
-                  style={{ color: TOK.accent }}
-                >
-                  <ShieldCheck size={16} />
-                  {mode === "function"
-                    ? "No tracked callers — safe to change in isolation."
-                    : "Nothing depends on this — safe to change in isolation."}
+                <div className="flex flex-col gap-0.5">
+                  <div
+                    className="inline-flex items-center gap-1.5 text-[15px] font-semibold"
+                    style={{ color: TOK.accent }}
+                  >
+                    <ShieldCheck size={16} />
+                    {mode === "function"
+                      ? "No tracked callers"
+                      : "No tracked dependents"}
+                  </div>
+                  <span
+                    className="text-[12px]"
+                    style={{ color: TOK.textMuted }}
+                  >
+                    {mode === "function"
+                      ? "No resolved call edge points here. Dynamic dispatch, reflection, and callers outside this repo aren't tracked."
+                      : "Nothing in the import/call graph reaches this file. Dynamic imports, framework wiring, and external consumers aren't tracked."}
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-baseline gap-2 flex-wrap">
@@ -399,10 +469,10 @@ export function ImpactExplorer({
                     className="text-[17px] font-semibold"
                     style={{ color: TOK.textPrimary }}
                   >
-                    {incoming.length}{" "}
+                    {countLabel}{" "}
                     {mode === "function"
-                      ? `function${incoming.length === 1 ? "" : "s"} break`
-                      : `file${incoming.length === 1 ? "" : "s"} break`}
+                      ? `function${plural ? "s" : ""} call this`
+                      : `file${plural ? "s" : ""} depend on this`}
                   </span>
                   <span className="text-[13px]" style={{ color: TOK.textMuted }}>
                     {mode === "function" && (
@@ -458,6 +528,15 @@ export function ImpactExplorer({
                   </button>
                 );
               })}
+              {fnTotal > fnRanks.length && (
+                <span
+                  className="text-[11px] px-1 self-center"
+                  style={{ color: TOK.textMuted }}
+                  title={`Showing the ${fnRanks.length} most-called functions of ${fnTotal} in this file`}
+                >
+                  + {fnTotal - fnRanks.length} more
+                </span>
+              )}
               {selectedFn && (
                 <button
                   type="button"

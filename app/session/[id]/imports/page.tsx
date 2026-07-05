@@ -11,7 +11,10 @@ import { EmptyPanel } from "@/components/EmptyPanel";
 // Cap the code-graph payload shipped to the client for the interactive impact
 // tool. The blast BFS is already node-capped, so this only bounds the SSR
 // payload for mega-repos; above it, the tool is hidden (canvas still renders).
-const IMPACT_EDGE_LIMIT = 40_000;
+// Measured against the LEAN projection (resolved calls + imports only), so the
+// cap tracks the bytes we actually ship, not the unresolved-call noise that
+// makes up the bulk of cg.calls on big repos. ~100 bytes/edge → ~2.5MB here.
+const IMPACT_EDGE_LIMIT = 25_000;
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +28,22 @@ export default async function ImportsPage({
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 
-  // Impact tool graph — trim the functions array to the fields the tool needs
-  // (name/container for drill-down chips + blast decoration; rows/bodyHash
-  // dropped) and skip entirely on very large graphs.
+  // Impact tool graph — an explicit projection, NOT a `{...cg}` spread. The
+  // tool reads only imports + resolved calls + a handful of function fields, so
+  // we ship exactly that and drop everything else (classes — which re-carry
+  // untrimmed FunctionDefs incl. bodyHash — plus fileComplexity/filesByExt/
+  // byPlugin the tool never touches). Unresolved call edges (toFile == null)
+  // are 70-90% of cg.calls on big repos and no impact consumer can use them, so
+  // they're filtered out here; the payload cap is measured against what's left.
   const cg = current.codeGraph;
+  const resolvedCalls = cg
+    ? cg.calls.filter((c) => c.toFile != null)
+    : [];
   const impactGraph =
-    cg && cg.imports.length + cg.calls.length <= IMPACT_EDGE_LIMIT
+    cg && cg.imports.length + resolvedCalls.length <= IMPACT_EDGE_LIMIT
       ? {
-          ...cg,
+          imports: cg.imports,
+          calls: resolvedCalls,
           functions: cg.functions.map((f) => ({
             filePath: f.filePath,
             name: f.name,
@@ -41,6 +52,10 @@ export default async function ImportsPage({
             startRow: 0,
             endRow: 0,
           })),
+          fileComplexity: {},
+          filesByExt: {},
+          byPlugin: {},
+          generatedAt: cg.generatedAt,
         }
       : null;
 

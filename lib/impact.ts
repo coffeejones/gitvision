@@ -14,25 +14,19 @@
 //      entry point ("here are the scariest files to touch — click to explore").
 
 import type { CodeGraph } from "./codeAnalysis/types";
+import { isTestFile } from "./codeAnalysis/testCoverage";
 
-// Test-file path patterns — kept local so this module stays client-safe (no
-// import of the server-side analysis modules). Mirrors the set in
-// lib/signals.ts / lib/codeAnalysis/testCoverage.ts.
-const TEST_PATTERNS: RegExp[] = [
-  /\.test\.[jt]sx?$/i,
-  /\.spec\.[jt]sx?$/i,
-  /_test\.go$/i,
-  /_spec\.rb$/i,
-  /(^|\/)test_[^/]*\.py$/i,
-  /(^|\/)tests?\//i,
-  /(^|\/)__tests__\//i,
-  /(^|\/)spec\//i,
-];
-
-/** True when a repo-relative path looks like a test file. */
-export function isTestPath(path: string): boolean {
-  return TEST_PATTERNS.some((re) => re.test(path));
-}
+/** True when a repo-relative path looks like a test file.
+ *
+ *  Delegates to the canonical `isTestFile` (lib/codeAnalysis/testCoverage.ts)
+ *  so the untested signal here can never diverge from the rest of the app.
+ *  That module is pure and imports only types, so it stays client-safe —
+ *  blastRanking.ts already consumes it the same way. A local regex set used
+ *  to live here and silently drifted (it missed .NET `*Test.cs`, `*_test.py`,
+ *  minitest `_test.rb`, `.test.mjs/.cjs`, `/specs/`, …), producing false
+ *  "untested" badges; re-exporting the one source of truth kills that class
+ *  of bug. */
+export const isTestPath = isTestFile;
 
 /** The set of non-test files that at least one TEST file imports or calls
  *  into — our lightweight "has test coverage" signal, derived from the same
@@ -111,6 +105,10 @@ export function rankFunctionsInFile(
   const callers = new Map<string, Set<string>>();
   for (const c of cg.calls) {
     if (c.toFile !== file || !c.toFunction || c.fromFunction === null) continue;
+    // Self-recursion isn't a caller: the blast engine drops self-edges
+    // (from === to), so counting a function's own recursive call here would
+    // make the chip read "foo 1" while drilling in shows "no tracked callers".
+    if (c.fromFile === file && c.fromFunction === c.toFunction) continue;
     const key = `${c.toFunction}\x1E${c.toContainerType ?? ""}`;
     let set = callers.get(key);
     if (!set) {
