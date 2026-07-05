@@ -3,10 +3,14 @@
 // Dependency Canvas — renders a FileGraph as a layered, brick-stagger grid.
 //
 // Scale strategy for big repos: *filtering*, not aggregation.
+//   - Hide test files — default on; they dominate the fan-in of shared hubs
 //   - Hide isolated files (no incoming or outgoing edges) — default on for >100 files
 //   - Text filter — paths not matching are hidden
 //   - Minimap — default on for >100 files so you can navigate
-//   - Click a file → neighbors highlighted, rest dimmed
+//   - Click a file → FOCUS mode: prune to that file's N-hop neighborhood
+//     (a readable local subgraph) instead of dimming the whole graph. The
+//     external impact overlay from the panel above still dims rather than
+//     prunes — two levels: soft highlight on the full map vs. zoom-in on click.
 //
 // Layout: BFS depth layers, adaptive cols-per-row with brick stagger for
 // an organic "pyramid" feel.
@@ -32,10 +36,12 @@ import {
   type Edge,
   type NodeProps,
 } from "@xyflow/react";
-import { AlertTriangle, Network } from "lucide-react";
+import { AlertTriangle, Crosshair, Minus, Network, Plus, X } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import { MUTED, VIZ_NEUTRAL, VIZ_SURFACE } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
+import { neighborhood, type FocusDirection } from "@/lib/graphFocus";
+import { isTestFile } from "@/lib/codeAnalysis/testCoverage";
 import type { ImpactHighlight } from "@/lib/impact";
 import type {
   FileGraph,
@@ -220,6 +226,10 @@ const ROW_H = 96;
 const LAYER_GAP = 120;
 const MAX_PER_ROW_CAP = 26;
 
+// Focus mode: cap the neighborhood so a hub file (e.g. a 51-importer types.ts)
+// doesn't re-explode into the same hairball. Nearest hops are kept first.
+const FOCUS_CAP = 60;
+
 function layeredPositions(
   ids: string[],
   edges: Array<{ from: string; to: string }>
@@ -257,8 +267,13 @@ function layeredPositions(
   for (const [, arr] of byLayer) arr.sort();
 
   const widest = Math.max(0, ...[...byLayer.values()].map((a) => a.length));
+  // Small sets (a focused neighborhood, or a tiny repo) pack tighter: the
+  // 6-per-row floor is tuned for wide global layers and would spread a
+  // 4-node layer across the whole canvas, leaving a pruned view looking
+  // broken. Drop the floor to 3 below 40 nodes.
+  const rowFloor = ids.length < 40 ? 3 : 6;
   const maxPerRow = Math.max(
-    6,
+    rowFloor,
     Math.min(MAX_PER_ROW_CAP, Math.ceil(Math.sqrt(widest * 3)))
   );
 
@@ -309,6 +324,13 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
   const bigRepo = graph.nodes.length > 100;
   const [hideIsolated, setHideIsolated] = useState(bigRepo);
   const [showMinimap, setShowMinimap] = useState(bigRepo);
+  // Test files dominate the fan-in of shared hubs (they import the modules
+  // under test), so they're the single biggest source of clutter — hidden by
+  // default, toggleable back on.
+  const [hideTests, setHideTests] = useState(true);
+  // Focus-mode controls, active once a node is clicked.
+  const [hopDepth, setHopDepth] = useState(2);
+  const [direction, setDirection] = useState<FocusDirection>("both");
   const { fitView } = useReactFlow();
 
   const presentKinds = useMemo(() => {
@@ -326,16 +348,75 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
     implements: true,
   });
 
-  // Files that survive the filters (isolated + text filter)
+  const testCount = useMemo(
+    () => graph.nodes.filter((n) => isTestFile(n.path)).length,
+    [graph.nodes]
+  );
+
+  // Edges the focus BFS may traverse — test edges removed when tests are
+  // hidden, so the neighborhood never spends its cap on nodes we won't render.
+  const focusEdges = useMemo(
+    () =>
+      hideTests
+        ? graph.edges.filter((e) => !isTestFile(e.from) && !isTestFile(e.to))
+        : graph.edges,
+    [graph.edges, hideTests]
+  );
+
+  // Focus mode: a click prunes the canvas to the selected file's N-hop
+  // neighborhood instead of dimming everything. null when nothing is selected.
+  const focus = useMemo(
+    () =>
+      selected
+        ? neighborhood(focusEdges, selected, {
+            depth: hopDepth,
+            direction,
+            maxNodes: FOCUS_CAP,
+          })
+        : null,
+    [selected, focusEdges, hopDepth, direction]
+  );
+
+  // The panel-driven impact overlay applies only while no canvas-internal
+  // selection is active (a canvas click wins) and while the toolbar toggle is
+  // on. Like a canvas click, it FOCUSES: the canvas prunes to the target plus
+  // the files its change reaches, rather than showing the whole graph dimmed.
+  const impactActive =
+    !selected && overlayOn && impactHighlight ? impactHighlight : null;
+
+  // The focus set + its root, from whichever source is driving: a canvas click
+  // (file-graph N-hop neighborhood, hop/direction controlled) or the panel
+  // (the target plus its computed blast — function-aware when a function is
+  // drilled). Either way the canvas shows ONLY these files; nothing is dimmed.
+  const focusRoot = selected ?? impactActive?.target ?? null;
+  const focusSet = useMemo<Set<string> | null>(() => {
+    if (focus) return focus.ids;
+    if (impactActive)
+      return new Set([impactActive.target, ...impactActive.impacted.keys()]);
+    return null;
+  }, [focus, impactActive]);
+
+  // Files that survive the filters. When a focus is active the canvas prunes to
+  // its set (the root always survives); otherwise it's the full graph minus the
+  // hide-isolated / hide-tests / text filters.
   const visibleIds = useMemo(() => {
     const set = new Set<string>();
     for (const n of graph.nodes) {
-      if (hideIsolated && n.inDegree === 0 && n.outDegree === 0) continue;
+      if (n.path === focusRoot) {
+        set.add(n.path); // the focused file is always shown
+        continue;
+      }
+      if (focusSet && !focusSet.has(n.path)) continue;
+      // hide-isolated is redundant inside a focus (neighborhood nodes are
+      // connected by construction), so apply it only on the full graph.
+      if (!focusSet && hideIsolated && n.inDegree === 0 && n.outDegree === 0)
+        continue;
+      if (hideTests && isTestFile(n.path)) continue;
       if (filter && !n.path.toLowerCase().includes(filter)) continue;
       set.add(n.path);
     }
     return set;
-  }, [graph.nodes, hideIsolated, filter]);
+  }, [graph.nodes, hideIsolated, hideTests, filter, focusSet, focusRoot]);
 
   const visibleEdges = useMemo(
     () =>
@@ -358,24 +439,9 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
     return () => cancelAnimationFrame(id);
   }, [positions, fitView]);
 
-  const neighbors = useMemo(() => {
-    if (!selected) return null;
-    const set = new Set<string>([selected]);
-    for (const e of graph.edges) {
-      if (e.from === selected) set.add(e.to);
-      if (e.to === selected) set.add(e.from);
-    }
-    return set;
-  }, [selected, graph.edges]);
-
-  // The impact overlay applies only while no canvas-internal selection is
-  // active (a click-to-isolate wins) and while the toolbar toggle is on.
-  const impactActive =
-    !selected && overlayOn && impactHighlight ? impactHighlight : null;
-
-  // How much of the highlight is actually on screen — the canvas filters
-  // (text filter, hide-isolated) can hide impacted nodes or even the target,
-  // so the toolbar count must report shown-vs-total instead of overstating.
+  // How much of the highlight is actually on screen — the hide-tests / text
+  // filters can still drop some impacted files from the pruned set, so the
+  // toolbar count reports shown-vs-total instead of overstating.
   const impactShown = useMemo(() => {
     if (!impactHighlight) return { shown: 0, total: 0, targetHidden: false };
     let shown = 0;
@@ -403,12 +469,10 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
         .filter((n) => visibleIds.has(n.path))
         .map((n) => {
           const pos = positions.get(n.path) ?? { x: 0, y: 0 };
-          const isDimmed = neighbors
-            ? !neighbors.has(n.path)
-            : impactActive
-              ? n.path !== impactActive.target &&
-                !impactActive.impacted.has(n.path)
-              : false;
+          // Both focus sources (canvas click and panel overlay) PRUNE the
+          // canvas to the relevant subgraph, so nothing on screen is ever
+          // dimmed — every visible node is relevant.
+          const isDimmed = false;
           return {
             id: n.path,
             type: "file",
@@ -429,7 +493,7 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
             selectable: false,
           };
         }),
-    [graph.nodes, visibleIds, positions, neighbors, selected, impactActive]
+    [graph.nodes, visibleIds, positions, selected, impactActive]
   );
 
   const edges: Edge[] = useMemo(
@@ -529,6 +593,102 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
           }}
         />
 
+        {selected && focus && (
+          <div
+            className="flex items-center gap-2 rounded-md px-2 py-1"
+            style={{
+              background: TOK.accentSoft,
+              border: `1px solid ${TOK.accent}66`,
+            }}
+          >
+            <Crosshair size={12} style={{ color: TOK.accent }} />
+            <span
+              className="font-mono text-[11px] max-w-[140px] truncate"
+              style={{ color: TOK.accent }}
+              title={selected}
+            >
+              {selected.split("/").pop()}
+            </span>
+
+            {/* hop stepper */}
+            <span style={{ color: TOK.textMuted }}>·</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Fewer hops"
+                onClick={() => setHopDepth((d) => Math.max(1, d - 1))}
+                disabled={hopDepth <= 1}
+                className="rounded p-0.5 disabled:opacity-30"
+                style={{ border: `1px solid ${TOK.border}` }}
+              >
+                <Minus size={10} style={{ color: TOK.textSecondary }} />
+              </button>
+              <span
+                className="tabular-nums text-[11px] w-10 text-center"
+                style={{ color: TOK.textSecondary }}
+                title="Hops out from the focused file"
+              >
+                {hopDepth} {hopDepth === 1 ? "hop" : "hops"}
+              </span>
+              <button
+                type="button"
+                aria-label="More hops"
+                onClick={() => setHopDepth((d) => Math.min(3, d + 1))}
+                disabled={hopDepth >= 3}
+                className="rounded p-0.5 disabled:opacity-30"
+                style={{ border: `1px solid ${TOK.border}` }}
+              >
+                <Plus size={10} style={{ color: TOK.textSecondary }} />
+              </button>
+            </div>
+
+            {/* direction toggle */}
+            <div className="flex items-center rounded overflow-hidden" style={{ border: `1px solid ${TOK.border}` }}>
+              {(
+                [
+                  ["in", "who depends on this"],
+                  ["out", "what this depends on"],
+                  ["both", "both directions"],
+                ] as [FocusDirection, string][]
+              ).map(([d, label]) => (
+                <button
+                  key={d}
+                  type="button"
+                  title={label}
+                  onClick={() => setDirection(d)}
+                  className="px-1.5 py-0.5 text-[10px] transition"
+                  style={{
+                    background: direction === d ? TOK.accent : "transparent",
+                    color: direction === d ? "#0a0a0c" : TOK.textSecondary,
+                  }}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+
+            {focus.dropped > 0 && (
+              <span
+                className="text-[10px]"
+                style={{ color: TOK.amber }}
+                title={`Neighborhood capped at ${FOCUS_CAP} nodes — ${focus.dropped} farther files hidden. Lower the hop depth or refine.`}
+              >
+                +{focus.dropped} hidden
+              </span>
+            )}
+
+            <button
+              type="button"
+              aria-label="Clear focus"
+              onClick={() => setSelected(null)}
+              className="rounded p-0.5"
+              style={{ border: `1px solid ${TOK.border}` }}
+            >
+              <X size={11} style={{ color: TOK.textSecondary }} />
+            </button>
+          </div>
+        )}
+
         {isolatedCount > 0 && (
           <label
             className="flex items-center gap-1.5 cursor-pointer"
@@ -541,6 +701,22 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
             />
             <span style={{ color: TOK.textSecondary }}>
               Hide isolated ({isolatedCount})
+            </span>
+          </label>
+        )}
+
+        {testCount > 0 && (
+          <label
+            className="flex items-center gap-1.5 cursor-pointer"
+            title={`${testCount} test files — hidden by default because they dominate the fan-in of shared modules`}
+          >
+            <input
+              type="checkbox"
+              checked={hideTests}
+              onChange={(e) => setHideTests(e.target.checked)}
+            />
+            <span style={{ color: TOK.textSecondary }}>
+              Hide tests ({testCount})
             </span>
           </label>
         )}
@@ -558,12 +734,9 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
           <label
             className="flex items-center gap-1.5 cursor-pointer"
             title={
-              `Dim everything the selected change doesn't reach — ${impactHighlight.target} plus ${impactHighlight.impacted.size} impacted file${impactHighlight.impacted.size === 1 ? "" : "s"}` +
+              `Show only ${impactHighlight.target} plus the ${impactHighlight.impacted.size} file${impactHighlight.impacted.size === 1 ? "" : "s"} its change reaches — uncheck to see the full graph` +
               (impactShown.shown !== impactShown.total
-                ? ` (${impactShown.total - impactShown.shown} hidden by the canvas filters)`
-                : "") +
-              (impactShown.targetHidden
-                ? " — the target itself is filtered out of the canvas"
+                ? ` (${impactShown.total - impactShown.shown} hidden by hide-tests / filter)`
                 : "")
             }
           >
@@ -611,8 +784,9 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
 
         <div className="h-4 w-px" style={{ background: TOK.border }} />
         <span className="tabular-nums" style={{ color: TOK.textMuted }}>
-          {visibleIds.size}/{graph.nodes.length} files
-          {selected ? ` · selected: ${selected.split("/").pop()}` : ""}
+          {focusRoot
+            ? `${visibleIds.size} in focus`
+            : `${visibleIds.size}/${graph.nodes.length} files`}
         </span>
       </div>
 
@@ -624,8 +798,9 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
           border: `1px solid ${TOK.border}`,
         }}
       >
-        Click a file to isolate its neighbors · Arrow A → B means A uses B
-        · Entry badge = nothing else points here
+        {focusRoot
+          ? "Click another file to re-focus · click empty space to see the full graph"
+          : "Click a file to focus on its neighborhood · Arrow A → B means A uses B · Entry badge = nothing else points here"}
       </div>
 
       {graph.truncated && (
@@ -655,7 +830,10 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
         nodesConnectable={false}
         elementsSelectable={false}
         panOnDrag
-        onPaneClick={() => setSelected(null)}
+        onPaneClick={() => {
+          setSelected(null);
+          setOverlayOn(false); // also drop a panel-driven focus → full graph
+        }}
       >
         <Background color={VIZ_SURFACE.grid} gap={28} size={1} />
         <Controls
