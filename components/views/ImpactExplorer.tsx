@@ -14,7 +14,7 @@
 // Free for everyone. The "most depended-on files" shortlist seeds the tool as
 // the scariest things to touch.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -33,7 +33,9 @@ import {
   impactFileList,
   rankFilesByFanIn,
   rankFunctionsInFile,
+  toFileHighlight,
   type FunctionImpactRank,
+  type ImpactHighlight,
 } from "@/lib/impact";
 import type { CodeGraph } from "@/lib/codeAnalysis/types";
 import { TOK } from "@/lib/sessionTheme";
@@ -172,7 +174,17 @@ function Column({
   );
 }
 
-export function ImpactExplorer({ graph }: { graph: CodeGraph }) {
+export function ImpactExplorer({
+  graph,
+  onImpactChange,
+}: {
+  graph: CodeGraph;
+  /** Notifies the parent of the current blast as a per-file overlay (target +
+   *  impacted files with min hop), so the dependency canvas can dim everything
+   *  the change doesn't reach. Fires on every selection change; null when
+   *  nothing is selected. */
+  onImpactChange?: (highlight: ImpactHighlight | null) => void;
+}) {
   const tested = useMemo(() => deriveTestedFiles(graph), [graph]);
   const topFiles = useMemo(() => rankFilesByFanIn(graph, 8), [graph]);
   const allFiles = useMemo(() => impactFileList(graph), [graph]);
@@ -202,6 +214,19 @@ export function ImpactExplorer({ graph }: { graph: CodeGraph }) {
         : null,
     [graph, selected, selectedFn]
   );
+
+  // Per-file overlay for the dependency canvas — function-level blasts
+  // collapse to the files containing the impacted functions. Memoized so the
+  // parent-notify effect below only fires on real selection changes.
+  const highlight = useMemo<ImpactHighlight | null>(() => {
+    if (!selected) return null;
+    const entries = fnBlast ? fnBlast.incoming : (blast?.incoming ?? []);
+    return toFileHighlight(selected, entries);
+  }, [selected, blast, fnBlast]);
+
+  useEffect(() => {
+    onImpactChange?.(highlight);
+  }, [highlight, onImpactChange]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -36,6 +36,7 @@ import { AlertTriangle, Network } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import { MUTED, VIZ_NEUTRAL, VIZ_SURFACE } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
+import type { ImpactHighlight } from "@/lib/impact";
 import type {
   FileGraph,
   FileGraphEdge,
@@ -292,10 +293,17 @@ function layeredPositions(
 
 interface Props {
   graph: FileGraph;
+  /** External impact overlay (from the ImpactExplorer): the changed file +
+   *  every file its change reaches. When set, nodes outside the blast are
+   *  dimmed and the target reads as selected. The canvas's own click-to-
+   *  isolate takes precedence while a node is selected; a toolbar toggle
+   *  lets the user switch the overlay off locally. */
+  impactHighlight?: ImpactHighlight | null;
 }
 
-function DependencyCanvasInner({ graph }: Props) {
+function DependencyCanvasInner({ graph, impactHighlight }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [overlayOn, setOverlayOn] = useState(true);
   const [filterInput, setFilterInput] = useState("");
   const filter = useDeferredValue(filterInput.trim().toLowerCase());
   const bigRepo = graph.nodes.length > 100;
@@ -360,13 +368,23 @@ function DependencyCanvasInner({ graph }: Props) {
     return set;
   }, [selected, graph.edges]);
 
+  // The impact overlay applies only while no canvas-internal selection is
+  // active (a click-to-isolate wins) and while the toolbar toggle is on.
+  const impactActive =
+    !selected && overlayOn && impactHighlight ? impactHighlight : null;
+
   const nodes: Node[] = useMemo(
     () =>
       graph.nodes
         .filter((n) => visibleIds.has(n.path))
         .map((n) => {
           const pos = positions.get(n.path) ?? { x: 0, y: 0 };
-          const isDimmed = !!neighbors && !neighbors.has(n.path);
+          const isDimmed = neighbors
+            ? !neighbors.has(n.path)
+            : impactActive
+              ? n.path !== impactActive.target &&
+                !impactActive.impacted.has(n.path)
+              : false;
           return {
             id: n.path,
             type: "file",
@@ -376,7 +394,9 @@ function DependencyCanvasInner({ graph }: Props) {
               ext: n.ext,
               inDegree: n.inDegree,
               outDegree: n.outDegree,
-              isSelected: selected === n.path,
+              isSelected:
+                selected === n.path ||
+                (!selected && impactActive?.target === n.path),
               isDimmed,
               isEntry: n.inDegree === 0,
               onSelect: setSelected,
@@ -385,7 +405,7 @@ function DependencyCanvasInner({ graph }: Props) {
             selectable: false,
           };
         }),
-    [graph.nodes, visibleIds, positions, neighbors, selected]
+    [graph.nodes, visibleIds, positions, neighbors, selected, impactActive]
   );
 
   const edges: Edge[] = useMemo(
@@ -509,6 +529,23 @@ function DependencyCanvasInner({ graph }: Props) {
           />
           <span style={{ color: TOK.textSecondary }}>Minimap</span>
         </label>
+
+        {impactHighlight && (
+          <label
+            className="flex items-center gap-1.5 cursor-pointer"
+            title={`Dim everything the selected change doesn't reach — ${impactHighlight.target} plus ${impactHighlight.impacted.size} impacted file${impactHighlight.impacted.size === 1 ? "" : "s"}`}
+          >
+            <input
+              type="checkbox"
+              checked={overlayOn}
+              onChange={(e) => setOverlayOn(e.target.checked)}
+            />
+            <span style={{ color: overlayOn ? TOK.accent : TOK.textSecondary }}>
+              Impact: {impactHighlight.target.split("/").pop()} →{" "}
+              {impactHighlight.impacted.size}
+            </span>
+          </label>
+        )}
 
         <div className="h-4 w-px" style={{ background: TOK.border }} />
 

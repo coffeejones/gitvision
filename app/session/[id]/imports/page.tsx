@@ -4,8 +4,7 @@ import { notFound } from "next/navigation";
 import { Network } from "lucide-react";
 import { getSession } from "@/lib/storage";
 import { TOK } from "@/lib/sessionTheme";
-import { DependencyCanvas } from "@/components/views/DependencyCanvas";
-import { ImpactExplorer } from "@/components/views/ImpactExplorer";
+import { ImpactWorkbench } from "@/components/views/ImpactWorkbench";
 import { HelpHint } from "@/components/HelpHint";
 import { EmptyPanel } from "@/components/EmptyPanel";
 
@@ -79,12 +78,10 @@ export default async function ImportsPage({
           />
         </p>
       </header>
-      {impactGraph && <ImpactExplorer graph={impactGraph} />}
-
-      <div id="screenshot-target" className="flex flex-col gap-4">
-        {current.fileGraph && current.fileGraph.nodes.length > 0 ? (
-          <DependencyCanvas graph={current.fileGraph} />
-        ) : (
+      <ImpactWorkbench
+        impactGraph={impactGraph}
+        fileGraph={current.fileGraph ?? null}
+        emptyFallback={
           <EmptyPanel
             icon={<Network size={22} />}
             title="No file-to-file imports detected"
@@ -102,8 +99,8 @@ export default async function ImportsPage({
               </>
             }
           />
-        )}
-      </div>
+        }
+      />
     </main>
   );
 }
