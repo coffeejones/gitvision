@@ -37,6 +37,8 @@ import {
   Microscope,
   Network,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search,
   Shield,
   X,
@@ -157,6 +159,27 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       }
       return next;
     });
+  }
+
+  // Focus mode: hide the whole sidebar so the content (canvas, imports
+  // split-pane, etc.) gets the full width. Persisted like the dept collapse;
+  // server renders it visible and we hydrate after mount to avoid an SSR
+  // mismatch. A floating button in the content gutter brings it back.
+  const [sidebarHidden, setSidebarHidden] = useState(false);
+  useEffect(() => {
+    try {
+      setSidebarHidden(localStorage.getItem("rj.sessionNav.hidden") === "1");
+    } catch {
+      // Storage unavailable — stay visible.
+    }
+  }, []);
+  function setHidden(hidden: boolean) {
+    setSidebarHidden(hidden);
+    try {
+      localStorage.setItem("rj.sessionNav.hidden", hidden ? "1" : "0");
+    } catch {
+      // Ignore — the toggle still works in-session.
+    }
   }
 
   // Counts that drive the sidebar badges. Same logic as the v0.3 tab
@@ -308,20 +331,42 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
 
   // The sidebar's inner content, shared by the desktop aside and the mobile
   // drawer. `onNavigate` (drawer only) closes the drawer on a tap.
-  const sidebarBody = (onNavigate?: () => void) => (
+  const sidebarBody = (onNavigate?: () => void, onHide?: () => void) => (
     <>
       <div
         className="px-2 pb-3 mb-1 flex flex-col gap-2"
         style={{ borderBottom: `1px solid ${TOK.border}` }}
       >
-        <Link
-          href="/"
-          onClick={onNavigate}
-          className="text-xs inline-flex items-center gap-1.5 transition hover:underline"
-          style={{ color: TOK.textMuted }}
-        >
-          ← All sessions
-        </Link>
+        <div className="flex items-center justify-between gap-2">
+          <Link
+            href="/"
+            onClick={onNavigate}
+            className="text-xs inline-flex items-center gap-1.5 transition hover:underline"
+            style={{ color: TOK.textMuted }}
+          >
+            ← All sessions
+          </Link>
+          {onHide && (
+            <button
+              type="button"
+              onClick={onHide}
+              aria-label="Hide sidebar"
+              title="Hide sidebar for focus"
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md transition"
+              style={{ color: TOK.textMuted }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = TOK.textSecondary;
+                e.currentTarget.style.background = TOK.surface;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = TOK.textMuted;
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <PanelLeftClose size={14} />
+            </button>
+          )}
+        </div>
         <button
           onClick={() => {
             setPaletteOpen(true);
@@ -463,9 +508,12 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
 
   return (
     <div className="flex w-full">
-      {/* Desktop sidebar — hidden below md, where it would crush the content. */}
+      {/* Desktop sidebar — hidden below md (would crush the content) and
+          hidden entirely in focus mode (user toggled it away). */}
       <aside
-        className="shrink-0 sticky self-start hidden md:flex flex-col gap-1 px-3 py-5 z-20"
+        className={`shrink-0 sticky self-start flex-col gap-1 px-3 py-5 z-20 ${
+          sidebarHidden ? "hidden" : "hidden md:flex"
+        }`}
         style={{
           // Sit immediately below the 48px sticky topbar.
           top: 48,
@@ -479,10 +527,38 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
           overflowY: "auto",
         }}
       >
-        {sidebarBody()}
+        {sidebarBody(undefined, () => setHidden(true))}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* Focus mode: a floating button to bring the sidebar back (desktop
+            only — mobile uses the hamburger drawer, which is always available). */}
+        {sidebarHidden && (
+          <button
+            type="button"
+            onClick={() => setHidden(false)}
+            aria-label="Show sidebar"
+            title="Show sidebar"
+            className="hidden md:flex fixed z-20 h-8 w-8 items-center justify-center rounded-md"
+            style={{
+              top: 56,
+              left: 12,
+              background: TOK.surface,
+              border: `1px solid ${TOK.border}`,
+              color: TOK.textSecondary,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = TOK.borderStrong;
+              e.currentTarget.style.color = TOK.textPrimary;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = TOK.border;
+              e.currentTarget.style.color = TOK.textSecondary;
+            }}
+          >
+            <PanelLeftOpen size={16} />
+          </button>
+        )}
         {/* Mobile nav trigger — below md, where the sidebar is hidden. */}
         <div
           className="md:hidden sticky z-20 flex items-center gap-2 px-4 py-2"
