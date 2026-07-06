@@ -42,6 +42,7 @@ import {
 } from "@/lib/impact";
 import type { CodeGraph } from "@/lib/codeAnalysis/types";
 import { TOK } from "@/lib/sessionTheme";
+import { CH_FOCUS } from "@/components/chambers/theme";
 
 const MONO = { fontFamily: "var(--font-mono)" } as const;
 
@@ -243,7 +244,7 @@ function Column({
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="text-[11px] py-1.5 px-2 text-left hover:opacity-80 transition"
+              className={`text-[11px] py-1.5 px-2 text-left hover:opacity-80 transition rounded ${CH_FOCUS}`}
               style={{ color: TOK.accent }}
             >
               {expanded
@@ -427,7 +428,7 @@ export function ImpactExplorer({
             }}
             aria-label="Search files for impact analysis"
             placeholder="Search a file…"
-            className="flex-1 bg-transparent outline-none text-[13px]"
+            className={`flex-1 bg-transparent text-[13px] rounded ${CH_FOCUS}`}
             style={{ ...MONO, color: TOK.textPrimary }}
           />
         </div>
@@ -446,7 +447,7 @@ export function ImpactExplorer({
                 key={f}
                 type="button"
                 onClick={() => pick(f)}
-                className="text-left px-3 py-1.5 text-[13px] truncate hover:bg-white/5 transition"
+                className={`text-left px-3 py-1.5 text-[13px] truncate hover:bg-white/5 transition ${CH_FOCUS}`}
                 style={{ ...MONO, color: TOK.textSecondary }}
                 title={f}
               >
@@ -468,7 +469,7 @@ export function ImpactExplorer({
                   key={t.file}
                   type="button"
                   onClick={() => pick(t.file)}
-                  className="text-[11px] px-2 py-0.5 rounded transition hover:opacity-80"
+                  className={`text-[11px] px-2 py-0.5 rounded transition hover:opacity-80 ${CH_FOCUS}`}
                   style={{
                     ...MONO,
                     background:
@@ -604,7 +605,7 @@ export function ImpactExplorer({
                     key={`${fr.containerType ?? ""}.${fr.name}`}
                     type="button"
                     onClick={() => setSelectedFn(active ? null : fr)}
-                    className="text-[11px] px-2 py-0.5 rounded transition hover:opacity-80"
+                    className={`text-[11px] px-2 py-0.5 rounded transition hover:opacity-80 ${CH_FOCUS}`}
                     style={{
                       ...MONO,
                       background: active ? TOK.accentSoft : "transparent",
@@ -633,7 +634,7 @@ export function ImpactExplorer({
                 <button
                   type="button"
                   onClick={() => setSelectedFn(null)}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition hover:opacity-80"
+                  className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition hover:opacity-80 ${CH_FOCUS}`}
                   style={{
                     border: `1px solid ${TOK.border}`,
                     color: TOK.textMuted,
@@ -667,7 +668,7 @@ export function ImpactExplorer({
                 <button
                   type="button"
                   onClick={() => setDepsOpen((v) => !v)}
-                  className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] hover:opacity-80 transition self-start"
+                  className={`flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] hover:opacity-80 transition self-start rounded ${CH_FOCUS}`}
                   style={{ color: TOK.textMuted }}
                   aria-expanded={depsOpen}
                 >

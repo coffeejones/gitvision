@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { STYLE, TOK } from "@/lib/sessionTheme";
+import { CH_FOCUS } from "@/components/chambers/theme";
 import { CommandPalette } from "./CommandPalette";
 
 interface Props {
@@ -352,7 +353,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
               onClick={onHide}
               aria-label="Hide sidebar"
               title="Hide sidebar for focus"
-              className="inline-flex h-6 w-6 items-center justify-center rounded-md transition"
+              className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition ${CH_FOCUS}`}
               style={{ color: TOK.textMuted }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = TOK.textSecondary;
@@ -372,7 +373,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
             setPaletteOpen(true);
             onNavigate?.();
           }}
-          className="flex items-center gap-2 px-2 h-8 rounded-md text-xs transition cursor-text text-left"
+          className={`flex items-center gap-2 px-2 h-8 rounded-md text-xs transition cursor-text text-left ${CH_FOCUS}`}
           style={{
             background: TOK.surface,
             border: `1px solid ${TOK.border}`,
@@ -426,7 +427,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
                 onClick={() => toggleDept(dept.title)}
                 aria-expanded={open}
                 aria-controls={panelId}
-                className={`group flex w-full items-center gap-1.5 px-2 py-1 rounded-md transition-colors ${STYLE.eyebrow}`}
+                className={`group flex w-full items-center gap-1.5 px-2 py-1 rounded-md transition-colors ${STYLE.eyebrow} ${CH_FOCUS}`}
                 style={{ color: TOK.textMuted }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = TOK.textSecondary;
@@ -539,7 +540,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
             onClick={() => setHidden(false)}
             aria-label="Show sidebar"
             title="Show sidebar"
-            className="hidden md:flex fixed z-20 h-8 w-8 items-center justify-center rounded-md"
+            className={`hidden md:flex fixed z-20 h-8 w-8 items-center justify-center rounded-md ${CH_FOCUS}`}
             style={{
               top: 56,
               left: 12,

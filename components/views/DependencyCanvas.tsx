@@ -36,8 +36,17 @@ import {
   type Edge,
   type NodeProps,
 } from "@xyflow/react";
-import { AlertTriangle, Crosshair, Minus, Network, Plus, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Crosshair,
+  Minus,
+  Network,
+  Plus,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
+import { CH_FOCUS } from "@/components/chambers/theme";
 import { MUTED, VIZ_NEUTRAL, VIZ_SURFACE } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
 import { neighborhood, type FocusDirection } from "@/lib/graphFocus";
@@ -324,6 +333,9 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
   const bigRepo = graph.nodes.length > 100;
   const [hideIsolated, setHideIsolated] = useState(bigRepo);
   const [showMinimap, setShowMinimap] = useState(bigRepo);
+  // The display toggles (hide-isolated / hide-tests / minimap) live in a "View"
+  // popover to keep the toolbar from wrapping into a wall on narrow screens.
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   // Test files dominate the fan-in of shared hubs (they import the modules
   // under test), so they're the single biggest source of clutter — hidden by
   // default, toggleable back on.
@@ -595,7 +607,8 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
           value={filterInput}
           onChange={(e) => setFilterInput(e.target.value)}
           placeholder="filter path…"
-          className="rounded px-2 py-0.5 text-xs outline-none w-40"
+          aria-label="Filter files by path"
+          className={`rounded px-2 py-0.5 text-xs w-40 ${CH_FOCUS}`}
           style={{
             background: TOK.surfaceElevated,
             color: TOK.textPrimary,
@@ -628,7 +641,7 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
                 aria-label="Fewer hops"
                 onClick={() => setHopDepth((d) => Math.max(1, d - 1))}
                 disabled={hopDepth <= 1}
-                className="rounded p-0.5 disabled:opacity-30"
+                className={`rounded inline-flex items-center justify-center min-h-6 min-w-6 disabled:opacity-30 ${CH_FOCUS}`}
                 style={{ border: `1px solid ${TOK.border}` }}
               >
                 <Minus size={10} style={{ color: TOK.textSecondary }} />
@@ -645,7 +658,7 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
                 aria-label="More hops"
                 onClick={() => setHopDepth((d) => Math.min(3, d + 1))}
                 disabled={hopDepth >= 3}
-                className="rounded p-0.5 disabled:opacity-30"
+                className={`rounded inline-flex items-center justify-center min-h-6 min-w-6 disabled:opacity-30 ${CH_FOCUS}`}
                 style={{ border: `1px solid ${TOK.border}` }}
               >
                 <Plus size={10} style={{ color: TOK.textSecondary }} />
@@ -665,8 +678,10 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
                   key={d}
                   type="button"
                   title={label}
+                  aria-label={label}
+                  aria-pressed={direction === d}
                   onClick={() => setDirection(d)}
-                  className="px-1.5 py-0.5 text-[10px] transition"
+                  className={`px-2 py-1 text-[10px] transition ${CH_FOCUS}`}
                   style={{
                     background: direction === d ? TOK.accent : "transparent",
                     color: direction === d ? TOK.accentOn : TOK.textSecondary,
@@ -691,7 +706,7 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
               type="button"
               aria-label="Clear focus"
               onClick={() => setSelected(null)}
-              className="rounded p-0.5"
+              className={`rounded inline-flex items-center justify-center min-h-6 min-w-6 ${CH_FOCUS}`}
               style={{ border: `1px solid ${TOK.border}` }}
             >
               <X size={11} style={{ color: TOK.textSecondary }} />
@@ -699,46 +714,75 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
           </div>
         )}
 
-        {isolatedCount > 0 && (
-          <label
-            className="flex items-center gap-1.5 cursor-pointer"
-            title={`${isolatedCount} files have no imports in either direction`}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setViewMenuOpen((v) => !v)}
+            aria-expanded={viewMenuOpen}
+            aria-label="View options"
+            className={`inline-flex items-center gap-1.5 rounded px-1.5 py-1 transition ${CH_FOCUS}`}
+            style={{ color: TOK.textSecondary }}
+            title="Display options"
           >
-            <input
-              type="checkbox"
-              checked={hideIsolated}
-              onChange={(e) => setHideIsolated(e.target.checked)}
-            />
-            <span style={{ color: TOK.textSecondary }}>
-              Hide isolated ({isolatedCount})
-            </span>
-          </label>
-        )}
-
-        {testCount > 0 && (
-          <label
-            className="flex items-center gap-1.5 cursor-pointer"
-            title={`${testCount} test files — hidden by default because they dominate the fan-in of shared modules`}
-          >
-            <input
-              type="checkbox"
-              checked={hideTests}
-              onChange={(e) => setHideTests(e.target.checked)}
-            />
-            <span style={{ color: TOK.textSecondary }}>
-              Hide tests ({testCount})
-            </span>
-          </label>
-        )}
-
-        <label className="flex items-center gap-1.5 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showMinimap}
-            onChange={(e) => setShowMinimap(e.target.checked)}
-          />
-          <span style={{ color: TOK.textSecondary }}>Minimap</span>
-        </label>
+            <SlidersHorizontal size={12} />
+            View
+          </button>
+          {viewMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setViewMenuOpen(false)}
+              />
+              <div
+                className="absolute z-50 mt-1 left-0 flex flex-col gap-2 rounded-lg p-2.5 shadow-lg"
+                style={{
+                  background: "rgba(10, 10, 12, 0.98)",
+                  border: `1px solid ${TOK.border}`,
+                  minWidth: 168,
+                }}
+              >
+                {isolatedCount > 0 && (
+                  <label
+                    className="flex items-center gap-2 cursor-pointer"
+                    title={`${isolatedCount} files have no imports in either direction`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={hideIsolated}
+                      onChange={(e) => setHideIsolated(e.target.checked)}
+                    />
+                    <span style={{ color: TOK.textSecondary }}>
+                      Hide isolated ({isolatedCount})
+                    </span>
+                  </label>
+                )}
+                {testCount > 0 && (
+                  <label
+                    className="flex items-center gap-2 cursor-pointer"
+                    title={`${testCount} test files — hidden by default because they dominate the fan-in of shared modules`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={hideTests}
+                      onChange={(e) => setHideTests(e.target.checked)}
+                    />
+                    <span style={{ color: TOK.textSecondary }}>
+                      Hide tests ({testCount})
+                    </span>
+                  </label>
+                )}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showMinimap}
+                    onChange={(e) => setShowMinimap(e.target.checked)}
+                  />
+                  <span style={{ color: TOK.textSecondary }}>Minimap</span>
+                </label>
+              </div>
+            </>
+          )}
+        </div>
 
         {impactHighlight && (
           <label
