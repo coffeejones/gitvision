@@ -2,10 +2,11 @@
 
 // Glue between the ImpactExplorer and the DependencyCanvas on the Imports tab:
 // holds the current blast overlay so picking a file (or function) in the
-// explorer instantly dims everything the change doesn't reach in the canvas
-// below. Both children are client components; the graphs arrive serialized
-// from the server page, the empty-state fallback arrives as a server-rendered
-// node.
+// explorer instantly prunes the canvas to what the change reaches. On wide
+// screens the two sit SIDE BY SIDE (explorer left, canvas right) so a selection
+// visibly reshapes the graph without scrolling; they stack on narrow screens.
+// Both children are client components; the graphs arrive serialized from the
+// server page, the empty-state fallback arrives as a server-rendered node.
 
 import { useState, type ReactNode } from "react";
 import { DependencyCanvas } from "@/components/views/DependencyCanvas";
@@ -29,22 +30,31 @@ export function ImpactWorkbench({
 }) {
   const [highlight, setHighlight] = useState<ImpactHighlight | null>(null);
 
-  return (
-    <>
-      {impactGraph && (
-        <ImpactExplorer graph={impactGraph} onImpactChange={setHighlight} />
+  const canvas = (
+    <div id="screenshot-target" className="min-w-0 flex flex-col gap-4">
+      {fileGraph && fileGraph.nodes.length > 0 ? (
+        <DependencyCanvas
+          graph={fileGraph}
+          impactHighlight={impactGraph ? highlight : null}
+        />
+      ) : (
+        emptyFallback
       )}
+    </div>
+  );
 
-      <div id="screenshot-target" className="flex flex-col gap-4">
-        {fileGraph && fileGraph.nodes.length > 0 ? (
-          <DependencyCanvas
-            graph={fileGraph}
-            impactHighlight={impactGraph ? highlight : null}
-          />
-        ) : (
-          emptyFallback
-        )}
+  // No impact tool on this snapshot (mega-repo payload cap or no code
+  // analysis) — the canvas takes the full width, as before.
+  if (!impactGraph) return canvas;
+
+  // Side-by-side on lg+, stacked below. min-w-0 on both cells lets the grid
+  // tracks shrink so long mono paths wrap/scroll instead of overflowing.
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-5 items-start">
+      <div className="min-w-0">
+        <ImpactExplorer graph={impactGraph} onImpactChange={setHighlight} />
       </div>
-    </>
+      {canvas}
+    </div>
   );
 }
