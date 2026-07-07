@@ -44,6 +44,7 @@ import {
   Package,
   Search,
   Shield,
+  ShieldAlert,
   Sparkles,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
@@ -92,6 +93,7 @@ export function CommandPalette({ sessionId, snapshot, open, onClose }: Props) {
       // Security
       { id: "p:security", group: "pages", label: "Security", icon: <Shield size={13} />, href: `${base}/security` },
       // Forensics
+      { id: "p:refactor", group: "pages", label: "Refactor", icon: <ShieldAlert size={13} />, href: `${base}/refactor` },
       { id: "p:architecture", group: "pages", label: "Architecture", icon: <Boxes size={13} />, href: `${base}/architecture` },
       { id: "p:canvas", group: "pages", label: "Canvas", icon: <Network size={13} />, href: `${base}/canvas` },
       { id: "p:code", group: "pages", label: "Code", icon: <CodeIcon size={13} />, href: `${base}/code` },

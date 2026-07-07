@@ -41,6 +41,7 @@ import {
   PanelLeftOpen,
   Search,
   Shield,
+  ShieldAlert,
   X,
   Sparkles,
   Stethoscope,
@@ -272,6 +273,15 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       title: "Forensics",
       icon: <Microscope size={12} />,
       items: [
+        {
+          // Arc 1 "Can I touch this?" — the action surface: files ranked by how
+          // safely you can change them. Leads Forensics because it's the
+          // "so what do I do?" answer to the structural views below it.
+          label: "Refactor",
+          href: `${base}/refactor`,
+          icon: <ShieldAlert size={14} />,
+          hint: hasCodeGraph ? undefined : "refresh",
+        },
         {
           // v0.70: Architecture tab — first beboer is class diagrams.
           // Future deeper-intelligence themes (hidden coupling,
