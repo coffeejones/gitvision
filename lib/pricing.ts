@@ -38,6 +38,9 @@ export interface TierLimits {
   architectureDiagrams: boolean;
   /** Structural diff between snapshots */
   structuralDiff: boolean;
+  /** Refactor guidance — the Impact-Ranked Test Prioritizer ("run these
+   *  tests before touching this file") in the Refactor tab. */
+  refactorGuidance: boolean;
   /** Team workspaces (multi-user) */
   teamWorkspaces: boolean;
   /** Priority support channel */
@@ -93,6 +96,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       aiInsights: false,
       architectureDiagrams: false,
       structuralDiff: false,
+      refactorGuidance: false,
       teamWorkspaces: false,
       prioritySupport: false,
       earlyAccess: false,
@@ -125,6 +129,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       aiInsights: true,
       architectureDiagrams: true,
       structuralDiff: true,
+      refactorGuidance: true,
       teamWorkspaces: false,
       prioritySupport: false,
       earlyAccess: false,
@@ -157,6 +162,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       aiInsights: true,
       architectureDiagrams: true,
       structuralDiff: true,
+      refactorGuidance: true,
       teamWorkspaces: true,
       prioritySupport: true,
       earlyAccess: true,

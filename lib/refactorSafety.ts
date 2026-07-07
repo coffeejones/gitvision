@@ -24,6 +24,14 @@ export const SAFETY_TIERS = [
 ] as const;
 export type SafetyTier = (typeof SAFETY_TIERS)[number];
 
+/** A test file worth running before touching a given file, and how many of the
+ *  affected files (the target + its dependents) it reaches. Static import/call
+ *  mapping — NOT a coverage measurement. */
+export interface TestToRun {
+  file: string;
+  guards: number;
+}
+
 export interface FileSafety {
   /** Repo-relative path. */
   file: string;
@@ -46,6 +54,10 @@ export interface FileSafety {
   /** A capped sample of the untested dependents, for the drill-down "who
    *  breaks silently" list. Empty for low-risk files to bound the payload. */
   untestedDependentSample: string[];
+  /** The Impact-Ranked Test Prioritizer result — test files that guard the
+   *  affected set, most-guarding first. Only populated when `withTests` is set
+   *  (a Plus feature) and only for the high tiers. Undefined otherwise. */
+  testsToRun?: TestToRun[];
   /** Internal ordering key — NEVER surfaced to the user. */
   rank: number;
 }
@@ -99,8 +111,13 @@ function classify(
   return "safe";
 }
 
-/** Compute the per-file refactor-safety report from a CodeGraph. */
-export function computeRefactorSafety(cg: CodeGraph): RefactorSafetyReport {
+/** Compute the per-file refactor-safety report from a CodeGraph.
+ *  `withTests` additionally computes the (Plus-gated) Test Prioritizer per
+ *  high-tier file; leave it off for the free view so the data never ships. */
+export function computeRefactorSafety(
+  cg: CodeGraph,
+  opts: { withTests?: boolean } = {}
+): RefactorSafetyReport {
   // 1. Direct fan-in: target file → set of distinct source files. Test files
   //    are never a target (you don't "refactor into" a test), and self-edges
   //    don't count as a dependent.
@@ -126,6 +143,23 @@ export function computeRefactorSafety(cg: CodeGraph): RefactorSafetyReport {
     for (const m of group.members) {
       duplicatedByFile.set(m.filePath, (duplicatedByFile.get(m.filePath) ?? 0) + 1);
     }
+  }
+
+  // 3b. (Plus) reverse test-mapping: prod file → the test files that reach it
+  //     (import or call). Powers "run these tests before touching X".
+  const testsByProd = new Map<string, Set<string>>();
+  if (opts.withTests) {
+    const addTest = (prod: string | null | undefined, source: string) => {
+      if (!prod || !isTestFile(source) || isTestFile(prod)) return;
+      let s = testsByProd.get(prod);
+      if (!s) {
+        s = new Set<string>();
+        testsByProd.set(prod, s);
+      }
+      s.add(source);
+    };
+    for (const e of cg.imports) addTest(e.to, e.from);
+    for (const c of cg.calls) if (c.toFile) addTest(c.toFile, c.fromFile);
   }
 
   // 4. The population of files to score: any non-test file that has code in the
@@ -155,6 +189,24 @@ export function computeRefactorSafety(cg: CodeGraph): RefactorSafetyReport {
     }
     const untestedDependents = untestedList.length;
     const tier = classify(dependents, untestedDependents, complexity, duplicatedFns);
+    const highTier = tier === "load-bearing" || tier === "handle-with-care";
+
+    // Test Prioritizer: rank test files by how many of the affected files
+    // (this file + its dependents) they reach. Static import/call mapping.
+    let testsToRun: TestToRun[] | undefined;
+    if (opts.withTests && highTier) {
+      const affected = new Set<string>([file]);
+      if (deps) for (const d of deps) affected.add(d);
+      const guardCounts = new Map<string, number>();
+      for (const a of affected) {
+        const ts = testsByProd.get(a);
+        if (ts) for (const t of ts) guardCounts.set(t, (guardCounts.get(t) ?? 0) + 1);
+      }
+      testsToRun = [...guardCounts.entries()]
+        .map(([f, guards]) => ({ file: f, guards }))
+        .sort((a, b) => b.guards - a.guards || a.file.localeCompare(b.file))
+        .slice(0, 6);
+    }
 
     files.push({
       file,
@@ -166,10 +218,8 @@ export function computeRefactorSafety(cg: CodeGraph): RefactorSafetyReport {
       tested: tested.has(file),
       // Only carry the sample for the tiers whose drill-down matters — bounds
       // the payload on big repos.
-      untestedDependentSample:
-        tier === "load-bearing" || tier === "handle-with-care"
-          ? untestedList.sort().slice(0, SAMPLE_CAP)
-          : [],
+      untestedDependentSample: highTier ? untestedList.sort().slice(0, SAMPLE_CAP) : [],
+      testsToRun,
       rank:
         dependents * 2 +
         untestedDependents * 3 +

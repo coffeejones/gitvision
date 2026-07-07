@@ -77,6 +77,7 @@ export type BooleanFeature =
   | "aiInsights"
   | "architectureDiagrams"
   | "structuralDiff"
+  | "refactorGuidance"
   | "teamWorkspaces"
   | "prioritySupport"
   | "earlyAccess"

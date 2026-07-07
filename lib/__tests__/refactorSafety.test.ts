@@ -112,6 +112,32 @@ describe("computeRefactorSafety", () => {
     expect(report.files.find((f) => f.file === "src/c.ts")!.duplicatedFns).toBe(0);
   });
 
+  it("ranks tests that guard the affected set only when withTests is set", () => {
+    const imports = [] as CodeGraph["imports"];
+    for (let i = 0; i < 8; i++) {
+      imports.push({ from: `src/d${i}.ts`, to: "src/hub.ts", kind: "import" });
+    }
+    // hub.test.ts guards hub + d0 + d1 + d2 (4 of the affected set)
+    for (const t of ["src/hub.ts", "src/d0.ts", "src/d1.ts", "src/d2.ts"]) {
+      imports.push({ from: "src/hub.test.ts", to: t, kind: "import" });
+    }
+    // d5.test.ts guards just d5
+    imports.push({ from: "src/d5.test.ts", to: "src/d5.ts", kind: "import" });
+    const cg = graph({ imports });
+
+    const withTests = computeRefactorSafety(cg, { withTests: true });
+    const hub = withTests.files.find((f) => f.file === "src/hub.ts")!;
+    expect(hub.tier).toBe("load-bearing");
+    expect(hub.testsToRun?.[0]).toEqual({ file: "src/hub.test.ts", guards: 4 });
+    expect(
+      hub.testsToRun?.some((t) => t.file === "src/d5.test.ts" && t.guards === 1)
+    ).toBe(true);
+
+    // The default (free) view never computes/ships the prioritizer data.
+    const free = computeRefactorSafety(cg);
+    expect(free.files.find((f) => f.file === "src/hub.ts")!.testsToRun).toBeUndefined();
+  });
+
   it("returns per-tier counts and sorts most load-bearing first", () => {
     const cg = graph({
       imports: [

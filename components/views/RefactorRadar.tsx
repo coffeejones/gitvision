@@ -15,6 +15,8 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  FlaskConical,
+  Lock,
   ShieldAlert,
   TriangleAlert,
 } from "lucide-react";
@@ -124,13 +126,16 @@ function FileRow({
   open,
   onToggle,
   sessionId,
+  entitled,
 }: {
   f: FileSafety;
   open: boolean;
   onToggle: () => void;
   sessionId: string;
+  entitled: boolean;
 }) {
   const meta = TIER_META[f.tier];
+  const highTier = f.tier === "load-bearing" || f.tier === "handle-with-care";
   return (
     <div style={{ borderBottom: `1px solid ${TOK.border}` }}>
       <button
@@ -226,6 +231,57 @@ function FileRow({
             </div>
           )}
 
+          {/* Test Prioritizer (Plus) — which tests to run before touching it */}
+          {highTier && (
+            <div className="flex flex-col gap-1">
+              <span
+                className="text-[10px] uppercase tracking-[0.1em] inline-flex items-center gap-1"
+                style={{ color: TOK.textMuted }}
+              >
+                <FlaskConical size={10} /> Run these tests first
+              </span>
+              {!entitled ? (
+                <Link
+                  href="/pricing"
+                  className="inline-flex items-center gap-1.5 text-[12px] self-start rounded px-2 py-1 transition hover:opacity-80"
+                  style={{ background: TOK.surfaceElevated, color: TOK.textSecondary }}
+                >
+                  <Lock size={11} /> See which tests guard this change —{" "}
+                  <span style={{ color: TOK.accent }}>Plus</span>
+                </Link>
+              ) : f.testsToRun && f.testsToRun.length > 0 ? (
+                <div className="flex flex-col gap-0.5">
+                  {f.testsToRun.map((t) => (
+                    <div key={t.file} className="flex items-center gap-2">
+                      <span
+                        className="text-[12px] truncate flex-1 min-w-0"
+                        style={{ ...MONO, color: TOK.textSecondary }}
+                        title={t.file}
+                      >
+                        {t.file}
+                      </span>
+                      <span
+                        className="text-[10px] tabular-nums shrink-0"
+                        style={{ color: TOK.textMuted }}
+                        title="How many of the affected files this test reaches"
+                      >
+                        guards {t.guards}
+                      </span>
+                    </div>
+                  ))}
+                  <span className="text-[10px]" style={{ color: TOK.textMuted }}>
+                    Static import/call mapping — not a coverage measurement.
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[12px]" style={{ color: TOK.textMuted }}>
+                  No test file reaches the affected code — there's nothing to run
+                  first.
+                </span>
+              )}
+            </div>
+          )}
+
           <Link
             href={`/session/${sessionId}/imports`}
             className="inline-flex items-center gap-1 text-[12px] self-start transition hover:opacity-80"
@@ -242,9 +298,12 @@ function FileRow({
 export function RefactorRadar({
   report,
   sessionId,
+  entitled,
 }: {
   report: RefactorSafetyReport;
   sessionId: string;
+  /** Whether the viewer's plan unlocks the Test Prioritizer (Plus). */
+  entitled: boolean;
 }) {
   // Load-bearing + handle-with-care open by default (the files that matter);
   // moderate + safe collapse to a count so the index leads with risk.
@@ -340,6 +399,7 @@ export function RefactorRadar({
                       setOpenFile((cur) => (cur === f.file ? null : f.file))
                     }
                     sessionId={sessionId}
+                    entitled={entitled}
                   />
                 ))}
               </div>

@@ -6,6 +6,9 @@
 import { notFound } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { getSession } from "@/lib/storage";
+import { getAuthSession } from "@/lib/authSession";
+import { canAccess } from "@/lib/billing/gates";
+import { isDemoSession } from "@/lib/demoSessions";
 import { TOK } from "@/lib/sessionTheme";
 import { computeRefactorSafety } from "@/lib/refactorSafety";
 import { RefactorRadar } from "@/components/views/RefactorRadar";
@@ -24,8 +27,19 @@ export default async function RefactorPage({
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 
+  // The Test Prioritizer is Plus-gated. Demo sessions show it ungated so a
+  // visitor sees the full surface; otherwise it needs the entitlement. When
+  // not entitled we don't compute it at all, so the data never ships.
+  const isDemo = isDemoSession(id);
+  const authSession = await getAuthSession();
+  const entitled =
+    isDemo ||
+    (authSession
+      ? await canAccess(authSession.user.id, "refactorGuidance")
+      : false);
+
   const report = current.codeGraph
-    ? computeRefactorSafety(current.codeGraph)
+    ? computeRefactorSafety(current.codeGraph, { withTests: entitled })
     : null;
 
   return (
@@ -60,7 +74,11 @@ export default async function RefactorPage({
       </header>
 
       {report && report.files.length > 0 ? (
-        <RefactorRadar report={report} sessionId={session.id} />
+        <RefactorRadar
+          report={report}
+          sessionId={session.id}
+          entitled={entitled}
+        />
       ) : (
         <EmptyPanel
           icon={<ShieldAlert size={22} />}
