@@ -33,6 +33,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   Share2,
+  ShieldAlert,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -43,6 +44,7 @@ import { TOK } from "@/lib/sessionTheme";
 import { WatchToggle } from "@/components/WatchToggle";
 import { RefineScope } from "@/components/RefineScope";
 import { ShareCardModal } from "./ShareCardModal";
+import { WallCardModal } from "./WallCardModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
 import { FeedbackModal } from "./FeedbackModal";
 import { Logo } from "./Logo";
@@ -82,6 +84,7 @@ export function SessionToolbar({
   const [deleting, startDelete] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [wallOpen, setWallOpen] = useState(false);
   const [wrappedOpen, setWrappedOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
@@ -265,6 +268,15 @@ export function SessionToolbar({
                   }}
                 />
                 <MenuItem
+                  icon={<ShieldAlert size={14} />}
+                  label="Load-bearing walls"
+                  hint="The files nobody dares touch"
+                  onClick={() => {
+                    setShareMenuOpen(false);
+                    setWallOpen(true);
+                  }}
+                />
+                <MenuItem
                   icon={<Gift size={14} />}
                   label="Contributor Wrapped"
                   hint="Per-person portrait cards"
@@ -422,6 +434,12 @@ export function SessionToolbar({
         sessionName={sessionName}
         open={shareOpen}
         onClose={() => setShareOpen(false)}
+      />
+      <WallCardModal
+        snapshot={snapshot}
+        sessionName={sessionName}
+        open={wallOpen}
+        onClose={() => setWallOpen(false)}
       />
       <ContributorWrappedModal
         snapshot={snapshot}
