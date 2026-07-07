@@ -6,6 +6,19 @@
 
 ---
 
+## Recent work (2026-07, on `feat/codetrawl-landing`)
+
+- **Interactive impact analysis** — the Imports tab gained a "what breaks if I change this?" workbench: a risk-tiered blast list (untested → cross-module → same-module) beside a **focus-mode dependency canvas** (click a file → prune to its N-hop neighborhood; selecting in the panel prunes too — nothing is dimmed). Split-pane so panel + canvas are co-visible; cold-boot leads with an invitation, not a wall. Sidebar gained a **focus-mode toggle** (hide the nav for a wider canvas).
+- **Call-graph accuracy fix** — five plugins (js, python, go, java, csharp, php) never set `hasReceiver` on method calls, so `.matches()`/`.find()`/`.get()` false-matched unique unrelated functions → false cross-module edges (parse.ts "depended on" a React view + a test file). Fixed to mirror the Ruby plugin; verified parse.ts's resolved out-edges drop 15 → 3 (self only).
+- **Arc 1 "Can I touch this?"** (Refactor tab, per `ROADMAP.md`) — the action layer:
+  - **Refactor-Safety Radar** (Free): per-file safety *tier* (load-bearing / handle-with-care / moderate / safe) composed from blast reach × complexity × untested dependents × duplicates. Named tiers, evidence on every row, never a bare score. `lib/refactorSafety.ts`.
+  - **Impact-Ranked Test Prioritizer** (Plus, `refactorGuidance` flag): "run these tests first" — reverse test-mapping ranked by dependents guarded.
+  - **Load-bearing walls share card** — the shareable "files nobody dares touch" PNG (distribution beat).
+
+**Forward plan lives in [`ROADMAP.md`](ROADMAP.md)** (web-grounded, H2 2026): five arcs — Refactor-Confidence (Arc 1, shipped), Agent Pre-Flight / MCP (Arc 2, next), Temporal drift (Arc 3, the Plus engine), Evidence Desk / CRA (Arc 4), Change-Time Blast (Arc 5).
+
+---
+
 ## CodeTrawl rebrand — shipped on `feat/codetrawl-landing` (2026-06-17)
 
 The whole product was re-skinned + re-voiced from **RepoJury** (a courtroom/"verdict" metaphor on a cool slate-violet theme) to **CodeTrawl** — a fishing-trawler/"sweep the depths" metaphor on a warm-grey bitumen theme. 35 commits, pushed; build + 1389 tests green; reviewed by an 8-slice multi-agent pass (no blockers).
