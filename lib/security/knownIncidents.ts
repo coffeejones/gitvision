@@ -30,11 +30,15 @@
 // Review cadence: quarterly. When adding entries, link the
 // reference URL so future maintainers can verify the claim.
 
+// Relative import (not the "@/" alias) so this file resolves under the mcp/
+// tsconfig too — it's pulled into the MCP build via the signals tool, and that
+// tsconfig has no path mapping. The rest of lib/ uses relative imports for the
+// same reason.
 import type {
   AnalysisSnapshot,
   Ecosystem,
   HealthSignal,
-} from "@/lib/types";
+} from "../types";
 
 export interface KnownIncident {
   /** Stable id, kebab-case. Used in evidence + future filtering. */

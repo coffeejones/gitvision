@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// RepoJury MCP server entry point (v0.64 / C1.1, expanded v0.65 / C1.2,
+// CodeTrawl MCP server entry point (v0.64 / C1.1, expanded v0.65 / C1.2,
 // refactored v0.66 / C1.3 to share a buildServer() with tests).
 //
-// Exposes the RepoJury analysis pipeline as Model Context Protocol
+// Exposes the CodeTrawl analysis pipeline as Model Context Protocol
 // tools so AI coding agents (Claude Code, Cursor, Cline, etc.) can
 // query deterministic structural information about a GitHub repo
 // without hallucinating cross-file relationships.
 //
 // Transport: stdio. Standard MCP install path is:
 //
-//   $ npm install -g repojury-mcp
-//   $ claude mcp add repojury npx repojury-mcp
+//   $ npm install -g codetrawl-mcp
+//   $ claude mcp add codetrawl npx codetrawl-mcp
 //
 // The server runs as a child process of the MCP client. Sessions are
 // cached in-memory (10-min TTL, 8 entries) AND on-disk at
@@ -45,6 +45,6 @@ main().catch((err) => {
   // Stderr is the only safe place to log fatal errors during stdio
   // protocol operation. The MCP client will surface this in its own
   // error UI.
-  console.error("repojury-mcp fatal:", err);
+  console.error("codetrawl-mcp fatal:", err);
   process.exit(1);
 });

@@ -41,10 +41,10 @@ import {
   handleReviewChanges,
 } from "./tools/reviewChanges.js";
 
-export const SERVER_NAME = "repojury";
+export const SERVER_NAME = "codetrawl";
 export const SERVER_VERSION = "0.67.0";
 
-/** Build a fully-configured RepoJury MCP server with all tools
+/** Build a fully-configured CodeTrawl MCP server with all tools
  *  registered. The caller decides which transport to attach (stdio
  *  in production, InMemoryTransport in tests). */
 export function buildServer(): McpServer {
@@ -57,7 +57,7 @@ export function buildServer(): McpServer {
     "analyze_repo",
     {
       description:
-        "Download a GitHub repo, run AST + git-history analysis, return a session id and a compact summary. Always call this first — every other RepoJury tool needs the session id. Cached for 10 minutes per repo URL so subsequent calls on the same URL are free.",
+        "Download a GitHub repo, run AST + git-history analysis, return a session id and a compact summary. Always call this first — every other CodeTrawl tool needs the session id. Cached for 10 minutes per repo URL so subsequent calls on the same URL are free.",
       inputSchema: analyzeRepoInputSchema,
     },
     handleAnalyzeRepo
