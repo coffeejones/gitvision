@@ -12,6 +12,7 @@ import {
   type EmailLayoutOptions,
 } from "./_shared";
 import type { WatchAlert } from "@/lib/watchMonitor";
+import { formatRiskDrift } from "@/lib/riskDrift";
 
 export function watchAlertEmail(input: {
   alerts: WatchAlert[];
@@ -21,21 +22,41 @@ export function watchAlertEmail(input: {
   const n = alerts.length;
   const one = alerts[0];
 
+  // A single alert with no grade drop but growing blast radius is a
+  // risk-drift-only regression — say so precisely rather than a bare "regressed".
+  const driftOnly = n === 1 && !one.gradeFrom && one.riskDrifts.length > 0;
+
   const subject =
     n === 1
       ? one.gradeFrom && one.gradeTo
         ? `CodeTrawl: ${one.repoFullName} dropped to ${one.gradeTo}`
-        : `CodeTrawl: ${one.repoFullName} regressed`
+        : driftOnly
+          ? `CodeTrawl: ${one.repoFullName} blast radius grew`
+          : `CodeTrawl: ${one.repoFullName} regressed`
       : `CodeTrawl: ${n} watched repos regressed`;
 
   const heading =
-    n === 1 ? "A repo you're watching regressed" : `${n} repos you're watching regressed`;
+    n === 1
+      ? driftOnly
+        ? "A repo you're watching drifted"
+        : "A repo you're watching regressed"
+      : `${n} repos you're watching regressed`;
+
+  // One line per repo (the verdict summary), followed by the blast-radius
+  // detail line when files got more load-bearing since the last sweep.
+  const repoLines: string[] = [];
+  for (const a of alerts) {
+    repoLines.push(`${a.repoFullName} — ${a.summary}`);
+    if (a.riskDrifts.length > 0) {
+      repoLines.push(`Blast radius grew: ${formatRiskDrift(a.riskDrifts)}`);
+    }
+  }
 
   const paragraphs = [
     n === 1
       ? "Since the last sweep, a repo you put on Watch got worse:"
       : "Since the last sweep, some repos you put on Watch got worse:",
-    ...alerts.map((a) => `${a.repoFullName} — ${a.summary}`),
+    ...repoLines,
   ];
 
   // One regression → straight to its grade; several → the workspace list.

@@ -52,15 +52,10 @@ export interface FileImpactRank {
   dependents: number;
 }
 
-/** Rank files by direct fan-in (distinct dependents), descending. Test files
- *  are excluded from the ranking — they're leaves you don't refactor to
- *  "maximize the codebase". A cheap O(edges) proxy for blast (the full
- *  per-file BFS is reserved for the selected file), used to seed the tool's
- *  "most-impactful files" shortlist. */
-export function rankFilesByFanIn(
-  cg: CodeGraph,
-  topN = 12
-): FileImpactRank[] {
+/** Distinct direct-dependent count per file (test files excluded) — the raw
+ *  fan-in map behind rankFilesByFanIn. Exposed so risk drift can diff it across
+ *  snapshots ("auth.ts blast grew 12 → 31"). O(edges). */
+export function fileFanIn(cg: CodeGraph): Map<string, number> {
   const fanIn = new Map<string, Set<string>>(); // target file → source files
 
   const add = (target: string | null | undefined, source: string) => {
@@ -76,9 +71,24 @@ export function rankFilesByFanIn(
   for (const e of cg.imports) add(e.to, e.from);
   for (const c of cg.calls) add(c.toFile, c.fromFile);
 
-  return [...fanIn.entries()]
-    .filter(([file]) => !isTestPath(file))
-    .map(([file, deps]) => ({ file, dependents: deps.size }))
+  const out = new Map<string, number>();
+  for (const [file, deps] of fanIn) {
+    if (!isTestPath(file)) out.set(file, deps.size);
+  }
+  return out;
+}
+
+/** Rank files by direct fan-in (distinct dependents), descending. Test files
+ *  are excluded from the ranking — they're leaves you don't refactor to
+ *  "maximize the codebase". A cheap O(edges) proxy for blast (the full
+ *  per-file BFS is reserved for the selected file), used to seed the tool's
+ *  "most-impactful files" shortlist. */
+export function rankFilesByFanIn(
+  cg: CodeGraph,
+  topN = 12
+): FileImpactRank[] {
+  return [...fileFanIn(cg).entries()]
+    .map(([file, dependents]) => ({ file, dependents }))
     .sort((a, b) => b.dependents - a.dependents || a.file.localeCompare(b.file))
     .slice(0, Math.max(0, topN));
 }

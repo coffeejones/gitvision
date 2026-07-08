@@ -22,6 +22,7 @@ import { getUpstreamHead } from "./freshness";
 import { appendSnapshot, getSession } from "./storage";
 import { computeVerdict } from "./intelligence/verdict";
 import { diffVerdict, type VerdictDelta } from "./intelligence/verdictDelta";
+import { computeRiskDrift, type RiskDrift } from "./riskDrift";
 import { extractHealthSignals } from "./signals";
 import {
   listActiveWatches,
@@ -52,6 +53,9 @@ export interface WatchAlert {
   scoreDelta: number;
   criticalDelta: number;
   lenses: string[];
+  /** Files whose blast reach grew since the last sweep (Arc 3). Can trigger an
+   *  alert on its own, even when the verdict grade held. Empty when none. */
+  riskDrifts: RiskDrift[];
   /** One-line human summary, e.g. "B→C · +2 critical · Security regressed". */
   summary: string;
 }
@@ -89,11 +93,22 @@ export function assessRegression(
   return { worthy: false, severity: "regression" };
 }
 
-function summarize(delta: VerdictDelta, lenses: string[]): string {
+function summarize(
+  delta: VerdictDelta,
+  lenses: string[],
+  riskDrifts: RiskDrift[],
+): string {
   const parts: string[] = [];
   if (delta.grade) parts.push(`${delta.grade.from}→${delta.grade.to}`);
   if (delta.criticalDelta > 0) parts.push(`+${delta.criticalDelta} critical`);
   if (lenses.length) parts.push(`${lenses.join(", ")} regressed`);
+  if (riskDrifts.length) {
+    parts.push(
+      `${riskDrifts.length} file${riskDrifts.length === 1 ? "" : "s"}' blast grew`,
+    );
+  }
+  // Only reachable on a verdict-only regression with no grade/lens/critical
+  // move (e.g. a bare score wobble) — risk-drift alerts always add a part above.
   if (!parts.length) parts.push(`score ${delta.scoreDelta}`);
   return parts.join(" · ");
 }
@@ -149,7 +164,20 @@ async function processWatch(
     countCriticals(prev),
     countCriticals(newSnap),
   );
-  const { worthy, severity } = assessRegression(delta);
+  const verdictAssess = assessRegression(delta);
+
+  // 3b. Risk drift — files whose blast reach grew (Arc 3). An independent
+  //     trigger: a file quietly becoming far more load-bearing is alert-worthy
+  //     even when no department flipped its vote. Needs code graphs on both
+  //     snapshots (regex-fallback-only langs / skipped analysis → empty).
+  const riskDrifts =
+    prev.codeGraph && newSnap.codeGraph
+      ? computeRiskDrift(prev.codeGraph, newSnap.codeGraph)
+      : [];
+
+  const worthy = verdictAssess.worthy || riskDrifts.length > 0;
+  // Keep the verdict's severity when it fired; risk-drift alone is a regression.
+  const severity = verdictAssess.worthy ? verdictAssess.severity : "regression";
 
   // 4. Persist state. Only mark alerted (for dedup) when we actually alert on
   //    a head we haven't alerted on before.
@@ -177,7 +205,8 @@ async function processWatch(
     scoreDelta: delta.scoreDelta,
     criticalDelta: delta.criticalDelta,
     lenses,
-    summary: summarize(delta, lenses),
+    riskDrifts,
+    summary: summarize(delta, lenses, riskDrifts),
   };
   return { swept: true, skipped: false, alert };
 }
