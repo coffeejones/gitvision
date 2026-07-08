@@ -1,6 +1,7 @@
 // Shared types for CodeTrawl
 
 import type { CodeGraph } from "./codeAnalysis/types";
+import type { DriftMetrics } from "./driftMetrics";
 import type { VerdictNarrative } from "./intelligence/verdictNarrative";
 import type { RecommendationNarrative } from "./intelligence/recommendationNarrative";
 
@@ -290,6 +291,13 @@ export interface AnalysisSnapshot {
    *  a specific message ("skipped: timeout") rather than the generic
    *  "old snapshot, click Refresh" empty state. v0.19+. */
   codeGraphSkipReason?: string;
+  /** A small per-snapshot health fingerprint (duplication %, complexity,
+   *  coverage %, connectivity) captured from the code graph, so future
+   *  snapshots can diff against it into drift trends. Optional — pre-drift
+   *  snapshots omit it; the temporal UI treats a missing value as "no
+   *  baseline yet". Drift can't be backfilled, so we capture from now on.
+   *  Arc 3. */
+  driftMetrics?: DriftMetrics;
   /** When the analysis was scoped to a subdirectory of the repo, this
    *  holds the cleaned subdir path (e.g. "src/cmd"). Refresh reads it
    *  to re-analyze the same scope. The session page surfaces it as a

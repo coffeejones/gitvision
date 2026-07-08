@@ -51,6 +51,7 @@ import { phpPlugin } from "./codeAnalysis/plugins/php";
 import { pythonPlugin } from "./codeAnalysis/plugins/python";
 import { rubyPlugin } from "./codeAnalysis/plugins/ruby";
 import { regexFallbackPlugin } from "./codeAnalysis/plugins/regexFallback";
+import { computeDriftMetrics } from "./driftMetrics";
 import {
   scanForSecrets,
   walkRepoForSecrets,
@@ -857,6 +858,11 @@ export async function analyzeRepo(
     /* ignore */
   }
 
+  // Drift fingerprint — captured per snapshot so future sweeps can diff it
+  // into trends. Can't be backfilled, so we capture it whenever we have a code
+  // graph (Arc 3).
+  const driftMetrics = codeGraph ? computeDriftMetrics(codeGraph) : undefined;
+
   return {
     fetchedAt: new Date().toISOString(),
     repo: repoMeta,
@@ -869,6 +875,7 @@ export async function analyzeRepo(
     fileGraph,
     codeGraph,
     codeGraphSkipReason,
+    driftMetrics,
     pullRequests,
     commitIndex,
     historySource,
