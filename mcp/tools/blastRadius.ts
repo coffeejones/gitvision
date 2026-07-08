@@ -17,7 +17,52 @@ import {
   computeBlastRadius,
   computeFunctionBlastRadius,
 } from "../../lib/codeAnalysis/blastRadius";
+import { deriveTestedFiles } from "../../lib/impact";
+import { isTestFile } from "../../lib/codeAnalysis/testCoverage";
 import { getCached } from "../cache";
+
+/** The fields file- and function-level blast entries share. Function entries
+ *  also carry name/containerType — preserved at runtime by the spread below and
+ *  emitted in the JSON, just not reflected in this narrower type. */
+interface BlastEntry {
+  filePath: string;
+  hop: number;
+  crossModule: boolean;
+}
+
+/** Rank entries by RISK (untested → cross-module → nearest hop), then keep as
+ *  many as fit in `charBudget`. Preserves the highest-risk nodes rather than
+ *  the nearest ones, so a token-capped result still surfaces what actually
+ *  matters. Tags each kept entry with `untested` so the agent sees the ranking
+ *  rationale. Exported for unit testing. */
+export function rankAndBudget(
+  entries: BlastEntry[],
+  tested: Set<string>,
+  charBudget: number
+): { shown: Array<BlastEntry & { untested: boolean }>; total: number } {
+  const ranked = entries
+    .map((e) => ({
+      ...e,
+      untested: !isTestFile(e.filePath) && !tested.has(e.filePath),
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.untested) - Number(a.untested) ||
+        Number(b.crossModule) - Number(a.crossModule) ||
+        a.hop - b.hop ||
+        a.filePath.localeCompare(b.filePath)
+    );
+  const shown: Array<BlastEntry & { untested: boolean }> = [];
+  let used = 0;
+  for (const e of ranked) {
+    const cost = JSON.stringify(e).length + 2;
+    // Always keep at least one so a tiny budget still returns the top risk.
+    if (shown.length > 0 && used + cost > charBudget) break;
+    shown.push(e);
+    used += cost;
+  }
+  return { shown, total: entries.length };
+}
 
 export const blastRadiusInputSchema = {
   sessionId: z
@@ -49,6 +94,15 @@ export const blastRadiusInputSchema = {
     .max(5)
     .optional()
     .describe("BFS depth cap. Default 3."),
+  maxTokens: z
+    .number()
+    .int()
+    .min(500)
+    .max(50000)
+    .optional()
+    .describe(
+      "Response token budget. When set, incoming/outgoing are ranked by RISK (untested → cross-module → nearest hop) and capped to fit an agent context window — the highest-risk nodes are kept, not just the nearest. Each entry is tagged `untested`, and a `budgeted` field reports what was trimmed. Omit for the full result."
+    ),
 };
 
 const InputSchema = z.object(blastRadiusInputSchema);
@@ -73,46 +127,60 @@ export async function handleBlastRadius(input: Input) {
 
   const opts = input.maxHops ? { maxHops: input.maxHops } : {};
 
-  // Function-level branch — needs all three of (file, fn, optionally
-  // container). Container disambiguates UserService.save vs OrderService.save.
-  if (input.fn) {
-    const result = computeFunctionBlastRadius(
-      snapshot.codeGraph,
-      input.file,
-      input.fn,
-      { ...opts, targetContainerType: input.container }
-    );
-    return jsonResult({
-      kind: "function",
-      target: result.target,
-      incoming: result.incoming,
-      outgoing: result.outgoing,
-      counts: {
-        incoming: result.incoming.length,
-        outgoing: result.outgoing.length,
-        byHop: result.byHop,
-        // Cross-module subset — entries whose filePath sits in a different
-        // directory than the target's. Sharper risk signal than raw count.
-        crossModule: result.crossModuleCounts,
-      },
-      truncated: result.truncated,
-    });
-  }
+  // Function-level branch needs (file, fn, optionally container); file-level
+  // needs just file. Both produce the same result shape from here on.
+  const result = input.fn
+    ? computeFunctionBlastRadius(snapshot.codeGraph, input.file, input.fn, {
+        ...opts,
+        targetContainerType: input.container,
+      })
+    : computeBlastRadius(snapshot.codeGraph, input.file, opts);
+  const kind = input.fn ? "function" : "file";
 
-  // File-level branch.
-  const result = computeBlastRadius(snapshot.codeGraph, input.file, opts);
-  return jsonResult({
-    kind: "file",
+  const base = {
+    kind,
     target: result.target,
-    incoming: result.incoming,
-    outgoing: result.outgoing,
     counts: {
       incoming: result.incoming.length,
       outgoing: result.outgoing.length,
       byHop: result.byHop,
+      // Cross-module subset — entries in a different directory than the
+      // target. A sharper risk signal than the raw count.
       crossModule: result.crossModuleCounts,
     },
     truncated: result.truncated,
+  };
+
+  // Token-budget mode: rank by risk + cap so the JSON fits an agent context.
+  if (input.maxTokens) {
+    const tested = deriveTestedFiles(snapshot.codeGraph);
+    const charBudget = input.maxTokens * 3.5; // ~3.5 chars/token, conservative
+    const inc = rankAndBudget(result.incoming, tested, charBudget * 0.55);
+    const out = rankAndBudget(result.outgoing, tested, charBudget * 0.45);
+    const trimmed =
+      inc.shown.length < inc.total || out.shown.length < out.total;
+    return jsonResult({
+      ...base,
+      incoming: inc.shown,
+      outgoing: out.shown,
+      budgeted: {
+        maxTokens: input.maxTokens,
+        ranking: "untested → cross-module → nearest hop",
+        incomingShown: inc.shown.length,
+        incomingTotal: inc.total,
+        outgoingShown: out.shown.length,
+        outgoingTotal: out.total,
+        note: trimmed
+          ? "Trimmed to fit maxTokens — the highest-risk nodes are kept. Raise maxTokens for more."
+          : "The full result fit within maxTokens.",
+      },
+    });
+  }
+
+  return jsonResult({
+    ...base,
+    incoming: result.incoming,
+    outgoing: result.outgoing,
   });
 }
 
