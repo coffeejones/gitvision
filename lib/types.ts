@@ -2,6 +2,7 @@
 
 import type { CodeGraph } from "./codeAnalysis/types";
 import type { DriftMetrics } from "./driftMetrics";
+import type { CIHardeningReport } from "./ciHardening/types";
 import type { VerdictNarrative } from "./intelligence/verdictNarrative";
 import type { RecommendationNarrative } from "./intelligence/recommendationNarrative";
 
@@ -298,6 +299,11 @@ export interface AnalysisSnapshot {
    *  baseline yet". Drift can't be backfilled, so we capture from now on.
    *  Arc 3. */
   driftMetrics?: DriftMetrics;
+  /** CI-hardening assessment of the repo's GitHub Actions workflows —
+   *  action-pinning, third-party inventory, token permission scope, each
+   *  grounded in a named incident. Optional; absent when the repo has no
+   *  workflows or pre-dates the check. Arc 4 (Evidence Desk). */
+  ciHardening?: CIHardeningReport;
   /** When the analysis was scoped to a subdirectory of the repo, this
    *  holds the cleaned subdir path (e.g. "src/cmd"). Refresh reads it
    *  to re-analyze the same scope. The session page surfaces it as a

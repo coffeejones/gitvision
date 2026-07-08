@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
 import { TOK } from "@/lib/sessionTheme";
 import { PackagesPanel } from "@/components/views/PackagesPanel";
+import { CIHardeningPanel } from "@/components/views/CIHardeningPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -45,8 +46,14 @@ export default async function PackagesRoute({
           advisory, any package name for its registry page.
         </p>
       </header>
-      <div id="screenshot-target" className="flex flex-col gap-4">
+      <div id="screenshot-target" className="flex flex-col gap-6">
         <PackagesPanel snapshot={current} />
+        {/* CI-hardening (Arc 4) — the supply chain doesn't stop at manifests;
+         *  the workflows that build + publish are attack surface too. Hidden
+         *  when the repo has no workflows / pre-dates the check. */}
+        {current.ciHardening && (
+          <CIHardeningPanel report={current.ciHardening} />
+        )}
       </div>
     </main>
   );

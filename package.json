@@ -49,6 +49,7 @@
     "smol-toml": "^1.6.1",
     "tar": "^7.5.13",
     "web-tree-sitter": "^0.26.8",
+    "yaml": "^2.9.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

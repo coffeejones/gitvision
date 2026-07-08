@@ -52,6 +52,7 @@ import { pythonPlugin } from "./codeAnalysis/plugins/python";
 import { rubyPlugin } from "./codeAnalysis/plugins/ruby";
 import { regexFallbackPlugin } from "./codeAnalysis/plugins/regexFallback";
 import { computeDriftMetrics } from "./driftMetrics";
+import { computeCiHardening } from "./ciHardening";
 import {
   scanForSecrets,
   walkRepoForSecrets,
@@ -729,6 +730,7 @@ export async function analyzeRepo(
   let codeGraphSkipReason: string | undefined;
   let secretFindings: SecretScanResult | undefined;
   let riskyPatternFindings: RiskyPatternScanResult | undefined;
+  let ciHardening: import("./ciHardening/types").CIHardeningReport | undefined;
   let cleanup: (() => Promise<void>) | null = null;
   try {
     const extracted = await downloadAndExtract(
@@ -796,15 +798,31 @@ export async function analyzeRepo(
         return undefined;
       });
 
-    const [fg, cgResult, secAndRisky] = await Promise.all([
+    // CI-hardening — reads .github/workflows from the same extracted tree.
+    // Additive signal, so a failure returns undefined rather than tanking the
+    // analysis. (Arc 4 — Evidence Desk.)
+    const ciHardeningPromise = computeCiHardening(
+      extracted.extractDir,
+      owner,
+    ).catch((err) => {
+      console.error(
+        `ciHardening failed for ${owner}/${repo}:`,
+        err instanceof Error ? err.message : err
+      );
+      return undefined;
+    });
+
+    const [fg, cgResult, secAndRisky, ciResult] = await Promise.all([
       buildFileGraphFromDir(extracted.extractDir),
       Promise.race([codeAnalysisPromise, timeoutPromise]),
       securityPromise,
+      ciHardeningPromise,
     ]);
 
     fileGraph = fg;
     secretFindings = secAndRisky?.sec;
     riskyPatternFindings = secAndRisky?.risky;
+    ciHardening = ciResult;
     if (cgResult === TIMEOUT) {
       codeGraph = undefined;
       codeGraphSkipReason = `Code analysis exceeded ${
@@ -886,6 +904,7 @@ export async function analyzeRepo(
     analyzedExcludeFolders: excludeFolders.length > 0 ? excludeFolders : undefined,
     secretFindings,
     riskyPatternFindings,
+    ciHardening,
     rateLimitInfo,
   };
 }
