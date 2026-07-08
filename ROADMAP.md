@@ -186,6 +186,13 @@ already behind the link.**
 
 ## Sequencing (solo, hobby velocity)
 
+> **Status (2026-07-08):** Arc 1, Arc 2, and Arc 3 have all landed on
+> `feat/codetrawl-landing` (adversarially reviewed). The "Now" and most of the
+> "Next" horizons below are done in code; what remains is manual infra — MCP
+> hosting / `npm publish` / registry listings, the demo re-sweep so drift +
+> badges show on public demos, and the Show HN distribution beat. Next feature
+> horizon is **Arc 4 (Evidence Desk / CRA)** and **Arc 1 Weak-Suite**.
+
 ### Now (~1 month) — harvest, not construction
 1. **Arc 1:** Radar + Test Prioritizer composed into ONE "Can I touch this?"
    surface (evidence-expandable tiers, no bare scores) + the load-bearing-wall

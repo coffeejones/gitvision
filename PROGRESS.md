@@ -14,8 +14,16 @@
   - **Refactor-Safety Radar** (Free): per-file safety *tier* (load-bearing / handle-with-care / moderate / safe) composed from blast reach × complexity × untested dependents × duplicates. Named tiers, evidence on every row, never a bare score. `lib/refactorSafety.ts`.
   - **Impact-Ranked Test Prioritizer** (Plus, `refactorGuidance` flag): "run these tests first" — reverse test-mapping ranked by dependents guarded.
   - **Load-bearing walls share card** — the shareable "files nobody dares touch" PNG (distribution beat).
+- **Arc 2 "Agent Pre-Flight"** (MCP, per `ROADMAP.md`) — the 8-tool `mcp/` server was already built; this shipped it. Rebranded server RepoJury→CodeTrawl (`codetrawl`), fixed the pre-existing `mcp:build` breakage (`@/lib/types` → relative), added a **token-budget mode** to `blast_radius` (`maxTokens` ranks untested → cross-module → nearest-hop and caps to fit an agent context), and a **/agents** docs page ("Verdicts, not queries" + 8-tool table + Claude Code / Cursor install recipes + pre-flight recipe). Hosting / `npm publish` / registry listings remain manual infra TODOs.
+- **Arc 3 "Temporal Intelligence"** — the full loop, five beats:
+  - **Drift fingerprint** (`lib/driftMetrics.ts`) — a small per-snapshot health fingerprint (files, functions, avg/max complexity, duplication %, coverage %, connectivity) persisted on every `AnalysisSnapshot` (optional field). Can't be backfilled, so it shipped first.
+  - **Drift panel** (Plus) — "direction of travel" on the Overview, worst-first, reusing the `structuralDiff` gate. Works retroactively via an on-the-fly fallback (`driftMetricsFor` computes from an old snapshot's codeGraph when the fingerprint is absent).
+  - **Drift share card** (`components/DriftCard.tsx`) — the shareable "Where <repo> is heading" PNG (full 5-metric fingerprint, movers highlighted, stable rows muted). Ungated distribution artifact.
+  - **README badge** (`/badge/[id]` SVG + `lib/badge.ts`) — evergreen grade + trend backlink (green→red ramp, ↗/↘/→ vs the previous sweep). Public-repo only; private sessions get a neutral "private" badge.
+  - **Risk Drift in Watch** (`lib/riskDrift.ts`) — blast-reach growth ("auth.ts blast 12→31") as an **independent** alert trigger wired into the Watch email; diffs the delta (not the level) so sustained-high blast never re-alerts.
+- **Adversarial review pass** — a 6-dimension refute-by-default review of the Arc 1–3 diff (21 agents) confirmed 10 issues; all 8 real ones fixed (`7dbe9fc`). The standout: a Watch email that framed an *improved* grade as a "regression" when risk-drift fired independently (fixed via `assessWatch`, which gates grade/lens copy on a real regression). Added `lib/sessionCache.ts` (React `cache()`) to dedup the Overview's double drift compute. Open follow-up: stamp an analyzer-version on snapshots so cross-parser-version diffs don't fabricate blast growth.
 
-**Forward plan lives in [`ROADMAP.md`](ROADMAP.md)** (web-grounded, H2 2026): five arcs — Refactor-Confidence (Arc 1, shipped), Agent Pre-Flight / MCP (Arc 2, next), Temporal drift (Arc 3, the Plus engine), Evidence Desk / CRA (Arc 4), Change-Time Blast (Arc 5).
+**Forward plan lives in [`ROADMAP.md`](ROADMAP.md)** (web-grounded, H2 2026): five arcs — Refactor-Confidence (Arc 1, shipped), Agent Pre-Flight / MCP (Arc 2, shipped), Temporal drift (Arc 3, shipped), Evidence Desk / CRA (Arc 4, next), Change-Time Blast (Arc 5).
 
 ---
 
