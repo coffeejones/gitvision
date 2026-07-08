@@ -131,6 +131,11 @@ export interface DriftReport {
   sweeps: number;
   /** Metrics that moved beyond a per-metric noise floor, worst-first. */
   trends: DriftTrend[];
+  /** Full fingerprints at the span endpoints, for renderers that want the raw
+   *  "then vs now" numbers (e.g. the share card). Present only when
+   *  hasBaseline. */
+  baseline?: DriftMetrics;
+  latest?: DriftMetrics;
 }
 
 /** Per-metric config: display label, unit, which direction is unhealthy, and a
@@ -150,32 +155,46 @@ const TREND_METRICS: ReadonlyArray<{
   { key: "connectivity", label: "Coupling", unit: "×", higherIsWorse: true, threshold: 0.1 },
 ];
 
+/** All five quality-metric movements between two fingerprints, each tagged
+ *  `moved` when it crossed its noise floor. computeDriftTrends surfaces only
+ *  the moved ones (the panel); the share card renders the full set with stable
+ *  rows muted, so it always shows the complete fingerprint. */
+export function driftRows(
+  from: DriftMetrics,
+  to: DriftMetrics
+): Array<DriftTrend & { moved: boolean }> {
+  return TREND_METRICS.map((cfg) => {
+    const a = from[cfg.key];
+    const b = to[cfg.key];
+    const delta = round2(b - a);
+    const moved = Math.abs(delta) >= cfg.threshold;
+    const worse = cfg.higherIsWorse ? delta > 0 : delta < 0;
+    return { key: cfg.key, label: cfg.label, from: a, to: b, delta, unit: cfg.unit, worse, moved };
+  });
+}
+
 /** Diff a session's snapshots (oldest → newest) into a drift report. Compares
  *  the earliest measurable snapshot against the latest — the full span, so the
  *  story is "since you first looked" rather than only "since last sweep". */
 export function computeDriftTrends(
   snapshots: ReadonlyArray<DriftInput>
 ): DriftReport {
-  const points = snapshots
-    .map((s) => ({ at: s.fetchedAt, m: driftMetricsFor(s) }))
-    .filter((p): p is { at: string; m: DriftMetrics } => p.m !== null);
-
-  if (points.length < 2) {
-    return { hasBaseline: false, sweeps: points.length, trends: [] };
+  // "Measurable" = carries a persisted fingerprint OR a code graph to derive
+  // one from. This is a cheap presence check (no compute), so we can pick the
+  // span endpoints first and only run the (potentially graph-walking) metric
+  // computation on the two snapshots we actually compare — not every one.
+  const measurable = snapshots.filter((s) => s.driftMetrics || s.codeGraph);
+  if (measurable.length < 2) {
+    return { hasBaseline: false, sweeps: measurable.length, trends: [] };
   }
 
-  const baseline = points[0];
-  const latest = points[points.length - 1];
-  const trends: DriftTrend[] = [];
+  const baseSnap = measurable[0];
+  const lastSnap = measurable[measurable.length - 1];
+  const baseline = driftMetricsFor(baseSnap)!; // non-null: measurable
+  const latest = driftMetricsFor(lastSnap)!;
 
-  for (const cfg of TREND_METRICS) {
-    const from = baseline.m[cfg.key];
-    const to = latest.m[cfg.key];
-    const delta = round2(to - from);
-    if (Math.abs(delta) < cfg.threshold) continue;
-    const worse = cfg.higherIsWorse ? delta > 0 : delta < 0;
-    trends.push({ key: cfg.key, label: cfg.label, from, to, delta, unit: cfg.unit, worse });
-  }
+  // Only the metrics that crossed their noise floor, worst-first.
+  const trends: DriftTrend[] = driftRows(baseline, latest).filter((r) => r.moved);
 
   // Worst-first: regressions before improvements, then by magnitude.
   trends.sort(
@@ -185,9 +204,11 @@ export function computeDriftTrends(
 
   return {
     hasBaseline: true,
-    baselineAt: baseline.at,
-    latestAt: latest.at,
-    sweeps: points.length,
+    baselineAt: baseSnap.fetchedAt,
+    latestAt: lastSnap.fetchedAt,
+    sweeps: measurable.length,
     trends,
+    baseline,
+    latest,
   };
 }

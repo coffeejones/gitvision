@@ -36,6 +36,7 @@ import {
   ShieldAlert,
   Sparkles,
   Trash2,
+  TrendingUp,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { pollJob } from "@/lib/jobsClient";
@@ -45,7 +46,9 @@ import { WatchToggle } from "@/components/WatchToggle";
 import { RefineScope } from "@/components/RefineScope";
 import { ShareCardModal } from "./ShareCardModal";
 import { WallCardModal } from "./WallCardModal";
+import { DriftCardModal } from "./DriftCardModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
+import type { DriftReport } from "@/lib/driftMetrics";
 import { FeedbackModal } from "./FeedbackModal";
 import { Logo } from "./Logo";
 
@@ -57,6 +60,9 @@ interface Props {
   // Delivered from the parent session page so we know what to show in the top strip
   updatedAtISO: string;
   snapshotCount: number;
+  // Multi-sweep drift report (Arc 3) — computed server-side in the layout since
+  // it spans every snapshot's fingerprint; feeds the drift share card.
+  driftReport: DriftReport;
 }
 
 function formatRel(iso: string): string {
@@ -78,6 +84,7 @@ export function SessionToolbar({
   targetId,
   updatedAtISO,
   snapshotCount,
+  driftReport,
 }: Props) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
@@ -85,6 +92,7 @@ export function SessionToolbar({
   const [message, setMessage] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [wallOpen, setWallOpen] = useState(false);
+  const [driftOpen, setDriftOpen] = useState(false);
   const [wrappedOpen, setWrappedOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
@@ -277,6 +285,15 @@ export function SessionToolbar({
                   }}
                 />
                 <MenuItem
+                  icon={<TrendingUp size={14} />}
+                  label="Drift trends"
+                  hint="Direction of travel across sweeps"
+                  onClick={() => {
+                    setShareMenuOpen(false);
+                    setDriftOpen(true);
+                  }}
+                />
+                <MenuItem
                   icon={<Gift size={14} />}
                   label="Contributor Wrapped"
                   hint="Per-person portrait cards"
@@ -440,6 +457,13 @@ export function SessionToolbar({
         sessionName={sessionName}
         open={wallOpen}
         onClose={() => setWallOpen(false)}
+      />
+      <DriftCardModal
+        snapshot={snapshot}
+        report={driftReport}
+        sessionName={sessionName}
+        open={driftOpen}
+        onClose={() => setDriftOpen(false)}
       />
       <ContributorWrappedModal
         snapshot={snapshot}

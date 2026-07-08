@@ -24,6 +24,7 @@ import { requireSessionReadAccess } from "@/lib/ownership";
 import { SessionToolbar } from "@/components/SessionToolbar";
 import { SessionShell } from "@/components/SessionShell";
 import { HideOnMarketing } from "@/components/MarketingModeWrapper";
+import { computeDriftTrends } from "@/lib/driftMetrics";
 import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
 import { TOK } from "@/lib/sessionTheme";
 
@@ -85,6 +86,12 @@ export default async function SessionLayout({
   const current = session.snapshots[session.snapshots.length - 1];
   if (!current) notFound();
 
+  // Multi-sweep drift report for the toolbar's drift share card (Arc 3).
+  // Cheap: computeDriftTrends only derives fingerprints for the two span
+  // endpoints, not every snapshot, so running it in the layout (which renders
+  // on every session route) stays inexpensive.
+  const driftReport = computeDriftTrends(session.snapshots);
+
   return (
     <div className={`${ctDisplay.variable} ${ctMono.variable}`} style={FONT_VARS}>
       {/* HideOnMarketing strips the top toolbar when ?marketing=1 is
@@ -99,6 +106,7 @@ export default async function SessionLayout({
           targetId="screenshot-target"
           updatedAtISO={session.updatedAt}
           snapshotCount={session.snapshots.length}
+          driftReport={driftReport}
         />
       </HideOnMarketing>
 

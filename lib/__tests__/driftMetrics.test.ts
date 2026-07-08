@@ -108,6 +108,9 @@ describe("computeDriftTrends", () => {
     expect(report.sweeps).toBe(3);
     expect(report.baselineAt).toBe("2026-01-01");
     expect(report.latestAt).toBe("2026-03-01");
+    // raw endpoint fingerprints exposed for the share card
+    expect(report.baseline?.duplicationPct).toBe(10);
+    expect(report.latest?.duplicationPct).toBe(44);
 
     // duplication +34 and coverage -20 both moved; both are regressions, so
     // they sort by magnitude → duplication first.
