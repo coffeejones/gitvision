@@ -19,12 +19,11 @@
 
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
-import { getSession } from "@/lib/storage";
+import { getSessionCached, getDriftReport } from "@/lib/sessionCache";
 import { requireSessionReadAccess } from "@/lib/ownership";
 import { SessionToolbar } from "@/components/SessionToolbar";
 import { SessionShell } from "@/components/SessionShell";
 import { HideOnMarketing } from "@/components/MarketingModeWrapper";
-import { computeDriftTrends } from "@/lib/driftMetrics";
 import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
 import { TOK } from "@/lib/sessionTheme";
 
@@ -61,7 +60,7 @@ export default async function SessionLayout({
   children: React.ReactNode;
 }) {
   const { id } = await params;
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
 
   // v0.81 read-side access gate: sessions analyzed from a PRIVATE repo
@@ -87,10 +86,10 @@ export default async function SessionLayout({
   if (!current) notFound();
 
   // Multi-sweep drift report for the toolbar's drift share card (Arc 3).
-  // Cheap: computeDriftTrends only derives fingerprints for the two span
-  // endpoints, not every snapshot, so running it in the layout (which renders
-  // on every session route) stays inexpensive.
-  const driftReport = computeDriftTrends(session.snapshots);
+  // Request-cached + keyed on id, so on the Overview route the layout and the
+  // page share one computation (and one session read) instead of two. Only the
+  // two span endpoints are ever fingerprinted, not every snapshot.
+  const driftReport = await getDriftReport(id);
 
   return (
     <div className={`${ctDisplay.variable} ${ctMono.variable}`} style={FONT_VARS}>

@@ -34,6 +34,7 @@ export function DriftCardModal({
 
   useEffect(() => {
     if (!open) return;
+    setError(null); // clear a prior failed download so it doesn't persist on reopen
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }

@@ -5,9 +5,17 @@
 // Watch monitor so a growing blast radius can independently trigger an alert.
 //
 // Pure over two CodeGraphs (client-safe): diffs the per-file fan-in maps from
-// lib/impact.ts. Analyzer-version caveat — a fan-in bump can reflect the parser
-// resolving more edges between deploys rather than real coupling; within a
-// single re-sweep the analyzer is constant, and the growth floor filters noise.
+// lib/impact.ts.
+//
+// Analyzer-version caveat (KNOWN LIMITATION): the two snapshots being diffed
+// come from different sweeps — `prev` is stored, `newSnap` is freshly analyzed —
+// so a parser upgrade between them (e.g. a language moving from the regex
+// fallback to a tree-sitter plugin) can resolve more call edges and inflate
+// fan-in without the code changing. The growth floor dampens small jumps but
+// does NOT distinguish real coupling growth from an analyzer change. The proper
+// fix is to stamp a coarse analyzer-version onto each snapshot and skip the
+// first cross-version diff; until then, treat a large one-off jump right after
+// a deploy with suspicion. Tracked as follow-up.
 
 import type { CodeGraph } from "./codeAnalysis/types";
 import { fileFanIn } from "./impact";

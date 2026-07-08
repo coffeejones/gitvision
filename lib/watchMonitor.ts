@@ -93,14 +93,35 @@ export function assessRegression(
   return { worthy: false, severity: "regression" };
 }
 
+/** Combine the verdict-regression assessment with risk drift into the final
+ *  alert decision. Risk drift is an INDEPENDENT trigger — a growing blast radius
+ *  alerts even when the verdict held. `verdictRegressed` reports whether the
+ *  verdict itself worsened, so callers surface grade/lens copy ONLY on a real
+ *  regression: a drift-only alert may accompany a grade that actually IMPROVED,
+ *  and must not be framed as "dropped"/"regressed". */
+export function assessWatch(
+  delta: VerdictDelta,
+  riskDrifts: RiskDrift[],
+): { worthy: boolean; severity: WatchAlert["severity"]; verdictRegressed: boolean } {
+  const v = assessRegression(delta);
+  return {
+    worthy: v.worthy || riskDrifts.length > 0,
+    severity: v.worthy ? v.severity : "regression",
+    verdictRegressed: v.worthy,
+  };
+}
+
 function summarize(
   delta: VerdictDelta,
   lenses: string[],
   riskDrifts: RiskDrift[],
+  verdictRegressed: boolean,
 ): string {
   const parts: string[] = [];
-  if (delta.grade) parts.push(`${delta.grade.from}→${delta.grade.to}`);
-  if (delta.criticalDelta > 0) parts.push(`+${delta.criticalDelta} critical`);
+  // Verdict copy only when the verdict actually regressed — a drift-only alert
+  // can accompany an IMPROVED grade, which must never read as a drop.
+  if (verdictRegressed && delta.grade) parts.push(`${delta.grade.from}→${delta.grade.to}`);
+  if (verdictRegressed && delta.criticalDelta > 0) parts.push(`+${delta.criticalDelta} critical`);
   if (lenses.length) parts.push(`${lenses.join(", ")} regressed`);
   if (riskDrifts.length) {
     parts.push(
@@ -164,8 +185,6 @@ async function processWatch(
     countCriticals(prev),
     countCriticals(newSnap),
   );
-  const verdictAssess = assessRegression(delta);
-
   // 3b. Risk drift — files whose blast reach grew (Arc 3). An independent
   //     trigger: a file quietly becoming far more load-bearing is alert-worthy
   //     even when no department flipped its vote. Needs code graphs on both
@@ -175,9 +194,7 @@ async function processWatch(
       ? computeRiskDrift(prev.codeGraph, newSnap.codeGraph)
       : [];
 
-  const worthy = verdictAssess.worthy || riskDrifts.length > 0;
-  // Keep the verdict's severity when it fired; risk-drift alone is a regression.
-  const severity = verdictAssess.worthy ? verdictAssess.severity : "regression";
+  const { worthy, severity, verdictRegressed } = assessWatch(delta, riskDrifts);
 
   // 4. Persist state. Only mark alerted (for dedup) when we actually alert on
   //    a head we haven't alerted on before.
@@ -192,7 +209,13 @@ async function processWatch(
 
   if (!alerting) return { swept: true, skipped: false, alert: null };
 
-  const lenses = delta.departments.map((d) => LENS_LABEL[d.id] ?? d.id);
+  // Only surface verdict-worsening copy (grade drop, worsened lenses, +critical)
+  // when the verdict actually regressed. On a drift-only alert the grade may
+  // have IMPROVED, so we null these out — otherwise the email would tell a user
+  // their repo "dropped to A" while the grade went up.
+  const lenses = verdictRegressed
+    ? delta.departments.map((d) => LENS_LABEL[d.id] ?? d.id)
+    : [];
   const alert: WatchAlert = {
     watchId: watch.id,
     userId: watch.userId,
@@ -200,13 +223,13 @@ async function processWatch(
     repoFullName: watch.repoFullName,
     headSha: head,
     severity,
-    gradeFrom: delta.grade?.from ?? null,
-    gradeTo: delta.grade?.to ?? null,
+    gradeFrom: verdictRegressed ? (delta.grade?.from ?? null) : null,
+    gradeTo: verdictRegressed ? (delta.grade?.to ?? null) : null,
     scoreDelta: delta.scoreDelta,
-    criticalDelta: delta.criticalDelta,
+    criticalDelta: verdictRegressed ? delta.criticalDelta : 0,
     lenses,
     riskDrifts,
-    summary: summarize(delta, lenses, riskDrifts),
+    summary: summarize(delta, lenses, riskDrifts, verdictRegressed),
   };
   return { swept: true, skipped: false, alert };
 }

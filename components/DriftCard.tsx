@@ -171,7 +171,7 @@ export function DriftCard({ snapshot, report, variant }: Props) {
           }}
         >
           Direction of travel · {report.sweeps} sweeps
-          {days > 0 ? ` over ${days} days` : ""}
+          {days > 0 ? ` over ${days} day${days === 1 ? "" : "s"}` : ""}
         </div>
         <div
           style={{

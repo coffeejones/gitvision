@@ -4,8 +4,11 @@
 // improvements/unchanged/mixed, and tiny score wobbles are dropped.
 
 import { describe, it, expect } from "vitest";
-import { assessRegression } from "../watchMonitor";
+import { assessRegression, assessWatch } from "../watchMonitor";
 import type { VerdictDelta } from "../intelligence/verdictDelta";
+import type { RiskDrift } from "../riskDrift";
+
+const drift: RiskDrift = { file: "src/auth.ts", from: 12, to: 31, delta: 19 };
 
 function delta(over: Partial<VerdictDelta>): VerdictDelta {
   return {
@@ -57,5 +60,41 @@ describe("assessRegression", () => {
   it("drops a tiny score wobble with no grade/lens/critical move", () => {
     const a = assessRegression(delta({ direction: "regressed", scoreDelta: -1 }));
     expect(a.worthy).toBe(false);
+  });
+});
+
+describe("assessWatch (risk drift as an independent trigger)", () => {
+  it("fires a drift-only alert when the verdict held", () => {
+    const a = assessWatch(delta({ direction: "unchanged" }), [drift]);
+    expect(a.worthy).toBe(true);
+    expect(a.severity).toBe("regression");
+    expect(a.verdictRegressed).toBe(false);
+  });
+
+  it("fires a drift-only alert even when the verdict IMPROVED (not framed as a regression)", () => {
+    // The bug the review caught: an improvement + blast growth must not report
+    // verdictRegressed, so the email never says "dropped"/"regressed".
+    const a = assessWatch(
+      delta({ direction: "improved", scoreDelta: 8, grade: { from: "C", to: "B" } }),
+      [drift],
+    );
+    expect(a.worthy).toBe(true);
+    expect(a.verdictRegressed).toBe(false);
+  });
+
+  it("does not alert when neither the verdict regressed nor anything drifted", () => {
+    const a = assessWatch(delta({ direction: "improved", scoreDelta: 5 }), []);
+    expect(a.worthy).toBe(false);
+    expect(a.verdictRegressed).toBe(false);
+  });
+
+  it("keeps the verdict severity + flags verdictRegressed on a real regression", () => {
+    const a = assessWatch(
+      delta({ direction: "regressed", scoreDelta: -8, criticalDelta: 2 }),
+      [drift],
+    );
+    expect(a.worthy).toBe(true);
+    expect(a.severity).toBe("critical");
+    expect(a.verdictRegressed).toBe(true);
   });
 });

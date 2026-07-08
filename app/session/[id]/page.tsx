@@ -56,7 +56,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { headers } from "next/headers";
-import { getSession } from "@/lib/storage";
+import { getSessionCached, getDriftReport } from "@/lib/sessionCache";
 import { markSeen } from "@/lib/seen";
 import { diffSnapshots } from "@/lib/diff";
 import { findDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
@@ -72,7 +72,6 @@ import {
   structuralDiff,
   structuralDiffHasContent,
 } from "@/lib/intelligence/structuralDiff";
-import { computeDriftTrends } from "@/lib/driftMetrics";
 import { STYLE, TOK } from "@/lib/sessionTheme";
 import { StatGrid } from "@/components/views/StatGrid";
 import { SinceLastVisit } from "@/components/views/SinceLastVisit";
@@ -114,7 +113,7 @@ export default async function OverviewPage({
     redirect(`/session/${id}/${sp.tab}${carry ? `?${carry}` : ""}`);
   }
 
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
 
   const current = session.snapshots[session.snapshots.length - 1];
@@ -217,7 +216,7 @@ export default async function OverviewPage({
   // pre-fingerprint snapshots. Same Plus gate + demo bypass as the structural
   // diff — both are snapshot-diff surfaces. Hidden on single-snapshot sessions
   // and when nothing drifted beyond the noise floor.
-  const driftReport = computeDriftTrends(session.snapshots);
+  const driftReport = await getDriftReport(id);
   const showDrift =
     hasStructuralDiff && driftReport.hasBaseline && driftReport.trends.length > 0;
 

@@ -24,15 +24,19 @@ export function WallCardModal({ snapshot, sessionName, open, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Cheap on a report already computed elsewhere, but memoize so re-renders
-  // (variant flip, download state) don't recompute the whole graph pass.
+  // Gated on `open`: this modal is mounted (closed) on every session route, so
+  // computing the full refactor-safety pass at mount would waste a graph walk
+  // on every page load for the majority of visits that never open the card.
+  // Deferred to first open; still memoized across re-renders (variant flip,
+  // download state).
   const report = useMemo(
-    () => (snapshot.codeGraph ? computeRefactorSafety(snapshot.codeGraph) : null),
-    [snapshot.codeGraph]
+    () => (open && snapshot.codeGraph ? computeRefactorSafety(snapshot.codeGraph) : null),
+    [open, snapshot.codeGraph]
   );
 
   useEffect(() => {
     if (!open) return;
+    setError(null); // clear a prior failed download so it doesn't persist on reopen
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
@@ -43,7 +47,13 @@ export function WallCardModal({ snapshot, sessionName, open, onClose }: Props) {
   if (!open) return null;
 
   const dim = WALL_CARD_DIMS[variant];
-  const hasData = report && report.files.length > 0;
+  // Require at least one high-tier file — a repo whose files are all
+  // moderate/safe has no "load-bearing walls" to show, and rendering the card
+  // anyway would put "The files nobody dares touch" over a "0 load-bearing"
+  // footer (an overclaim on a public artifact).
+  const hasData =
+    report &&
+    report.counts["load-bearing"] + report.counts["handle-with-care"] > 0;
 
   async function download() {
     setDownloading(true);
@@ -131,8 +141,9 @@ export function WallCardModal({ snapshot, sessionName, open, onClose }: Props) {
             </div>
           ) : (
             <p className="text-sm text-center max-w-sm" style={{ color: TOK.textMuted }}>
-              No code graph on this snapshot yet — refresh the session to build
-              the refactor-safety report, then the walls card can render.
+              No load-bearing walls to show — this repo&rsquo;s files are
+              loosely coupled, or there&rsquo;s no code graph on this snapshot
+              yet. Refresh the session to rebuild the refactor-safety report.
             </p>
           )}
         </div>
