@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import * as htmlToImage from "html-to-image";
 import Link from "next/link";
 import {
+  Award,
   Camera,
   ChevronDown,
   GitBranch,
@@ -47,6 +48,7 @@ import { RefineScope } from "@/components/RefineScope";
 import { ShareCardModal } from "./ShareCardModal";
 import { WallCardModal } from "./WallCardModal";
 import { DriftCardModal } from "./DriftCardModal";
+import { BadgeModal } from "./BadgeModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
 import type { DriftReport } from "@/lib/driftMetrics";
 import { FeedbackModal } from "./FeedbackModal";
@@ -93,6 +95,7 @@ export function SessionToolbar({
   const [shareOpen, setShareOpen] = useState(false);
   const [wallOpen, setWallOpen] = useState(false);
   const [driftOpen, setDriftOpen] = useState(false);
+  const [badgeOpen, setBadgeOpen] = useState(false);
   const [wrappedOpen, setWrappedOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
@@ -294,6 +297,15 @@ export function SessionToolbar({
                   }}
                 />
                 <MenuItem
+                  icon={<Award size={14} />}
+                  label="README badge"
+                  hint="Grade + trend backlink for your README"
+                  onClick={() => {
+                    setShareMenuOpen(false);
+                    setBadgeOpen(true);
+                  }}
+                />
+                <MenuItem
                   icon={<Gift size={14} />}
                   label="Contributor Wrapped"
                   hint="Per-person portrait cards"
@@ -464,6 +476,12 @@ export function SessionToolbar({
         sessionName={sessionName}
         open={driftOpen}
         onClose={() => setDriftOpen(false)}
+      />
+      <BadgeModal
+        sessionId={sessionId}
+        isPrivate={snapshot.repo?.private === true}
+        open={badgeOpen}
+        onClose={() => setBadgeOpen(false)}
       />
       <ContributorWrappedModal
         snapshot={snapshot}
