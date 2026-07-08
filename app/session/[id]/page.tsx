@@ -72,6 +72,7 @@ import {
   structuralDiff,
   structuralDiffHasContent,
 } from "@/lib/intelligence/structuralDiff";
+import { computeDriftTrends } from "@/lib/driftMetrics";
 import { STYLE, TOK } from "@/lib/sessionTheme";
 import { StatGrid } from "@/components/views/StatGrid";
 import { SinceLastVisit } from "@/components/views/SinceLastVisit";
@@ -80,6 +81,7 @@ import { BlastRadiusPanel } from "@/components/views/BlastRadiusPanel";
 import { HealthSummary } from "@/components/views/HealthSummary";
 import { SecretFindingsPanel } from "@/components/views/SecretFindingsPanel";
 import { StructuralDiffPanel } from "@/components/views/StructuralDiffPanel";
+import { DriftPanel } from "@/components/views/DriftPanel";
 import { SessionNameEditor } from "@/components/SessionNameEditor";
 import { HotspotTreemap } from "@/components/views/HotspotTreemap";
 import { ContributorList } from "@/components/views/ContributorList";
@@ -208,6 +210,17 @@ export default async function OverviewPage({
     structDiff !== null &&
     structuralDiffHasContent(structDiff);
 
+  // Arc 3: multi-sweep drift trends. Diffs the earliest measurable snapshot
+  // against the latest (full-span "direction of travel"), so it complements
+  // the current-vs-previous StructuralDiff rather than duplicating it. Falls
+  // back to computing fingerprints on the fly, so it works retroactively for
+  // pre-fingerprint snapshots. Same Plus gate + demo bypass as the structural
+  // diff — both are snapshot-diff surfaces. Hidden on single-snapshot sessions
+  // and when nothing drifted beyond the noise floor.
+  const driftReport = computeDriftTrends(session.snapshots);
+  const showDrift =
+    hasStructuralDiff && driftReport.hasBaseline && driftReport.trends.length > 0;
+
   // Advance the viewer's Chambers "seen" baseline: opening this detail
   // page means they've now seen the latest verdict, so the case stops
   // showing a since-last-visit delta until something new lands. Skipped
@@ -305,6 +318,12 @@ export default async function OverviewPage({
             repoFullName={current.repo.fullName}
           />
         )}
+
+        {/* Drift (Arc 3) — the most zoomed-out temporal read: multi-sweep
+         *  direction of travel. Sits above the current-vs-previous panels
+         *  because it answers "where is this heading", not "what just
+         *  changed". Hides itself on single-snapshot sessions. */}
+        {showDrift && <DriftPanel report={driftReport} />}
 
         {/* Structural changes (v0.67 / C2) — per-function / per-file
          *  diff between snapshots. Lives between SinceLastVisit

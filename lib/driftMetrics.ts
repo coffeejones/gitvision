@@ -9,6 +9,7 @@
 // doesn't read as real drift.
 
 import type { CodeGraph } from "./codeAnalysis/types";
+import type { AnalysisSnapshot } from "./types";
 import { computeTestCoverage } from "./codeAnalysis/testCoverage";
 import {
   findDuplicateGroups,
@@ -74,5 +75,119 @@ export function computeDriftMetrics(cg: CodeGraph): DriftMetrics {
     duplicationPct,
     prodFnCoveragePct,
     connectivity,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Drift trends — diff a session's snapshots into a "direction of travel"
+// report ("duplication rose 34% over 3 sweeps"). This is the display layer of
+// the temporal arc: it reads the persisted fingerprints but falls back to
+// computing them on the fly, so trends work retroactively for snapshots taken
+// before the fingerprint was persisted.
+// ---------------------------------------------------------------------------
+
+/** The subset of a snapshot the drift math needs — narrowed so callers (and
+ *  tests) don't have to build a whole AnalysisSnapshot. */
+type DriftInput = Pick<
+  AnalysisSnapshot,
+  "fetchedAt" | "driftMetrics" | "codeGraph"
+>;
+
+/** Metrics for a snapshot: the persisted fingerprint if present, else computed
+ *  on the fly from its code graph. Null when there's no code graph to measure
+ *  (so the snapshot is skipped from the trend). */
+export function driftMetricsFor(s: DriftInput): DriftMetrics | null {
+  if (s.driftMetrics) return s.driftMetrics;
+  return s.codeGraph ? computeDriftMetrics(s.codeGraph) : null;
+}
+
+/** One metric's movement between the baseline and latest sweep. */
+export interface DriftTrend {
+  key:
+    | "duplicationPct"
+    | "prodFnCoveragePct"
+    | "avgComplexity"
+    | "maxComplexity"
+    | "connectivity";
+  label: string;
+  from: number;
+  to: number;
+  /** to - from, rounded. */
+  delta: number;
+  unit: "%" | "cx" | "×";
+  /** True when the movement is in the unhealthy direction (duplication up,
+   *  coverage down, complexity up, coupling up). Drives the color + copy. */
+  worse: boolean;
+}
+
+export interface DriftReport {
+  /** False until there are 2+ measurable snapshots to compare. */
+  hasBaseline: boolean;
+  /** ISO timestamp of the earliest measurable snapshot. */
+  baselineAt?: string;
+  /** ISO timestamp of the latest measurable snapshot. */
+  latestAt?: string;
+  /** How many measurable snapshots span the trend. */
+  sweeps: number;
+  /** Metrics that moved beyond a per-metric noise floor, worst-first. */
+  trends: DriftTrend[];
+}
+
+/** Per-metric config: display label, unit, which direction is unhealthy, and a
+ *  noise floor below which a movement isn't worth reporting (rounding jitter,
+ *  a single renamed function). Order is the tiebreak when magnitudes match. */
+const TREND_METRICS: ReadonlyArray<{
+  key: DriftTrend["key"];
+  label: string;
+  unit: DriftTrend["unit"];
+  higherIsWorse: boolean;
+  threshold: number;
+}> = [
+  { key: "duplicationPct", label: "Duplication", unit: "%", higherIsWorse: true, threshold: 1 },
+  { key: "prodFnCoveragePct", label: "Test coverage", unit: "%", higherIsWorse: false, threshold: 1 },
+  { key: "maxComplexity", label: "Worst-file complexity", unit: "cx", higherIsWorse: true, threshold: 2 },
+  { key: "avgComplexity", label: "Avg complexity", unit: "cx", higherIsWorse: true, threshold: 0.5 },
+  { key: "connectivity", label: "Coupling", unit: "×", higherIsWorse: true, threshold: 0.1 },
+];
+
+/** Diff a session's snapshots (oldest → newest) into a drift report. Compares
+ *  the earliest measurable snapshot against the latest — the full span, so the
+ *  story is "since you first looked" rather than only "since last sweep". */
+export function computeDriftTrends(
+  snapshots: ReadonlyArray<DriftInput>
+): DriftReport {
+  const points = snapshots
+    .map((s) => ({ at: s.fetchedAt, m: driftMetricsFor(s) }))
+    .filter((p): p is { at: string; m: DriftMetrics } => p.m !== null);
+
+  if (points.length < 2) {
+    return { hasBaseline: false, sweeps: points.length, trends: [] };
+  }
+
+  const baseline = points[0];
+  const latest = points[points.length - 1];
+  const trends: DriftTrend[] = [];
+
+  for (const cfg of TREND_METRICS) {
+    const from = baseline.m[cfg.key];
+    const to = latest.m[cfg.key];
+    const delta = round2(to - from);
+    if (Math.abs(delta) < cfg.threshold) continue;
+    const worse = cfg.higherIsWorse ? delta > 0 : delta < 0;
+    trends.push({ key: cfg.key, label: cfg.label, from, to, delta, unit: cfg.unit, worse });
+  }
+
+  // Worst-first: regressions before improvements, then by magnitude.
+  trends.sort(
+    (a, b) =>
+      Number(b.worse) - Number(a.worse) || Math.abs(b.delta) - Math.abs(a.delta)
+  );
+
+  return {
+    hasBaseline: true,
+    baselineAt: baseline.at,
+    latestAt: latest.at,
+    sweeps: points.length,
+    trends,
   };
 }
