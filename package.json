@@ -38,6 +38,7 @@
     "d3": "^7.9.0",
     "d3-sankey": "^0.12.3",
     "drizzle-orm": "^0.45.2",
+    "fflate": "^0.8.3",
     "html-to-image": "^1.11.13",
     "lucide-react": "^1.9.0",
     "nanoid": "^5.1.9",
