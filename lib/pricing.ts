@@ -41,6 +41,9 @@ export interface TierLimits {
   /** Refactor guidance — the Impact-Ranked Test Prioritizer ("run these
    *  tests before touching this file") in the Refactor tab. */
   refactorGuidance: boolean;
+  /** SBOM export — download a timestamped CycloneDX / SPDX bill of materials
+   *  for a snapshot (Arc 4, Pro-only evidence feature). */
+  sbomExport: boolean;
   /** Team workspaces (multi-user) */
   teamWorkspaces: boolean;
   /** Priority support channel */
@@ -97,6 +100,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       architectureDiagrams: false,
       structuralDiff: false,
       refactorGuidance: false,
+      sbomExport: false,
       teamWorkspaces: false,
       prioritySupport: false,
       earlyAccess: false,
@@ -130,6 +134,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       architectureDiagrams: true,
       structuralDiff: true,
       refactorGuidance: true,
+      sbomExport: false,
       teamWorkspaces: false,
       prioritySupport: false,
       earlyAccess: false,
@@ -163,6 +168,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       architectureDiagrams: true,
       structuralDiff: true,
       refactorGuidance: true,
+      sbomExport: true,
       teamWorkspaces: true,
       prioritySupport: true,
       earlyAccess: true,

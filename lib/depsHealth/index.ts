@@ -18,6 +18,7 @@ import type {
   VulnerableDep,
   DeprecatedDep,
   DepScope,
+  SbomComponent,
 } from "../types";
 import { fetchRepoTree } from "./tree";
 import { fetchOsvBatch } from "./osv";
@@ -269,6 +270,24 @@ async function runPluginPipeline(
     0
   );
 
+  // Full declared-component list for SBOM export (Arc 4) — every analyzed
+  // package at its resolved concrete version, not just the problematic subset.
+  // Range specs use the version they resolve to (meta.latest); packages we
+  // couldn't resolve to a concrete version are omitted (can't produce a purl).
+  const components: SbomComponent[] = [];
+  for (const d of withMeta) {
+    const version = d.exact ? d.current : d.meta?.latest ?? d.current;
+    if (!version) continue;
+    components.push({
+      name: d.name,
+      version,
+      scope: scopeByKey.get(d.key) ?? "runtime",
+    });
+  }
+  components.sort(
+    (a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version)
+  );
+
   return {
     ecosystem: plugin.name,
     total: totalDeclarations,
@@ -277,6 +296,7 @@ async function runPluginPipeline(
     outdated,
     vulnerable,
     deprecated,
+    components,
     analyzedAt: new Date().toISOString(),
     note: truncated,
   };

@@ -2,9 +2,14 @@
 
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
+import { getAuthSession } from "@/lib/authSession";
+import { canAccess } from "@/lib/billing/gates";
+import { isDemoSession } from "@/lib/demoSessions";
+import { sbomComponentCount } from "@/lib/sbom";
 import { TOK } from "@/lib/sessionTheme";
 import { PackagesPanel } from "@/components/views/PackagesPanel";
 import { CIHardeningPanel } from "@/components/views/CIHardeningPanel";
+import { SbomPanel } from "@/components/views/SbomPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +22,13 @@ export default async function PackagesRoute({
   const session = await getSession(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
+
+  // SBOM export (Arc 4) — Pro-only; demo sessions bypass to showcase it.
+  const authSession = await getAuthSession();
+  const sbomEntitled =
+    isDemoSession(id) ||
+    (authSession ? await canAccess(authSession.user.id, "sbomExport") : false);
+  const sbomComponents = sbomComponentCount(current);
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-7xl mx-auto w-full">
@@ -54,6 +66,13 @@ export default async function PackagesRoute({
         {current.ciHardening && (
           <CIHardeningPanel report={current.ciHardening} />
         )}
+        {/* SBOM export (Arc 4) — Pro-only downloadable evidence. Non-Pro sees
+         *  the value-led upgrade prompt. */}
+        <SbomPanel
+          sessionId={session.id}
+          componentCount={sbomComponents}
+          entitled={sbomEntitled}
+        />
       </div>
     </main>
   );

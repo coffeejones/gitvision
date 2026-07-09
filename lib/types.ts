@@ -177,6 +177,17 @@ export interface DeprecatedDep {
  *  opaque strings (useful in UI fallbacks). */
 export type Ecosystem = "npm" | "cargo" | "pypi" | (string & {});
 
+/** One declared dependency at its resolved version — the full component list an
+ *  SBOM needs (the outdated/vulnerable/deprecated arrays only hold the
+ *  problematic subset). Optional on DependencyHealth: pre-SBOM snapshots omit it,
+ *  so SBOM export needs a fresh sweep (can't be backfilled). Arc 4. */
+export interface SbomComponent {
+  name: string;
+  /** Resolved concrete version (exact pin, or the version a range resolves to). */
+  version: string;
+  scope: DepScope;
+}
+
 export interface DependencyHealth {
   ecosystem: Ecosystem;
   total: number; // total declarations across all manifest files
@@ -185,6 +196,9 @@ export interface DependencyHealth {
   outdated: OutdatedDep[];
   vulnerable: VulnerableDep[];
   deprecated: DeprecatedDep[];
+  /** Full declared-component list for SBOM export (Arc 4). Optional for
+   *  backward-compat with pre-SBOM snapshots. */
+  components?: SbomComponent[];
   analyzedAt: string;
   note?: string; // truncation or partial-success reason
 }
