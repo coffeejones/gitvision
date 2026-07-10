@@ -5,8 +5,8 @@
 // refactor-safety report from the snapshot's code graph and renders WallCard.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as htmlToImage from "html-to-image";
 import type { AnalysisSnapshot } from "@/lib/types";
+import { downloadCardPng } from "@/lib/shareCardImage";
 import { TOK } from "@/lib/sessionTheme";
 import { computeRefactorSafety } from "@/lib/refactorSafety";
 import { WallCard, WALL_CARD_DIMS, type WallCardVariant } from "./WallCard";
@@ -59,20 +59,13 @@ export function WallCardModal({ snapshot, sessionName, open, onClose }: Props) {
     setDownloading(true);
     setError(null);
     try {
-      if (!cardRef.current) throw new Error("Card not mounted");
-      const dataUrl = await htmlToImage.toPng(cardRef.current, {
-        pixelRatio: 2,
-        cacheBust: true,
+      await downloadCardPng(cardRef.current, {
         width: dim.w,
         height: dim.h,
-        style: { transform: "none" },
+        filename: `codetrawl-${sessionName
+          .replace(/\s+/g, "-")
+          .toLowerCase()}-walls-${variant}`,
       });
-      const link = document.createElement("a");
-      link.download = `codetrawl-${sessionName
-        .replace(/\s+/g, "-")
-        .toLowerCase()}-walls-${variant}.png`;
-      link.href = dataUrl;
-      link.click();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
     } finally {

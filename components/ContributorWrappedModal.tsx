@@ -6,8 +6,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import * as htmlToImage from "html-to-image";
 import type { AnalysisSnapshot, Contributor } from "@/lib/types";
+import { downloadCardPng } from "@/lib/shareCardImage";
 import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
 import { TOK } from "@/lib/sessionTheme";
 
@@ -510,20 +510,12 @@ export function ContributorWrappedModal({ snapshot, open, onClose }: Props) {
     setError(null);
     setDownloading(key);
     try {
-      const el = cardRefs.current.get(key);
-      if (!el) throw new Error("Card not mounted");
-      const dataUrl = await htmlToImage.toPng(el, {
-        pixelRatio: 2,
-        cacheBust: true,
+      const safe = displayName.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+      await downloadCardPng(cardRefs.current.get(key) ?? null, {
         width: CARD_W,
         height: CARD_H,
-        style: { transform: "none" },
+        filename: `codetrawl-wrapped-${snapshot.repo.name}-${safe}`,
       });
-      const safe = displayName.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
-      const link = document.createElement("a");
-      link.download = `codetrawl-wrapped-${snapshot.repo.name}-${safe}.png`;
-      link.href = dataUrl;
-      link.click();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
     } finally {

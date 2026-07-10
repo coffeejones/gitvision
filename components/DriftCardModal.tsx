@@ -6,9 +6,9 @@
 // snapshot's fingerprint) rather than deriving from a single snapshot.
 
 import { useEffect, useRef, useState } from "react";
-import * as htmlToImage from "html-to-image";
 import type { AnalysisSnapshot } from "@/lib/types";
 import type { DriftReport } from "@/lib/driftMetrics";
+import { downloadCardPng } from "@/lib/shareCardImage";
 import { TOK } from "@/lib/sessionTheme";
 import { DriftCard, DRIFT_CARD_DIMS, type DriftCardVariant } from "./DriftCard";
 
@@ -51,20 +51,13 @@ export function DriftCardModal({
     setDownloading(true);
     setError(null);
     try {
-      if (!cardRef.current) throw new Error("Card not mounted");
-      const dataUrl = await htmlToImage.toPng(cardRef.current, {
-        pixelRatio: 2,
-        cacheBust: true,
+      await downloadCardPng(cardRef.current, {
         width: dim.w,
         height: dim.h,
-        style: { transform: "none" },
+        filename: `codetrawl-${sessionName
+          .replace(/\s+/g, "-")
+          .toLowerCase()}-drift-${variant}`,
       });
-      const link = document.createElement("a");
-      link.download = `codetrawl-${sessionName
-        .replace(/\s+/g, "-")
-        .toLowerCase()}-drift-${variant}.png`;
-      link.href = dataUrl;
-      link.click();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
     } finally {

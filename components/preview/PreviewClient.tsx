@@ -5,15 +5,19 @@
 // inside the /preview marketing shell (server component provides CTSurface).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ChangeBlastReport, ChangedFileBlast } from "@/lib/changeBlast/types";
+import { Share2, Link2, Check } from "lucide-react";
 import type { StoredPreview } from "@/lib/previewStore";
-
-const ORANGE = "#ff4f00";
-const BONE = "#eceae8";
-const MUTED = "rgba(255,255,255,0.58)";
-const SURFACE = "rgba(255,255,255,0.04)";
-const BORDER = "rgba(255,255,255,0.10)";
-const MINT = "#7fc7a1";
+import { BlastCardModal } from "./BlastCardModal";
+import {
+  ORANGE,
+  BONE,
+  MUTED,
+  SURFACE,
+  BORDER,
+  VERDICT,
+  KIND_LABEL,
+  TIER_COLOR,
+} from "./previewTheme";
 
 type Phase = "idle" | "running" | "done" | "error";
 
@@ -23,28 +27,6 @@ function humanize(s: unknown): string {
   if (typeof s !== "string") return "";
   return s.match(/^\[gh:[^\]]+\]\s*(.+)$/)?.[1] ?? s;
 }
-
-const VERDICT: Record<
-  ChangeBlastReport["verdict"],
-  { label: string; color: string }
-> = {
-  "high-risk": { label: "High risk", color: ORANGE },
-  review: { label: "Review carefully", color: "#d8b04a" },
-  clear: { label: "Clear", color: MINT },
-};
-
-const KIND_LABEL: Record<ChangedFileBlast["kind"], string> = {
-  added: "+ added",
-  removed: "− removed",
-  modified: "~ modified",
-};
-
-const TIER_COLOR: Record<string, string> = {
-  "load-bearing": ORANGE,
-  "handle-with-care": "#d8b04a",
-  moderate: MUTED,
-  safe: "rgba(255,255,255,0.4)",
-};
 
 export function PreviewClient() {
   const [prUrl, setPrUrl] = useState("");
@@ -199,6 +181,24 @@ function Result({ preview }: { preview: StoredPreview }) {
   const v = VERDICT[report.verdict];
   const shownFiles = report.changedFiles.slice(0, FILE_ROW_CAP);
   const hiddenFiles = report.changedFiles.length - shownFiles.length;
+  const [blastOpen, setBlastOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyLink = useCallback(async () => {
+    try {
+      const url = `${window.location.origin}/preview?preview=${preview.id}`;
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked (insecure context / iframe) — surface the URL so the
+      // user can copy it by hand.
+      window.prompt(
+        "Copy this preview link:",
+        `${window.location.origin}/preview?preview=${preview.id}`,
+      );
+    }
+  }, [preview.id]);
 
   if (!report.hasGraphs) {
     return (
@@ -240,6 +240,15 @@ function Result({ preview }: { preview: StoredPreview }) {
           <span style={{ fontSize: 13, color: MUTED }}>
             {pr.owner}/{pr.repo} #{pr.number} · {pr.baseRef} ← {pr.headRef}
           </span>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <ActionButton onClick={() => setBlastOpen(true)}>
+              <Share2 size={13} /> Share card
+            </ActionButton>
+            <ActionButton onClick={copyLink}>
+              {copied ? <Check size={13} /> : <Link2 size={13} />}
+              {copied ? "Copied" : "Copy link"}
+            </ActionButton>
+          </div>
         </div>
         <p style={{ fontSize: 16.5, color: BONE, fontWeight: 600, letterSpacing: "-0.01em", margin: 0 }}>
           {report.headline}
@@ -318,7 +327,45 @@ function Result({ preview }: { preview: StoredPreview }) {
         deterministic, cited to imports + calls. Not a line-by-line review; it
         shows what a change <em>reaches</em>, not whether it&rsquo;s correct.
       </p>
+
+      <BlastCardModal
+        pr={pr}
+        report={report}
+        open={blastOpen}
+        onClose={() => setBlastOpen(false)}
+      />
     </div>
+  );
+}
+
+function ActionButton({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        height: 30,
+        padding: "0 12px",
+        borderRadius: 8,
+        background: "rgba(255,255,255,0.05)",
+        border: `1px solid ${BORDER}`,
+        color: BONE,
+        fontSize: 12.5,
+        fontFamily: "inherit",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 

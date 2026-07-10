@@ -1,32 +1,30 @@
 "use client";
 
-// Modal that previews the share card at exact pixel dimensions (scaled to fit),
-// lets the user flip variant (landscape / square), and downloads a PNG.
+// Modal that previews the reviewer-brief BlastCard at exact pixel dimensions
+// (scaled to fit), lets the user flip landscape / square, and downloads a PNG.
+// Mirrors ShareCardModal, but themed for the /preview marketing surface
+// (CTSurface) — it uses the shared preview palette, not the session TOK tokens.
 
 import { useEffect, useRef, useState } from "react";
-import type { AnalysisSnapshot } from "@/lib/types";
+import { X, Download } from "lucide-react";
 import { downloadCardPng } from "@/lib/shareCardImage";
-import { TOK } from "@/lib/sessionTheme";
-import {
-  ShareCard,
-  SHARE_CARD_DIMS,
-  type ShareCardVariant,
-} from "./ShareCard";
+import type { ChangeBlastReport } from "@/lib/changeBlast/types";
+import { BlastCard, BLAST_CARD_DIMS, type BlastCardVariant, type BlastCardPr } from "./BlastCard";
+import { BONE, MUTED, BORDER, ORANGE } from "./previewTheme";
+
+const PANEL = "#131110";
+const DEEP = "#0a0908";
+const ROSE = "#ff8a80";
 
 interface Props {
-  snapshot: AnalysisSnapshot;
-  sessionName: string;
+  pr: BlastCardPr;
+  report: ChangeBlastReport;
   open: boolean;
   onClose: () => void;
 }
 
-export function ShareCardModal({
-  snapshot,
-  sessionName,
-  open,
-  onClose,
-}: Props) {
-  const [variant, setVariant] = useState<ShareCardVariant>("landscape");
+export function BlastCardModal({ pr, report, open, onClose }: Props) {
+  const [variant, setVariant] = useState<BlastCardVariant>("landscape");
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -42,7 +40,7 @@ export function ShareCardModal({
 
   if (!open) return null;
 
-  const dim = SHARE_CARD_DIMS[variant];
+  const dim = BLAST_CARD_DIMS[variant];
 
   async function download() {
     setDownloading(true);
@@ -51,9 +49,7 @@ export function ShareCardModal({
       await downloadCardPng(cardRef.current, {
         width: dim.w,
         height: dim.h,
-        filename: `codetrawl-${sessionName
-          .replace(/\s+/g, "-")
-          .toLowerCase()}-${variant}`,
+        filename: `codetrawl-blast-${pr.owner}-${pr.repo}-${pr.number}-${variant}`,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
@@ -62,55 +58,48 @@ export function ShareCardModal({
     }
   }
 
-  // Scale the card to fit the viewport preview area
+  // Scale the card to fit the viewport preview area.
   const previewMaxW = Math.min(960, typeof window !== "undefined" ? window.innerWidth - 120 : 960);
-  const previewMaxH = Math.min(620, typeof window !== "undefined" ? window.innerHeight - 260 : 620);
+  const previewMaxH = Math.min(560, typeof window !== "undefined" ? window.innerHeight - 260 : 560);
   const scale = Math.min(previewMaxW / dim.w, previewMaxH / dim.h, 1);
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ background: "rgba(0,0,0,0.75)" }}
+      style={{ background: "rgba(0,0,0,0.8)" }}
       onClick={onClose}
     >
       <div
         className="relative rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-        style={{
-          maxWidth: "min(1040px, 95vw)",
-          background: TOK.surface,
-          border: `1px solid ${TOK.border}`,
-        }}
+        style={{ maxWidth: "min(1040px, 95vw)", background: PANEL, border: `1px solid ${BORDER}` }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className="flex items-center justify-between px-5 py-3"
-          style={{ borderBottom: `1px solid ${TOK.border}` }}
+          style={{ borderBottom: `1px solid ${BORDER}` }}
         >
           <div className="flex items-center gap-3">
-            <h2
-              className="text-lg font-semibold"
-              style={{ color: TOK.textPrimary }}
-            >
-              Share card
+            <h2 className="text-lg font-semibold" style={{ color: BONE }}>
+              Reviewer brief
             </h2>
-            <span className="text-xs" style={{ color: TOK.textMuted }}>
+            <span className="text-xs" style={{ color: MUTED, fontFamily: "var(--font-ct-mono, monospace)" }}>
               {dim.w}×{dim.h}
             </span>
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 flex items-center justify-center rounded-lg transition"
-            style={{ color: TOK.textMuted }}
+            className="h-8 w-8 flex items-center justify-center rounded-lg transition hover:opacity-70"
+            style={{ color: MUTED }}
             aria-label="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
         {/* Preview */}
         <div
           className="flex-1 min-h-0 p-6 flex items-center justify-center overflow-hidden"
-          style={{ background: TOK.bgDeep }}
+          style={{ background: DEEP }}
         >
           <div
             style={{
@@ -119,7 +108,7 @@ export function ShareCardModal({
               position: "relative",
               borderRadius: 12,
               overflow: "hidden",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
             }}
           >
             <div
@@ -131,7 +120,7 @@ export function ShareCardModal({
                 height: dim.h,
               }}
             >
-              <ShareCard snapshot={snapshot} variant={variant} />
+              <BlastCard pr={pr} report={report} variant={variant} />
             </div>
           </div>
         </div>
@@ -139,28 +128,28 @@ export function ShareCardModal({
         {/* Controls */}
         <div
           className="flex items-center justify-between gap-3 px-5 py-3"
-          style={{ borderTop: `1px solid ${TOK.border}`, background: TOK.surface }}
+          style={{ borderTop: `1px solid ${BORDER}`, background: PANEL }}
         >
           <div
             role="tablist"
             className="inline-flex gap-1 rounded-lg p-1"
-            style={{ border: `1px solid ${TOK.border}` }}
+            style={{ border: `1px solid ${BORDER}` }}
           >
-            {(["landscape", "square"] as const).map((v) => {
-              const sel = variant === v;
+            {(["landscape", "square"] as const).map((tab) => {
+              const sel = variant === tab;
               return (
                 <button
-                  key={v}
+                  key={tab}
                   role="tab"
                   aria-selected={sel}
-                  onClick={() => setVariant(v)}
+                  onClick={() => setVariant(tab)}
                   className="px-3 h-8 rounded-md text-sm font-medium transition"
                   style={{
-                    background: sel ? TOK.accent : "transparent",
-                    color: sel ? TOK.accentOn : TOK.textSecondary,
+                    background: sel ? ORANGE : "transparent",
+                    color: sel ? "#0c0b0b" : MUTED,
                   }}
                 >
-                  {v === "landscape" ? "Landscape · 1200×630" : "Square · 1080×1080"}
+                  {tab === "landscape" ? "Landscape · 1200×630" : "Square · 1080×1080"}
                 </button>
               );
             })}
@@ -168,22 +157,17 @@ export function ShareCardModal({
 
           <div className="flex items-center gap-3">
             {error && (
-              <span className="text-sm" style={{ color: TOK.rose }}>
+              <span className="text-sm" style={{ color: ROSE }}>
                 {error}
               </span>
             )}
-            <span
-              className="text-xs hidden sm:inline"
-              style={{ color: TOK.textMuted }}
-            >
-              OG / Twitter / LinkedIn · Instagram
-            </span>
             <button
               onClick={download}
               disabled={downloading}
-              className="h-9 px-4 rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-40"
-              style={{ background: TOK.accent, color: TOK.accentOn }}
+              className="h-9 px-4 rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-40 inline-flex items-center gap-2"
+              style={{ background: ORANGE, color: "#0c0b0b" }}
             >
+              <Download size={15} />
               {downloading ? "Rendering…" : "Download PNG"}
             </button>
           </div>
