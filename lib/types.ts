@@ -460,6 +460,16 @@ export type JobInput =
        *  previous snapshot's analyzedExcludeFolders (so a plain refresh keeps
        *  the same scope). Null/absent = no exclusion. */
       excludeFolders?: string[] | null;
+    }
+  | {
+      /** Change-time blast preview: analyze a PR's base + head and map the diff
+       *  onto blast reach (Arc 5). Result is a previewId, not a session. */
+      kind: "preview-blast";
+      owner: string;
+      repo: string;
+      number: number;
+      /** Better Auth user id of the requester (for their GitHub token). */
+      userId?: string;
     };
 
 export interface Job {
@@ -471,6 +481,9 @@ export interface Job {
   /** Populated when status transitions to "done". Refresh jobs reuse the
    *  existing sessionId; create jobs return a fresh one. */
   sessionId?: string;
+  /** Populated when a preview-blast job finishes — the stored ChangeBlast
+   *  preview id (Arc 5). Distinct from sessionId (previews aren't sessions). */
+  previewId?: string;
   /** Populated when status transitions to "failed". User-facing message;
    *  sensitive details (full stack traces) are logged server-side. */
   error?: string;

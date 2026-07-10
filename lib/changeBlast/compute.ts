@@ -10,6 +10,7 @@
 import type { AnalysisSnapshot } from "../types";
 import type { CodeGraph } from "../codeAnalysis/types";
 import {
+  buildFanIn,
   computeRefactorSafety,
   SAFETY_TIERS,
   type FileSafety,
@@ -35,11 +36,17 @@ function fileSignatures(cg: CodeGraph): Map<string, string> {
   const out = new Map<string, string>();
   const files = new Set<string>([
     ...Object.keys(cg.fileComplexity),
+    ...Object.keys(cg.contentHashes ?? {}),
     ...fnByFile.keys(),
   ]);
   for (const f of files) {
     const fns = (fnByFile.get(f) ?? []).sort();
-    out.set(f, `${cg.fileComplexity[f] ?? 0}|${fns.join(",")}`);
+    // Fold in the raw-content hash so edits the function/complexity signature
+    // can't see (regex-fallback languages: no functions, constant complexity)
+    // still register as a change. Absent on legacy graphs → falls back to the
+    // structural signature only.
+    const content = cg.contentHashes?.[f] ?? "";
+    out.set(f, `${cg.fileComplexity[f] ?? 0}|${fns.join(",")}|${content}`);
   }
   return out;
 }
@@ -135,7 +142,20 @@ export function computeChangeBlast(
   const wallsTouched = prod
     .filter((f) => f.tier === "load-bearing" || f.tier === "handle-with-care")
     .map((f) => f.file);
-  const combinedDependents = prod.reduce((s, f) => s + f.dependents, 0);
+
+  // Combined reach = the UNION of the changed prod files' dependent SETS, not
+  // the sum of their counts. Summing double-counts a file that depends on
+  // several changed files and can exceed the repo's file count — nonsense for a
+  // grounded stat. Union each changed file's dependents from the graph it was
+  // tiered against (head for added/modified, base for removed).
+  const headFanIn = buildFanIn(headCg);
+  const baseFanIn = buildFanIn(baseCg);
+  const reached = new Set<string>();
+  for (const f of prod) {
+    const deps = (f.kind === "removed" ? baseFanIn : headFanIn).get(f.file);
+    if (deps) for (const d of deps) reached.add(d);
+  }
+  const combinedDependents = reached.size;
   const testFilesChanged = changedFiles.filter((f) => f.isTest).length;
 
   const testsToRun = [...new Set(prod.flatMap((f) => f.testsToRun))];
@@ -144,10 +164,13 @@ export function computeChangeBlast(
   const functionsAdded = changed.filter((c) => c.kind === "added").length;
   const functionsRemoved = changed.filter((c) => c.kind === "removed").length;
 
-  // Verdict: touching a load-bearing wall while the diff updates NO tests is
-  // high-risk; any wall touched or wide reach warrants review; else clear.
+  // Verdict: touching a load-bearing wall while NONE of the tests that actually
+  // guard the changed files were updated is high-risk. `mappedTestsUpdated`
+  // (not `testFilesChanged`) is the right gate — a diff can touch an unrelated
+  // test file yet leave every guarding test stale. Any wall touched or wide
+  // reach warrants review; else clear.
   const verdict: ChangeBlastReport["verdict"] =
-    loadBearingTouched.length > 0 && testFilesChanged === 0
+    loadBearingTouched.length > 0 && mappedTestsUpdated === 0
       ? "high-risk"
       : wallsTouched.length > 0 || combinedDependents >= 10
         ? "review"

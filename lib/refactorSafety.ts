@@ -111,16 +111,12 @@ function classify(
   return "safe";
 }
 
-/** Compute the per-file refactor-safety report from a CodeGraph.
- *  `withTests` additionally computes the (Plus-gated) Test Prioritizer per
- *  high-tier file; leave it off for the free view so the data never ships. */
-export function computeRefactorSafety(
-  cg: CodeGraph,
-  opts: { withTests?: boolean } = {}
-): RefactorSafetyReport {
-  // 1. Direct fan-in: target file → set of distinct source files. Test files
-  //    are never a target (you don't "refactor into" a test), and self-edges
-  //    don't count as a dependent.
+/** Direct fan-in: target file → set of distinct source files that import or
+ *  call into it. Test files are never a target (you don't "refactor into" a
+ *  test) and self-edges don't count as a dependent. Exported so change-blast
+ *  can union dependent SETS across files instead of summing counts (which
+ *  double-counts a file that depends on several changed files). */
+export function buildFanIn(cg: CodeGraph): Map<string, Set<string>> {
   const fanIn = new Map<string, Set<string>>();
   const add = (target: string | null | undefined, source: string) => {
     if (!target || !source || target === source || isTestFile(target)) return;
@@ -133,6 +129,20 @@ export function computeRefactorSafety(
   };
   for (const e of cg.imports) add(e.to, e.from);
   for (const c of cg.calls) if (c.toFile) add(c.toFile, c.fromFile);
+  return fanIn;
+}
+
+/** Compute the per-file refactor-safety report from a CodeGraph.
+ *  `withTests` additionally computes the (Plus-gated) Test Prioritizer per
+ *  high-tier file; leave it off for the free view so the data never ships. */
+export function computeRefactorSafety(
+  cg: CodeGraph,
+  opts: { withTests?: boolean } = {}
+): RefactorSafetyReport {
+  // 1. Direct fan-in: target file → set of distinct source files. Test files
+  //    are never a target (you don't "refactor into" a test), and self-edges
+  //    don't count as a dependent.
+  const fanIn = buildFanIn(cg);
 
   // 2. Which files a test reaches (has coverage).
   const tested = deriveTestedFiles(cg);

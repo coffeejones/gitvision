@@ -263,26 +263,34 @@ export async function fetchPrRefs(
   token?: string | null,
 ): Promise<PrRefs> {
   const client = token ? makeOctokit(token) : octokit;
-  const { data } = await client.rest.pulls.get({
-    owner,
-    repo,
-    pull_number: number,
-  });
-  return {
-    title: data.title,
-    base: {
-      owner: data.base.repo.owner.login,
-      repo: data.base.repo.name,
-      ref: data.base.ref,
-      sha: data.base.sha,
-    },
-    head: {
-      owner: data.head.repo?.owner.login ?? owner,
-      repo: data.head.repo?.name ?? repo,
-      ref: data.head.ref,
-      sha: data.head.sha,
-    },
-  };
+  try {
+    const { data } = await client.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: number,
+    });
+    return {
+      title: data.title,
+      base: {
+        owner: data.base.repo.owner.login,
+        repo: data.base.repo.name,
+        ref: data.base.ref,
+        sha: data.base.sha,
+      },
+      head: {
+        owner: data.head.repo?.owner.login ?? owner,
+        repo: data.head.repo?.name ?? repo,
+        ref: data.head.ref,
+        sha: data.head.sha,
+      },
+    };
+  } catch (err) {
+    // A missing/private PR (or a bad number) becomes a clean GithubAccessError
+    // with the same wire format the rest of the pipeline surfaces, instead of a
+    // raw Octokit stack trace leaking to the client. coerceGithubAccessError
+    // returns `never` (always throws), so control never falls through.
+    coerceGithubAccessError(err, owner, repo, !!token);
+  }
 }
 
 /** When a user pastes an org / user profile URL (https://github.com/ZeebleChat)

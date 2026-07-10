@@ -61,6 +61,9 @@ async function ownerClaimForJob(
   if (job.input.kind === "create-session") {
     return { userId: job.input.userId, ownerId: job.input.ownerId };
   }
+  if (job.input.kind === "preview-blast") {
+    return { userId: job.input.userId };
+  }
   const session = await getSession(job.input.sessionId);
   if (!session) return {};
   return { userId: session.userId, ownerId: session.ownerId };

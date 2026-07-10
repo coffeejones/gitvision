@@ -39,6 +39,15 @@ const SKIP_DIRS = new Set([
 const MAX_FILE_BYTES = 1_000_000;
 const DEFAULT_MAX_FILES = 5000;
 
+/** djb2 — a fast, stable, dependency-free string hash. Used only for per-file
+ *  change detection (same file, base vs head), where a 32-bit collision is
+ *  negligible; not a security hash. */
+function hashContent(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
 export interface AnalysisTotals {
   filesScanned: number;
   filesParsed: number;
@@ -152,6 +161,14 @@ export async function analyzeDirectory(
       ? `Walker hit MAX_FILES cap (${maxFiles})`
       : undefined,
   });
+
+  // Raw-content fingerprint per file (djb2). The function/complexity signature
+  // is blind to regex-fallback languages (they emit no functions + constant
+  // complexity), so a .kt/.html/.css edit would look unchanged to the
+  // change-blast diff. Hashing the raw source closes that gap.
+  const contentHashes: Record<string, string> = {};
+  for (const f of sourceFiles) contentHashes[f.rel] = hashContent(f.content);
+  codeGraph.contentHashes = contentHashes;
 
   const totals: AnalysisTotals = {
     filesScanned: sourceFiles.length,

@@ -121,4 +121,68 @@ describe("computeChangeBlast", () => {
     expect(r.hasGraphs).toBe(false);
     expect(r.verdict).toBe("clear");
   });
+
+  it("stays high-risk when an UNRELATED test changed but the guarding test is stale", () => {
+    // core.ts (load-bearing) is modified; its guard core.test.ts is NOT touched,
+    // yet an unrelated test (misc.test.ts) is added. Old logic keyed on
+    // testFilesChanged === 0 would wrongly downgrade this to "review"; the fix
+    // keys on mappedTestsUpdated, so it correctly stays high-risk.
+    const headOtherTest = mkGraph({
+      "src/core.ts": { fns: [["coreFn", "CORE_V2", 12]] }, // modified
+      "src/util.ts": { fns: [["utilFn", "UTIL_V1", 5]] },
+      "src/a.ts": { fns: [["a", "A"]], imports: ["src/util.ts"] },
+      "src/b.ts": { fns: [["b", "B"]], imports: ["src/util.ts"] },
+      ...deps,
+      "src/core.test.ts": { fns: [["testCore", "TEST_V1"]], imports: ["src/core.ts"] }, // unchanged guard
+      "src/misc.test.ts": { fns: [["m", "MISC"]] }, // unrelated test, added
+    });
+    const r = computeChangeBlast(snap(base), snap(headOtherTest));
+    expect(r.testFilesChanged).toBe(1); // misc.test.ts is a test in the diff
+    expect(r.testsToRun).toContain("src/core.test.ts");
+    expect(r.mappedTestsUpdated).toBe(0); // the guard itself is stale
+    expect(r.verdict).toBe("high-risk");
+  });
+
+  it("counts combined reach as the UNION of dependent sets, not the sum", () => {
+    // x.ts depends on BOTH core.ts and util.ts; y.ts on core.ts only. When both
+    // core.ts and util.ts change, summing per-file dependents double-counts x.ts
+    // (sum = 3); the union is {x, y} = 2.
+    const b = mkGraph({
+      "src/core.ts": { fns: [["c", "C_V1"]] },
+      "src/util.ts": { fns: [["u", "U_V1"]] },
+      "src/x.ts": { fns: [["x", "X"]], imports: ["src/core.ts", "src/util.ts"] },
+      "src/y.ts": { fns: [["y", "Y"]], imports: ["src/core.ts"] },
+    });
+    const h = mkGraph({
+      "src/core.ts": { fns: [["c", "C_V2"]] }, // modified
+      "src/util.ts": { fns: [["u", "U_V2"]] }, // modified
+      "src/x.ts": { fns: [["x", "X"]], imports: ["src/core.ts", "src/util.ts"] },
+      "src/y.ts": { fns: [["y", "Y"]], imports: ["src/core.ts"] },
+    });
+    const r = computeChangeBlast(snap(b), snap(h));
+    expect(r.changedFiles.map((c) => c.file).sort()).toEqual(["src/core.ts", "src/util.ts"]);
+    expect(r.combinedDependents).toBe(2); // union {x, y}, not sum 3
+  });
+
+  it("detects a content-only change via contentHashes (regex-fallback languages)", () => {
+    // A .css file: no functions, constant complexity — the structural signature
+    // is identical across refs. Only the raw-content hash reveals the edit.
+    const cg = (hash: string): CodeGraph =>
+      ({
+        functions: [],
+        calls: [],
+        imports: [],
+        fileComplexity: { "src/theme.css": 1 },
+        contentHashes: { "src/theme.css": hash },
+        filesByExt: {},
+        byPlugin: {},
+        generatedAt: "",
+      }) as unknown as CodeGraph;
+    const changed = computeChangeBlast(snap(cg("HASH_A")), snap(cg("HASH_B")));
+    expect(changed.changedFiles.map((f) => f.file)).toContain("src/theme.css");
+    expect(changed.changedFiles.find((f) => f.file === "src/theme.css")!.kind).toBe("modified");
+    // Identical content hash → no change.
+    const same = computeChangeBlast(snap(cg("HASH_A")), snap(cg("HASH_A")));
+    expect(same.changedFiles).toEqual([]);
+  });
 });

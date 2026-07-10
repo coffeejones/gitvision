@@ -22,6 +22,8 @@ import { nanoid } from "nanoid";
 import { atomicWriteJson } from "./atomicWrite";
 import { GithubAccessError, analyzeRepo, parseRepoUrl } from "./github";
 import { getGithubTokenForUser } from "./githubUserToken";
+import { runChangeBlastPreview } from "./changeBlast/preview";
+import { savePreview } from "./previewStore";
 import { canAccess } from "./billing/gates";
 import { SubdirNotFoundError } from "./graph";
 import {
@@ -122,6 +124,8 @@ export async function processJob(jobId: string): Promise<void> {
       await runCreateSession(initial);
     } else if (initial.input.kind === "refresh-session") {
       await runRefreshSession(initial);
+    } else if (initial.input.kind === "preview-blast") {
+      await runPreviewBlast(initial);
     } else {
       throw new Error(`Unknown job kind: ${(initial.input as { kind: string }).kind}`);
     }
@@ -219,6 +223,23 @@ async function runRefreshSession(job: Job): Promise<void> {
   });
   await appendSnapshot(sessionId, snapshot);
   await patchJob(job.id, { status: "done", sessionId });
+}
+
+async function runPreviewBlast(job: Job): Promise<void> {
+  if (job.input.kind !== "preview-blast") return;
+  // Use the requester's GitHub token when signed in (rate-limit isolation +
+  // private-repo reach); falls back to the env PAT inside analyzeRepo.
+  const userToken = job.input.userId
+    ? await getGithubTokenForUser(job.input.userId)
+    : null;
+  const result = await runChangeBlastPreview({
+    owner: job.input.owner,
+    repo: job.input.repo,
+    number: job.input.number,
+    userToken,
+  });
+  const previewId = await savePreview(result);
+  await patchJob(job.id, { status: "done", previewId });
 }
 
 // ------------------- Orphan recovery -------------------

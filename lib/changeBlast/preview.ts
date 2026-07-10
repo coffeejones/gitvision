@@ -66,6 +66,18 @@ export async function runChangeBlastPreview(input: {
 
   const base = await analyzeRef(refs.base, input.userToken);
   const head = await analyzeRef(refs.head, input.userToken);
+
+  // Refuse private repos outright. A stored preview is served without auth (the
+  // nanoid is the only handle), so blast-mapping a private repo would leak its
+  // file structure to anyone with the link — and it would sidestep the
+  // privateRepos entitlement gate that /api/sessions enforces. The preview flow
+  // is public-repo-only by design.
+  if (base.repo.private || head.repo.private) {
+    throw new Error(
+      "Blast preview only supports public repositories. Analyze a private repo from the dashboard instead.",
+    );
+  }
+
   const report = computeChangeBlast(base, head);
 
   return {

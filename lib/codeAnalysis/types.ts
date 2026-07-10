@@ -337,6 +337,11 @@ export interface CodeGraph {
   imports: ImportEdge[];
   /** Aggregate complexity per file (sum of decision points + 1). */
   fileComplexity: Record<string, number>;
+  /** Stable content fingerprint per file (djb2 of the raw source). Optional so
+   *  legacy snapshots stay valid; lets change-detection see edits that the
+   *  function/complexity signature misses — notably regex-fallback languages
+   *  (.kt/.html/.css) that emit no functions and constant complexity. */
+  contentHashes?: Record<string, string>;
   /** Files we parsed grouped by extension — helps debug coverage. */
   filesByExt: Record<string, number>;
   /** Per-plugin breakdown for stats and "fallback in use" indicators. */
