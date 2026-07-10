@@ -213,6 +213,78 @@ export function parseRepoUrl(input: string): { owner: string; repo: string } | n
   return null;
 }
 
+/** Parse a GitHub pull-request URL → { owner, repo, number }. Accepts the full
+ *  https URL, the scheme-less github.com form, and an owner/repo#N shorthand.
+ *  Returns null for anything that isn't a PR reference (Arc 5). */
+export function parsePrUrl(
+  input: string,
+): { owner: string; repo: string; number: number } | null {
+  const trimmed = input.trim().replace(/\/$/, "");
+  const OWNER = "[A-Za-z0-9-]+";
+  const REPO = "[A-Za-z0-9._-]+";
+  const patterns = [
+    new RegExp(`^https?:\\/\\/github\\.com\\/(${OWNER})\\/(${REPO})\\/pull\\/(\\d+)`),
+    new RegExp(`^github\\.com\\/(${OWNER})\\/(${REPO})\\/pull\\/(\\d+)`),
+    new RegExp(`^(${OWNER})\\/(${REPO})#(\\d+)$`),
+  ];
+  for (const p of patterns) {
+    const m = trimmed.match(p);
+    if (m) {
+      const repo = m[2];
+      if (repo === "." || repo === "..") return null;
+      const number = Number.parseInt(m[3], 10);
+      if (!Number.isFinite(number) || number <= 0) return null;
+      return { owner: m[1], repo, number };
+    }
+  }
+  return null;
+}
+
+export interface PrRefEndpoint {
+  owner: string;
+  repo: string;
+  ref: string;
+  sha: string;
+}
+
+export interface PrRefs {
+  title: string;
+  base: PrRefEndpoint;
+  head: PrRefEndpoint;
+}
+
+/** Resolve a pull request's base + head endpoints (owner/repo/ref/sha). Head may
+ *  live in a fork, so its owner/repo can differ from base's; when the fork was
+ *  deleted (head.repo null) we fall back to the base repo. (Arc 5) */
+export async function fetchPrRefs(
+  owner: string,
+  repo: string,
+  number: number,
+  token?: string | null,
+): Promise<PrRefs> {
+  const client = token ? makeOctokit(token) : octokit;
+  const { data } = await client.rest.pulls.get({
+    owner,
+    repo,
+    pull_number: number,
+  });
+  return {
+    title: data.title,
+    base: {
+      owner: data.base.repo.owner.login,
+      repo: data.base.repo.name,
+      ref: data.base.ref,
+      sha: data.base.sha,
+    },
+    head: {
+      owner: data.head.repo?.owner.login ?? owner,
+      repo: data.head.repo?.name ?? repo,
+      ref: data.head.ref,
+      sha: data.head.sha,
+    },
+  };
+}
+
 /** When a user pastes an org / user profile URL (https://github.com/ZeebleChat)
  *  parseRepoUrl returns null because there's no repo segment. This helper
  *  detects that specific case and returns the org / user name so the API

@@ -5,11 +5,48 @@
 import { describe, it, expect } from "vitest";
 import {
   parseRepoUrl,
+  parsePrUrl,
   extractOrgOrUserFromUrl,
   computeHotspots,
   computeCoChange,
   computeCommitActivity,
 } from "../github";
+
+describe("parsePrUrl", () => {
+  it("parses full, scheme-less, and shorthand PR references", () => {
+    expect(parsePrUrl("https://github.com/pallets/flask/pull/5432")).toEqual({
+      owner: "pallets",
+      repo: "flask",
+      number: 5432,
+    });
+    expect(parsePrUrl("github.com/octocat/Hello-World/pull/1")).toEqual({
+      owner: "octocat",
+      repo: "Hello-World",
+      number: 1,
+    });
+    expect(parsePrUrl("pallets/flask#42")).toEqual({
+      owner: "pallets",
+      repo: "flask",
+      number: 42,
+    });
+  });
+
+  it("ignores extra path segments (e.g. /files) after the number", () => {
+    expect(parsePrUrl("https://github.com/a/b/pull/7/files")).toEqual({
+      owner: "a",
+      repo: "b",
+      number: 7,
+    });
+  });
+
+  it("returns null for non-PR urls and junk", () => {
+    expect(parsePrUrl("https://github.com/pallets/flask")).toBeNull();
+    expect(parsePrUrl("https://github.com/pallets/flask/issues/5")).toBeNull();
+    expect(parsePrUrl("not a url")).toBeNull();
+    expect(parsePrUrl("https://github.com/a/b/pull/0")).toBeNull();
+    expect(parsePrUrl("https://github.com/a/b/pull/abc")).toBeNull();
+  });
+});
 
 describe("parseRepoUrl", () => {
   it("parses full HTTPS GitHub URL", () => {
