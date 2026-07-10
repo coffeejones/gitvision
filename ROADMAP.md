@@ -186,12 +186,16 @@ already behind the link.**
 
 ## Sequencing (solo, hobby velocity)
 
-> **Status (2026-07-08):** Arc 1, Arc 2, and Arc 3 have all landed on
-> `feat/codetrawl-landing` (adversarially reviewed). The "Now" and most of the
-> "Next" horizons below are done in code; what remains is manual infra — MCP
-> hosting / `npm publish` / registry listings, the demo re-sweep so drift +
-> badges show on public demos, and the Show HN distribution beat. Next feature
-> horizon is **Arc 4 (Evidence Desk / CRA)** and **Arc 1 Weak-Suite**.
+> **Status (2026-07-10):** Arcs 1–4 have all landed on `feat/codetrawl-landing`
+> (two adversarial-review rounds; the SBOM review caught a real SPDX-validator
+> failure). Arc 4 (Evidence Desk) is complete — CI-hardening signals,
+> public incident-exposure pages, SBOM export (CycloneDX + SPDX, Pro), and the
+> evidence pack (Pro) — so the tier story is whole: **Free = look, Plus = watch,
+> Pro = prove.** What remains is manual infra (MCP hosting / `npm publish` /
+> registry listings, `CRON_SECRET`, the demo re-sweep so drift + badges + CI +
+> SBOM populate on public demos) and the Show HN beat. The one remaining feature
+> arc is **Arc 5 (Change-Time Blast)** — which ships last by design; **Arc 1
+> Weak-Suite** is the other open feature item. Not yet merged to `main`/prod.
 
 ### Now (~1 month) — harvest, not construction
 1. **Arc 1:** Radar + Test Prioritizer composed into ONE "Can I touch this?"
