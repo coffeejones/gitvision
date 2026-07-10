@@ -52,6 +52,7 @@ import { pythonPlugin } from "./codeAnalysis/plugins/python";
 import { rubyPlugin } from "./codeAnalysis/plugins/ruby";
 import { regexFallbackPlugin } from "./codeAnalysis/plugins/regexFallback";
 import { computeDriftMetrics } from "./driftMetrics";
+import { computeWeakSuite, weakSuiteSummary } from "./weakSuite";
 import { computeCiHardening } from "./ciHardening";
 import {
   scanForSecrets,
@@ -961,6 +962,13 @@ export async function analyzeRepo(
   // graph (Arc 3).
   const driftMetrics = codeGraph ? computeDriftMetrics(codeGraph) : undefined;
 
+  // Weak-Suite (Arc 1): aggregate assertion-quality summary. The full, gated
+  // report is recomputed from the code graph at read time; only the aggregate
+  // rides on the snapshot to drive the health signal.
+  const weakSuite = codeGraph
+    ? weakSuiteSummary(computeWeakSuite(codeGraph))
+    : undefined;
+
   return {
     fetchedAt: new Date().toISOString(),
     repo: repoMeta,
@@ -974,6 +982,7 @@ export async function analyzeRepo(
     codeGraph,
     codeGraphSkipReason,
     driftMetrics,
+    weakSuite,
     pullRequests,
     commitIndex,
     historySource,

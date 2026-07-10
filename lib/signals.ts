@@ -996,6 +996,72 @@ function detectContributorSpread(snap: AnalysisSnapshot): HealthSignal[] {
   return [];
 }
 
+/**
+ * Weak-Suite (Arc 1): flags "coverage that means nothing" — test cases that
+ * execute code but assert nothing meaningful (no assertions, or only trivial
+ * existence/truthiness/did-not-throw oracles). Reads the aggregate summary the
+ * plugin+compute layer produced; the per-file drill-down lives on the Plus tab,
+ * so this signal is aggregate-only (a safe free teaser, no file paths).
+ */
+function detectWeakSuite(snap: AnalysisSnapshot): {
+  working: HealthSignal[];
+  needsWork: HealthSignal[];
+} {
+  const ws = snap.weakSuite;
+  if (!ws) return { working: [], needsWork: [] };
+  const { totals } = ws;
+
+  // Don't cry wolf on tiny suites — the ratio is noisy under ~15 cases.
+  const MIN_CASES = 15;
+  if (totals.testCases < MIN_CASES) return { working: [], needsWork: [] };
+
+  const smokePct = Math.round(totals.smokeOnlyRatio * 100);
+  const numbers = {
+    testFiles: totals.testFiles,
+    testCases: totals.testCases,
+    assertions: totals.assertions,
+    smokeOnlyCases: totals.smokeOnlyCases,
+    smokeOnlyPct: smokePct,
+    assertionDensity: totals.assertionDensity,
+    hollowFiles: ws.counts.hollow,
+    thinFiles: ws.counts.thin,
+  };
+
+  // Weak: a meaningful share of cases verify nothing. High when it's the
+  // majority-ish; medium when it's a real minority.
+  if (totals.smokeOnlyRatio >= 0.2) {
+    return {
+      working: [],
+      needsWork: [
+        {
+          id: "weak-suite",
+          title: "Tests run code without checking it",
+          detail: `${smokePct}% of test cases (${totals.smokeOnlyCases} of ${totals.testCases}) execute code but assert nothing meaningful — coverage that wouldn't catch a regression. ${totals.assertionDensity} assertions per case across ${totals.testFiles} test files.`,
+          evidence: { numbers },
+          severity: totals.smokeOnlyRatio >= 0.4 ? "high" : "medium",
+        },
+      ],
+    };
+  }
+
+  // Strong: dense, value-checking suite. Give healthy repos credit.
+  if (totals.smokeOnlyRatio <= 0.1 && totals.assertionDensity >= 1.5) {
+    return {
+      working: [
+        {
+          id: "assertion-dense-tests",
+          title: "Tests actually assert",
+          detail: `${totals.assertionDensity} assertions per test case across ${totals.testCases} cases, only ${smokePct}% smoke-only — the suite checks values, not just that code runs.`,
+          evidence: { numbers },
+        },
+      ],
+      needsWork: [],
+    };
+  }
+
+  return { working: [], needsWork: [] };
+}
+
 // ------------------- Aggregator -------------------
 
 export function extractHealthSignals(snap: AnalysisSnapshot): HealthSignals {
@@ -1057,6 +1123,12 @@ export function extractHealthSignals(snap: AnalysisSnapshot): HealthSignals {
   // payload without human context. Falls into "code" dimension on
   // Health-at-a-Glance.
   questions.push(...detectRiskyPatterns(snap));
+
+  // Weak-Suite (Arc 1): assertion quality of the test suite — "coverage that
+  // means nothing" as a risk, dense value-checking suites as a positive.
+  const weakSuite = detectWeakSuite(snap);
+  working.push(...weakSuite.working);
+  needsWork.push(...weakSuite.needsWork);
 
   // Solo-friendly positive detectors — these fire on team projects too, but
   // they're especially important for giving solo projects credit where due.

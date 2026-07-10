@@ -313,6 +313,12 @@ export interface AnalysisSnapshot {
    *  baseline yet". Drift can't be backfilled, so we capture from now on.
    *  Arc 3. */
   driftMetrics?: DriftMetrics;
+  /** Aggregate assertion-quality summary (Weak-Suite, Arc 1) — how many test
+   *  files are hollow/thin/solid and repo-wide assertion density + smoke-only
+   *  ratio. Just the aggregate (no file list / per-case detail); the full,
+   *  Plus-gated report is recomputed from codeGraph at read time. Optional —
+   *  absent on non-JS repos, repos with no test cases, and legacy snapshots. */
+  weakSuite?: import("./weakSuite").WeakSuiteSummary;
   /** CI-hardening assessment of the repo's GitHub Actions workflows —
    *  action-pinning, third-party inventory, token permission scope, each
    *  grounded in a named incident. Optional; absent when the repo has no

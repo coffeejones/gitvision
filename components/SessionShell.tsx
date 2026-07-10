@@ -37,6 +37,7 @@ import {
   Microscope,
   Network,
   Package,
+  FlaskConical,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
@@ -280,6 +281,15 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
           label: "Refactor",
           href: `${base}/refactor`,
           icon: <ShieldAlert size={14} />,
+          hint: hasCodeGraph ? undefined : "refresh",
+        },
+        {
+          // Arc 1 Weak-Suite — "coverage that means nothing": test files ranked
+          // by how hollow their assertions are. Sits by Refactor as the other
+          // "can I trust this?" surface.
+          label: "Test quality",
+          href: `${base}/testquality`,
+          icon: <FlaskConical size={14} />,
           hint: hasCodeGraph ? undefined : "refresh",
         },
         {

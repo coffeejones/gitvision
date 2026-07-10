@@ -108,6 +108,37 @@ export interface ParsedCall {
   hasReceiver?: boolean;
 }
 
+/** One test case (an `it`/`test` block) with its assertion-quality tally.
+ *  LANGUAGE-NEUTRAL: a plugin fills these counts from its own assertion idioms
+ *  (JS `expect`/`assert`, Python `assert`/`pytest.raises`, …). Nothing
+ *  downstream — the aggregate compute, the signal, the UI — knows any language.
+ *  This is the Weak-Suite contract (Arc 1). */
+export interface TestCaseMeta {
+  /** The test's description (first string arg), or "" when anonymous. */
+  name: string;
+  /** 1-based line the test case opens on, for evidence citations. */
+  line: number;
+  /** Assertion statements found in the case body. */
+  assertions: number;
+  /** Of those, how many are trivial "smoke" oracles — existence / truthiness /
+   *  did-not-throw checks that verify almost nothing. */
+  trivialAssertions: number;
+  /** True when the case has at least one meaningful (value-checking) assertion.
+   *  A case with assertions but no meaningful oracle is "smoke-only". */
+  hasMeaningfulOracle: boolean;
+}
+
+/** Per-test-file assertion-quality metadata (Weak-Suite). Emitted only for
+ *  files a plugin recognises as containing test cases; absent otherwise. */
+export interface TestFileMeta {
+  /** Test cases found in the file, in source order. */
+  cases: TestCaseMeta[];
+  /** Distinct trivial-oracle idiom names encountered (e.g. "toBeDefined"),
+   *  carried verbatim as evidence so the methodology is auditable ("publish
+   *  the math"). Language-specific STRINGS, but treated as opaque data. */
+  trivialOracleNames: string[];
+}
+
 export interface ParsedFile {
   rel: string;
   imports: ParsedImport[];
@@ -122,6 +153,11 @@ export interface ParsedFile {
    *  ships first; other languages emit empty arrays until they wire
    *  up class extraction in their parseDirect / query handlers. */
   classes?: ParsedClass[];
+  /** Per-test-file assertion-quality metadata (Weak-Suite, Arc 1). Present only
+   *  when the plugin recognised test cases in this file; JS/TS ships first,
+   *  other languages fill the same shape as they adopt. Optional for
+   *  backward-compat. */
+  testMeta?: TestFileMeta;
 }
 
 /** Per-file class definition emitted by language plugins.
@@ -351,7 +387,16 @@ export interface CodeGraph {
    *  unchanged; the Architecture tab shows an empty-state when
    *  this field is missing or empty. */
   classes?: ClassDef[];
+  /** Per-test-file assertion-quality metadata (Weak-Suite, Arc 1), one entry
+   *  per test file a plugin classified. Raw material for computeWeakSuite;
+   *  optional/absent on legacy graphs and non-test-bearing repos. */
+  testFiles?: TestFileGraphEntry[];
   /** Truncation reason if any cap was hit. */
   truncated?: string;
   generatedAt: string;
+}
+
+/** A test file's assertion-quality metadata, path-tagged for the graph layer. */
+export interface TestFileGraphEntry extends TestFileMeta {
+  file: string;
 }

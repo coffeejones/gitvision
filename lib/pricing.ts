@@ -41,6 +41,9 @@ export interface TierLimits {
   /** Refactor guidance — the Impact-Ranked Test Prioritizer ("run these
    *  tests before touching this file") in the Refactor tab. */
   refactorGuidance: boolean;
+  /** Test-quality (Weak-Suite) — the per-test-file assertion-quality report
+   *  ("coverage that means nothing") in the Test Quality tab (Arc 1). */
+  testQuality: boolean;
   /** SBOM export — download a timestamped CycloneDX / SPDX bill of materials
    *  for a snapshot (Arc 4, Pro-only evidence feature). */
   sbomExport: boolean;
@@ -100,6 +103,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       architectureDiagrams: false,
       structuralDiff: false,
       refactorGuidance: false,
+      testQuality: false,
       sbomExport: false,
       teamWorkspaces: false,
       prioritySupport: false,
@@ -134,6 +138,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       architectureDiagrams: true,
       structuralDiff: true,
       refactorGuidance: true,
+      testQuality: true,
       sbomExport: false,
       teamWorkspaces: false,
       prioritySupport: false,
@@ -168,6 +173,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       architectureDiagrams: true,
       structuralDiff: true,
       refactorGuidance: true,
+      testQuality: true,
       sbomExport: true,
       teamWorkspaces: true,
       prioritySupport: true,

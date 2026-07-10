@@ -18,6 +18,7 @@ import type {
   ParsedClass,
   ParsedFile,
   PluginStats,
+  TestFileGraphEntry,
 } from "./types";
 
 export interface BuildCodeGraphInput {
@@ -224,6 +225,13 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
     });
   });
 
+  // Weak-Suite: lift each test file's assertion-quality metadata onto the graph
+  // (language-agnostic — just carries whatever the plugin attached).
+  const testFiles: TestFileGraphEntry[] = [];
+  for (const f of parsedFiles) {
+    if (f.testMeta) testFiles.push({ file: f.rel, ...f.testMeta });
+  }
+
   return {
     functions,
     calls,
@@ -232,6 +240,7 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
     filesByExt,
     byPlugin,
     classes: classes.length > 0 ? classes : undefined,
+    testFiles: testFiles.length > 0 ? testFiles : undefined,
     truncated,
     generatedAt: new Date().toISOString(),
   };

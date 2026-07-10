@@ -41,6 +41,7 @@ import {
   Home,
   ListChecks,
   Network,
+  FlaskConical,
   Package,
   Search,
   Shield,
@@ -94,6 +95,7 @@ export function CommandPalette({ sessionId, snapshot, open, onClose }: Props) {
       { id: "p:security", group: "pages", label: "Security", icon: <Shield size={13} />, href: `${base}/security` },
       // Forensics
       { id: "p:refactor", group: "pages", label: "Refactor", icon: <ShieldAlert size={13} />, href: `${base}/refactor` },
+      { id: "p:testquality", group: "pages", label: "Test quality", icon: <FlaskConical size={13} />, href: `${base}/testquality` },
       { id: "p:architecture", group: "pages", label: "Architecture", icon: <Boxes size={13} />, href: `${base}/architecture` },
       { id: "p:canvas", group: "pages", label: "Canvas", icon: <Network size={13} />, href: `${base}/canvas` },
       { id: "p:code", group: "pages", label: "Code", icon: <CodeIcon size={13} />, href: `${base}/code` },

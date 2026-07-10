@@ -384,6 +384,64 @@ export default function HelpPage() {
         </P>
       </Section>
 
+      <Section id="testquality" title="Test quality (Weak-Suite)">
+        <P>
+          Coverage tells you which lines <em>ran</em>. It says nothing about
+          whether the tests would notice if the result were wrong. In
+          AI-generated suites that gap is where the risk hides: dozens of tests
+          that call a function and assert almost nothing. The Test Quality tab
+          measures that — per test file, how much the tests actually verify.
+        </P>
+        <P>
+          <strong>What counts as a test case.</strong> An <Code>it(...)</Code>,{" "}
+          <Code>test(...)</Code>, <Code>specify(...)</Code> or <Code>fit(...)</Code>{" "}
+          block (including <Code>.only</Code> / <Code>.each</Code>). Skipped
+          tests (<Code>.skip</Code> / <Code>.todo</Code>) are ignored — they
+          don&apos;t run.
+        </P>
+        <P>
+          <strong>What counts as an assertion.</strong> An <Code>expect(...)</Code>{" "}
+          chain (Jest / Vitest, including <Code>expect.soft(...)</Code>), a Node{" "}
+          <Code>assert</Code> call, or a chai chain — both the call form{" "}
+          (<Code>expect(x).to.equal(y)</Code>) and the property-getter form{" "}
+          (<Code>expect(x).to.be.true</Code>). A chained assertion{" "}
+          (<Code>expect(x).not.toBe(y)</Code>) is counted once, not twice.
+        </P>
+        <P>
+          <strong>What we call a trivial (&quot;smoke&quot;) oracle.</strong>{" "}
+          An assertion that runs but verifies next to nothing — existence,
+          truthiness, or that the code didn&apos;t throw:{" "}
+          <Code>toBeDefined</Code>, <Code>toBeUndefined</Code>,{" "}
+          <Code>toBeNull</Code>, <Code>toBeTruthy</Code>, <Code>toBeFalsy</Code>,{" "}
+          <Code>toBeNaN</Code>, <Code>toThrow</Code>, <Code>toThrowError</Code>,{" "}
+          <Code>toBeInstanceOf</Code>, <Code>toHaveBeenCalled</Code>, a bare{" "}
+          <Code>expect(x)</Code> with no matcher, <Code>assert.ok</Code> / bare{" "}
+          <Code>assert(x)</Code>, and the chai getters <Code>.to.be.null</Code> /{" "}
+          <Code>.to.be.undefined</Code> / <Code>.to.exist</Code> /{" "}
+          <Code>.to.be.empty</Code>. Anything that checks an actual value
+          (<Code>toBe</Code>, <Code>toEqual</Code>,{" "}
+          <Code>toHaveBeenCalledWith</Code>, <Code>assert.equal</Code>,{" "}
+          <Code>.to.be.true</Code>, …) is a <em>meaningful</em> oracle. A test
+          case is <strong>smoke-only</strong> when it has no meaningful oracle
+          (zero assertions, or only trivial ones).
+        </P>
+        <P>
+          <strong>The tiers.</strong> A test file is <strong>hollow</strong>{" "}
+          when half or more of its cases are smoke-only (&quot;coverage that
+          means nothing&quot;), <strong>thin</strong> when a real minority are
+          or the file averages under one assertion per case, and{" "}
+          <strong>solid</strong> otherwise. Every row shows the raw counts — the
+          tier is an argument you can audit, never a black-box score.
+        </P>
+        <P>
+          <strong>Honest limits.</strong> This is static heuristic detection, not
+          execution — we read the test source, we don&apos;t run it. It ships
+          JS/TS first; other languages fill the same shape as they adopt. A
+          &quot;solid&quot; tier means the tests assert values, not that they
+          assert the <em>right</em> ones.
+        </P>
+      </Section>
+
       <Section id="untested-duplicates" title="Untested hotspots & near-duplicates">
         <P>
           Two actionable insight panels at the bottom of the Code tab.

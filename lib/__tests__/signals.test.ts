@@ -854,3 +854,60 @@ describe("Risky-pattern signal (#20)", () => {
     expect(sig?.evidence.paths).toEqual(["src/runtime.js (×3)"]);
   });
 });
+
+describe("detectWeakSuite (Arc 1)", () => {
+  type WS = NonNullable<AnalysisSnapshot["weakSuite"]>;
+  const ws = (
+    smokeOnlyRatio: number,
+    assertionDensity: number,
+    testCases = 40,
+  ): WS => ({
+    counts: { hollow: 0, thin: 0, solid: 0 },
+    totals: {
+      testFiles: 5,
+      testCases,
+      assertions: Math.round(assertionDensity * testCases),
+      smokeOnlyCases: Math.round(smokeOnlyRatio * testCases),
+      assertionDensity,
+      smokeOnlyRatio,
+    },
+  });
+
+  it("no signal when weakSuite is absent (non-JS / legacy snapshot)", () => {
+    const r = extractHealthSignals(mockSnapshot());
+    const all = [...r.working, ...r.needsWork, ...r.questions];
+    expect(all.some((s) => s.id === "weak-suite" || s.id === "assertion-dense-tests")).toBe(false);
+  });
+
+  it("suppresses the signal on tiny suites (below the sample floor)", () => {
+    const r = extractHealthSignals(mockSnapshot({ weakSuite: ws(0.6, 0.5, 10) }));
+    expect(hasSignal(r.needsWork, "weak-suite")).toBe(false);
+  });
+
+  it("flags high severity when most cases assert nothing meaningful", () => {
+    const { needsWork } = extractHealthSignals(mockSnapshot({ weakSuite: ws(0.5, 0.6) }));
+    const sig = needsWork.find((s) => s.id === "weak-suite");
+    expect(sig).toBeDefined();
+    expect(sig?.severity).toBe("high");
+    expect(sig?.evidence.numbers?.smokeOnlyPct).toBe(50);
+    expect(sig?.evidence.paths).toBeUndefined(); // aggregate-only teaser
+  });
+
+  it("flags medium severity for a real minority of smoke-only cases", () => {
+    const { needsWork } = extractHealthSignals(mockSnapshot({ weakSuite: ws(0.25, 1.2) }));
+    const sig = needsWork.find((s) => s.id === "weak-suite");
+    expect(sig?.severity).toBe("medium");
+  });
+
+  it("credits a dense, value-checking suite as a positive", () => {
+    const { working, needsWork } = extractHealthSignals(mockSnapshot({ weakSuite: ws(0.05, 2.0) }));
+    expect(hasSignal(working, "assertion-dense-tests")).toBe(true);
+    expect(hasSignal(needsWork, "weak-suite")).toBe(false);
+  });
+
+  it("stays quiet in the middle (neither weak nor notably strong)", () => {
+    const r = extractHealthSignals(mockSnapshot({ weakSuite: ws(0.15, 1.2) }));
+    expect(hasSignal(r.needsWork, "weak-suite")).toBe(false);
+    expect(hasSignal(r.working, "assertion-dense-tests")).toBe(false);
+  });
+});

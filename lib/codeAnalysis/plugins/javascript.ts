@@ -26,6 +26,8 @@ import type {
   ParsedImport,
   PluginQueries,
   SourceFile,
+  TestCaseMeta,
+  TestFileMeta,
 } from "../types";
 import { loadBuiltinGrammar } from "../runtime";
 import { hashSubtree } from "../astHash";
@@ -378,6 +380,282 @@ interface JsMethodScope {
   name: string;
   locals: Map<string, string>;
   decisionPoints: number;
+}
+
+// ------------------- Weak-Suite: assertion-quality extraction -------------------
+//
+// Per test file, measure how much its tests actually VERIFY vs merely execute.
+// This is the language-specific half of the Weak-Suite signal (Arc 1): every
+// JS/TS assertion idiom lives HERE and nowhere else (architecture invariant #1).
+// The output is a language-NEUTRAL TestFileMeta that the aggregate/signal/UI
+// consume as plain numbers.
+//
+// "Publish the math": the idiom tables below ARE the methodology. A trivial
+// (smoke) oracle checks existence / truthiness / that nothing threw — it raises
+// coverage without catching regressions, the deceptive metric in AI-generated
+// suites. A meaningful oracle checks an actual value.
+
+/** Functions that open a test case whose callback we scan. Member forms
+ *  (it.only, test.each, it.concurrent) match on this leftmost identifier. */
+const TEST_RUNNERS = new Set(["it", "test", "specify", "fit"]);
+/** Member modifiers that STILL open a scored test case (`it.only`, `test.each`,
+ *  `it.concurrent`). Anything else on a runner — describe, beforeEach/afterEach
+ *  hooks, `test.step`, `.skip`/`.todo`, `test.use` — is a container / hook /
+ *  step / skipped test, NOT its own case. This allow-list is what keeps
+ *  Playwright's `test.describe` / `test.beforeEach` / `test.step` out of the
+ *  case count. */
+const CASE_MODIFIERS = new Set(["only", "each", "concurrent", "failing"]);
+/** Call-form matchers that verify next to nothing (existence/truthiness/threw). */
+const TRIVIAL_MATCHERS = new Set([
+  "toBeDefined",
+  "toBeUndefined",
+  "toBeNull",
+  "toBeTruthy",
+  "toBeFalsy",
+  "toBeNaN",
+  "toThrow",
+  "toThrowError",
+  "toBeInstanceOf",
+  "toHaveBeenCalled", // called — but not asserted WITH WHAT — weak
+  "ok", // assert.ok(x) — truthiness only
+]);
+/** Chai property-getter terminals that verify next to nothing. `.to.be.true` /
+ *  `.to.be.false` are real value checks, so they are deliberately NOT here. */
+const GETTER_TRIVIAL = new Set([
+  "null",
+  "undefined",
+  "exist",
+  "ok",
+  "empty",
+  "NaN",
+]);
+
+/** Cheap path gate so the extra walk only runs on plausible JS/TS test files.
+ *  Path-based, hence language-neutral. */
+function looksLikeJsTestFile(rel: string): boolean {
+  return (
+    /\.(test|spec)\.[cm]?[jt]sx?$/.test(rel) ||
+    /(^|\/)(__tests__|tests?|spec)\//.test(rel)
+  );
+}
+
+/** If this call opens a scored test CASE, return the runner root ("it"/"test"/…);
+ *  else null. Bare `it(...)`/`test(...)`, or a member form whose EVERY modifier
+ *  is a case modifier (`it.only`, `test.each`, `it.concurrent.only`). Rejects
+ *  containers (`describe`, `test.describe`), hooks (`test.beforeEach`), steps
+ *  (`test.step`), skipped tests (`.skip`/`.todo`), and `test.describe.only`
+ *  (a container, because `describe` isn't a case modifier). */
+function caseOpenerRoot(fnNode: TsNode): string | null {
+  let node = fnNode;
+  // `test.each([...])(name, cb)` — the callee is the `test.each([...])`
+  // invocation; unwrap it to reach the `test.each` member chain.
+  if (node.type === "call_expression") {
+    const inner = node.childForFieldName("function");
+    if (!inner) return null;
+    node = inner;
+  }
+  if (node.type === "identifier") {
+    return TEST_RUNNERS.has(node.text) ? node.text : null;
+  }
+  if (node.type !== "member_expression") return null;
+  let n: TsNode | null = node;
+  while (n && n.type === "member_expression") {
+    const prop = n.childForFieldName("property");
+    if (prop?.type !== "property_identifier" || !CASE_MODIFIERS.has(prop.text)) {
+      return null;
+    }
+    n = n.childForFieldName("object");
+  }
+  return n && n.type === "identifier" && TEST_RUNNERS.has(n.text) ? n.text : null;
+}
+
+/** Walk an assertion chain's object side to find its library root: an
+ *  `expect(...)` / `expect.soft(...)` call, or an `assert` identifier/property.
+ *  Handles namespaced forms (`chai.assert.equal`, `expect.soft(x).toBe(y)`). */
+function assertionKind(objNode: TsNode): "expect" | "assert" | null {
+  let n: TsNode | null = objNode;
+  while (n) {
+    if (n.type === "call_expression") {
+      const f = n.childForFieldName("function");
+      if (f?.type === "identifier" && f.text === "expect") return "expect";
+      if (
+        f?.type === "member_expression" &&
+        f.childForFieldName("object")?.text === "expect"
+      ) {
+        return "expect"; // expect.soft(x) / expect.hard(x)
+      }
+      return null;
+    }
+    if (n.type === "member_expression") {
+      const prop = n.childForFieldName("property");
+      if (prop?.text === "assert") return "assert"; // chai.assert.<...>
+      n = n.childForFieldName("object");
+      continue;
+    }
+    if (n.type === "identifier") {
+      return n.text === "assert" ? "assert" : n.text === "expect" ? "expect" : null;
+    }
+    return null;
+  }
+  return null;
+}
+
+/** The `expect(...)`/`expect.soft(...)` call node in a chain, so it can be
+ *  marked consumed and not re-counted as a bare expect. */
+function expectCallNode(objNode: TsNode): TsNode | null {
+  let n: TsNode | null = objNode;
+  while (n) {
+    if (n.type === "call_expression") {
+      const f = n.childForFieldName("function");
+      if (f?.type === "identifier" && f.text === "expect") return n;
+      if (
+        f?.type === "member_expression" &&
+        f.childForFieldName("object")?.text === "expect"
+      ) {
+        return n;
+      }
+      return null;
+    }
+    if (n.type === "member_expression") {
+      n = n.childForFieldName("object");
+      continue;
+    }
+    return null;
+  }
+  return null;
+}
+
+/** The matcher property at the end of an assertion chain (`toBe` in
+ *  `expect(x).not.toBe(y)`, `equal` in `assert.equal(...)`), or null. */
+function matcherOf(matcherCall: TsNode): string | null {
+  const callee = matcherCall.childForFieldName("function");
+  if (!callee || callee.type !== "member_expression") return null;
+  const prop = callee.childForFieldName("property");
+  return prop?.type === "property_identifier" ? prop.text : null;
+}
+
+/** Raw text of a string literal node (quotes stripped). */
+function stringLiteralText(node: TsNode): string {
+  for (const child of node.namedChildren) {
+    if (child.type === "string_fragment") return child.text;
+  }
+  return "";
+}
+
+/** Extract per-test-case assertion quality for one file. Self-contained walk
+ *  over the already-parsed tree — it does NOT touch the main visit() pass.
+ *  Returns undefined when no test cases are found (nothing to score). */
+function extractTestMeta(root: TsNode): TestFileMeta | undefined {
+  const cases: TestCaseMeta[] = [];
+  const trivialNames = new Set<string>();
+  // Inner `expect(x)` calls already attributed to an outer matcher, so a
+  // chained assertion is counted exactly once (see the double-count gotcha).
+  const consumed = new Set<number>();
+
+  function record(tc: TestCaseMeta, matcher: string | null, trivial: boolean) {
+    tc.assertions++;
+    if (trivial) {
+      tc.trivialAssertions++;
+      if (matcher) trivialNames.add(matcher);
+    } else {
+      tc.hasMeaningfulOracle = true;
+    }
+  }
+
+  /** A bare `expect(x)` call: either a chai property-getter assertion
+   *  (`expect(x).to.be.true`) — classified by the terminal getter word — or a
+   *  truly bare `expect(x);` — pure smoke. */
+  function classifyBareExpect(callNode: TsNode, tc: TestCaseMeta) {
+    let term = callNode;
+    let p = callNode.parent;
+    while (p && p.type === "member_expression") {
+      term = p;
+      p = p.parent;
+    }
+    consumed.add(callNode.id);
+    if (term === callNode) {
+      record(tc, null, true); // truly bare expect(x) — smoke
+      return;
+    }
+    if (p && p.type === "call_expression") {
+      return; // a matcher CALL wraps it — counted by the member branch instead
+    }
+    // Getter assertion: the terminal property is the assertion word.
+    const prop = term.childForFieldName("property");
+    const g = prop?.type === "property_identifier" ? prop.text : null;
+    record(tc, g, !g || GETTER_TRIVIAL.has(g));
+  }
+
+  function classifyAssertion(callNode: TsNode, fn: TsNode, tc: TestCaseMeta) {
+    if (fn.type === "identifier") {
+      if (fn.text === "assert") {
+        record(tc, null, true); // assert(x) — truthiness only
+      } else if (fn.text === "expect" && !consumed.has(callNode.id)) {
+        classifyBareExpect(callNode, tc);
+      }
+      return;
+    }
+    if (fn.type !== "member_expression") return;
+    const obj = fn.childForFieldName("object");
+    if (!obj) return;
+    // `expect.soft(x)` / `expect.assertions(n)` — a modifier on expect, not a
+    // matcher. It's the chain ROOT (consumed by its outer matcher) or meta;
+    // never its own assertion.
+    if (obj.type === "identifier" && obj.text === "expect") return;
+    const kind = assertionKind(obj);
+    if (!kind) return;
+    if (kind === "expect") {
+      const ec = expectCallNode(obj);
+      if (ec) consumed.add(ec.id); // don't re-count the inner expect()
+    }
+    const matcher = matcherOf(callNode);
+    record(tc, matcher, !matcher || TRIVIAL_MATCHERS.has(matcher));
+  }
+
+  /** Scan one test-case callback body, tallying assertions into `tc`. Stops at
+   *  a nested CASE opener (its assertions are its own); `test.step` and hooks
+   *  are NOT case openers, so their assertions count toward the enclosing case. */
+  function scanBody(node: TsNode, tc: TestCaseMeta) {
+    if (node.type === "call_expression") {
+      const fn = node.childForFieldName("function");
+      if (fn) {
+        if (caseOpenerRoot(fn)) return;
+        classifyAssertion(node, fn, tc);
+      }
+    }
+    for (const child of node.namedChildren) scanBody(child, tc);
+  }
+
+  /** Top-level walk: open a case for each case-opening runner with a callback. */
+  function walk(node: TsNode) {
+    if (node.type === "call_expression") {
+      const fn = node.childForFieldName("function");
+      if (fn && caseOpenerRoot(fn)) {
+        const args = node.childForFieldName("arguments");
+        const callback = args?.namedChildren.find(
+          (a) => a.type === "arrow_function" || a.type === "function_expression"
+        );
+        if (callback) {
+          const nameArg = args?.namedChildren.find((a) => a.type === "string");
+          const tc: TestCaseMeta = {
+            name: nameArg ? stringLiteralText(nameArg) : "",
+            line: node.startPosition.row + 1,
+            assertions: 0,
+            trivialAssertions: 0,
+            hasMeaningfulOracle: false,
+          };
+          const body = callback.childForFieldName("body");
+          if (body) scanBody(body, tc);
+          cases.push(tc);
+        }
+      }
+    }
+    for (const child of node.namedChildren) walk(child);
+  }
+
+  walk(root);
+  if (cases.length === 0) return undefined;
+  return { cases, trivialOracleNames: [...trivialNames].sort() };
 }
 
 function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
@@ -1102,6 +1380,12 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
 
   visit(tree.rootNode);
 
+  // Weak-Suite: only test files pay for the extra assertion-quality walk. Must
+  // read nodes BEFORE tree.delete() below.
+  const testMeta = looksLikeJsTestFile(file.rel)
+    ? extractTestMeta(tree.rootNode)
+    : undefined;
+
   tree.delete();
   parser.delete();
 
@@ -1113,6 +1397,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     fileComplexity: 1 + totalDecisionPoints,
     parseError: false,
     classes: parsedClasses,
+    ...(testMeta ? { testMeta } : {}),
   };
 }
 
