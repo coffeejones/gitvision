@@ -47,6 +47,7 @@ import {
   Sparkles,
   Stethoscope,
   Truck,
+  Zap,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { STYLE, TOK } from "@/lib/sessionTheme";
@@ -281,6 +282,17 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
           label: "Refactor",
           href: `${base}/refactor`,
           icon: <ShieldAlert size={14} />,
+          hint: hasCodeGraph ? undefined : "refresh",
+        },
+        {
+          // The Faultline Simulator — the live "what if I change this?" surface.
+          // Pick a file → simulate deleting it → deterministic blast + the
+          // required-actions conscience (Shadow-Graph patcher). Sits right below
+          // Refactor as its interactive sibling.
+          label: "Faultline",
+          href: `${base}/faultline`,
+          icon: <Zap size={14} />,
+          hasNewFeatureBadge: true,
           hint: hasCodeGraph ? undefined : "refresh",
         },
         {
