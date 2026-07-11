@@ -67,7 +67,7 @@ describe("MCP server · initialization", () => {
 });
 
 describe("MCP server · tools/list", () => {
-  it("exposes all eight CodeTrawl tools", async () => {
+  it("exposes all nine CodeTrawl tools", async () => {
     const { client, cleanup } = await connectInMemory();
     try {
       const result = await client.listTools();
@@ -80,6 +80,7 @@ describe("MCP server · tools/list", () => {
         "find_duplicates",
         "review_changes",
         "signals",
+        "simulate_change",
         "untested_hotspots",
       ]);
     } finally {
@@ -106,7 +107,7 @@ describe("MCP server · tools/list", () => {
     const { client, cleanup } = await connectInMemory();
     try {
       const result = await client.listTools();
-      const downstream = ["blast_radius", "find_duplicates", "signals", "untested_hotspots"];
+      const downstream = ["blast_radius", "find_duplicates", "signals", "untested_hotspots", "simulate_change"];
       for (const name of downstream) {
         const tool = result.tools.find((t) => t.name === name);
         expect(tool, `tool ${name} should be registered`).toBeDefined();
@@ -218,6 +219,24 @@ describe("MCP server · tool error paths", () => {
         arguments: { sessionId: "nope" },
       });
       expect(result.isError).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("simulate_change returns an error for unknown session", async () => {
+    const { client, cleanup } = await connectInMemory();
+    try {
+      const result = await client.callTool({
+        name: "simulate_change",
+        arguments: {
+          sessionId: "does-not-exist",
+          changes: [{ path: "src/foo.ts", newContent: "export const x = 1;" }],
+        },
+      });
+      expect(result.isError).toBe(true);
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content[0].text).toMatch(/not found|expired/i);
     } finally {
       await cleanup();
     }

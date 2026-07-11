@@ -12,6 +12,7 @@
 
 import * as z from "zod/v4";
 import { analyzeRepo, parseRepoUrl } from "../../lib/github";
+import { parseLayerWriter } from "../../lib/shadowGraph/persist";
 import { sessionIdFor, setCached } from "../cache";
 
 export const analyzeRepoInputSchema = {
@@ -55,6 +56,12 @@ export async function handleAnalyzeRepo(input: Input) {
     snapshot = await analyzeRepo(parsed.owner, parsed.repo, {
       subdir: input.subdir ?? null,
       ref: input.ref ?? null,
+      // Persist the parse layer so a later simulate_change on this session can
+      // rebuild the graph incrementally instead of re-analyzing the whole repo.
+      onParseLayer: parseLayerWriter({
+        repo: `${parsed.owner}/${parsed.repo}`,
+        ref: input.ref ?? undefined,
+      }),
     });
   } catch (err) {
     return errorResult(
@@ -122,6 +129,7 @@ export async function handleAnalyzeRepo(input: Input) {
       `Call find_duplicates with sessionId='${sessionId}' to surface structurally identical functions.`,
       `Call untested_hotspots with sessionId='${sessionId}' for production code without test coverage.`,
       `Call signals with sessionId='${sessionId}' for the full 17-signal health verdict.`,
+      `Call simulate_change with sessionId='${sessionId}' and a proposed diff to see what it breaks BEFORE committing (deterministic blast + required actions).`,
     ],
   };
 

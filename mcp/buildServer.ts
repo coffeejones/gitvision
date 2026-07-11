@@ -40,6 +40,10 @@ import {
   reviewChangesInputSchema,
   handleReviewChanges,
 } from "./tools/reviewChanges.js";
+import {
+  simulateChangeInputSchema,
+  handleSimulateChange,
+} from "./tools/simulateChange.js";
 
 export const SERVER_NAME = "codetrawl";
 export const SERVER_VERSION = "0.67.0";
@@ -131,6 +135,16 @@ export function buildServer(): McpServer {
       inputSchema: reviewChangesInputSchema,
     },
     handleReviewChanges
+  );
+
+  server.registerTool(
+    "simulate_change",
+    {
+      description:
+        "Simulate a proposed diff BEFORE committing it and get a deterministic verdict on what it breaks. Pass the session id and your changed files (whole-file edits, adds, or deletes); the change is spliced into the cached parse layer and the graph is rebuilt (byte-identical to a full re-analysis for JS/TS), then diffed against the base. Returns a traffic-light verdict, the blast (load-bearing walls touched, dependents reached, guarding tests to run) and a machine-readable requiredActions list — load-bearing code changed with no guarding test, a new test that asserts nothing, code that now duplicates an existing function. Sub-second: only the changed files are re-parsed. The agent conscience — call it to check a candidate change instead of finding out after the fact.",
+      inputSchema: simulateChangeInputSchema,
+    },
+    handleSimulateChange
   );
 
   return server;
