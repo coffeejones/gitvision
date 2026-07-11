@@ -1466,4 +1466,10 @@ export const javascriptPlugin = {
   parseDirect: parseJsDirect,
 
   resolveImport: resolveJsImport,
+
+  // Import resolution uses only the path set + a serializable context
+  // (tsconfig paths + workspace map), never another file's content, so the
+  // Shadow-Graph patcher can re-resolve JS/TS imports from a stub index and
+  // produce a byte-exact incremental graph. See fastPatchable in the contract.
+  fastPatchable: true,
 } satisfies CodeAnalysisPlugin;

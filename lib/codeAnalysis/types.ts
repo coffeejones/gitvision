@@ -272,6 +272,15 @@ export interface CodeAnalysisPlugin {
    *  to a repo-relative file path. Return null for external / unresolvable
    *  specs. */
   resolveImport(spec: string, fromPath: string, ix: FileIndex): string | null;
+
+  /** True when this plugin's cross-file resolution depends ONLY on the path set
+   *  + a serializable resolver context (not on other files' contents), so the
+   *  Shadow-Graph patcher can re-resolve its imports from a stub index without
+   *  the repo on disk — enabling a byte-exact incremental patch. JS/TS sets this.
+   *  Plugins whose extras are built from other files' contents (Java/C#/PHP/Ruby)
+   *  or baked in prepareForRepo (kt/html/css) leave it false; the patcher freezes
+   *  their cross-file edges at base and declares the approximation. */
+  readonly fastPatchable?: boolean;
 }
 
 // ------------------- CodeGraph (cross-file aggregate) -------------------
