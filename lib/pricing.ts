@@ -44,6 +44,12 @@ export interface TierLimits {
   /** Test-quality (Weak-Suite) — the per-test-file assertion-quality report
    *  ("coverage that means nothing") in the Test Quality tab (Arc 1). */
   testQuality: boolean;
+  /** Change-simulation (Shadow-Graph "Faultline") — propose a diff against a
+   *  cached snapshot and get back a deterministic blast report + a
+   *  required-actions verdict ("you touched a load-bearing wall with no guarding
+   *  test") BEFORE committing. The conscience layer; gates the web /simulate
+   *  route. */
+  simulate: boolean;
   /** SBOM export — download a timestamped CycloneDX / SPDX bill of materials
    *  for a snapshot (Arc 4, Pro-only evidence feature). */
   sbomExport: boolean;
@@ -104,6 +110,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       structuralDiff: false,
       refactorGuidance: false,
       testQuality: false,
+      simulate: false,
       sbomExport: false,
       teamWorkspaces: false,
       prioritySupport: false,
@@ -139,6 +146,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       structuralDiff: true,
       refactorGuidance: true,
       testQuality: true,
+      simulate: true,
       sbomExport: false,
       teamWorkspaces: false,
       prioritySupport: false,
@@ -174,6 +182,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       structuralDiff: true,
       refactorGuidance: true,
       testQuality: true,
+      simulate: true,
       sbomExport: true,
       teamWorkspaces: true,
       prioritySupport: true,

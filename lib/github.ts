@@ -44,14 +44,7 @@ import { analyzeRepoHistory, type GitLogCommit } from "./gitLog";
 import { analyzeDependencyHealth } from "./depsHealth/index";
 import { analyzeDirectory } from "./codeAnalysis/analyze";
 import type { ParseLayer } from "./shadowGraph/parseCache";
-import { csharpPlugin } from "./codeAnalysis/plugins/csharp";
-import { goPlugin } from "./codeAnalysis/plugins/go";
-import { javaPlugin } from "./codeAnalysis/plugins/java";
-import { javascriptPlugin } from "./codeAnalysis/plugins/javascript";
-import { phpPlugin } from "./codeAnalysis/plugins/php";
-import { pythonPlugin } from "./codeAnalysis/plugins/python";
-import { rubyPlugin } from "./codeAnalysis/plugins/ruby";
-import { regexFallbackPlugin } from "./codeAnalysis/plugins/regexFallback";
+import { ALL_PLUGINS } from "./codeAnalysis/plugins/all";
 import { computeDriftMetrics } from "./driftMetrics";
 import { computeWeakSuite, weakSuiteSummary } from "./weakSuite";
 import { computeCiHardening } from "./ciHardening";
@@ -838,16 +831,7 @@ export async function analyzeRepo(
     // timeout rejection (the tarball gets deleted by `cleanup` while a
     // tree-sitter parser may still be reading from it) so it doesn't bubble
     // up as an unhandled rejection.
-    const codeAnalysisPromise = analyzeDirectory(extracted.extractDir, [
-      javascriptPlugin,
-      pythonPlugin,
-      goPlugin,
-      javaPlugin,
-      csharpPlugin,
-      phpPlugin,
-      rubyPlugin,
-      regexFallbackPlugin,
-    ])
+    const codeAnalysisPromise = analyzeDirectory(extracted.extractDir, ALL_PLUGINS)
       .then((r) => ({
         kind: "ok" as const,
         codeGraph: r.codeGraph,

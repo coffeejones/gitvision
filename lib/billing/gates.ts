@@ -79,6 +79,7 @@ export type BooleanFeature =
   | "structuralDiff"
   | "refactorGuidance"
   | "testQuality"
+  | "simulate"
   | "sbomExport"
   | "teamWorkspaces"
   | "prioritySupport"
