@@ -16,7 +16,27 @@ import type { PatchLimits } from "./runPatch";
 
 export type SimulateSessionOutcome =
   | { ok: true; result: SimulateResult }
-  | { ok: false; reason: "no-code-graph" | "layer-unavailable"; message: string };
+  | {
+      ok: false;
+      reason: "no-code-graph" | "layer-unavailable" | "too-large-to-simulate";
+      message: string;
+    };
+
+export interface SimulateSessionOptions {
+  /** Max cached-layer file count eligible for interactive simulation. Above it,
+   *  the per-call whole-graph work (patch()'s full buildCodeGraph + baseGraphOf's
+   *  second one + computeChangeBlast's refactor-safety/fan-in + the verdict
+   *  layer's weak-suite + duplicate passes — all synchronous, O(repo)) is too
+   *  heavy for the request thread. The runPatch byte caps bound only the re-parse
+   *  of touched files, NOT this whole-repo rebuild, so we bound it by graph size
+   *  here until the Stage 3 worker offload lands. Injectable for tests. */
+  maxFiles?: number;
+}
+
+/** Default from the "sub-second" premise: a repo this large no longer rebuilds
+ *  interactively anyway, so it gets a typed fallback instead of blocking the
+ *  loop. Below the analysis file cap (5000); most real repos clear it. */
+const DEFAULT_MAX_SIMULATE_FILES = 4000;
 
 /** Simulate a proposed change against a session snapshot's cached parse layer.
  *  `snapshot` is structurally typed on just the field we key on, so a real
@@ -25,6 +45,7 @@ export async function runSimulateForSession(
   snapshot: { codeGraph?: { contentHashes?: Record<string, string> } },
   changes: FileChange[],
   limits?: PatchLimits,
+  opts: SimulateSessionOptions = {},
 ): Promise<SimulateSessionOutcome> {
   if (!snapshot.codeGraph) {
     return {
@@ -42,6 +63,16 @@ export async function runSimulateForSession(
       reason: "layer-unavailable",
       message:
         "The parse layer for this snapshot has expired or wasn't cached (older sessions, or evicted under cache pressure). Refresh the session to rebuild it, then simulate.",
+    };
+  }
+
+  // Bound the per-call whole-repo rebuild by graph size (see maxFiles above).
+  const maxFiles = opts.maxFiles ?? DEFAULT_MAX_SIMULATE_FILES;
+  if (layer.files.length > maxFiles) {
+    return {
+      ok: false,
+      reason: "too-large-to-simulate",
+      message: `This repo (${layer.files.length} analyzed files) is above the interactive-simulation size limit (${maxFiles}). Simulation rebuilds the whole graph per call; that's not sub-second at this scale yet.`,
     };
   }
 

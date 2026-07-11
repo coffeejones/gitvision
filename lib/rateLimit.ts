@@ -137,6 +137,11 @@ export const RATE_LIMITS = {
   /** AI generation endpoints — cheap CPU but real $$ to Anthropic.
    *  Layered with the daily AI budget kill-switch in lib/aiBudget.ts. */
   aiGenerate: { limit: 20, windowMs: 60 * 60_000 },
+  /** Change simulation — sub-second per call (only changed files re-parse) and
+   *  the payload is byte-capped by the patch DoS gate, but it's synchronous
+   *  tree-sitter work on the shared loop, so bound the per-IP burst. Generous
+   *  enough for interactive diff iteration (~1/min sustained). */
+  sessionSimulate: { limit: 60, windowMs: 60 * 60_000 },
   /** GitHub App PR analyses per installation — protects against a
    *  repo firing pull_request events in a flood (e.g. force-pushing
    *  50 branches back-to-back). Soft-fail: skip + log, don't post a

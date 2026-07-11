@@ -82,6 +82,24 @@ describe("runSimulateForSession", () => {
     }
   });
 
+  it("refuses a repo above the interactive-simulation size limit", async () => {
+    const tree: Record<string, string> = {
+      "a.ts": "export const a = 1;",
+      "b.ts": "export const b = 2;",
+      "c.ts": "export const c = 3;",
+    };
+    const snap = await analyzedSnapshot(tree);
+    // 3 analyzed files, cap of 2 → over-limit → typed fallback, no rebuild.
+    const out = await runSimulateForSession(
+      snap,
+      [{ path: "a.ts", newContent: "export const a = 9;" }],
+      undefined,
+      { maxFiles: 2 },
+    );
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.reason).toBe("too-large-to-simulate");
+  });
+
   it("returns no-code-graph when the snapshot carries none", async () => {
     const out = await runSimulateForSession({}, []);
     expect(out.ok).toBe(false);
