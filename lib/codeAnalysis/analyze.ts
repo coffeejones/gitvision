@@ -90,10 +90,24 @@ export async function analyzeDirectory(
     for (const ext of p.extensions) pluginByExt.set(ext, p);
   }
 
-  const { files: sourceFiles, truncated } = await walkAndRead(
+  const { files: walkedFiles, truncated } = await walkAndRead(
     root,
     pluginByExt,
     maxFiles
+  );
+
+  // Canonical order: sort every downstream pass (parse, graph build, content
+  // hashes, per-plugin `prepareForRepo` extras) by repo-relative path. The
+  // walker's order is `fs.readdir` order, which is OS-dependent — so without
+  // this, two machines (Mac / Windows / Railway Linux) can produce different
+  // call-edge tie-breaks and class-name disambiguation suffixes for the *same*
+  // repo. Code-unit comparison (not `localeCompare`) keeps ordering identical
+  // across ICU/locale configurations. This determinism is also the invariant
+  // the Shadow-Graph incremental patcher relies on: a re-parsed/added file must
+  // land at a stable position so a patched graph is byte-identical to a full
+  // re-analysis.
+  const sourceFiles = [...walkedFiles].sort((a, b) =>
+    a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0
   );
 
   const byPath = new Map<string, SourceFile>();
