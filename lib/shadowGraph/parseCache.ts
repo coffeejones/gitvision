@@ -103,6 +103,14 @@ export async function writeParseCache(
     ...layer,
   };
   await fs.mkdir(parseCacheDir(), { recursive: true });
+  // Yield before the synchronous serialize burst. encodeForJson deep-clones the
+  // whole layer (up to DEFAULT_MAX_FILES ParsedFiles + the per-plugin resolver-
+  // context Maps in `extras`) and JSON.stringify walks the clone again — bounded
+  // main-thread work we keep OFF the current tick so it can't compound with a
+  // caller's session-persistence latency or starve a concurrent simulate in the
+  // same tick. gzip + disk below are already offloaded; the full serialize
+  // offload to a worker is Stage 3 (gated on Railway contention measurement).
+  await new Promise<void>((resolve) => setImmediate(resolve));
   const json = JSON.stringify(encodeForJson(entry));
   const gz = await gzipAsync(json, { level: 1 });
   await atomicWriteBuffer(parseCachePath(digest), gz);

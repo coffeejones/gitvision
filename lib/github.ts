@@ -43,6 +43,7 @@ import {
 import { analyzeRepoHistory, type GitLogCommit } from "./gitLog";
 import { analyzeDependencyHealth } from "./depsHealth/index";
 import { analyzeDirectory } from "./codeAnalysis/analyze";
+import type { ParseLayer } from "./shadowGraph/parseCache";
 import { csharpPlugin } from "./codeAnalysis/plugins/csharp";
 import { goPlugin } from "./codeAnalysis/plugins/go";
 import { javaPlugin } from "./codeAnalysis/plugins/java";
@@ -670,6 +671,16 @@ export interface AnalyzeRepoOptions {
    *  refresh. Whole-repo metadata (stars, languages, contributors, PRs) stays
    *  repo-wide. */
   excludeFolders?: string[] | null;
+  /** Best-effort seam for the Shadow-Graph patcher. Invoked with the parse
+   *  layer (the parsed files + resolver contexts + content hashes) once code
+   *  analysis succeeds, so a later `simulate` can rebuild the graph
+   *  incrementally instead of re-analyzing the whole repo. Fired-and-forgotten
+   *  so it can neither fail session creation nor block it on the gzip/disk write;
+   *  the one synchronous cost — serializing the layer — is bounded and deferred
+   *  off the critical tick (see writeParseCache), with the full worker offload
+   *  left to Stage 3. NOT invoked when code analysis times out, errors, or the
+   *  walk hit the file cap (a truncated base can't serve the golden fast path). */
+  onParseLayer?: (layer: ParseLayer) => void | Promise<unknown>;
 }
 
 export async function analyzeRepo(
@@ -837,7 +848,24 @@ export async function analyzeRepo(
       rubyPlugin,
       regexFallbackPlugin,
     ])
-      .then((r) => ({ kind: "ok" as const, codeGraph: r.codeGraph }))
+      .then((r) => ({
+        kind: "ok" as const,
+        codeGraph: r.codeGraph,
+        // The parse layer, carried through the race so the success branch can
+        // hand it to the cache-write seam. Same object references as `r` — no
+        // copy — and simply unused when no `onParseLayer` was supplied.
+        layer: {
+          files: r.files,
+          pluginByFile: r.pluginByFile,
+          extras: r.extras,
+          contentHashes: r.codeGraph.contentHashes ?? {},
+          truncated: r.truncated ? "Walker hit MAX_FILES cap" : undefined,
+          scope: {
+            subdir: subdir ?? undefined,
+            excludeFolders: excludeFolders.length > 0 ? excludeFolders : undefined,
+          },
+        } satisfies ParseLayer,
+      }))
       .catch((err) => {
         console.error(
           `codeAnalysis failed for ${owner}/${repo}:`,
@@ -915,6 +943,28 @@ export async function analyzeRepo(
         "Code analysis failed — see server logs. Other snapshot data is still accurate.";
     } else {
       codeGraph = cgResult.codeGraph;
+      // Hand the parse layer to the cache-write seam (Shadow-Graph patcher).
+      // Fire-and-forget with a swallowed error: this is a pure optimization for
+      // a future incremental simulate, never on the session-creation critical
+      // path. Skipped for a truncated walk — the fast path needs a complete base
+      // (readParseCache rejects truncated entries anyway, so this just saves the
+      // wasted write). On Railway's long-lived process the background write
+      // completes reliably; on exit an in-flight write is simply lost (harmless).
+      if (opts.onParseLayer && !cgResult.layer.truncated) {
+        const emit = opts.onParseLayer;
+        const layer = cgResult.layer;
+        // Defer the call into a microtask so a SYNCHRONOUS throw from the
+        // callback becomes a rejection the `.catch` handles — never a synchronous
+        // throw that escapes into the outer try/catch and discards codeGraph.
+        void Promise.resolve()
+          .then(() => emit(layer))
+          .catch((err) => {
+            console.error(
+              `onParseLayer failed for ${owner}/${repo}:`,
+              err instanceof Error ? err.message : err
+            );
+          });
+      }
     }
   } catch (err) {
     // SubdirNotFoundError is a USER input error — they pointed at a path

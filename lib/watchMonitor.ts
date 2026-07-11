@@ -17,6 +17,7 @@
 
 import type { AnalysisSnapshot } from "./types";
 import { analyzeRepo, parseRepoUrl } from "./github";
+import { parseLayerWriter } from "./shadowGraph/persist";
 import { getGithubTokenForUser } from "./githubUserToken";
 import { getUpstreamHead } from "./freshness";
 import { appendSnapshot, getSession } from "./storage";
@@ -175,6 +176,17 @@ async function processWatch(
     ref,
     subdir: prev.analyzedSubdir ?? null,
     userToken: token,
+    // Gate the cache write on !dryRun — a dry sweep is contractually
+    // side-effect-free (no snapshot append, no state write), and the parse-cache
+    // write + its fire-and-forget GC would otherwise mutate shared disk state
+    // (and could evict a cold layer). analyzeRepo has no notion of dryRun, so the
+    // gate belongs here alongside the other `if (!dryRun)` side effects.
+    onParseLayer: dryRun
+      ? undefined
+      : parseLayerWriter({
+          repo: `${parsed.owner}/${parsed.repo}`,
+          ref: ref ?? undefined,
+        }),
   });
   if (!dryRun) await appendSnapshot(watch.sessionId, newSnap);
 

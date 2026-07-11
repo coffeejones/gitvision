@@ -21,6 +21,7 @@ import path from "node:path";
 import { nanoid } from "nanoid";
 import { atomicWriteJson } from "./atomicWrite";
 import { GithubAccessError, analyzeRepo, parseRepoUrl } from "./github";
+import { parseLayerWriter } from "./shadowGraph/persist";
 import { getGithubTokenForUser } from "./githubUserToken";
 import { runChangeBlastPreview } from "./changeBlast/preview";
 import { savePreview } from "./previewStore";
@@ -165,6 +166,10 @@ async function runCreateSession(job: Job): Promise<void> {
     subdir: job.input.subdir,
     ref: job.input.ref ?? null,
     userToken,
+    onParseLayer: parseLayerWriter({
+      repo: `${parsed.owner}/${parsed.repo}`,
+      ref: job.input.ref ?? undefined,
+    }),
   });
 
   // Tier backstop: analyzing PRIVATE repos is a Plus feature. The Private-repo
@@ -220,6 +225,10 @@ async function runRefreshSession(job: Job): Promise<void> {
     ref: prevRef,
     userToken,
     excludeFolders: job.input.excludeFolders ?? null,
+    onParseLayer: parseLayerWriter({
+      repo: `${parsed.owner}/${parsed.repo}`,
+      ref: prevRef ?? undefined,
+    }),
   });
   await appendSnapshot(sessionId, snapshot);
   await patchJob(job.id, { status: "done", sessionId });
