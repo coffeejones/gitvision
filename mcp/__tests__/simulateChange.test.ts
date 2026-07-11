@@ -52,6 +52,9 @@ describe("buildSimulatePayload", () => {
           evidence: {},
         },
       ],
+      affectedFiles: [
+        { path: "dep0.ts", hop: 1, untested: true, isTest: false, crossModule: false },
+      ],
       approximations: [],
     };
 
@@ -66,12 +69,15 @@ describe("buildSimulatePayload", () => {
     expect(blast.loadBearingTouched).toEqual(["core.ts"]);
     expect(blast.combinedDependents).toBe(12);
     expect((payload.changedFiles as unknown[]).length).toBe(1);
+    // The affected-file list flows into the payload.
+    expect((payload.affectedFiles as Array<{ path: string }>)[0].path).toBe("dep0.ts");
   });
 
   it("shapes a non-patched mode as an explicit re-analyze signal", () => {
     const result: SimulateResult = {
       mode: "needs-full-analysis",
       requiredActions: [],
+      affectedFiles: [],
       approximations: [],
     };
 
@@ -89,6 +95,7 @@ describe("buildSimulatePayload", () => {
     const result: SimulateResult = {
       mode: "base-mismatch",
       requiredActions: [],
+      affectedFiles: [],
       approximations: [],
       baseMismatch: ["core.ts", "dep0.ts"],
     };

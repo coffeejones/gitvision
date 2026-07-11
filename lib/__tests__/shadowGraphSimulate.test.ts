@@ -72,6 +72,18 @@ describe("simulateChange verdict layer", () => {
     expect(wall.evidence.numbers?.dependentsReached).toBeGreaterThan(0);
   });
 
+  it("lists the dependent files a delete actually reaches (affectedFiles)", async () => {
+    const r = await sim(loadBearingRepo(), [
+      { path: "core.ts", newContent: null }, // delete the load-bearing file
+    ]);
+    expect(r.mode).toBe("patched");
+    // All 12 deps import core.ts → all reached, none guarded (no test files).
+    expect(r.affectedFiles).toHaveLength(12);
+    expect(r.affectedFiles.map((a) => a.path)).toContain("dep0.ts");
+    expect(r.affectedFiles.every((a) => a.untested)).toBe(true);
+    expect(r.affectedFiles.every((a) => a.hop === 1)).toBe(true);
+  });
+
   it("flags a hollow test case added by the diff", async () => {
     const r = await sim(loadBearingRepo(), [
       // A new test file whose only case asserts nothing meaningful.

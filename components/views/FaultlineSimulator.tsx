@@ -17,6 +17,7 @@ import { Zap, Search, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { SimulateResult, RequiredAction } from "@/lib/shadowGraph/simulate";
 import type { ChangeBlastReport } from "@/lib/changeBlast/types";
+import { FaultlineBlastCanvas } from "@/components/views/FaultlineBlastCanvas";
 
 // Verdict traffic light under the CH palette: heat is rationed to criticals, so
 // a cleared verdict goes quiet/neutral, not green.
@@ -27,13 +28,6 @@ const VERDICT_TOK: Record<
   "high-risk": { label: "High risk", color: TOK.rose, soft: TOK.roseSoft },
   review: { label: "Review carefully", color: TOK.amber, soft: TOK.amberSoft },
   clear: { label: "Clear", color: TOK.accent, soft: TOK.accentSoft },
-};
-
-const TIER_TOK: Record<string, string> = {
-  "load-bearing": TOK.rose,
-  "handle-with-care": TOK.amber,
-  moderate: TOK.textMuted,
-  safe: TOK.textMuted,
 };
 
 const SEVERITY_TOK: Record<RequiredAction["severity"], string> = {
@@ -337,23 +331,18 @@ function ResultPanel({
     );
   }
 
-  return (
-    <Verdict path={path} report={result.report} actions={result.requiredActions} />
-  );
+  return <Verdict path={path} result={result} />;
 }
 
-function Verdict({
-  path,
-  report,
-  actions,
-}: {
-  path: string | null;
-  report: ChangeBlastReport;
-  actions: RequiredAction[];
-}) {
+function Verdict({ path, result }: { path: string | null; result: SimulateResult }) {
+  const report = result.report!;
+  const actions = result.requiredActions;
+  const affected = result.affectedFiles;
   const v = VERDICT_TOK[report.verdict];
-  const shown = report.changedFiles.slice(0, FILE_ROW_CAP);
-  const hidden = report.changedFiles.length - shown.length;
+  const shown = affected.slice(0, FILE_ROW_CAP);
+  const hidden = affected.length - shown.length;
+  const untested = affected.filter((a) => a.untested).length;
+  const epicenter = path ?? "the file";
 
   return (
     <div className="flex flex-col gap-4">
@@ -372,7 +361,7 @@ function Verdict({
           <span className="text-[13px]" style={{ color: TOK.textMuted }}>
             if you delete{" "}
             <span style={{ fontFamily: "var(--font-ct-mono, monospace)", color: TOK.textSecondary }}>
-              {path ? baseName(path) : "this file"}
+              {baseName(epicenter)}
             </span>
           </span>
         </div>
@@ -380,17 +369,25 @@ function Verdict({
           {report.headline}
         </p>
         <div className="flex gap-5 flex-wrap text-[13px]" style={{ color: TOK.textMuted }}>
-          <Stat n={report.changedFiles.length} one="file affected" many="files affected" />
+          <Stat
+            n={affected.length}
+            one="file breaks"
+            many="files break"
+            accent={affected.length > 0 ? v.color : undefined}
+          />
+          <Stat n={untested} one="with no test" many="with no test" accent={untested > 0 ? TOK.rose : undefined} />
           <Stat
             n={report.loadBearingTouched.length}
             one="load-bearing wall"
             many="load-bearing walls"
             accent={report.loadBearingTouched.length > 0 ? TOK.rose : undefined}
           />
-          <Stat n={report.combinedDependents} one="dependent reached" many="dependents reached" />
           <Stat n={report.testsToRun.length} one="guarding test" many="guarding tests" />
         </div>
       </div>
+
+      {/* The shockwave — the hero */}
+      <FaultlineBlastCanvas epicenter={epicenter} affected={affected} />
 
       {/* Required actions — the conscience */}
       {actions.length > 0 && (
@@ -424,51 +421,40 @@ function Verdict({
         </div>
       )}
 
-      {/* Affected files */}
-      <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${TOK.border}` }}>
-        {shown.map((f, i) => (
-          <div
-            key={f.file}
-            className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 items-center"
-            style={{
-              background: i % 2 === 0 ? TOK.surface : "transparent",
-              borderTop: i === 0 ? "none" : `1px solid ${TOK.border}`,
-            }}
-          >
-            <div className="min-w-0 flex flex-col gap-0.5">
+      {/* Affected files — the concrete casualty list */}
+      {affected.length > 0 && (
+        <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${TOK.border}` }}>
+          {shown.map((f, i) => (
+            <div
+              key={f.path}
+              className="grid grid-cols-[1fr_auto] gap-3 px-4 py-2.5 items-center"
+              style={{
+                background: i % 2 === 0 ? TOK.surface : "transparent",
+                borderTop: i === 0 ? "none" : `1px solid ${TOK.border}`,
+              }}
+            >
               <span
-                className="text-[13px] break-all"
+                className="text-[13px] break-all min-w-0"
                 style={{ color: TOK.textPrimary, fontFamily: "var(--font-ct-mono, monospace)" }}
               >
-                {f.file}
+                {f.path}
               </span>
-              <span className="text-[11.5px]" style={{ color: TOK.textMuted }}>
-                {f.kind}
-                {!f.isTest && (
-                  <>
-                    {" · "}
-                    <span style={{ color: TIER_TOK[f.tier] ?? TOK.textMuted }}>{f.tier}</span>
-                    {" · "}
-                    {f.dependents} dependent{f.dependents === 1 ? "" : "s"}
-                    {f.untestedDependents > 0 && ` (${f.untestedDependents} untested)`}
-                  </>
-                )}
-                {f.isTest && " · test"}
+              <span
+                className="text-[11.5px] text-right whitespace-nowrap"
+                style={{ color: f.untested ? TOK.rose : TOK.textMuted }}
+              >
+                {f.untested ? "no test" : f.isTest ? "guarding test" : "covered"}
+                {f.hop > 1 && ` · ${f.hop} hops`}
               </span>
             </div>
-            {!f.isTest && f.testsToRun.length > 0 && (
-              <span className="text-[11.5px] text-right whitespace-nowrap" style={{ color: TOK.textMuted }}>
-                {f.testsToRun.length} test{f.testsToRun.length === 1 ? "" : "s"} to run
-              </span>
-            )}
-          </div>
-        ))}
-        {hidden > 0 && (
-          <div className="px-4 py-3 text-[12px]" style={{ color: TOK.textMuted, borderTop: `1px solid ${TOK.border}` }}>
-            + {hidden} more affected file{hidden === 1 ? "" : "s"}
-          </div>
-        )}
-      </div>
+          ))}
+          {hidden > 0 && (
+            <div className="px-4 py-2.5 text-[12px]" style={{ color: TOK.textMuted, borderTop: `1px solid ${TOK.border}` }}>
+              + {hidden} more file{hidden === 1 ? "" : "s"} reached
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="text-[11.5px] leading-relaxed" style={{ color: TOK.textMuted }}>
         Deterministic — the deletion mapped onto the cached code graph, cited to

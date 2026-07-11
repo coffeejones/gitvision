@@ -10,12 +10,15 @@
 
 import { buildCodeGraph } from "@/lib/codeAnalysis/codeGraph";
 import { findDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
+import { computeBlastRadius } from "@/lib/codeAnalysis/blastRadius";
+import { isTestFile } from "@/lib/codeAnalysis/testCoverage";
 import type { CodeGraph } from "@/lib/codeAnalysis/types";
 import type { CodeAnalysisPlugin } from "@/lib/codeAnalysis/types";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { computeChangeBlast } from "@/lib/changeBlast/compute";
 import type { ChangeBlastReport } from "@/lib/changeBlast/types";
 import { computeWeakSuite } from "@/lib/weakSuite";
+import { deriveTestedFiles } from "@/lib/impact";
 import { runPatch, type PatchLimits } from "./runPatch";
 import type { FileChange, PatchMode } from "./patch";
 import type { ParseLayer } from "./parseCache";
@@ -32,11 +35,27 @@ export interface RequiredAction {
   evidence: { files?: string[]; numbers?: Record<string, number> };
 }
 
+/** A file the change reaches — a dependent of a changed/deleted file, so it's at
+ *  risk of breaking. The Faultline canvas draws the shockwave from these; an
+ *  agent reads them to know WHICH files to check, not just how many. */
+export interface AffectedFile {
+  path: string;
+  /** Hops from the nearest changed file (1 = a direct importer). */
+  hop: number;
+  /** A non-test file that no test reaches — a break with no safety net. */
+  untested: boolean;
+  isTest: boolean;
+  /** In a different module/directory than the changed file it depends on. */
+  crossModule: boolean;
+}
+
 export interface SimulateResult {
   mode: PatchMode;
   /** Present when mode === "patched". */
   report?: ChangeBlastReport;
   requiredActions: RequiredAction[];
+  /** The dependent files the change reaches (empty for non-patched modes). */
+  affectedFiles: AffectedFile[];
   approximations: string[];
   reason?: string;
   baseMismatch?: string[];
@@ -128,6 +147,41 @@ function deriveRequiredActions(
   return actions;
 }
 
+/** The dependent files the change reaches: the incoming blast (who imports/calls
+ *  the changed files) in the BASE graph — for a delete, exactly "what breaks".
+ *  Deduped across changes, keeping the nearest hop, risk-ordered. */
+function computeAffectedFiles(
+  baseGraph: CodeGraph,
+  changes: FileChange[],
+): AffectedFile[] {
+  const changedPaths = new Set(changes.map((c) => c.path));
+  const tested = deriveTestedFiles(baseGraph);
+  const byPath = new Map<string, AffectedFile>();
+  for (const c of changes) {
+    // Only a file present in the base has dependents (an added path breaks nothing).
+    const blast = computeBlastRadius(baseGraph, c.path);
+    for (const e of blast.incoming) {
+      if (changedPaths.has(e.filePath)) continue; // a changed file isn't its own casualty
+      const isTest = isTestFile(e.filePath);
+      const cand: AffectedFile = {
+        path: e.filePath,
+        hop: e.hop,
+        isTest,
+        untested: !isTest && !tested.has(e.filePath),
+        crossModule: e.crossModule,
+      };
+      const prev = byPath.get(e.filePath);
+      if (!prev || cand.hop < prev.hop) byPath.set(e.filePath, cand);
+    }
+  }
+  return [...byPath.values()].sort(
+    (a, b) =>
+      a.hop - b.hop ||
+      Number(b.untested) - Number(a.untested) ||
+      (a.path < b.path ? -1 : a.path > b.path ? 1 : 0),
+  );
+}
+
 /** Simulate a change against a cached parse layer and return the blast verdict +
  *  required actions (or a declared non-patched mode). */
 export async function simulateChange(
@@ -141,6 +195,7 @@ export async function simulateChange(
     return {
       mode: patched.mode,
       requiredActions: [],
+      affectedFiles: [],
       approximations: patched.approximations,
       reason: patched.reason,
       baseMismatch: patched.baseMismatch,
@@ -150,6 +205,13 @@ export async function simulateChange(
   const baseGraph = baseGraphOf(layer);
   const report = computeChangeBlast(asSnapshot(baseGraph), asSnapshot(patched.graph));
   const requiredActions = deriveRequiredActions(report, baseGraph, patched.graph);
+  const affectedFiles = computeAffectedFiles(baseGraph, changes);
 
-  return { mode: "patched", report, requiredActions, approximations: patched.approximations };
+  return {
+    mode: "patched",
+    report,
+    requiredActions,
+    affectedFiles,
+    approximations: patched.approximations,
+  };
 }

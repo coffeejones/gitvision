@@ -111,6 +111,9 @@ export function buildSimulatePayload(r: SimulateResult): Record<string, unknown>
     },
     // Every changed file, risk-ranked (non-test → tier → reach).
     changedFiles: report.changedFiles,
+    // The dependent files the change reaches — WHICH files to check, nearest +
+    // untested first. The concrete "what breaks" list behind the counts.
+    affectedFiles: r.affectedFiles,
     // Non-JS/TS files carry declared approximations (frozen cross-file edges);
     // empty when the whole diff was JS/TS-precise.
     approximations: r.approximations,
