@@ -14,39 +14,18 @@ import type {
 } from "./types";
 import { parseFile } from "./parse";
 import { buildCodeGraph } from "./codeGraph";
+import {
+  DEFAULT_MAX_FILES,
+  MAX_FILE_BYTES,
+  djb2,
+  looksMinifiedByContent,
+  looksVendoredByPath,
+  shouldSkipDir,
+} from "./fileUniverse";
 
-const SKIP_DIRS = new Set([
-  "node_modules",
-  "vendor",
-  "dist",
-  "build",
-  "target",
-  ".git",
-  ".next",
-  ".nuxt",
-  ".svelte-kit",
-  ".output",
-  ".cache",
-  "out",
-  "coverage",
-  ".venv",
-  "venv",
-  "__pycache__",
-  ".idea",
-  ".vscode",
-]);
-
-const MAX_FILE_BYTES = 1_000_000;
-const DEFAULT_MAX_FILES = 5000;
-
-/** djb2 — a fast, stable, dependency-free string hash. Used only for per-file
- *  change detection (same file, base vs head), where a 32-bit collision is
- *  negligible; not a security hash. */
-function hashContent(s: string): string {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-  return h.toString(36);
-}
+// Re-exported so existing importers (and tests) keep resolving these from
+// `analyze`; the definitions now live in fileUniverse (shared with the patcher).
+export { looksVendoredByPath, looksMinifiedByContent };
 
 export interface AnalysisTotals {
   filesScanned: number;
@@ -68,6 +47,13 @@ export interface AnalysisResult {
   totals: AnalysisTotals;
   elapsedMs: number;
   truncated: boolean;
+  /** Which plugin parsed each file — the byPlugin/graph-rebuild input. Exposed
+   *  (with `files` + `extras`) so a caller can persist the parse layer for the
+   *  Shadow-Graph patcher; production used to discard all three. */
+  pluginByFile: Map<string, string>;
+  /** Per-plugin resolver contexts (FileIndex.extras) needed to re-parse a
+   *  changed file's imports without the repo on disk. */
+  extras: Map<string, unknown>;
 }
 
 export interface AnalyzeOptions {
@@ -181,7 +167,7 @@ export async function analyzeDirectory(
   // complexity), so a .kt/.html/.css edit would look unchanged to the
   // change-blast diff. Hashing the raw source closes that gap.
   const contentHashes: Record<string, string> = {};
-  for (const f of sourceFiles) contentHashes[f.rel] = hashContent(f.content);
+  for (const f of sourceFiles) contentHashes[f.rel] = djb2(f.content);
   codeGraph.contentHashes = contentHashes;
 
   const totals: AnalysisTotals = {
@@ -202,6 +188,8 @@ export async function analyzeDirectory(
     totals,
     elapsedMs: Date.now() - start,
     truncated,
+    pluginByFile,
+    extras: fileIndex.extras,
   };
 }
 
@@ -231,7 +219,7 @@ async function walkAndRead(
       }
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
-        if (SKIP_DIRS.has(e.name) || e.name.startsWith(".")) continue;
+        if (shouldSkipDir(e.name)) continue;
         await visit(full);
       } else if (e.isFile()) {
         const ext = path.extname(e.name).slice(1).toLowerCase();
@@ -259,28 +247,3 @@ async function walkAndRead(
   return { files: out, truncated };
 }
 
-/** Recognize files by path that virtually never represent real first-party
- *  source: vendored library copies under tests/assets, fixtures, vendor
- *  directories; explicitly-named .min.js / .bundle.js outputs.
- *  Exported for unit-testing the heuristic — production callers should
- *  rely on walkAndRead applying it automatically. */
-export function looksVendoredByPath(rel: string): boolean {
-  if (/(^|\/)tests?\/(assets|fixtures)\//i.test(rel)) return true;
-  if (/(^|\/)(vendor|vendored|third[_-]?party)\//i.test(rel)) return true;
-  if (/\.min\.(js|mjs|cjs)$/i.test(rel)) return true;
-  if (/[-.]bundle\.(js|mjs|cjs)$/i.test(rel)) return true;
-  return false;
-}
-
-/** Heuristic for minified/bundled content. Real source files have lots of
- *  newlines; minified bundles cram code into one or two enormous lines.
- *  We sample only the first 10KB so this stays cheap on big files.
- *  Exported for unit-testing the heuristic. */
-export function looksMinifiedByContent(content: string): boolean {
-  if (content.length < 50_000) return false;
-  const head = content.slice(0, 10_000);
-  const newlines = (head.match(/\n/g) ?? []).length;
-  if (newlines === 0) return true;
-  const avgLineLen = head.length / (newlines + 1);
-  return avgLineLen > 500;
-}

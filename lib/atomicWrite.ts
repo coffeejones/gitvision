@@ -21,8 +21,20 @@ export async function atomicWriteJson(
   filePath: string,
   data: unknown
 ): Promise<void> {
+  await atomicWriteBuffer(
+    filePath,
+    Buffer.from(JSON.stringify(data, null, 2), "utf-8")
+  );
+}
+
+/** Atomic binary write (temp + rename). Used for gzipped artifacts like the
+ *  Shadow-Graph parse cache where the payload isn't human-readable JSON. */
+export async function atomicWriteBuffer(
+  filePath: string,
+  data: Buffer | Uint8Array
+): Promise<void> {
   const tmp = `${filePath}.tmp.${process.pid}.${Date.now()}.${nanoid(4)}`;
-  await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf-8");
+  await fs.writeFile(tmp, data);
   try {
     await fs.rename(tmp, filePath);
   } catch (err) {
