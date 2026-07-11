@@ -126,9 +126,19 @@ export async function analyzeDirectory(
   /** Records which plugin parsed each file. Drives CodeGraph.byPlugin stats
    *  and lets the debug API/CLI show coverage per language family. */
   const pluginByFile = new Map<string, string>();
+  let parsedSinceYield = 0;
   for (const f of sourceFiles) {
     const plugin = pluginByExt.get(f.ext);
     if (!plugin) continue;
+    // Yield the single Node event loop periodically. tree-sitter parsing is
+    // synchronous, so a big analysis (thousands of files) would otherwise
+    // monopolize the process for seconds — starving every other request,
+    // including an interactive Shadow-Graph simulate, job polling, and SSR.
+    // Batches of 64 keep the overhead negligible while breaking the block up.
+    if (++parsedSinceYield >= 64) {
+      parsedSinceYield = 0;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
     try {
       parsed.push(parseFile(plugin, f, fileIndex));
       pluginByFile.set(f.rel, plugin.name);
