@@ -27,6 +27,7 @@ export interface RequiredAction {
   kind:
     | "load-bearing-touched"
     | "update-guarding-tests"
+    | "guarding-tests-will-break"
     | "no-guarding-tests"
     | "hollow-tests-added"
     | "new-duplicate";
@@ -89,25 +90,48 @@ function deriveRequiredActions(
   report: ChangeBlastReport,
   baseGraph: CodeGraph,
   patchedGraph: CodeGraph,
+  affectedFiles: AffectedFile[],
 ): RequiredAction[] {
   const actions: RequiredAction[] = [];
 
   if (report.loadBearingTouched.length > 0) {
+    // Are the load-bearing files being DELETED (vs modified)? Their guarding
+    // tests then break with them rather than needing an update — reworded below.
+    const lbEntries = report.changedFiles.filter((f) =>
+      report.loadBearingTouched.includes(f.file),
+    );
+    const loadBearingRemoved =
+      lbEntries.length > 0 && lbEntries.every((f) => f.kind === "removed");
+    const breaks = affectedFiles.length;
+
     actions.push({
       kind: "load-bearing-touched",
       severity: "high",
-      detail: `Touches ${report.loadBearingTouched.length} load-bearing wall${report.loadBearingTouched.length === 1 ? "" : "s"}; the change reaches ${report.combinedDependents} dependent file${report.combinedDependents === 1 ? "" : "s"}.`,
+      detail: `Touches ${report.loadBearingTouched.length} load-bearing wall${report.loadBearingTouched.length === 1 ? "" : "s"}; ${breaks} file${breaks === 1 ? "" : "s"} depend on it directly.`,
       evidence: {
         files: report.loadBearingTouched.slice(0, 10),
-        numbers: { walls: report.loadBearingTouched.length, dependentsReached: report.combinedDependents },
+        numbers: { walls: report.loadBearingTouched.length, filesBroken: breaks },
       },
     });
     if (report.testsToRun.length === 0) {
       actions.push({
         kind: "no-guarding-tests",
         severity: "high",
-        detail: "No test file guards the changed load-bearing code — a regression here won't be caught. Add one before merging.",
+        detail: loadBearingRemoved
+          ? "No test guards this load-bearing code — nothing would have caught the breakage before you deleted it."
+          : "No test file guards the changed load-bearing code — a regression here won't be caught. Add one before merging.",
         evidence: {},
+      });
+    } else if (loadBearingRemoved) {
+      const n = report.testsToRun.length;
+      actions.push({
+        kind: "guarding-tests-will-break",
+        severity: "high",
+        detail: `${n} test${n === 1 ? "" : "s"} guard this code — deleting it breaks them too. Remove or rewrite them alongside the change.`,
+        evidence: {
+          files: report.testsToRun.slice(0, 10),
+          numbers: { guardingTests: n },
+        },
       });
     } else if (report.mappedTestsUpdated < report.testsToRun.length) {
       actions.push({
@@ -147,9 +171,13 @@ function deriveRequiredActions(
   return actions;
 }
 
-/** The dependent files the change reaches: the incoming blast (who imports/calls
- *  the changed files) in the BASE graph — for a delete, exactly "what breaks".
- *  Deduped across changes, keeping the nearest hop, risk-ordered. */
+/** The dependent files the change DIRECTLY breaks: the immediate importers/callers
+ *  of the changed files in the BASE graph — for a delete, exactly the files that
+ *  won't compile once it's gone. Deliberately hop-1 only: hop-2+ files import the
+ *  broken file, not the deleted one, so they don't necessarily break. This keeps
+ *  the "N files break" count honest AND consistent with the report's direct
+ *  fan-in (one number everywhere, no "reach vs break" contradiction). Deduped,
+ *  risk-ordered (untested first). */
 function computeAffectedFiles(
   baseGraph: CodeGraph,
   changes: FileChange[],
@@ -159,7 +187,7 @@ function computeAffectedFiles(
   const byPath = new Map<string, AffectedFile>();
   for (const c of changes) {
     // Only a file present in the base has dependents (an added path breaks nothing).
-    const blast = computeBlastRadius(baseGraph, c.path);
+    const blast = computeBlastRadius(baseGraph, c.path, { maxHops: 1 });
     for (const e of blast.incoming) {
       if (changedPaths.has(e.filePath)) continue; // a changed file isn't its own casualty
       const isTest = isTestFile(e.filePath);
@@ -204,8 +232,13 @@ export async function simulateChange(
 
   const baseGraph = baseGraphOf(layer);
   const report = computeChangeBlast(asSnapshot(baseGraph), asSnapshot(patched.graph));
-  const requiredActions = deriveRequiredActions(report, baseGraph, patched.graph);
   const affectedFiles = computeAffectedFiles(baseGraph, changes);
+  const requiredActions = deriveRequiredActions(
+    report,
+    baseGraph,
+    patched.graph,
+    affectedFiles,
+  );
 
   return {
     mode: "patched",

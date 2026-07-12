@@ -66,10 +66,10 @@ describe("simulateChange verdict layer", () => {
     const kinds = r.requiredActions.map((a) => a.kind);
     expect(kinds).toContain("load-bearing-touched");
     expect(kinds).toContain("no-guarding-tests");
-    // the load-bearing action carries its receipts
+    // the load-bearing action carries its receipts (filesBroken = direct dependents)
     const wall = r.requiredActions.find((a) => a.kind === "load-bearing-touched")!;
     expect(wall.severity).toBe("high");
-    expect(wall.evidence.numbers?.dependentsReached).toBeGreaterThan(0);
+    expect(wall.evidence.numbers?.filesBroken).toBeGreaterThan(0);
   });
 
   it("lists the dependent files a delete actually reaches (affectedFiles)", async () => {
@@ -82,6 +82,18 @@ describe("simulateChange verdict layer", () => {
     expect(r.affectedFiles.map((a) => a.path)).toContain("dep0.ts");
     expect(r.affectedFiles.every((a) => a.untested)).toBe(true);
     expect(r.affectedFiles.every((a) => a.hop === 1)).toBe(true);
+  });
+
+  it("warns guarding tests will break when deleting guarded load-bearing code", async () => {
+    const tree = loadBearingRepo();
+    // A test that guards core.ts — deleting core.ts breaks it too.
+    tree["core.test.ts"] = `import { core } from "./core";\nit("doubles", () => { expect(core(2)).toBe(4); });`;
+    const r = await sim(tree, [{ path: "core.ts", newContent: null }]);
+    expect(r.mode).toBe("patched");
+    const kinds = r.requiredActions.map((a) => a.kind);
+    // Delete framing, not the modify-framed "update the rest".
+    expect(kinds).toContain("guarding-tests-will-break");
+    expect(kinds).not.toContain("update-guarding-tests");
   });
 
   it("flags a hollow test case added by the diff", async () => {

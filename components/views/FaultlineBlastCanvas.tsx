@@ -12,7 +12,6 @@ import {
   ReactFlowProvider,
   Background,
   Controls,
-  MiniMap,
   Handle,
   Position,
   MarkerType,
@@ -73,8 +72,8 @@ const AffectedNode = memo(function AffectedNode({ data }: NodeProps) {
         border: `1px solid ${d.untested ? `${TOK.rose}66` : TOK.border}`,
         borderRadius: 8,
         padding: "6px 10px",
-        minWidth: 96,
-        maxWidth: 168,
+        minWidth: 110,
+        maxWidth: 190,
       }}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
@@ -105,17 +104,21 @@ function baseName(p: string): string {
   return p.split("/").pop() || p;
 }
 
+/** Last two path segments — enough to tell apart the many same-named files
+ *  (route.ts, index.ts, page.tsx) a repo has, without a full path. */
+function shortPath(p: string): string {
+  const parts = p.split("/");
+  return parts.length <= 2 ? p : parts.slice(-2).join("/");
+}
+
+const ROWS_PER_COL = 8;
+
 function build(epicenter: string, affected: AffectedFile[]): { nodes: Node[]; edges: Edge[] } {
   const shown = affected.slice(0, NODE_CAP);
-  const byHop = new Map<number, AffectedFile[]>();
-  for (const a of shown) {
-    const arr = byHop.get(a.hop) ?? [];
-    arr.push(a);
-    byHop.set(a.hop, arr);
-  }
-  const hops = [...byHop.keys()].sort((a, b) => a - b);
-  const tallest = Math.max(1, ...[...byHop.values()].map((v) => v.length));
-  const canvasMid = (tallest * ROW_H) / 2;
+  // All casualties are direct (hop 1) — lay them in a grid fan to the right of
+  // the epicenter, wrapping into columns so a wide blast stays legible.
+  const firstColCount = Math.min(ROWS_PER_COL, shown.length || 1);
+  const canvasMid = (firstColCount * ROW_H) / 2;
 
   const nodes: Node[] = [
     {
@@ -128,33 +131,33 @@ function build(epicenter: string, affected: AffectedFile[]): { nodes: Node[]; ed
   ];
   const edges: Edge[] = [];
 
-  for (const h of hops) {
-    const col = byHop.get(h)!;
-    const x = h * COL_W;
-    const startY = canvasMid - (col.length * ROW_H) / 2;
-    col.forEach((a, i) => {
-      nodes.push({
-        id: a.path,
-        type: "affected",
-        position: { x, y: startY + i * ROW_H },
-        data: { label: baseName(a.path), untested: a.untested, isTest: a.isTest },
-        draggable: false,
-      });
-      edges.push({
-        id: `e-${a.path}`,
-        source: "__epicenter",
-        target: a.path,
-        // Untested casualties pulse red — the breaks nothing will catch.
-        animated: a.untested,
-        style: {
-          stroke: a.untested ? TOK.rose : TOK.border,
-          strokeWidth: a.untested ? 1.5 : 1,
-          opacity: a.untested ? 0.9 : 0.5,
-        },
-        markerEnd: { type: MarkerType.ArrowClosed, color: a.untested ? TOK.rose : TOK.border },
-      });
+  shown.forEach((a, i) => {
+    const col = Math.floor(i / ROWS_PER_COL);
+    const row = i % ROWS_PER_COL;
+    const colCount = Math.min(ROWS_PER_COL, shown.length - col * ROWS_PER_COL);
+    const startY = canvasMid - (colCount * ROW_H) / 2;
+    nodes.push({
+      id: a.path,
+      type: "affected",
+      position: { x: (col + 1) * COL_W, y: startY + row * ROW_H },
+      data: { label: shortPath(a.path), untested: a.untested, isTest: a.isTest },
+      draggable: false,
     });
-  }
+    edges.push({
+      id: `e-${a.path}`,
+      source: "__epicenter",
+      target: a.path,
+      // Untested casualties pulse red — the breaks nothing will catch.
+      animated: a.untested,
+      style: {
+        stroke: a.untested ? TOK.rose : TOK.border,
+        strokeWidth: a.untested ? 1.5 : 1,
+        opacity: a.untested ? 0.9 : 0.5,
+      },
+      markerEnd: { type: MarkerType.ArrowClosed, color: a.untested ? TOK.rose : TOK.border },
+    });
+  });
+
   return { nodes, edges };
 }
 
@@ -208,17 +211,6 @@ export function FaultlineBlastCanvas({
         >
           <Background color={TOK.border} gap={22} size={1} />
           <Controls showInteractive={false} />
-          {nodes.length > 20 && (
-            <MiniMap
-              pannable
-              zoomable
-              maskColor="rgba(0,0,0,0.55)"
-              style={{ background: TOK.bg, border: `1px solid ${TOK.border}` }}
-              nodeColor={(n) =>
-                (n.data as { untested?: boolean })?.untested ? TOK.rose : TOK.border
-              }
-            />
-          )}
         </ReactFlow>
       </ReactFlowProvider>
     </div>

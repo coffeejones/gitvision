@@ -39,6 +39,7 @@ const SEVERITY_TOK: Record<RequiredAction["severity"], string> = {
 const ACTION_LABEL: Record<RequiredAction["kind"], string> = {
   "load-bearing-touched": "Load-bearing code touched",
   "update-guarding-tests": "Guarding tests left stale",
+  "guarding-tests-will-break": "Guarding tests will break too",
   "no-guarding-tests": "No guarding test",
   "hollow-tests-added": "Hollow tests added",
   "new-duplicate": "New duplicate code",
@@ -343,6 +344,16 @@ function Verdict({ path, result }: { path: string | null; result: SimulateResult
   const hidden = affected.length - shown.length;
   const untested = affected.filter((a) => a.untested).length;
   const epicenter = path ?? "the file";
+  const base = baseName(epicenter);
+  const noTest = untested > 0 ? `, ${untested} with no test to catch it` : "";
+  // Delete-framed, composed from ONE number (affected.length) so nothing on the
+  // card contradicts — not the modify-framed report.headline.
+  const headline =
+    affected.length === 0
+      ? `Deleting ${base} breaks nothing — no file depends on it.`
+      : report.loadBearingTouched.length > 0
+        ? `${base} is load-bearing — deleting it breaks ${affected.length} file${affected.length === 1 ? "" : "s"}${noTest}.`
+        : `Deleting ${base} breaks ${affected.length} file${affected.length === 1 ? "" : "s"}${noTest}.`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -366,7 +377,7 @@ function Verdict({ path, result }: { path: string | null; result: SimulateResult
           </span>
         </div>
         <p className="text-base font-semibold" style={{ color: TOK.textPrimary, letterSpacing: "-0.01em" }}>
-          {report.headline}
+          {headline}
         </p>
         <div className="flex gap-5 flex-wrap text-[13px]" style={{ color: TOK.textMuted }}>
           <Stat
