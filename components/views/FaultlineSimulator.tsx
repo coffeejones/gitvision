@@ -93,7 +93,7 @@ export function FaultlineSimulator({ sessionId, files, suggested }: Props) {
           setOutcome({
             kind: "error",
             message:
-              (body && body.error) ||
+              (body && (body.message || body.error)) ||
               `Simulation failed (${res.status}). Try again in a moment.`,
           });
           setPhase("error");

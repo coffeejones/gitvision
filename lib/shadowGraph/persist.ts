@@ -13,9 +13,12 @@
 import {
   writeParseCache,
   readParseCache,
+  touchParseCache,
+  universeDigest,
   type ParseLayer,
   type ParseCacheEntry,
 } from "./parseCache";
+import { getWarmLayer, putWarmLayer } from "./layerCache";
 
 /** Bind repo/ref metadata and return the writer callback for analyzeRepo's
  *  `onParseLayer`. writeParseCache keys on the layer's own contentHashes, so the
@@ -38,5 +41,19 @@ export async function loadLayer(snapshot: {
 }): Promise<ParseCacheEntry | null> {
   const hashes = snapshot.codeGraph?.contentHashes;
   if (!hashes || Object.keys(hashes).length === 0) return null;
-  return readParseCache(hashes);
+
+  // Warm cache first (Stage 3b) — skip the disk read + gunzip + Map/Set decode on
+  // repeat simulates. Keyed by the same content digest readParseCache derives.
+  const digest = universeDigest(hashes);
+  const warm = getWarmLayer(digest);
+  if (warm) {
+    // Refresh the disk mtime the warm hit would otherwise skip, so GC keeps the
+    // fallback file alive while the session is still being simulated (3b review).
+    touchParseCache(digest);
+    return warm;
+  }
+
+  const entry = await readParseCache(digest);
+  if (entry) putWarmLayer(digest, entry);
+  return entry;
 }

@@ -96,6 +96,23 @@ describe("simulateChange verdict layer", () => {
     expect(kinds).not.toContain("update-guarding-tests");
   });
 
+  it("is safe to reuse one layer instance across simulates (warm-cache invariant)", async () => {
+    const { layer, cleanup } = await layerOf(loadBearingRepo());
+    try {
+      const change = [{ path: "core.ts", newContent: null }];
+      const r1 = await simulateChange(layer, change, JS);
+      const r2 = await simulateChange(layer, change, JS);
+      expect(r1.mode).toBe("patched");
+      // Same layer instance, run twice → identical. The warm cache (3b) shares
+      // one instance, so patch() must not mutate the layer; if it did, r2 drifts.
+      expect(r2.affectedFiles).toEqual(r1.affectedFiles);
+      expect(r2.requiredActions).toEqual(r1.requiredActions);
+      expect(r2.report).toEqual(r1.report);
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("flags a hollow test case added by the diff", async () => {
     const r = await sim(loadBearingRepo(), [
       // A new test file whose only case asserts nothing meaningful.

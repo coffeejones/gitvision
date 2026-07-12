@@ -159,6 +159,18 @@ export async function readParseCache(
   return entry;
 }
 
+/** Refresh a cached entry's mtime WITHOUT reading it — keeps a still-in-use layer
+ *  fresh against the oldest-mtime-first GC even when it's served from the warm
+ *  cache (Stage 3b), which skips readParseCache's own read-touch. Without this a
+ *  warm-served session's disk file freezes at populate-time mtime and becomes a
+ *  GC victim, so a later warm eviction would spuriously report "layer-unavailable".
+ *  Best-effort, fire-and-forget. */
+export function touchParseCache(digest: string): void {
+  if (!isValidDigest(digest)) return;
+  const now = new Date();
+  void fs.utimes(parseCachePath(digest), now, now).catch(() => {});
+}
+
 /** Enforce the namespace byte budget by evicting oldest-mtime entries first.
  *  Best-effort; safe to call concurrently (deletes are idempotent). */
 export async function gcParseCache(maxBytes = GC_MAX_BYTES): Promise<void> {

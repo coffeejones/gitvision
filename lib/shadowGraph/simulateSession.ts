@@ -11,6 +11,7 @@
 import { ALL_PLUGINS } from "@/lib/codeAnalysis/plugins/all";
 import { loadLayer } from "./persist";
 import { simulateChange, type SimulateResult } from "./simulate";
+import { runGated, ComputeBusyError, type GateLimits } from "./computeGate";
 import type { FileChange } from "./patch";
 import type { PatchLimits } from "./runPatch";
 
@@ -18,7 +19,11 @@ export type SimulateSessionOutcome =
   | { ok: true; result: SimulateResult }
   | {
       ok: false;
-      reason: "no-code-graph" | "layer-unavailable" | "too-large-to-simulate";
+      reason:
+        | "no-code-graph"
+        | "layer-unavailable"
+        | "too-large-to-simulate"
+        | "busy";
       message: string;
     };
 
@@ -31,6 +36,8 @@ export interface SimulateSessionOptions {
    *  of touched files, NOT this whole-repo rebuild, so we bound it by graph size
    *  here until the Stage 3 worker offload lands. Injectable for tests. */
   maxFiles?: number;
+  /** Concurrency-gate limits for the compute (Stage 3a). Injectable for tests. */
+  gate?: GateLimits;
 }
 
 /** Default from the "sub-second" premise: a repo this large no longer rebuilds
@@ -56,31 +63,44 @@ export async function runSimulateForSession(
     };
   }
 
-  const layer = await loadLayer(snapshot);
-  if (!layer) {
-    return {
-      ok: false,
-      reason: "layer-unavailable",
-      message:
-        "The parse layer for this snapshot has expired or wasn't cached (older sessions, or evicted under cache pressure). Refresh the session to rebuild it, then simulate.",
-    };
+  // Everything below is the heavy, O(repo) synchronous compute — run it under the
+  // global concurrency gate so a flood sheds load ("busy") instead of piling up
+  // on the event loop. Cheap outcomes (no layer, too large) return early and
+  // release the slot fast.
+  try {
+    return await runGated<SimulateSessionOutcome>(async () => {
+      const layer = await loadLayer(snapshot);
+      if (!layer) {
+        return {
+          ok: false,
+          reason: "layer-unavailable",
+          message:
+            "The parse layer for this snapshot has expired or wasn't cached (older sessions, or evicted under cache pressure). Refresh the session to rebuild it, then simulate.",
+        };
+      }
+
+      // Bound the per-call whole-repo rebuild by graph size (see maxFiles above).
+      const maxFiles = opts.maxFiles ?? DEFAULT_MAX_SIMULATE_FILES;
+      if (layer.files.length > maxFiles) {
+        return {
+          ok: false,
+          reason: "too-large-to-simulate",
+          message: `This repo (${layer.files.length} analyzed files) is above the interactive-simulation size limit (${maxFiles}). Simulation rebuilds the whole graph per call; that's not sub-second at this scale yet.`,
+        };
+      }
+
+      // Grammars must be loaded before the patch re-parses the touched files.
+      // plugin.load() is idempotent (loads once, then a no-op), so calling it per
+      // request is cheap in a warm process and correct in a cold one.
+      await Promise.all(ALL_PLUGINS.map((p) => p.load()));
+
+      const result = await simulateChange(layer, changes, ALL_PLUGINS, limits);
+      return { ok: true, result };
+    }, opts.gate);
+  } catch (err) {
+    if (err instanceof ComputeBusyError) {
+      return { ok: false, reason: "busy", message: err.message };
+    }
+    throw err;
   }
-
-  // Bound the per-call whole-repo rebuild by graph size (see maxFiles above).
-  const maxFiles = opts.maxFiles ?? DEFAULT_MAX_SIMULATE_FILES;
-  if (layer.files.length > maxFiles) {
-    return {
-      ok: false,
-      reason: "too-large-to-simulate",
-      message: `This repo (${layer.files.length} analyzed files) is above the interactive-simulation size limit (${maxFiles}). Simulation rebuilds the whole graph per call; that's not sub-second at this scale yet.`,
-    };
-  }
-
-  // Grammars must be loaded before the patch re-parses the touched files.
-  // plugin.load() is idempotent (loads once, then a no-op), so calling it per
-  // request is cheap in a warm process and correct in a cold one.
-  await Promise.all(ALL_PLUGINS.map((p) => p.load()));
-
-  const result = await simulateChange(layer, changes, ALL_PLUGINS, limits);
-  return { ok: true, result };
 }

@@ -98,7 +98,15 @@ export async function POST(req: Request, ctx: Ctx) {
   //    server error.
   const out = await runSimulateForSession(snapshot, parsed.changes);
   if (!out.ok) {
-    return NextResponse.json({ ok: false, reason: out.reason, message: out.message });
+    // "busy" = the compute gate shed load; it's transient, so signal a retryable
+    // 503. The other reasons are stable states the UI renders inline (200).
+    const status = out.reason === "busy" ? 503 : 200;
+    return NextResponse.json(
+      { ok: false, reason: out.reason, message: out.message },
+      out.reason === "busy"
+        ? { status, headers: { "Retry-After": "2" } }
+        : { status },
+    );
   }
   // `simulated` is the discriminator a consumer must key on. A non-patched mode
   // (config edit → needs-full-analysis, too-large, base drift) carries no report
