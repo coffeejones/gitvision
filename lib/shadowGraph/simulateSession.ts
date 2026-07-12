@@ -11,7 +11,8 @@
 import { ALL_PLUGINS } from "@/lib/codeAnalysis/plugins/all";
 import { loadLayer } from "./persist";
 import { simulateChange, type SimulateResult } from "./simulate";
-import { runGated, ComputeBusyError, type GateLimits } from "./computeGate";
+import { runGated, ComputeBusyError, gateInFlight, type GateLimits } from "./computeGate";
+import { recordSimulate, recordShed } from "./simulateTelemetry";
 import type { FileChange } from "./patch";
 import type { PatchLimits } from "./runPatch";
 
@@ -94,11 +95,16 @@ export async function runSimulateForSession(
       // request is cheap in a warm process and correct in a cold one.
       await Promise.all(ALL_PLUGINS.map((p) => p.load()));
 
+      // Time just the compute (Stage 3c) — the O(repo) work the worker would
+      // offload — to inform whether the worker is worth building.
+      const t0 = Date.now();
       const result = await simulateChange(layer, changes, ALL_PLUGINS, limits);
+      recordSimulate(Date.now() - t0, layer.files.length, gateInFlight());
       return { ok: true, result };
     }, opts.gate);
   } catch (err) {
     if (err instanceof ComputeBusyError) {
+      recordShed();
       return { ok: false, reason: "busy", message: err.message };
     }
     throw err;
