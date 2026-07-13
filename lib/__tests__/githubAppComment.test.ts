@@ -2,14 +2,31 @@ import { describe, expect, it } from "vitest";
 
 import type { DiffSummary } from "../codeAnalysis/diffAware";
 import type { VerificationSuggestion } from "../codeAnalysis/verificationRules";
+import type { ChangeBlastReport } from "../changeBlast/types";
 import { COMMENT_MARKER, formatPrComment } from "../githubApp/comment";
 import type { PipelineResult } from "../githubApp/pipeline";
+
+const MOCK_BLAST: ChangeBlastReport = {
+  hasGraphs: true,
+  changedFiles: [],
+  wallsTouched: [],
+  loadBearingTouched: [],
+  combinedDependents: 0,
+  functionsAdded: 0,
+  functionsRemoved: 0,
+  testFilesChanged: 0,
+  testsToRun: [],
+  mappedTestsUpdated: 0,
+  verdict: "clear",
+  headline: "No load-bearing code changed.",
+};
 
 interface OkResultOverrides {
   suggestions?: VerificationSuggestion[];
   diffSummary?: DiffSummary;
   headSessionId?: string;
   baseSessionId?: string;
+  blast?: ChangeBlastReport;
 }
 
 function okResult(overrides: OkResultOverrides = {}): PipelineResult {
@@ -17,6 +34,7 @@ function okResult(overrides: OkResultOverrides = {}): PipelineResult {
     ok: true,
     baseSessionId: overrides.baseSessionId ?? "sess-base",
     headSessionId: overrides.headSessionId ?? "sess-head",
+    blast: overrides.blast ?? MOCK_BLAST,
     diffSummary: overrides.diffSummary ?? {
       filesChanged: 3,
       functionsAdded: 5,

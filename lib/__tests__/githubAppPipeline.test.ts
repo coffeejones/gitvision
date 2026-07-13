@@ -62,11 +62,26 @@ const FAKE_BASE_SNAPSHOT = {
 const FAKE_HEAD_SNAPSHOT = {
   codeGraph: FAKE_CODE_GRAPH,
 } as unknown as Awaited<ReturnType<PipelineDeps["analyzeRepo"]>>;
+const FAKE_BLAST = {
+  hasGraphs: true,
+  changedFiles: [],
+  wallsTouched: [],
+  loadBearingTouched: [],
+  combinedDependents: 0,
+  functionsAdded: 0,
+  functionsRemoved: 0,
+  testFilesChanged: 0,
+  testsToRun: [],
+  mappedTestsUpdated: 0,
+  verdict: "clear" as const,
+  headline: "No load-bearing code changed.",
+};
 
 interface MockOverrides {
   parseRepoUrl?: PipelineDeps["parseRepoUrl"];
   analyzeRepo?: PipelineDeps["analyzeRepo"];
   computeDiff?: PipelineDeps["computeDiff"];
+  computeChangeBlast?: PipelineDeps["computeChangeBlast"];
   evaluateVerificationRules?: PipelineDeps["evaluateVerificationRules"];
   createSession?: PipelineDeps["createSession"];
 }
@@ -89,6 +104,11 @@ function makeDeps(overrides: MockOverrides = {}): PipelineDeps {
       (vi.fn(
         () => FAKE_DIFF,
       ) as unknown as PipelineDeps["computeDiff"]),
+    computeChangeBlast:
+      overrides.computeChangeBlast ??
+      (vi.fn(
+        () => FAKE_BLAST,
+      ) as unknown as PipelineDeps["computeChangeBlast"]),
     evaluateVerificationRules:
       overrides.evaluateVerificationRules ??
       (vi.fn(

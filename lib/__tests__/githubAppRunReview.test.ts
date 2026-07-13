@@ -3,8 +3,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestEvent } from "../githubApp/events/pullRequest";
 import type { PipelineResult } from "../githubApp/pipeline";
 import { type RunReviewDeps, runReview } from "../githubApp/runReview";
+import type { ChangeBlastReport } from "../changeBlast/types";
 
 // ---------------- fixtures ----------------
+
+const MOCK_BLAST: ChangeBlastReport = {
+  hasGraphs: true,
+  changedFiles: [],
+  wallsTouched: [],
+  loadBearingTouched: [],
+  combinedDependents: 0,
+  functionsAdded: 0,
+  functionsRemoved: 0,
+  testFilesChanged: 0,
+  testsToRun: [],
+  mappedTestsUpdated: 0,
+  verdict: "clear",
+  headline: "No load-bearing code changed.",
+};
 
 function makeEvent(
   overrides: Partial<{
@@ -46,6 +62,7 @@ function makeOkPipelineResult(): PipelineResult {
       functionsModified: 1,
       netComplexityDelta: 0,
     },
+    blast: MOCK_BLAST,
     suggestions: [],
     durationMs: 100,
   };
@@ -95,8 +112,12 @@ function makeDeps(
           commentId: 100,
         },
     ) as unknown as RunReviewDeps["postPrComment"],
+    postCheckRun: vi.fn(
+      async () => ({ action: "created", checkRunId: 200 }),
+    ) as unknown as RunReviewDeps["postCheckRun"],
     pipelineDeps: {} as RunReviewDeps["pipelineDeps"],
     posterDeps: {} as RunReviewDeps["posterDeps"],
+    checkDeps: {} as RunReviewDeps["checkDeps"],
     concurrency: {
       tryAcquireConcurrencySlot: vi.fn(
         () => overrides.tryAcquireResult ?? true,

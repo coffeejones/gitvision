@@ -24,6 +24,8 @@ import { computeDiff } from "../codeAnalysis/diffAware";
 import type { DiffSummary } from "../codeAnalysis/diffAware";
 import { evaluateVerificationRules } from "../codeAnalysis/verificationRules";
 import type { VerificationSuggestion } from "../codeAnalysis/verificationRules";
+import { computeChangeBlast } from "../changeBlast/compute";
+import type { ChangeBlastReport } from "../changeBlast/types";
 import { analyzeRepo, parseRepoUrl } from "../github";
 import { createSession } from "../storage";
 
@@ -33,6 +35,7 @@ export interface PipelineDeps {
   parseRepoUrl: typeof parseRepoUrl;
   analyzeRepo: typeof analyzeRepo;
   computeDiff: typeof computeDiff;
+  computeChangeBlast: typeof computeChangeBlast;
   evaluateVerificationRules: typeof evaluateVerificationRules;
   createSession: typeof createSession;
 }
@@ -44,6 +47,7 @@ export const defaultPipelineDeps: PipelineDeps = {
   parseRepoUrl,
   analyzeRepo,
   computeDiff,
+  computeChangeBlast,
   evaluateVerificationRules,
   createSession,
 };
@@ -62,6 +66,9 @@ export type PipelineResult =
       baseSessionId: string;
       headSessionId: string;
       diffSummary: DiffSummary;
+      /** The deterministic blast verdict for the PR — drives the Check Run
+       *  conclusion (The Gate) and the receipt. */
+      blast: ChangeBlastReport;
       suggestions: VerificationSuggestion[];
       durationMs: number;
     }
@@ -193,16 +200,19 @@ export async function runAnalysisPipeline(
     };
   }
 
-  // 6. Diff + rules. Pure functions — should never throw, but wrap
-  // defensively for robustness.
+  // 6. Diff + rules + blast. Pure functions — should never throw, but wrap
+  // defensively for robustness. computeChangeBlast reuses the two code graphs
+  // already in hand, so the gate verdict costs nothing extra to fetch.
   let diff;
   let suggestions;
+  let blast: ChangeBlastReport;
   try {
     diff = deps.computeDiff(baseSnapshot.codeGraph, headSnapshot.codeGraph);
     suggestions = deps.evaluateVerificationRules(
       { diff },
       { maxResults: 3 },
     );
+    blast = deps.computeChangeBlast(baseSnapshot, headSnapshot);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[github-app pipeline] diff/rules failed ${logCtx}: ${msg}`);
@@ -216,7 +226,7 @@ export async function runAnalysisPipeline(
 
   const durationMs = elapsed();
   console.log(
-    `[github-app pipeline] done ${logCtx} suggestions=${suggestions.length} duration=${durationMs}ms baseSession=${baseSession.id} headSession=${headSession.id}`,
+    `[github-app pipeline] done ${logCtx} verdict=${blast.verdict} suggestions=${suggestions.length} duration=${durationMs}ms baseSession=${baseSession.id} headSession=${headSession.id}`,
   );
 
   return {
@@ -224,6 +234,7 @@ export async function runAnalysisPipeline(
     baseSessionId: baseSession.id,
     headSessionId: headSession.id,
     diffSummary: diff.summary,
+    blast,
     suggestions,
     durationMs,
   };

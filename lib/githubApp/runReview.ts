@@ -30,6 +30,13 @@ import {
   type PostCommentResult,
   type PosterDeps,
 } from "./poster";
+import {
+  defaultCheckRunDeps,
+  gateOutput,
+  postCheckRun,
+  type CheckRunDeps,
+  type PostCheckResult,
+} from "./checkRun";
 
 export interface ConcurrencyDeps {
   tryAcquireConcurrencySlot: typeof tryAcquireConcurrencySlot;
@@ -40,8 +47,10 @@ export interface RunReviewDeps {
   runAnalysisPipeline: typeof runAnalysisPipeline;
   formatPrComment: typeof formatPrComment;
   postPrComment: typeof postPrComment;
+  postCheckRun: typeof postCheckRun;
   pipelineDeps: PipelineDeps;
   posterDeps: PosterDeps;
+  checkDeps: CheckRunDeps;
   concurrency: ConcurrencyDeps;
   /** Used to build the "Full analysis" link in the comment footer.
    *  Default reads REPOBARON_PUBLIC_URL env var, falling back to
@@ -54,8 +63,10 @@ export function defaultRunReviewDeps(): RunReviewDeps {
     runAnalysisPipeline,
     formatPrComment,
     postPrComment,
+    postCheckRun,
     pipelineDeps: defaultPipelineDeps,
     posterDeps: defaultPosterDeps,
+    checkDeps: defaultCheckRunDeps,
     concurrency: {
       tryAcquireConcurrencySlot,
       releaseConcurrencySlot,
@@ -71,6 +82,7 @@ export type RunReviewResult =
       ok: true;
       pipelineResult: PipelineResult;
       postResult: PostCommentResult;
+      checkResult?: PostCheckResult;
     }
   | {
       ok: false;
@@ -145,11 +157,32 @@ export async function runReview(
       deps.posterDeps,
     );
 
+    // 4. Post the Gate check run on the head commit. Best-effort — a missing
+    //    checks:write permission just skips it, leaving the comment intact.
+    //    Only runs on pipeline success (needs the blast); body!=null already
+    //    implies pipelineResult.ok, but narrow it explicitly for the type.
+    let checkResult: PostCheckResult | undefined;
+    if (pipelineResult.ok) {
+      const mergeUrl = `${deps.workspaceBaseUrl}/session/${pipelineResult.headSessionId}/merge`;
+      const output = gateOutput(pipelineResult.blast, { mergeUrl });
+      checkResult = await deps.postCheckRun(
+        {
+          installationId,
+          owner,
+          repo: repoName,
+          headSha: event.pull_request.head.sha,
+          output,
+          detailsUrl: mergeUrl,
+        },
+        deps.checkDeps,
+      );
+    }
+
     console.log(
-      `[github-app runReview] done ${logCtx} pipeline=${pipelineResult.ok ? "ok" : "fail"} post=${postResult.action}`,
+      `[github-app runReview] done ${logCtx} pipeline=${pipelineResult.ok ? "ok" : "fail"} post=${postResult.action} check=${checkResult?.action ?? "—"}`,
     );
 
-    return { ok: true, pipelineResult, postResult };
+    return { ok: true, pipelineResult, postResult, checkResult };
   } finally {
     // ALWAYS release the slot — pipeline error, format null, post
     // failure, even uncaught exceptions slipping past the inner

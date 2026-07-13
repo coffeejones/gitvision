@@ -14,6 +14,7 @@ import type {
   Severity,
   VerificationSuggestion,
 } from "../codeAnalysis/verificationRules";
+import type { ChangeBlastReport } from "../changeBlast/types";
 import type { PipelineResult } from "./pipeline";
 
 /**
@@ -51,12 +52,15 @@ export function formatPrComment(
 
   const baseUrl = ctx.workspaceBaseUrl.replace(/\/+$/, "");
   const analysisLink = `${baseUrl}/session/${result.headSessionId}`;
+  const verdictLine = renderVerdict(result.blast);
   const diffLine = `**Diff summary:** ${renderDiffSummary(result.diffSummary)}`;
 
   let body: string;
   if (result.suggestions.length === 0) {
     body = [
       "## CodeTrawl Review",
+      "",
+      verdictLine,
       "",
       diffLine,
       "",
@@ -65,6 +69,8 @@ export function formatPrComment(
   } else {
     const lines: string[] = [
       "## CodeTrawl Review",
+      "",
+      verdictLine,
       "",
       diffLine,
       "",
@@ -87,6 +93,21 @@ export function formatPrComment(
 }
 
 // ---------- helpers ----------
+
+const VERDICT: Record<
+  ChangeBlastReport["verdict"],
+  { emoji: string; label: string }
+> = {
+  clear: { emoji: "✅", label: "Clear" },
+  review: { emoji: "🟡", label: "Review closely" },
+  "high-risk": { emoji: "🔴", label: "High blast" },
+};
+
+/** The Gate verdict line — the deterministic pass/warn/fail, headlined. */
+function renderVerdict(report: ChangeBlastReport): string {
+  const v = VERDICT[report.verdict];
+  return `${v.emoji} **${v.label}** — ${report.headline}`;
+}
 
 const SEVERITY_EMOJI: Record<Severity, string> = {
   critical: "🔴",
