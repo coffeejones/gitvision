@@ -115,6 +115,9 @@ function makeDeps(
     postCheckRun: vi.fn(
       async () => ({ action: "created", checkRunId: 200 }),
     ) as unknown as RunReviewDeps["postCheckRun"],
+    issueReceipt: vi.fn(
+      async () => null,
+    ) as unknown as RunReviewDeps["issueReceipt"],
     pipelineDeps: {} as RunReviewDeps["pipelineDeps"],
     posterDeps: {} as RunReviewDeps["posterDeps"],
     checkDeps: {} as RunReviewDeps["checkDeps"],

@@ -17,6 +17,7 @@
 import { z } from "zod";
 
 import { deleteSessionsByInstallation } from "../../storage";
+import { deleteReceiptsByInstallation } from "../../receiptStore";
 import type { HandleResult } from "../webhook";
 
 const SUPPORTED_ACTIONS = new Set(["created", "deleted"]);
@@ -42,10 +43,12 @@ export type InstallationEvent = z.infer<typeof InstallationEventSchema>;
 
 export interface InstallationHandlerDeps {
   deleteSessionsByInstallation: typeof deleteSessionsByInstallation;
+  deleteReceiptsByInstallation: typeof deleteReceiptsByInstallation;
 }
 
 export const defaultInstallationHandlerDeps: InstallationHandlerDeps = {
   deleteSessionsByInstallation,
+  deleteReceiptsByInstallation,
 };
 
 export async function handleInstallationEvent(
@@ -76,14 +79,17 @@ export async function handleInstallationEvent(
     // uninstalled = they don't want us holding their analysis.
     try {
       const count = await deps.deleteSessionsByInstallation(installation.id);
+      // Receipts carry the same installation tag — remove them too, so the
+      // owner's PR/commit metadata stops being served from /r/[id].
+      const receipts = await deps.deleteReceiptsByInstallation(installation.id);
       console.log(
-        `[github-app] installation ${logCtx} deleted_sessions=${count}`,
+        `[github-app] installation ${logCtx} deleted_sessions=${count} deleted_receipts=${receipts}`,
       );
     } catch (err) {
-      // deleteSessionsByInstallation is supposed to never throw, but
-      // defense-in-depth: log and continue so the webhook still 200s.
+      // Both deleters are supposed to never throw, but defense-in-depth: log and
+      // continue so the webhook still 200s.
       console.error(
-        `[github-app] session GC failed ${logCtx}:`,
+        `[github-app] uninstall GC failed ${logCtx}:`,
         err,
       );
     }

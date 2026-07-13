@@ -32,6 +32,9 @@ export interface FormatContext {
   /** Base URL of the workspace (e.g. "https://codetrawl.com"). Used
    *  to build the "Full analysis" link. Trailing slash is normalized. */
   workspaceBaseUrl: string;
+  /** Permalink to the signed Merge Receipt for this commit, when one was
+   *  issued (absent if RECEIPT_SECRET isn't configured). */
+  receiptUrl?: string;
 }
 
 /**
@@ -83,10 +86,16 @@ export function formatPrComment(
     body = lines.join("\n");
   }
 
+  const links = [
+    `[Full analysis ↗](${analysisLink})`,
+    `[Merge confidence ↗](${analysisLink}/merge)`,
+  ];
+  if (ctx.receiptUrl) links.push(`[Signed receipt ↗](${ctx.receiptUrl})`);
+
   const footer = [
     "",
     "---",
-    `[Full analysis ↗](${analysisLink}) · [Merge confidence ↗](${analysisLink}/merge) · _Signals computed deterministically — no LLM in this comment_`,
+    `${links.join(" · ")} · _Signals computed deterministically — no LLM in this comment_`,
   ].join("\n");
 
   return `${COMMENT_MARKER}\n${body}${footer}\n`;

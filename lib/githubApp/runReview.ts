@@ -37,6 +37,7 @@ import {
   type CheckRunDeps,
   type PostCheckResult,
 } from "./checkRun";
+import { issueReceipt } from "../receiptStore";
 
 export interface ConcurrencyDeps {
   tryAcquireConcurrencySlot: typeof tryAcquireConcurrencySlot;
@@ -48,6 +49,7 @@ export interface RunReviewDeps {
   formatPrComment: typeof formatPrComment;
   postPrComment: typeof postPrComment;
   postCheckRun: typeof postCheckRun;
+  issueReceipt: typeof issueReceipt;
   pipelineDeps: PipelineDeps;
   posterDeps: PosterDeps;
   checkDeps: CheckRunDeps;
@@ -64,6 +66,7 @@ export function defaultRunReviewDeps(): RunReviewDeps {
     formatPrComment,
     postPrComment,
     postCheckRun,
+    issueReceipt,
     pipelineDeps: defaultPipelineDeps,
     posterDeps: defaultPosterDeps,
     checkDeps: defaultCheckRunDeps,
@@ -134,11 +137,40 @@ export async function runReview(
       deliveryId,
     );
 
+    // 1b. Issue a signed Merge Receipt for this exact commit. Best-effort:
+    //     null when RECEIPT_SECRET is unset, and a swallowed catch on any other
+    //     failure — a receipt hiccup must never break the check/comment path.
+    let receiptUrl: string | undefined;
+    if (pipelineResult.ok) {
+      try {
+        const b = pipelineResult.blast;
+        const receipt = await deps.issueReceipt({
+          repo: `${owner}/${repoName}`,
+          prNumber,
+          headSha: event.pull_request.head.sha,
+          verdict: b.verdict,
+          loadBearingWalls: b.loadBearingTouched.length,
+          filesReached: b.combinedDependents,
+          guardingTestsTotal: b.testsToRun.length,
+          guardingTestsUpdated: b.mappedTestsUpdated,
+          headSessionId: pipelineResult.headSessionId,
+        }, { installationId });
+        receiptUrl = receipt
+          ? `${deps.workspaceBaseUrl}/r/${receipt.receipt.id}`
+          : undefined;
+      } catch (err) {
+        console.error(
+          `[github-app runReview] receipt issuance failed ${logCtx}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+
     // 2. Render the comment body. Returns null on pipeline failure —
     // we skip posting in that case (silent failure beats noisy failure
     // for v1 per design).
     const body = deps.formatPrComment(pipelineResult, {
       workspaceBaseUrl: deps.workspaceBaseUrl,
+      receiptUrl,
     });
     if (!body) {
       console.log(
@@ -164,7 +196,7 @@ export async function runReview(
     let checkResult: PostCheckResult | undefined;
     if (pipelineResult.ok) {
       const mergeUrl = `${deps.workspaceBaseUrl}/session/${pipelineResult.headSessionId}/merge`;
-      const output = gateOutput(pipelineResult.blast, { mergeUrl });
+      const output = gateOutput(pipelineResult.blast, { mergeUrl, receiptUrl });
       checkResult = await deps.postCheckRun(
         {
           installationId,

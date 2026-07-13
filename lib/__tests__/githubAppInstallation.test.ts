@@ -38,6 +38,11 @@ function makeDeps(
       (vi.fn(
         async () => 0,
       ) as unknown as InstallationHandlerDeps["deleteSessionsByInstallation"]),
+    deleteReceiptsByInstallation:
+      override.deleteReceiptsByInstallation ??
+      (vi.fn(
+        async () => 0,
+      ) as unknown as InstallationHandlerDeps["deleteReceiptsByInstallation"]),
   };
 }
 
