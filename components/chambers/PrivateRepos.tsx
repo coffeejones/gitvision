@@ -129,6 +129,11 @@ export function PrivateRepos({ analyzedRepos }: { analyzedRepos: Set<string> }) 
     }
   }
 
+  // Dormant in the free-phase: `needsUpgrade` is set only when /api/github/repos
+  // returns `upgrade: true`, which it does only when canAccess(privateRepos) is
+  // false — now always true for every tier (see lib/pricing.ts). Kept intact so
+  // re-gating private repos is a one-line flag flip; this wall would then apply
+  // again. Unreachable while the flag is open.
   if (needsUpgrade) {
     return (
       <div

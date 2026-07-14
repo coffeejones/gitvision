@@ -26,7 +26,7 @@ import { CheckoutCTA } from "@/components/pricing/CheckoutCTA";
 export const metadata: Metadata = {
   title: "Pricing — CodeTrawl",
   description:
-    "Start free on public repos. Upgrade for unlimited private repos, a grade on every pull request, and team access — one deterministic sweep, computed not generated.",
+    "The whole tool is free on one repo — private repos, AI briefing and Faultline change-simulation included. Upgrade to keep unlimited repos, a grade on every pull request, and regression watch — one deterministic sweep, computed not generated.",
 };
 
 export const dynamic = "force-dynamic";
@@ -50,12 +50,12 @@ export default async function PricingPage({
       <PricingNav loggedIn={loggedIn} />
       <main className="wrap price-page">
         <header className="price-hero">
-          <span className="eyebrow">Pricing · your first sweep is free</span>
+          <span className="eyebrow">Pricing · the whole tool is free on one repo</span>
           <h1>Pick your depth.</h1>
           <p className="lede">
-            Sweep any public repo for free. Upgrade for unlimited private
-            repos, a grade on every pull request, and access for the whole
-            team.
+            Sweep any repo — public or private — with every panel unlocked,
+            free. Upgrade to keep more than one repo on the go, put a grade on
+            every pull request, and watch for regressions.
           </p>
         </header>
 
@@ -172,14 +172,20 @@ function PricingCards({
 // ─── Feature comparison grid (reuses the .compare table styling) ───────────
 
 function FeatureComparison() {
+  // Free-phase: the whole analysis toolset is free (the top block, all ✓ on
+  // Free). The paid axis is persistence + scale + recurring-cost monitoring
+  // (the lower block). Mirrors the flags in lib/pricing.ts — keep in sync.
   const rows: Array<{ label: string; values: [boolean, boolean, boolean] }> = [
     { label: "Public repo analysis", values: [true, true, true] },
-    { label: "Private repo analysis", values: [false, true, true] },
-    { label: "Saved surveys", values: [false, true, true] },
+    { label: "Private repo analysis", values: [true, true, true] },
+    { label: "AI Briefing + the read", values: [true, true, true] },
+    { label: "Architecture diagrams", values: [true, true, true] },
+    { label: "Structural diff between snapshots", values: [true, true, true] },
+    { label: "Refactor guidance", values: [true, true, true] },
+    { label: "Test-quality report", values: [true, true, true] },
+    { label: "Faultline change-simulation", values: [true, true, true] },
+    { label: "Unlimited saved repos", values: [false, true, true] },
     { label: "Unlimited refreshes", values: [false, true, true] },
-    { label: "AI Briefing + the read", values: [false, true, true] },
-    { label: "Architecture diagrams", values: [false, true, true] },
-    { label: "Structural diff between snapshots", values: [false, true, true] },
     { label: "Grade watch on PRs", values: [false, true, true] },
     { label: "Unlimited PR repos", values: [false, false, true] },
     { label: "Team workspaces", values: [false, false, true] },

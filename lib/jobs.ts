@@ -172,10 +172,12 @@ async function runCreateSession(job: Job): Promise<void> {
     }),
   });
 
-  // Tier backstop: analyzing PRIVATE repos is a Plus feature. The Private-repo
-  // tab is gated at the listing level, but a Free user could paste a private
-  // repo URL into the public input directly — enforce it here, where the
-  // repo's visibility is finally known, rather than saving the session.
+  // Tier backstop: private-repo analysis is gated on the `privateRepos` flag
+  // (open to every tier in the free-phase — see lib/pricing.ts). Kept as the
+  // enforcement point so re-gating is a one-line flag flip: a user could
+  // otherwise paste a private repo URL into the public input directly, so we
+  // check here, where the repo's visibility is finally known, rather than at
+  // save time. Dormant while the flag is open.
   if (snapshot.repo.private && job.input.userId) {
     const allowed = await canAccess(job.input.userId, "privateRepos");
     if (!allowed) {

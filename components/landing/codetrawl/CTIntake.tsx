@@ -177,7 +177,7 @@ export function CTIntake({ value, onChange }: Props) {
         {error ?? (pending ? "Analysis running — this can take about a minute." : "")}
       </div>
       <div className="intake-micro">
-        public repos · free account · zero config · survey in ~60s
+        public or private · free account · zero config · survey in ~60s
       </div>
       <div className="samples">
         <span>or see a live demo —</span>

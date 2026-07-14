@@ -16,6 +16,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import {
   TIER_CONFIG,
+  TIER_ORDER,
   type TierConfig,
   type TierLimits,
 } from "@/lib/pricing";
@@ -117,8 +118,13 @@ export function tierDisplayName(tier: Tier): string {
  *  UpgradePrompt to render "Upgrade to Plus" or "Upgrade
  *  to Pro" depending on what's needed. */
 export function minimumTierFor(feature: BooleanFeature): Tier {
-  if (TIER_CONFIG["standing-docket"].limits[feature]) return "standing-docket";
-  if (TIER_CONFIG["full-bench"].limits[feature]) return "full-bench";
+  // Lowest tier first (TIER_ORDER = Free → Plus → Pro). A feature the
+  // free-phase grants (see pricing.ts) must report "open-case", not the next
+  // paid tier — otherwise an upsell would offer to "upgrade" for something
+  // that's already free.
+  for (const tier of TIER_ORDER) {
+    if (TIER_CONFIG[tier].limits[feature]) return tier;
+  }
   // Shouldn't happen in practice — every feature flag should be
   // unlocked at some tier. Fallback to Pro as the safest answer.
   return "full-bench";

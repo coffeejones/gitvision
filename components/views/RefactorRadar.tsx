@@ -242,12 +242,12 @@ function FileRow({
               </span>
               {!entitled ? (
                 <Link
-                  href="/pricing"
+                  href={`/login?next=${encodeURIComponent(`/session/${sessionId}/refactor`)}`}
                   className="inline-flex items-center gap-1.5 text-[12px] self-start rounded px-2 py-1 transition hover:opacity-80"
                   style={{ background: TOK.surfaceElevated, color: TOK.textSecondary }}
                 >
                   <Lock size={11} /> See which tests guard this change —{" "}
-                  <span style={{ color: TOK.accent }}>Plus</span>
+                  <span style={{ color: TOK.accent }}>free, sign in</span>
                 </Link>
               ) : f.testsToRun && f.testsToRun.length > 0 ? (
                 <div className="flex flex-col gap-0.5">

@@ -23,7 +23,7 @@ import { isDemoSession } from "@/lib/demoSessions";
 import { TOK } from "@/lib/sessionTheme";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
 import { HealthPanel } from "@/components/HealthPanel";
-import { UpgradePrompt } from "@/components/billing/UpgradePrompt";
+import { SignInToUnlock } from "@/components/billing/SignInToUnlock";
 
 export const dynamic = "force-dynamic";
 
@@ -96,17 +96,10 @@ export default async function InsightsRoute({
             />
           </>
         ) : (
-          <UpgradePrompt
+          <SignInToUnlock
             featureName="AI Insights"
-            requiredTier="standing-docket"
-            context="The deterministic Health Summary on your Overview page is free forever. AI Briefing + Health Check grade — the prose layer that explains the signals in plain English — needs Plus."
-            unlockedFeatures={[
-              "AI Briefing — 150-word repo profile generated from your codebase",
-              "Health Check grade — three-column \"what works / dig deeper / open questions\" grounded in 20 signals",
-              "Structural diff between snapshots (see what changed semantically)",
-              "Auto-extracted Architecture diagrams",
-              "Unlimited saved sessions + private repos",
-            ]}
+            redirectTo={`/session/${id}/insights`}
+            context="The deterministic Health Summary on your Overview page is free to everyone. The AI Briefing + Health Check grade — the prose layer that explains the signals in plain English — is free with any account."
           />
         )}
       </div>

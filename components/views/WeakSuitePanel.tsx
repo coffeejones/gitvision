@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronRight, Lock, FlaskConical, Dot } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import {
@@ -65,6 +66,7 @@ export function WeakSuitePanel({
   entitled: boolean;
 }) {
   const { counts, totals } = summary;
+  const pathname = usePathname();
 
   return (
     <div className="flex flex-col gap-6">
@@ -130,7 +132,7 @@ export function WeakSuitePanel({
       {/* Per-file breakdown (Plus). */}
       {!entitled ? (
         <Link
-          href="/pricing"
+          href={`/login?next=${encodeURIComponent(pathname)}`}
           className="rounded-xl p-6 flex flex-col items-start gap-2 transition hover:opacity-90"
           style={{ background: TOK.surface, border: `1px dashed ${TOK.border}` }}
         >
@@ -142,8 +144,8 @@ export function WeakSuitePanel({
           </span>
           <span className="text-[13px]" style={{ color: TOK.textSecondary }}>
             The per-file, per-test-case breakdown — which specific tests assert nothing, and
-            the exact matchers we count as smoke — is a{" "}
-            <span style={{ color: TOK.accent }}>Plus</span> feature.
+            the exact matchers we count as smoke — is{" "}
+            <span style={{ color: TOK.accent }}>free with any account</span>. Sign in to see it.
           </span>
         </Link>
       ) : files && files.length > 0 ? (

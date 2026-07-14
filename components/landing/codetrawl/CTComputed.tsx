@@ -60,8 +60,7 @@ export function CTComputed() {
         <CTReveal className="rv-block">
           <p className="trust-line">
             Repos are cloned in memory, read once, and discarded — we keep the
-            findings, never your files. Public repos are free; private repos
-            run on paid plans.
+            findings, never your files. Public or private, your sweep is free.
           </p>
           <a href="#analyze" className="ct-cta-ghost">
             Analyze a repo

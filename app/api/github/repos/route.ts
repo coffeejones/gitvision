@@ -29,9 +29,11 @@ export async function GET(req: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  // Tier gate: analyzing private repos is a Plus feature, so Free users
-  // shouldn't even see their private repo list. Signal `upgrade` (200) so the
-  // Private tab can render an upgrade prompt instead of the connect prompt.
+  // Tier gate: private-repo listing is gated on the `privateRepos` flag (open
+  // to every tier in the free-phase — see lib/pricing.ts), so this branch is
+  // dormant while the flag is open. Kept intact so re-gating is a one-line flag
+  // flip: it signals `upgrade` (200) so the Private tab renders an upgrade
+  // prompt instead of the connect prompt.
   if (!(await canAccess(userId, "privateRepos"))) {
     return NextResponse.json({
       connected: true,

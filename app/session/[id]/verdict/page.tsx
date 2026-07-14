@@ -59,9 +59,11 @@ export default async function VerdictRoute({
   const recommendations = generateRecommendations(latest);
   const sessionBase = `/session/${session.id}`;
 
-  // Tier gate: AI bench statement is a Plus tier feature (same gate
-  // as /insights). Free users still see the deterministic verdict
-  // hero + department rulings — only the AI prose layer is hidden.
+  // Gate: the AI bench statement is free with any account (same gate as
+  // /insights — aiInsights, open to every tier in the free-phase), but the
+  // generation costs tokens, so anonymous/logged-out viewers don't trigger it.
+  // They still see the deterministic verdict hero + department rulings — only
+  // the AI prose layer is hidden until they sign in (free).
   const authSession = await getAuthSession();
   const isDemo = isDemoSession(id);
   const hasAi =
@@ -75,10 +77,10 @@ export default async function VerdictRoute({
   //
   // CRITICAL: scope `narrative` to ENTITLED viewers (hasAi), not merely "a
   // cached narrative exists". A public session's cache is seeded the first
-  // time any paid user views it; reading it unconditionally would leak the
-  // Plus-only bench statement to free/anonymous viewers of that same public
+  // time any signed-in user views it; reading it unconditionally would leak the
+  // account-gated bench statement to anonymous viewers of that same public
   // session (the JudgeStatement render keys off `narrative`). So a non-entitled
-  // viewer gets null here regardless of what's cached.
+  // (logged-out) viewer gets null here regardless of what's cached.
   let narrative = hasAi ? (latest.verdictNarrative ?? null) : null;
   // Generate only for a paid (non-demo) viewer on a cache miss, and only if the
   // global daily AI budget allows — same kill-switch the POST AI routes honor,

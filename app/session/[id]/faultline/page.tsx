@@ -15,7 +15,7 @@ import { TOK } from "@/lib/sessionTheme";
 import { computeRefactorSafety } from "@/lib/refactorSafety";
 import type { CodeGraph } from "@/lib/codeAnalysis/types";
 import { FaultlineSimulator } from "@/components/views/FaultlineSimulator";
-import { UpgradePrompt } from "@/components/billing/UpgradePrompt";
+import { SignInToUnlock } from "@/components/billing/SignInToUnlock";
 import { EmptyPanel } from "@/components/EmptyPanel";
 
 export const dynamic = "force-dynamic";
@@ -71,9 +71,9 @@ export default async function FaultlinePage({
 
       <div id="screenshot-target">
         {!entitled ? (
-          <UpgradePrompt
+          <SignInToUnlock
             featureName="the Faultline Simulator"
-            requiredTier="standing-docket"
+            redirectTo={`/session/${session.id}/faultline`}
             context="Simulate a change before you make it — and see what it breaks, deterministically."
           />
         ) : !canSimulate ? (

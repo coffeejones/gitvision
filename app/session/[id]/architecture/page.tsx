@@ -28,7 +28,7 @@ import {
 } from "@/lib/intelligence/classDiagram";
 import { TOK } from "@/lib/sessionTheme";
 import { ArchitecturePanel } from "@/components/views/ArchitecturePanel";
-import { UpgradePrompt } from "@/components/billing/UpgradePrompt";
+import { SignInToUnlock } from "@/components/billing/SignInToUnlock";
 
 export const dynamic = "force-dynamic";
 
@@ -130,17 +130,10 @@ export default async function ArchitectureRoute({
             currentScope={currentScope}
           />
         ) : (
-          <UpgradePrompt
+          <SignInToUnlock
             featureName="Architecture diagrams"
-            requiredTier="standing-docket"
+            redirectTo={`/session/${id}/architecture`}
             context="Auto-extracted class diagrams from your codebase's AST — classes, interfaces, method relationships, ready to paste into mermaid.live or your README."
-            unlockedFeatures={[
-              "Class diagrams rendered automatically from your codebase",
-              "Scope-filter to focus on one folder at a time",
-              "Copy as Mermaid source — paste anywhere",
-              "AI Briefing + Health Check grade",
-              "Unlimited saved sessions + private repos",
-            ]}
           />
         )}
       </div>

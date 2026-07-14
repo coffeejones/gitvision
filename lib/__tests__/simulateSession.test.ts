@@ -14,11 +14,11 @@ import { TIER_CONFIG } from "../pricing";
 import { minimumTierFor } from "../billing/gates";
 
 describe("simulate feature gating", () => {
-  it("is Plus-gated: off on Free, on for Plus + Pro", () => {
-    expect(TIER_CONFIG["open-case"].limits.simulate).toBe(false);
+  it("is free-phase: unlocked on every tier (paid axis is multi-repo, not features)", () => {
+    expect(TIER_CONFIG["open-case"].limits.simulate).toBe(true);
     expect(TIER_CONFIG["standing-docket"].limits.simulate).toBe(true);
     expect(TIER_CONFIG["full-bench"].limits.simulate).toBe(true);
-    expect(minimumTierFor("simulate")).toBe("standing-docket");
+    expect(minimumTierFor("simulate")).toBe("open-case");
   });
 });
 
