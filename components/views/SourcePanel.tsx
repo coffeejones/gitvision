@@ -12,21 +12,31 @@ import { FileSearch, Loader2, TriangleAlert } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import { buildFileTree, defaultExpanded } from "@/lib/fileTree";
 import { highlightToLines, type CodeLines } from "@/lib/highlight";
+import type { FileChips, FnMarker } from "@/lib/sourceAnnotations";
 import { SourceTree } from "./SourceTree";
 import { CodeView } from "./CodeView";
 
 type LoadState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "loaded"; path: string; lines: CodeLines; lang: string | null; aligned: boolean }
+  | {
+      status: "loaded";
+      path: string;
+      lines: CodeLines;
+      lang: string | null;
+      aligned: boolean;
+      functions: FnMarker[];
+    }
   | { status: "error"; message: string };
 
 export function SourcePanel({
   sessionId,
   files,
+  chips,
 }: {
   sessionId: string;
   files: string[];
+  chips: Record<string, FileChips>;
 }) {
   const tree = useMemo(() => buildFileTree(files), [files]);
   const defaultOpen = useMemo(() => defaultExpanded(tree), [tree]);
@@ -59,10 +69,18 @@ export function SourcePanel({
           content: string;
           ext: string;
           aligned: boolean;
+          functions?: FnMarker[];
         };
         const { lines, lang } = await highlightToLines(data.content, data.ext);
         if (!cancelled) {
-          setState({ status: "loaded", path: data.path, lines, lang, aligned: data.aligned });
+          setState({
+            status: "loaded",
+            path: data.path,
+            lines,
+            lang,
+            aligned: data.aligned,
+            functions: data.functions ?? [],
+          });
         }
       } catch (err) {
         if (!cancelled) {
@@ -105,7 +123,14 @@ export function SourcePanel({
         {state.status === "loading" && <Centered icon={<Loader2 size={22} className="animate-spin" />} title="Fetching source…" body="Live from GitHub, pinned to the commit we analyzed." />}
         {state.status === "error" && <Centered icon={<TriangleAlert size={24} />} title="Couldn't load this file" body={state.message} tone="warn" />}
         {state.status === "loaded" && (
-          <CodeView path={state.path} lines={state.lines} aligned={state.aligned} lang={state.lang} />
+          <CodeView
+            path={state.path}
+            lines={state.lines}
+            aligned={state.aligned}
+            lang={state.lang}
+            chips={chips[state.path] ?? null}
+            functions={state.functions}
+          />
         )}
       </div>
     </div>

@@ -46,7 +46,19 @@ function session(over?: { private?: boolean }): Session {
           private: over?.private ?? false,
         },
         analyzedRef: "abc123",
-        codeGraph: { contentHashes: { [PATH]: djb2(SRC) } },
+        codeGraph: {
+          contentHashes: { [PATH]: djb2(SRC) },
+          functions: [
+            { filePath: PATH, name: "x", startRow: 0, endRow: 0, complexity: 1 },
+            { filePath: "other.ts", name: "y", startRow: 0, endRow: 0, complexity: 1 },
+          ],
+          imports: [],
+          calls: [],
+          fileComplexity: {},
+          filesByExt: {},
+          byPlugin: {},
+          generatedAt: "2026-07-14T00:00:00.000Z",
+        },
       },
     ],
   } as unknown as Session;
@@ -119,13 +131,16 @@ describe("GET source — fetch + integrity", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ path: PATH, ref: "abc123", content: SRC, aligned: true, ext: "ts" });
+    // Function markers ride along, scoped to this file only.
+    expect(body.functions).toEqual([{ name: "x", startRow: 0, endRow: 0, complexity: 1 }]);
   });
 
-  it("returns aligned:false when the file drifted since analysis", async () => {
+  it("returns aligned:false and DROPS markers when the file drifted", async () => {
     octoWith("export const x = 2;\n"); // different content → different djb2
     const body = await (await call()).json();
     expect(body.aligned).toBe(false);
     expect(body.content).toBe("export const x = 2;\n"); // still returned
+    expect(body.functions).toEqual([]); // line-anchored markers would be wrong
   });
 
   it("pins the fetch to analyzedRef", async () => {

@@ -14,6 +14,7 @@ import { TOK } from "@/lib/sessionTheme";
 import { SourcePanel } from "@/components/views/SourcePanel";
 import { SignInToUnlock } from "@/components/billing/SignInToUnlock";
 import { EmptyPanel } from "@/components/EmptyPanel";
+import { computeFileChips } from "@/lib/sourceAnnotations";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +81,7 @@ export default async function SourcePage({
           }
         />
       ) : (
-        <SourcePanel sessionId={session.id} files={files} />
+        <SourcePanel sessionId={session.id} files={files} chips={computeFileChips(current)} />
       )}
     </main>
   );

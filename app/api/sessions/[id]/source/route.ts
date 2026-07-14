@@ -28,6 +28,7 @@ import {
   type SourceOctokit,
   type FetchSourceError,
 } from "@/lib/sourceView";
+import { functionMarkersFor } from "@/lib/sourceAnnotations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,13 +87,14 @@ export async function GET(req: Request, ctx: Ctx) {
   }
 
   const snap = session.snapshots[session.snapshots.length - 1];
-  const hashes = snap?.codeGraph?.contentHashes;
-  if (!snap || !hashes) {
+  const cg = snap?.codeGraph;
+  if (!snap || !cg?.contentHashes) {
     return NextResponse.json(
       { error: "This snapshot has no analyzed files. Refresh to re-analyze." },
       { status: 404 },
     );
   }
+  const hashes = cg.contentHashes;
 
   // 5. Path must be a real analyzed file. This bounds the fetch to files we
   //    actually parsed (no arbitrary GitHub path) AND blocks traversal.
@@ -139,13 +141,17 @@ export async function GET(req: Request, ctx: Ctx) {
     );
   }
 
-  // 8. Prove alignment; never store the source.
+  // 8. Prove alignment; never store the source. Function markers ride along —
+  //    a cheap per-path filter (the O(graph) file chips come from the page).
+  //    Drop them when the file drifted: their line numbers would be wrong.
+  const aligned = isAligned(result.content, expectedHash);
   return NextResponse.json({
     path,
     ref,
     ext: result.ext,
     bytes: result.bytes,
     content: result.content,
-    aligned: isAligned(result.content, expectedHash),
+    aligned,
+    functions: aligned ? functionMarkersFor(cg, path) : [],
   });
 }
