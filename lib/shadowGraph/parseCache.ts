@@ -16,9 +16,9 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { gzip, gunzip } from "node:zlib";
 import { promisify } from "node:util";
-import { atomicWriteBuffer } from "@/lib/atomicWrite";
-import { djb2 } from "@/lib/codeAnalysis/fileUniverse";
-import type { ParsedFile } from "@/lib/codeAnalysis/types";
+import { atomicWriteBuffer } from "../atomicWrite";
+import { djb2 } from "../codeAnalysis/fileUniverse";
+import type { ParsedFile } from "../codeAnalysis/types";
 import { encodeForJson, decodeFromJson } from "./serialize";
 
 const gzipAsync = promisify(gzip);

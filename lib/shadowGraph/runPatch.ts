@@ -23,7 +23,7 @@
 //    review's own guidance is to bound + measure first, then add the worker only
 //    if the data demands it.
 
-import type { CodeAnalysisPlugin } from "@/lib/codeAnalysis/types";
+import type { CodeAnalysisPlugin } from "../codeAnalysis/types";
 import { patch, type FileChange, type PatchResult } from "./patch";
 import type { ParseLayer } from "./parseCache";
 

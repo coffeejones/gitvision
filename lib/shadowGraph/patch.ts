@@ -14,14 +14,14 @@
 // from-scratch analysis. The cache read and the worker/timeout wrapper live
 // elsewhere.
 
-import { buildCodeGraph } from "@/lib/codeAnalysis/codeGraph";
-import { parseFile } from "@/lib/codeAnalysis/parse";
-import { djb2, isAnalyzableFile } from "@/lib/codeAnalysis/fileUniverse";
+import { buildCodeGraph } from "../codeAnalysis/codeGraph";
+import { parseFile } from "../codeAnalysis/parse";
+import { djb2, isAnalyzableFile } from "../codeAnalysis/fileUniverse";
 import type {
   CodeAnalysisPlugin,
   CodeGraph,
   ParsedFile,
-} from "@/lib/codeAnalysis/types";
+} from "../codeAnalysis/types";
 import type { ParseLayer } from "./parseCache";
 import { buildStubIndex } from "./stubIndex";
 

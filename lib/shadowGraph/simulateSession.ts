@@ -8,7 +8,7 @@
 // the session predates the patcher), it degrades explicitly rather than silently
 // doing something slower or wrong.
 
-import { ALL_PLUGINS } from "@/lib/codeAnalysis/plugins/all";
+import { ALL_PLUGINS } from "../codeAnalysis/plugins/all";
 import { loadLayer } from "./persist";
 import { simulateChange, type SimulateResult } from "./simulate";
 import { runGated, ComputeBusyError, gateInFlight, type GateLimits } from "./computeGate";

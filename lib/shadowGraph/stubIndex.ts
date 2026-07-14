@@ -6,7 +6,7 @@
 // file against the whole repo needs just the (patched) path list + extras, with
 // no other file contents in memory.
 
-import type { FileIndex, SourceFile } from "@/lib/codeAnalysis/types";
+import type { FileIndex, SourceFile } from "../codeAnalysis/types";
 
 function extOf(rel: string): string {
   const dot = rel.lastIndexOf(".");

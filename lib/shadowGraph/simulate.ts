@@ -8,17 +8,17 @@
 // /simulate route) call this. The base graph is rebuilt from the unchanged layer
 // so base and patched come from the SAME buildCodeGraph pass — a clean diff.
 
-import { buildCodeGraph } from "@/lib/codeAnalysis/codeGraph";
-import { findDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
-import { computeBlastRadius } from "@/lib/codeAnalysis/blastRadius";
-import { isTestFile } from "@/lib/codeAnalysis/testCoverage";
-import type { CodeGraph } from "@/lib/codeAnalysis/types";
-import type { CodeAnalysisPlugin } from "@/lib/codeAnalysis/types";
-import type { AnalysisSnapshot } from "@/lib/types";
-import { computeChangeBlast } from "@/lib/changeBlast/compute";
-import type { ChangeBlastReport } from "@/lib/changeBlast/types";
-import { computeWeakSuite } from "@/lib/weakSuite";
-import { deriveTestedFiles } from "@/lib/impact";
+import { buildCodeGraph } from "../codeAnalysis/codeGraph";
+import { findDuplicateGroups } from "../codeAnalysis/duplicates";
+import { computeBlastRadius } from "../codeAnalysis/blastRadius";
+import { isTestFile } from "../codeAnalysis/testCoverage";
+import type { CodeGraph } from "../codeAnalysis/types";
+import type { CodeAnalysisPlugin } from "../codeAnalysis/types";
+import type { AnalysisSnapshot } from "../types";
+import { computeChangeBlast } from "../changeBlast/compute";
+import type { ChangeBlastReport } from "../changeBlast/types";
+import { computeWeakSuite } from "../weakSuite";
+import { deriveTestedFiles } from "../impact";
 import { runPatch, type PatchLimits } from "./runPatch";
 import type { FileChange, PatchMode } from "./patch";
 import type { ParseLayer } from "./parseCache";
