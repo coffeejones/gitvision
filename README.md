@@ -1,50 +1,52 @@
-# RepoJury
+# CodeTrawl
 
-> Know your code before you touch it.
+> See to the bottom of any codebase — and know what a change breaks before you make it.
 
-A codebase intelligence layer for the AI-augmented era — workspace
-dashboards plus a GitHub PR-bot, sharing one deterministic signal
-pipeline across 7 languages. Paste a URL, get blast radius, untested
-hotspots, structural duplicates, and architecture diagrams in under
-20 seconds.
+CodeTrawl is a **deterministic verification layer for code in the AI era.** Paste
+a public GitHub repo and get blast radius, untested hotspots, structural
+duplicates, a dependency-health panel, and architecture diagrams in under 20
+seconds — then *simulate* a change and get a cited, sub-second verdict on what it
+would break. The same engine backs a human workspace, a GitHub PR gate with a
+signed merge receipt, and an MCP server that gives AI agents a conscience.
 
-![RepoJury alpha](https://img.shields.io/badge/status-alpha-amber)
+Every claim is grounded in a signal computed server-side from the real import +
+call graph. **No LLM in any verdict — zero hallucination room.**
+
+![CodeTrawl status: live](https://img.shields.io/badge/status-live-brightgreen)
 ![Next.js 16](https://img.shields.io/badge/next.js-16-black)
 ![React 19](https://img.shields.io/badge/react-19-blue)
-![Tests](https://img.shields.io/badge/tests-1000%2B%20passing-emerald)
+![Tests](https://img.shields.io/badge/tests-1700%2B%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-purple)
 
-![RepoJury landing — paste any URL or click any of 4 instant demos. Sticky nav, real findings, and a public roadmap below.](doc/screenshots/Landing.png)
+![CodeTrawl landing — paste any URL or open an instant demo; a deterministic verdict, not a query interface.](doc/screenshots/CT_Landing.png)
 
-## Why RepoJury
+## Why CodeTrawl
 
-GitHub Insights gives you commit counts and a contributor list. RepoJury
-gives you the questions an engineering manager actually asks:
+GitHub Insights gives you commit counts and a contributor list. CodeTrawl answers
+the questions an engineer — or an AI agent — actually needs before touching code:
 
-- **What breaks if I change this file?** — three-hop blast radius across
-  the call graph, computed from tree-sitter AST parses.
-- **Where's the tech debt nobody's looking at?** — structural duplicate
-  detection that spotted 36 copies of one ARM rewrite pattern in
-  `golang/go/src/cmd`.
-- **What complex code is the test suite ignoring?** — per-function test
-  coverage estimated by walking the call graph from test files into
-  production code. No external coverage tool needed.
-- **What changed since I last looked?** — a story-driven refresh banner,
-  not a metadata diff.
-
-Every AI claim is grounded in a deterministic signal computed
-server-side. Zero hallucination room.
+- **What breaks if I change this file?** — three-hop blast radius across the call
+  graph, from real tree-sitter AST parses.
+- **What breaks if I *delete* this?** — the **Faultline Simulator** rebuilds the
+  graph live from your change and shows the casualties, the untested ones flagged.
+- **Where's the tech debt nobody's looking at?** — structural duplicate detection
+  that spotted 36 copies of one ARM rewrite pattern in `golang/go/src/cmd`.
+- **What complex code is the test suite ignoring?** — per-function coverage from
+  walking the call graph, no external coverage tool needed.
+- **Does this PR ship a regression nothing catches?** — a deterministic **Gate**
+  on every pull request, with a signed, verifiable **merge receipt**.
 
 ## Try it
 
-👉 **[codetrawl.com](https://codetrawl.com)** — 4 pre-analyzed demo repos load instantly. No signup, no setup.
+👉 **[codetrawl.com](https://codetrawl.com)** — pre-analyzed demo repos load
+instantly. No signup, no setup.
 
 Or run it locally:
 
 ```bash
 # 1. Install
-git clone https://github.com/coffeejones/repobaron
-cd repobaron
+git clone https://github.com/coffeejones/gitvision
+cd gitvision
 npm install
 
 # 2. Recommended: GitHub token (60 → 5000 req/hr)
@@ -63,172 +65,132 @@ npm run dev
 
 Node 20.9+ required (tested on 25.x).
 
-## Two surfaces, one signal layer
+## Four surfaces, one signal layer
 
-RepoJury delivers the same analysis through two different surfaces:
+The same deterministic analysis, delivered four ways:
 
-**Workspace** — `codetrawl.com`. Paste a URL, get an explorable
-dashboard with blast radius, untested hotspots, near-duplicates,
-architecture diagrams, dependency health, and a red / yellow / green
-verdict grounded in 17 deterministic signals. The destination for
-deep-dive analysis and "understand this repo before I work on it"
-workflows.
+**Workspace** — `codetrawl.com`. Paste a URL, get an explorable dashboard: blast
+radius, untested hotspots, near-duplicates, architecture diagrams, dependency
+health, a security/evidence desk, and a red / yellow / green verdict grounded in
+deterministic signals.
 
-**PR-bot** — a native GitHub App. Install on a public repo and every
-new PR gets one grounded review comment with the top verification
-signals from the diff. Same pipeline as the workspace, packaged for
-review-time. Zero LLM cost, deterministic-only, find-or-update so
-repeated `synchronize` events don't stack duplicate comments.
+**Faultline Simulator** — pick a file, simulate a change, and watch what it
+breaks — a live blast shockwave rebuilt from the cached code graph in under a
+second. Deterministic, cited to real edges.
 
-Both surfaces share the same diff-aware AST analysis, the same
-calibrated rules engine, the same plugin architecture. Improvements
-to one improve the other.
+**The Gate** — a native GitHub App. Install on a public repo and every PR gets a
+**Check Run** driven by the blast verdict (clear / review / high-risk) plus a
+grounded comment and a **signed merge receipt** — a verifiable record that the
+gate ran on that exact commit.
 
-![Public roadmap section on codetrawl.com — recently-shipped items in green tags, upcoming work in muted tags](doc/screenshots/Roadmap.png)
+**For agents (MCP)** — an MCP server that hands an AI coding agent the blast
+radius and a `simulate_change` conscience: propose a diff, get a stop/go gate
+*before* committing.
+
+Every surface shares the same diff-aware AST analysis, the same calibrated rules
+engine, the same plugin architecture. Improvements to one improve them all.
 
 ## What you'll find
 
-Each session opens as a workspace with a persistent sidebar — every
-tab is its own URL, screenshot-worthy alone.
+Each session opens as a workspace with a persistent sidebar — every tab is its
+own URL, screenshot-worthy alone.
 
-![Overview — workspace shell with quick-look cards into each tab](doc/screenshots/Overview.png)
+![Overview — the workspace shell with quick-look cards into each surface](doc/screenshots/CT_Overview.png)
 
-**Canvas** — Folder frames + file cards laid out as a packed map. Color
-by file type or by dominant author. Time-scrub to see the codebase
-evolve commit-by-commit.
+**Canvas** — folder frames + file cards as a packed map. Color by file type or
+dominant author; time-scrub to watch the codebase evolve commit-by-commit.
 
-**Imports** — File-to-file import graph as a brick-stagger layered
-layout. Click a file to isolate its 1-hop neighborhood.
+**Imports** — the file-to-file import graph as a layered brick-stagger layout.
+Click a file to isolate its neighborhood.
 
-**Code** — The AST-based analysis hero. Three insight panels above
-twin lists:
+**Code** — the AST analysis hero. Blast radius (file + function level), untested
+hotspots (most-complex production functions with no direct test caller), and
+near-duplicates (structural AST-hash groups, worst tech-debt first).
 
-- **Blast radius** — file mode shows incoming + outgoing dependency
-  hops. Click a function to zoom into function-level: callers and
-  callees.
-- **Untested hotspots** — most-complex production functions with no
-  direct test caller. Per-file coverage badges scaled by ratio.
-- **Near-duplicates** — structural AST-hash groups. Sorted by
-  `groupSize × maxComplexity` so the worst tech-debt finds rise to
-  the top.
+![Code — blast radius, untested hotspots, and structural near-duplicates](doc/screenshots/CT_Code.png)
 
-![Code tab — Near-Duplicates panel surfaces structurally identical functions](doc/screenshots/NearDuplicate.png)
+**Faultline** — the change simulator. Pick a file, see the deterministic blast +
+the required-actions "conscience" + the affected-file shockwave.
 
-**Architecture** — Auto-generated class diagrams from the AST.
-First inhabitant of the Architecture tab — class hierarchies,
-field types, method signatures rendered as boxes you can pan around.
-Across all 7 AST-supported languages, no manual UML, no setup.
+**Refactor** — "Can I touch this?" Every file ranked by how safely you can change
+it: blast reach, untested dependents, complexity, duplication. Named tiers, with
+the evidence on every row.
 
-**Packages** — Multi-ecosystem dependency health (npm, Cargo, PyPI).
-Vulnerable / outdated / deprecated packages with direct CVE links.
+**Architecture** — auto-generated class diagrams from the AST across all
+AST-supported languages. No manual UML, no setup.
 
-**PRs** — Sankey of cycle-time flow: Opened → Outcome → time-to-merge
-bucket. Plus an inline PR-bot install callout for "want this analysis
-on every new PR?".
+**Packages** — multi-ecosystem dependency health (npm, Cargo, PyPI). Vulnerable /
+outdated / deprecated packages with direct CVE links.
 
-Plus, on the Overview page:
+![Packages — multi-ecosystem dependency health with CVE links](doc/screenshots/CT_Packages.png)
 
-- **Refresh banner** — "Since your last visit": story-driven headline
-  ("1 new contributor joined — colinhacks led with 6 commits") + the
+**Security / Evidence** — secret + risky-pattern scans, CI-hardening checks, an
+SBOM export (CycloneDX / SPDX), and a one-zip evidence pack.
+
+![Security review — secret scan, risky patterns, and CI-hardening checks](doc/screenshots/CT_SecurityReview.png)
+
+**PRs** — a Sankey of cycle-time flow, plus a Merge Confidence read for
+PR-analysis sessions.
+
+Plus, on the Overview and Insights pages:
+
+- **Refresh banner** — "Since your last visit": a story-driven headline + the
   metric chips behind it.
+- **AI briefing** — a grounded repo profile + a three-column health verdict
+  ("What works / Where to dig deeper / Open questions"), each bullet mapped to a
+  deterministic signal.
 
-  ![Refresh banner — story-driven diff between snapshots](doc/screenshots/Refresh.png)
+![Insights — AI briefing + health verdict, grounded in deterministic signals](doc/screenshots/CT_Insights.png)
 
-- **AI summary** — 150-200 word repo profile. Grounded in computed
-  facts; no hallucinated claims.
-- **AI health verdict** — three-column "What works / Where to dig
-  deeper / Open questions". Each bullet maps to one of 17
-  deterministic signals computed server-side.
+- **Final grade** — the whole analysis distilled to one honest, computed verdict.
 
-  ![Health Check — three-column verdict grounded in deterministic signals](doc/screenshots/HealthCheck.png)
+![Final grade — the deterministic verdict for the repo](doc/screenshots/CT_FinalGrade.png)
 
-**Cmd+K palette** — keyboard navigation across pages, files, and
-functions. Linear / Raycast / Sublime pattern — type to filter, arrows
-to navigate, Enter to jump.
+**Cmd+K palette** — keyboard navigation across pages, files, and functions.
 
-## GitHub App (PR-bot)
+## The Gate (GitHub App)
 
-The PR-bot half of the two surfaces above — installable on any public
-repo, posts a single grounded review comment on every PR. Same signal
-layer as the workspace, packaged for the PR-review workflow.
+Install the app on a public repo and every PR is analyzed at the base + head SHA.
+Same signal layer as the workspace, packaged for review-time.
 
-### What you get
+- **A Check Run** on the merge box, from the deterministic blast verdict: clear →
+  success, review → neutral, high-risk → failure. A red conclusion doesn't block
+  on its own — the repo decides via branch protection.
+- **A grounded comment** leading with the verdict + the top verification signals
+  from the diff. No LLM in the comment; every claim cites a deterministic signal.
+- **A signed merge receipt** — an HMAC-SHA256 certificate that the gate ran on
+  that exact commit, permalinked and independently verifiable at
+  `/api/receipts/verify`.
+- **Find-or-update** so re-runs on `synchronize` don't stack duplicate comments;
+  a fresh check per commit.
 
-A comment like this on every PR:
+Guardrails: public repos only, ≤100 MB, per-installation rate + concurrency caps.
+On uninstall, every session and receipt the bot created is deleted within seconds.
 
-```markdown
-## RepoJury Review
+Webhook handler at `app/api/github/webhook/route.ts`; business logic in
+`lib/githubApp/`. Heavy work runs via Next's `after()` so the webhook responds in
+<100 ms regardless of analysis duration.
 
-**Diff summary:** 3 files changed · functions: 5 added, 2 removed, 7 modified · net complexity +4
+## For agents — the Conscience over MCP
 
-### Suggested verification (top 3)
+CodeTrawl exposes the code graph as an **MCP server** so Claude Code, Cursor, or
+anything that speaks MCP can ask *"what breaks if I change this?"* — and verify a
+change **before** it commits. Verdicts, not raw graph dumps.
 
-1. 🔴 **CRITICAL** — load_dotenv in `src/flask/cli.py` grew by +4 cyclomatic complexity (9 → 13). No tests in the same module were changed.
-2. 🟡 **WARNING** — _path_is_relative_to was removed from `src/flask/sansio/scaffold.py` (original complexity 2). Verify no callers still depend on it.
-3. 🟢 **INFO** — Sizeable PR — touches 23 files with 109 function-level changes.
+Nine tools, headlined by:
 
----
-[Full analysis ↗](https://codetrawl.com/session/…) · _Signals computed deterministically — no LLM in this comment_
-```
+- **`analyze_repo`** — parse a repo → a session id (always first).
+- **`blast_radius`** — what breaks if you change a file or function.
+- **`simulate_change`** — simulate a proposed diff → a deterministic blast + a
+  pass/block **conscience gate**. The pre-commit check.
 
-When nothing crosses the calibrated thresholds, you still get a short
-positive comment (`Nothing notable on this PR ✅`) so reviewers know we
-ran. No silent skips.
+…plus `untested_hotspots`, `find_duplicates`, `signals`, `compare_sessions`,
+`analyze_diff`, and `review_changes`.
 
-### How it works
-
-1. You install the app on a public repo
-2. On `pull_request.opened` / `synchronize` / `reopened` /
-   `ready_for_review`, the app analyzes the base + head SHAs
-3. `computeDiff` + the rules engine produce up to 3 prioritized
-   verification suggestions
-4. Comment posted via the installation token, find-or-update so
-   re-runs on the same PR don't stack duplicates
-
-Same pipeline as the workspace — diff-aware AST analysis across 7
-languages via tree-sitter, computed server-side. **No LLM in the
-comment**: every claim maps to a deterministic signal with citable
-evidence.
-
-### Install
-
-🚧 **Currently in private beta.** v1.0 install ceremony will land at
-`https://github.com/apps/codetrawl-pr` once we've
-validated noise rate on 2-3 friendly real-world repos. If you want
-to be one of those early installs, [open an issue](https://github.com/coffeejones/repobaron/issues).
-
-### Limits & guardrails
-
-| Guardrail | Cap | Why |
-|---|---|---|
-| Repo size | 100 MB | Mega-repos eat bandwidth + clone time + disk |
-| PRs per installation per hour | 10 | Protects against flood (e.g. force-push of 50 branches) |
-| Concurrent analyses per installation | 2 | Per-process memory ceiling on Railway |
-| Public repos only | yes | Private-repo support deferred to v2 (with OAuth) |
-
-### Privacy
-
-- We **clone your repo** read-only to analyze it. Analysis runs on
-  Railway, results are stored as JSON sessions
-- Sessions created by the PR-bot are **public-by-default** — the
-  "Full analysis" link is a public read-only URL. Don't install the
-  app on a repo whose code shouldn't be analyzed publicly.
-- **No LLM** sees the diff. The comment text is rendered from
-  deterministic rules, not generated.
-- When you **uninstall**, every session the bot created for that
-  installation is deleted within seconds (`installation.deleted` →
-  GC sweep). Workspace-created sessions for the same repo are NOT
-  affected — they came from a different consent flow.
-
-### Architecture
-
-The whole PR-bot lives in the same Next.js app as the workspace.
-Webhook handler at `app/api/github/webhook/route.ts`, business logic
-in `lib/githubApp/`. Heavy work runs via Next's `after()` so the
-webhook response ships in <100ms regardless of analysis duration.
-
-Design + decisions: [eval/strategy/github-app-skeleton-2026-05.md](./eval/strategy/github-app-skeleton-2026-05.md).
-End-to-end validation: [eval/strategy/github-app-validation-2026-05.md](./eval/strategy/github-app-validation-2026-05.md).
+And a first-class **`conscience` prompt** that codifies the loop: propose →
+`simulate_change` → resolve the blocking gate (untested regressions, hollow
+tests) or justify it → re-simulate until `gate.pass`. See
+[codetrawl.com/agents](https://codetrawl.com/agents).
 
 ## Language coverage
 
@@ -242,78 +204,79 @@ End-to-end validation: [eval/strategy/github-app-validation-2026-05.md](./eval/s
 | PHP          | `php`            | ✅ AST  | ✅        | ✅    | ✅         | ✅         |
 | Ruby         | `ruby`           | ✅ AST  | ✅        | ✅    | ✅         | partial    |
 | Kotlin       | `regex-fallback` | ✅      | —         | —     | —          | —          |
-| HTML / CSS   | `regex-fallback` | render-target only — Spring MVC controllers, etc.    |
 
-Kotlin migration is blocked upstream
-([`tree-sitter-wasms@0.1.13` ABI mismatch with `web-tree-sitter@0.26.8`](https://github.com/tree-sitter/tree-sitter/discussions/2912)).
-Until a compatible WASM grammar appears, Kotlin gets imports only.
+The Shadow-Graph fast path (Faultline + `simulate_change`) is golden-equivalent
+for JS/TS; other languages get declared approximations. Kotlin gets imports only
+until a compatible WASM grammar ships.
 
 ## Architecture (light)
 
 ```
 app/                        Next.js App Router
 ├─ page.tsx                 Landing (adaptive: marketing or workspace)
-├─ session/[id]/page.tsx    Session dashboard
+├─ session/[id]/            Workspace tabs (Overview, Code, Faultline, …)
+├─ r/[id]/                  Public signed merge-receipt certificate
 └─ api/
-   ├─ sessions/             POST /sessions, /refresh, /summary, /health
-   └─ github/webhook/       PR-bot webhook receiver
+   ├─ sessions/[id]/simulate  The change-simulation endpoint
+   ├─ receipts/verify         Trustless receipt verification
+   └─ github/webhook/         The Gate — PR webhook receiver
 
 components/                 React Flow canvases + panels + UI primitives
 lib/
 ├─ codeAnalysis/            AST pipeline — plugins/ per language + WASM runtime
+├─ shadowGraph/             Sub-second incremental patcher + simulate + gate
+├─ changeBlast/             Base-vs-head blast report engine
 ├─ depsHealth/              Multi-ecosystem dep-health — ecosystems/ per registry
-├─ githubApp/               PR-bot pipeline (webhook, auth, events, poster)
-├─ signals.ts               17 deterministic health detectors (no AI)
-├─ healthAnalysis.ts        Constrained Claude narrative grounded in signals
-├─ aiSummary.ts             Claude repo profile generator
-├─ rateLimit.ts             Per-IP / per-installation rate limiter
-├─ aiBudget.ts              Daily Anthropic call kill-switch
+├─ githubApp/               The Gate — webhook, pipeline, check run, comment
+├─ receipt.ts              HMAC-signed merge receipts
+├─ signals.ts               Deterministic health detectors (no AI)
 └─ storage.ts               File-based sessions (.gitvision/sessions/*.json)
+
+mcp/                        MCP server — tools + the conscience prompt
 ```
 
-Full architecture, design decisions, and a per-version changelog live
-in [PROGRESS.md](./PROGRESS.md) — required reading if you're
-contributing or branching ideas off the codebase.
+Full design decisions and a per-version history live in
+[PROGRESS.md](./PROGRESS.md) and [CHANGELOG.md](./CHANGELOG.md).
 
 ## Tech stack
 
 - **Next.js 16** App Router (Turbopack dev, webpack prod)
 - **React 19** + TypeScript 5 (strict)
 - **Tailwind CSS v4** via `@tailwindcss/postcss`
-- **@xyflow/react** (React Flow 12) for both canvases
+- **@xyflow/react** (React Flow 12) for the canvases
 - **web-tree-sitter** + `@vscode/tree-sitter-wasm` for AST parsing
 - **D3 v7** for treemap + sankey + color scales
-- **Octokit** for GitHub REST API
-- **`@iarna/toml`** for Cargo + PyPI manifest parsing
-- **`@anthropic-ai/sdk`** Claude Sonnet 4.5 (optional)
-- **vitest** — 1000+ unit tests across plugins, signals, parsers,
-  the rate-limit / AI-budget rails, and the GitHub App pipeline
+- **Octokit** for the GitHub REST + App APIs
+- **`@modelcontextprotocol/sdk`** for the MCP server
+- **Anthropic Claude** (optional) for the grounded briefing + health narrative
+- **vitest** — 1700+ unit tests across plugins, signals, the Shadow-Graph patcher,
+  the receipt crypto, the rate-limit / AI-budget rails, and the GitHub App
 
-Storage is filesystem-based (`.gitvision/sessions/<id>.json`). No
-database. Inspectable, portable, gitignored.
+Storage is filesystem-based (`.gitvision/sessions/<id>.json`). No database.
+Inspectable, portable, gitignored.
 
 ## Cross-platform
 
-Runs identically on macOS, Linux (Railway), and Windows. Cross-platform
-npm scripts; `.gitattributes` pins LF line endings.
+Runs identically on macOS, Linux (Railway), and Windows. Cross-platform npm
+scripts; `.gitattributes` pins LF line endings.
 
 ## Contributing
 
-Project status is **alpha**. Bug reports and feature ideas are welcome
-via [GitHub Issues](https://github.com/coffeejones/repobaron/issues). Note
-the license — see below.
+Bug reports and feature ideas are welcome via
+[GitHub Issues](https://github.com/coffeejones/gitvision/issues). Note the license
+— see below.
 
 ## License
 
-RepoJury is licensed under the **PolyForm Noncommercial License 1.0.0**
-— see [LICENSE](./LICENSE).
+CodeTrawl is licensed under the **PolyForm Noncommercial License 1.0.0** — see
+[LICENSE](./LICENSE).
 
-- **Yes** to personal use, learning, experimentation, hobby projects,
-  academic research, teaching, nonprofit organizations.
-- **No** to using this code (or derivatives) in a commercial product
-  or for-profit service without a separate commercial license.
+- **Yes** to personal use, learning, experimentation, hobby projects, academic
+  research, teaching, nonprofit organizations.
+- **No** to using this code (or derivatives) in a commercial product or for-profit
+  service without a separate commercial license.
 
-If you want to use RepoJury commercially, [open an issue](https://github.com/coffeejones/repobaron/issues)
-or get in touch.
+If you want to use CodeTrawl commercially,
+[open an issue](https://github.com/coffeejones/gitvision/issues) or get in touch.
 
 Copyright © 2026 Jonas Hansen.
