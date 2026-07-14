@@ -166,6 +166,36 @@ describe("MCP server · tools/list", () => {
   });
 });
 
+describe("MCP server · prompts", () => {
+  it("advertises the conscience prompt", async () => {
+    const { client, cleanup } = await connectInMemory();
+    try {
+      const result = await client.listPrompts();
+      expect(result.prompts.map((p) => p.name)).toContain("conscience");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("renders the conscience loop, weaving in a session id", async () => {
+    const { client, cleanup } = await connectInMemory();
+    try {
+      const result = await client.getPrompt({
+        name: "conscience",
+        arguments: { sessionId: "abc123xyz" },
+      });
+      const text = result.messages
+        .map((m) => (m.content as { text?: string }).text ?? "")
+        .join("\n");
+      expect(text).toMatch(/simulate_change/);
+      expect(text).toMatch(/gate\.pass/);
+      expect(text).toMatch(/abc123xyz/);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
 describe("MCP server · tool error paths", () => {
   it("blast_radius returns an error when called with a non-existent sessionId", async () => {
     const { client, cleanup } = await connectInMemory();

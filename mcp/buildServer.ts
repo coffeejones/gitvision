@@ -44,6 +44,11 @@ import {
   simulateChangeInputSchema,
   handleSimulateChange,
 } from "./tools/simulateChange.js";
+import {
+  CONSCIENCE_PROMPT_NAME,
+  conscienceArgsSchema,
+  conscienceHandler,
+} from "./prompts/conscience.js";
 
 export const SERVER_NAME = "codetrawl";
 export const SERVER_VERSION = "0.67.0";
@@ -145,6 +150,19 @@ export function buildServer(): McpServer {
       inputSchema: simulateChangeInputSchema,
     },
     handleSimulateChange
+  );
+
+  // The Conscience loop — a reusable prompt that codifies "simulate before you
+  // finish; resolve the blocking gate; re-simulate until clear."
+  server.registerPrompt(
+    CONSCIENCE_PROMPT_NAME,
+    {
+      title: "Conscience — verify a change before you finish",
+      description:
+        "The CodeTrawl conscience loop: simulate your proposed diff, resolve the blocking gate items (untested regressions, hollow tests) or justify them, and re-simulate until clear. Invoke before declaring a coding change done.",
+      argsSchema: conscienceArgsSchema,
+    },
+    conscienceHandler
   );
 
   return server;

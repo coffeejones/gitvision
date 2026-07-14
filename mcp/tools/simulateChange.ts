@@ -83,6 +83,8 @@ export function buildSimulatePayload(r: SimulateResult): Record<string, unknown>
     return {
       simulated: false,
       mode: r.mode,
+      // The conscience gate — never a pass on a non-patched mode.
+      gate: r.gate,
       reason: r.reason ?? modeReason(r.mode),
       ...(r.baseMismatch ? { baseMismatch: r.baseMismatch } : {}),
       approximations: r.approximations,
@@ -97,6 +99,9 @@ export function buildSimulatePayload(r: SimulateResult): Record<string, unknown>
     mode: r.mode,
     verdict: report.verdict, // clear | review | high-risk
     headline: report.headline,
+    // The conscience gate — the agent's stop/go. `gate.pass` false means resolve
+    // or justify `gate.blocking` before finishing; `gate.directive` says it plainly.
+    gate: r.gate,
     // The actionable conscience — what to do before merging. The star of the result.
     requiredActions: r.requiredActions,
     blast: {

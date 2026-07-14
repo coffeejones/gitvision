@@ -26,6 +26,7 @@ const BORDER = "rgba(255,255,255,0.10)";
 const TOOLS: Array<[string, string]> = [
   ["analyze_repo", "Download + parse a GitHub repo → a session id and a compact summary. Always first."],
   ["blast_radius", "What breaks if you change a file or function — cross-file reach via imports + calls, 3 hops."],
+  ["simulate_change", "Simulate a proposed diff BEFORE you commit → a deterministic blast + a pass/block conscience gate. The pre-commit check."],
   ["untested_hotspots", "Production functions with no test caller, ranked by complexity — test the risky paths first."],
   ["find_duplicates", "Structurally identical functions (AST hash) across the codebase — refactor candidates."],
   ["signals", "Deterministic health verdict: what works, what needs work, what needs human judgment."],
@@ -34,17 +35,24 @@ const TOOLS: Array<[string, string]> = [
   ["review_changes", "Prioritized verification suggestions on a diff, each with severity + evidence."],
 ];
 
-const RECIPE = `## Before changing a file, check its blast radius
+const RECIPE = `## Before you change code — and before you call it done
 
-This repo is connected to the CodeTrawl MCP server. Before you edit a
-file that other code depends on:
+This repo is connected to the CodeTrawl MCP server.
+
+Before you edit:
 1. Call analyze_repo once with the repo URL to get a session id.
 2. Call blast_radius on the file/function you're about to change — read
    the dependents and how many are untested before you commit to the edit.
-3. Call untested_hotspots if you're adding behavior, so you test the
-   riskiest paths first.
-Treat results as pre-planning context (repo-at-commit), not a live view
-of your unsaved edits.`;
+
+Before you finish — the conscience loop:
+3. Call simulate_change with your FULL proposed diff.
+4. If gate.pass is false, resolve each gate.blocking item (load-bearing
+   code with no guarding test, a hollow test) or justify it, then
+   re-simulate. Repeat until gate.pass is true.
+
+The verdict is deterministic — computed from the real import + call graph,
+cited to concrete files. Treat gate.pass:false as a stop, not a warning.
+(Or invoke the "conscience" prompt to load this loop verbatim.)`;
 
 function Code({ children }: { children: string }) {
   return (
@@ -167,7 +175,7 @@ export default function AgentsPage() {
           </p>
         </Section>
 
-        <Section eyebrow="Eight tools" title="What your agent can call">
+        <Section eyebrow="Nine tools" title="What your agent can call">
           <div style={{ display: "flex", flexDirection: "column", borderRadius: 12, overflow: "hidden", border: `1px solid ${BORDER}` }}>
             {TOOLS.map(([name, desc], i) => (
               <div

@@ -52,6 +52,7 @@ describe("buildSimulatePayload", () => {
           evidence: {},
         },
       ],
+      gate: { pass: false, blocking: [], advisory: [], directive: "Not done yet." },
       affectedFiles: [
         { path: "dep0.ts", hop: 1, untested: true, isTest: false, crossModule: false },
       ],
@@ -71,12 +72,15 @@ describe("buildSimulatePayload", () => {
     expect((payload.changedFiles as unknown[]).length).toBe(1);
     // The affected-file list flows into the payload.
     expect((payload.affectedFiles as Array<{ path: string }>)[0].path).toBe("dep0.ts");
+    // The conscience gate flows into the payload.
+    expect((payload.gate as { pass: boolean }).pass).toBe(false);
   });
 
   it("shapes a non-patched mode as an explicit re-analyze signal", () => {
     const result: SimulateResult = {
       mode: "needs-full-analysis",
       requiredActions: [],
+      gate: { pass: false, blocking: [], advisory: [], directive: "Not evaluated." },
       affectedFiles: [],
       approximations: [],
     };
@@ -95,6 +99,7 @@ describe("buildSimulatePayload", () => {
     const result: SimulateResult = {
       mode: "base-mismatch",
       requiredActions: [],
+      gate: { pass: false, blocking: [], advisory: [], directive: "Not evaluated." },
       affectedFiles: [],
       approximations: [],
       baseMismatch: ["core.ts", "dep0.ts"],

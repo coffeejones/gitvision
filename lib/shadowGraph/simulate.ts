@@ -50,16 +50,65 @@ export interface AffectedFile {
   crossModule: boolean;
 }
 
+/** The agent conscience (Conscience loop). Classifies the required actions into
+ *  what an agent must RESOLVE-OR-JUSTIFY before finishing vs what's merely worth
+ *  considering — turning the verdict into an actionable stop/go gate. Blocking is
+ *  scoped to genuine "ships an uncaught regression" signals, not "this change is
+ *  big" (a load-bearing touch WITH a guarding test is fine). */
+export interface ConscienceGate {
+  /** true when nothing blocking remains — clear to proceed. false for a
+   *  non-patched mode (not evaluated) too, so it's never mistaken for a pass. */
+  pass: boolean;
+  /** Must be resolved or explicitly justified before finishing. */
+  blocking: RequiredAction[];
+  /** Worth considering, but not stop-the-line. */
+  advisory: RequiredAction[];
+  /** One-line imperative for the agent. */
+  directive: string;
+}
+
 export interface SimulateResult {
   mode: PatchMode;
   /** Present when mode === "patched". */
   report?: ChangeBlastReport;
   requiredActions: RequiredAction[];
+  /** The blocking/advisory gate over requiredActions — the agent conscience. */
+  gate: ConscienceGate;
   /** The dependent files the change reaches (empty for non-patched modes). */
   affectedFiles: AffectedFile[];
   approximations: string[];
   reason?: string;
   baseMismatch?: string[];
+}
+
+/** The required-action kinds that BLOCK: the change would ship a regression
+ *  nothing catches. A load-bearing touch alone (with a test) is advisory. */
+const BLOCKING_KINDS: ReadonlySet<RequiredAction["kind"]> = new Set([
+  "no-guarding-tests",
+  "guarding-tests-will-break",
+  "hollow-tests-added",
+]);
+
+function deriveGate(actions: RequiredAction[]): ConscienceGate {
+  const blocking = actions.filter((a) => BLOCKING_KINDS.has(a.kind));
+  const advisory = actions.filter((a) => !BLOCKING_KINDS.has(a.kind));
+  const pass = blocking.length === 0;
+  const directive = pass
+    ? advisory.length > 0
+      ? "Clear to proceed — no blocking issues; weigh the advisory items."
+      : "Clear to proceed — no required actions."
+    : `Not done yet: resolve or justify ${blocking.length} blocking issue${blocking.length === 1 ? "" : "s"} (the change ships an uncaught regression), then re-simulate.`;
+  return { pass, blocking, advisory, directive };
+}
+
+/** The gate for a non-patched mode — never a pass, since nothing was evaluated. */
+function notEvaluatedGate(mode: PatchMode): ConscienceGate {
+  return {
+    pass: false,
+    blocking: [],
+    advisory: [],
+    directive: `Not evaluated (${mode}) — re-analyze the repo for an exact gate.`,
+  };
 }
 
 const byRelAsc = (a: { rel: string }, b: { rel: string }) =>
@@ -223,6 +272,7 @@ export async function simulateChange(
     return {
       mode: patched.mode,
       requiredActions: [],
+      gate: notEvaluatedGate(patched.mode),
       affectedFiles: [],
       approximations: patched.approximations,
       reason: patched.reason,
@@ -244,6 +294,7 @@ export async function simulateChange(
     mode: "patched",
     report,
     requiredActions,
+    gate: deriveGate(requiredActions),
     affectedFiles,
     approximations: patched.approximations,
   };

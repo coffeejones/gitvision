@@ -70,6 +70,12 @@ describe("simulateChange verdict layer", () => {
     const wall = r.requiredActions.find((a) => a.kind === "load-bearing-touched")!;
     expect(wall.severity).toBe("high");
     expect(wall.evidence.numbers?.filesBroken).toBeGreaterThan(0);
+    // conscience gate: an untested load-bearing change BLOCKS (uncaught regression);
+    // load-bearing-touched itself is advisory, no-guarding-tests is the blocker.
+    expect(r.gate.pass).toBe(false);
+    expect(r.gate.blocking.map((a) => a.kind)).toContain("no-guarding-tests");
+    expect(r.gate.advisory.map((a) => a.kind)).toContain("load-bearing-touched");
+    expect(r.gate.directive).toMatch(/re-simulate/i);
   });
 
   it("lists the dependent files a delete actually reaches (affectedFiles)", async () => {
@@ -156,6 +162,27 @@ describe("simulateChange verdict layer", () => {
     expect(r.mode).toBe("patched");
     // A safe, non-load-bearing edit → no required actions.
     expect(r.requiredActions).toEqual([]);
+    // …and the conscience gate passes.
+    expect(r.gate.pass).toBe(true);
+    expect(r.gate.blocking).toEqual([]);
+  });
+
+  it("gate: a new duplicate is advisory, not blocking (still a pass)", async () => {
+    const body = `export function process(items: number[]) {
+  let total = 0;
+  for (const it of items) {
+    if (it > 10) { total += it * 2; }
+    else if (it > 5) { total += it; }
+    else if (it > 0) { total -= it; }
+    else if (it < -5) { total *= 2; }
+    else { total = 0; }
+  }
+  return total;
+}`;
+    const r = await sim({ "a.ts": body }, [{ path: "b.ts", newContent: body }]);
+    expect(r.gate.pass).toBe(true);
+    expect(r.gate.advisory.some((a) => a.kind === "new-duplicate")).toBe(true);
+    expect(r.gate.blocking).toEqual([]);
   });
 
   it("propagates a non-patched mode with no actions", async () => {
