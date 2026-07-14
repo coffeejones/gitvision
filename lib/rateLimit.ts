@@ -147,4 +147,8 @@ export const RATE_LIMITS = {
    *  50 branches back-to-back). Soft-fail: skip + log, don't post a
    *  comment, GitHub gets 200 either way. */
   githubAppPrPerInstallation: { limit: 10, windowMs: 60 * 60_000 },
+  /** Source-view file fetch — one live GitHub Contents call per file opened.
+   *  Cheap locally but spends the GitHub token budget, so bound the per-IP burst.
+   *  Generous enough to click through a repo (~2/min sustained). */
+  sourceView: { limit: 120, windowMs: 60 * 60_000 },
 } as const;
