@@ -28,6 +28,7 @@ import {
   ChevronDown,
   Code as CodeIcon,
   FileCode,
+  FileText,
   Fingerprint,
   Gauge,
   GitPullRequest,
@@ -325,6 +326,17 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
           href: `${base}/code`,
           icon: <CodeIcon size={14} />,
           count: hasCodeGraph ? codeFunctionCount : undefined,
+          hint: hasCodeGraph ? undefined : "refresh",
+        },
+        {
+          // The read-only Source view — GitHub's blob view with CodeTrawl's
+          // deterministic findings on every line. The drill-down destination
+          // the other Forensics surfaces deep-link into. Source is fetched live
+          // per file and never stored.
+          label: "Source",
+          href: `${base}/source`,
+          icon: <FileText size={14} />,
+          hasNewFeatureBadge: true,
           hint: hasCodeGraph ? undefined : "refresh",
         },
         {
