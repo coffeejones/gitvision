@@ -43,10 +43,17 @@ export function SourcePanel({
 
   const searchParams = useSearchParams();
   const linked = searchParams.get("file");
+  const linkedLine = Number(searchParams.get("line")) || null;
   const [selected, setSelected] = useState<string | null>(
     linked && files.includes(linked) ? linked : null,
   );
   const [state, setState] = useState<LoadState>({ status: "idle" });
+
+  // Follow a deep-link that lands while we're already mounted (a soft nav from
+  // another Forensics surface changes ?file= without remounting).
+  useEffect(() => {
+    if (linked && files.includes(linked)) setSelected(linked);
+  }, [linked, files]);
 
   useEffect(() => {
     if (!selected) {
@@ -130,6 +137,7 @@ export function SourcePanel({
             lang={state.lang}
             chips={chips[state.path] ?? null}
             functions={state.functions}
+            focusLine={state.path === linked ? linkedLine : null}
           />
         )}
       </div>

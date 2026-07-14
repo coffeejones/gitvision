@@ -6,7 +6,7 @@
 //   · a complexity marker in the gutter at each non-trivial function's start line.
 // Pure render — no fetching, no highlighting — so it's harness-/snapshot-friendly.
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   AlertTriangle,
   ShieldAlert,
@@ -34,6 +34,7 @@ export function CodeView({
   lang,
   chips,
   functions = [],
+  focusLine,
 }: {
   path: string;
   lines: CodeLines;
@@ -41,7 +42,41 @@ export function CodeView({
   lang: string | null;
   chips?: FileChips | null;
   functions?: FnMarker[];
+  /** 1-indexed line to scroll to + highlight (from a ?line= deep-link). */
+  focusLine?: number | null;
 }) {
+  // Scroll the deep-linked line into view once its content is rendered. We can't
+  // use el.scrollIntoView(): the code block is `overflow-x: auto`, which the CSS
+  // spec promotes to a vertical scroll container too — so scrollIntoView "traps"
+  // on it (it has no vertical overflow, so it never scrolls) and never reaches
+  // the real scroll pane. Instead we find the nearest ancestor that actually
+  // scrolls vertically and centre the line in it ourselves.
+  const focusRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = focusRef.current;
+    if (!focusLine || !el) return;
+    // Two frames: an effect fires before the browser has settled the final
+    // layout (line heights), so a one-frame measurement lands short. We also
+    // can't use el.scrollIntoView() — the code block is `overflow-x: auto`,
+    // which the spec promotes to a vertical scroll container; scrollIntoView
+    // then "traps" on it (no vertical overflow, never scrolls) and never
+    // reaches the real pane. So find the nearest ancestor that actually scrolls
+    // vertically and centre the line in it ourselves.
+    const t = setTimeout(() => {
+      let sc = el.parentElement;
+      while (sc) {
+        const oy = getComputedStyle(sc).overflowY;
+        if ((oy === "auto" || oy === "scroll") && sc.scrollHeight > sc.clientHeight) break;
+        sc = sc.parentElement;
+      }
+      if (!sc) return;
+      const r = el.getBoundingClientRect();
+      const delta = r.top - sc.getBoundingClientRect().top - sc.clientHeight / 2 + r.height / 2;
+      sc.scrollTop += delta; // jump (not smooth): land the reader on the line at once
+    }, 80);
+    return () => clearTimeout(t);
+  }, [focusLine, lines]);
+
   // Map displayed line (startRow + 1) → the highest-complexity function starting
   // there, but only if it clears the "worth a marker" threshold.
   const markerByLine = useMemo(() => {
@@ -101,11 +136,15 @@ export function CodeView({
           {lines.map((toks, i) => {
             const lineNo = i + 1;
             const marker = aligned ? markerByLine.get(lineNo) : undefined;
+            const focused = !!focusLine && lineNo === focusLine;
+            const bg = focused ? "rgba(255,255,255,0.07)" : TOK.surface;
             return (
               <div
                 key={i}
+                id={`L${lineNo}`}
+                ref={focused ? focusRef : undefined}
                 className="flex items-stretch"
-                style={{ minWidth: "max-content", height: LINE_HEIGHT }}
+                style={{ minWidth: "max-content", height: LINE_HEIGHT, background: bg }}
               >
                 <span
                   className="text-right select-none flex-shrink-0"
@@ -114,8 +153,8 @@ export function CodeView({
                     left: 0,
                     width: GUTTER_NUM,
                     paddingRight: 12,
-                    color: TOK.textMuted,
-                    background: TOK.surface,
+                    color: focused ? TOK.textSecondary : TOK.textMuted,
+                    background: bg,
                     lineHeight: `${LINE_HEIGHT}px`,
                   }}
                 >
@@ -123,7 +162,7 @@ export function CodeView({
                 </span>
                 <span
                   className="flex items-center justify-center select-none flex-shrink-0"
-                  style={{ width: GUTTER_MARK, background: TOK.surface, position: "sticky", left: GUTTER_NUM }}
+                  style={{ width: GUTTER_MARK, background: bg, position: "sticky", left: GUTTER_NUM }}
                 >
                   {marker && <ComplexityMarker fn={marker} />}
                 </span>

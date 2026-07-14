@@ -282,13 +282,22 @@ function FileRow({
             </div>
           )}
 
-          <Link
-            href={`/session/${sessionId}/imports`}
-            className="inline-flex items-center gap-1 text-[12px] self-start transition hover:opacity-80"
-            style={{ color: TOK.accent }}
-          >
-            See the blast in the dependency canvas <ArrowRight size={12} />
-          </Link>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <Link
+              href={`/session/${sessionId}/source?file=${encodeURIComponent(f.file)}`}
+              className="inline-flex items-center gap-1 text-[12px] transition hover:opacity-80"
+              style={{ color: TOK.accent }}
+            >
+              Open in Source <ArrowRight size={12} />
+            </Link>
+            <Link
+              href={`/session/${sessionId}/imports`}
+              className="inline-flex items-center gap-1 text-[12px] transition hover:opacity-80"
+              style={{ color: TOK.accent }}
+            >
+              See the blast in the dependency canvas <ArrowRight size={12} />
+            </Link>
+          </div>
         </div>
       )}
     </div>

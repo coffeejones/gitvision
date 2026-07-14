@@ -13,6 +13,7 @@
 // canvas beside this that lights up the blast reach.
 
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 import { Zap, Search, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { SimulateResult, RequiredAction } from "@/lib/shadowGraph/simulate";
@@ -229,7 +230,7 @@ export function FaultlineSimulator({ sessionId, files, suggested }: Props) {
         {phase === "idle" && <IdlePrompt />}
         {phase === "running" && <RunningState path={selected} />}
         {(phase === "done" || phase === "error") && outcome && (
-          <ResultPanel path={selected} outcome={outcome} onRetry={() => selected && runSimulate(selected)} />
+          <ResultPanel sessionId={sessionId} path={selected} outcome={outcome} onRetry={() => selected && runSimulate(selected)} />
         )}
       </div>
     </div>
@@ -280,10 +281,12 @@ function RunningState({ path }: { path: string | null }) {
 }
 
 function ResultPanel({
+  sessionId,
   path,
   outcome,
   onRetry,
 }: {
+  sessionId: string;
   path: string | null;
   outcome: Outcome;
   onRetry: () => void;
@@ -332,10 +335,18 @@ function ResultPanel({
     );
   }
 
-  return <Verdict path={path} result={result} />;
+  return <Verdict sessionId={sessionId} path={path} result={result} />;
 }
 
-function Verdict({ path, result }: { path: string | null; result: SimulateResult }) {
+function Verdict({
+  sessionId,
+  path,
+  result,
+}: {
+  sessionId: string;
+  path: string | null;
+  result: SimulateResult;
+}) {
   const report = result.report!;
   const actions = result.requiredActions;
   const affected = result.affectedFiles;
@@ -444,12 +455,13 @@ function Verdict({ path, result }: { path: string | null; result: SimulateResult
                 borderTop: i === 0 ? "none" : `1px solid ${TOK.border}`,
               }}
             >
-              <span
-                className="text-[13px] break-all min-w-0"
+              <Link
+                href={`/session/${sessionId}/source?file=${encodeURIComponent(f.path)}`}
+                className="text-[13px] break-all min-w-0 transition hover:underline"
                 style={{ color: TOK.textPrimary, fontFamily: "var(--font-ct-mono, monospace)" }}
               >
                 {f.path}
-              </span>
+              </Link>
               <span
                 className="text-[11.5px] text-right whitespace-nowrap"
                 style={{ color: f.untested ? TOK.rose : TOK.textMuted }}
