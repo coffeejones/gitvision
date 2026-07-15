@@ -28,7 +28,7 @@ import {
   type SourceOctokit,
   type FetchSourceError,
 } from "@/lib/sourceView";
-import { functionMarkersFor, duplicateIndex } from "@/lib/sourceAnnotations";
+import { functionMarkersFor, duplicateIndex, callerIndex } from "@/lib/sourceAnnotations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -156,6 +156,8 @@ export async function GET(req: Request, ctx: Ctx) {
     bytes: result.bytes,
     content: result.content,
     aligned,
-    functions: aligned ? functionMarkersFor(cg, path, prevCg, duplicateIndex(cg)) : [],
+    functions: aligned
+      ? functionMarkersFor(cg, path, prevCg, duplicateIndex(cg), callerIndex(cg))
+      : [],
   });
 }

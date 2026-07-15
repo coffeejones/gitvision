@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronRight,
   CornerDownRight,
+  Waypoints,
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { CodeLines } from "@/lib/highlight";
@@ -134,6 +135,15 @@ export function CodeView({
   const [dupesOpen, setDupesOpen] = useState(false);
   useEffect(() => setDupesOpen(false), [path]);
 
+  // Hub functions — called from many places, so a signature change ripples. >=3
+  // callers keeps it to genuine hubs (most functions are called once or twice).
+  const hubFns = useMemo(
+    () => functions.filter((f) => (f.callers?.length ?? 0) >= 3),
+    [functions],
+  );
+  const [callersOpen, setCallersOpen] = useState(false);
+  useEffect(() => setCallersOpen(false), [path]);
+
   return (
     <div className="flex flex-col min-w-0">
       {/* File header — path + language. */}
@@ -198,6 +208,9 @@ export function CodeView({
           dupeCount={dupeFns.length}
           dupesOpen={dupesOpen}
           onToggleDupes={() => setDupesOpen((o) => !o)}
+          hubCount={hubFns.length}
+          callersOpen={callersOpen}
+          onToggleCallers={() => setCallersOpen((o) => !o)}
         />
       )}
 
@@ -205,6 +218,12 @@ export function CodeView({
           structurally-identical copies live. */}
       {dupesOpen && sessionId && dupeFns.length > 0 && (
         <DuplicatesPanel sessionId={sessionId} fns={dupeFns} />
+      )}
+
+      {/* Hub functions — where each is called from, so you know what a signature
+          change ripples into. */}
+      {callersOpen && sessionId && hubFns.length > 0 && (
+        <CallersPanel sessionId={sessionId} fns={hubFns} />
       )}
 
       {/* Drift banner — the fetched bytes don't hash to what we analyzed. */}
@@ -305,12 +324,18 @@ function ChipsBar({
   dupeCount = 0,
   dupesOpen = false,
   onToggleDupes,
+  hubCount = 0,
+  callersOpen = false,
+  onToggleCallers,
 }: {
   chips: FileChips;
   changedCount?: number;
   dupeCount?: number;
   dupesOpen?: boolean;
   onToggleDupes?: () => void;
+  hubCount?: number;
+  callersOpen?: boolean;
+  onToggleCallers?: () => void;
 }) {
   const items: React.ReactNode[] = [];
 
@@ -426,6 +451,28 @@ function ChipsBar({
     );
   }
 
+  // Hub functions — clickable: opens the "called from" panel.
+  if (hubCount > 0 && onToggleCallers) {
+    items.push(
+      <button
+        key="hubs"
+        type="button"
+        onClick={onToggleCallers}
+        title={`${hubCount} function${hubCount === 1 ? "" : "s"} here are called from many places — click to see where. Changing their signature ripples widely.`}
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-md transition hover:bg-white/[0.04] cursor-pointer"
+        style={{
+          color: callersOpen ? TOK.textPrimary : TOK.textMuted,
+          background: callersOpen ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+          border: `1px solid ${TOK.border}`,
+        }}
+      >
+        <Waypoints size={12} />
+        {hubCount} hub function{hubCount === 1 ? "" : "s"}
+        {callersOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+      </button>,
+    );
+  }
+
   if (items.length === 0) return null;
   return (
     <div
@@ -462,6 +509,46 @@ function DuplicatesPanel({ sessionId, fns }: { sessionId: string; fns: FnMarker[
                 style={{ color: TOK.accent, fontFamily: "var(--font-mono)" }}
               >
                 <CornerDownRight size={11} className="flex-shrink-0" /> {d.path}:{d.line}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Call-site navigation (function-level fan-in) ───────────────────────────
+
+function CallersPanel({ sessionId, fns }: { sessionId: string; fns: FnMarker[] }) {
+  return (
+    <div
+      className="px-4 py-3 flex flex-col gap-3 flex-shrink-0"
+      style={{ borderBottom: `1px solid ${TOK.border}`, background: TOK.surfaceElevated }}
+    >
+      {fns.map((f, i) => (
+        <div key={i} className="flex flex-col gap-1">
+          <span className="text-[12px]" style={{ color: TOK.textPrimary, fontFamily: "var(--font-mono)" }}>
+            <span style={{ color: TOK.textMuted }}>ƒ</span> {f.name || "(anonymous)"}
+            <span className="ml-1.5 text-[11px]" style={{ color: TOK.textMuted }}>
+              L{f.startRow + 1} · called from {f.callers!.length} place{f.callers!.length === 1 ? "" : "s"}
+            </span>
+          </span>
+          <div className="flex flex-col gap-0.5 pl-3.5">
+            {f.callers!.map((c, j) => (
+              <Link
+                key={j}
+                href={
+                  c.line
+                    ? `/session/${sessionId}/source?file=${encodeURIComponent(c.path)}&line=${c.line}`
+                    : `/session/${sessionId}/source?file=${encodeURIComponent(c.path)}`
+                }
+                className="inline-flex items-center gap-1 text-[12px] self-start transition hover:opacity-80"
+                style={{ color: TOK.accent, fontFamily: "var(--font-mono)" }}
+              >
+                <CornerDownRight size={11} className="flex-shrink-0" />
+                {c.path}
+                {c.fn ? ` · ${c.fn}()` : " · module scope"}
               </Link>
             ))}
           </div>

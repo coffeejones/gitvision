@@ -6,6 +6,7 @@ import {
   functionMarkersFor,
   complexityTone,
   duplicateIndex,
+  callerIndex,
 } from "../sourceAnnotations";
 
 function graph(partial: Partial<CodeGraph>): CodeGraph {
@@ -159,6 +160,47 @@ describe("duplicate navigation", () => {
 
   it("attaches nothing without a duplicate index", () => {
     expect(functionMarkersFor(dcg, "a.ts").every((m) => m.duplicates === undefined)).toBe(true);
+  });
+});
+
+describe("function fan-in (callers)", () => {
+  const cg = graph({
+    contentHashes: { "core.ts": "1", "a.ts": "2", "b.ts": "3" },
+    functions: [
+      { filePath: "core.ts", name: "load", startRow: 4, endRow: 20, complexity: 6 },
+      { filePath: "a.ts", name: "useCore", startRow: 0, endRow: 5, complexity: 3 },
+      { filePath: "b.ts", name: "alsoUse", startRow: 10, endRow: 15, complexity: 3 },
+    ],
+    calls: [
+      { fromFile: "a.ts", fromFunction: "useCore", calleeName: "load", toFile: "core.ts", toFunction: "load" },
+      { fromFile: "b.ts", fromFunction: "alsoUse", calleeName: "load", toFile: "core.ts", toFunction: "load" },
+      { fromFile: "b.ts", fromFunction: null, calleeName: "load", toFile: "core.ts", toFunction: "load" },
+      { fromFile: "a.ts", fromFunction: "useCore", calleeName: "load", toFile: "core.ts", toFunction: "load" },
+      { fromFile: "x.ts", fromFunction: "y", calleeName: "z", toFile: null, toFunction: null },
+    ],
+  });
+
+  it("indexes resolved call edges by target, dropping unresolved", () => {
+    const idx = callerIndex(cg);
+    expect(idx.size).toBe(1);
+    expect([...idx.values()][0].length).toBe(4);
+  });
+
+  it("attaches deduped callers with resolved caller lines / module scope", () => {
+    const markers = functionMarkersFor(cg, "core.ts", null, null, callerIndex(cg));
+    const load = markers.find((m) => m.name === "load");
+    expect(load?.callers).toHaveLength(3); // (a/useCore), (b/alsoUse), (b/module-scope)
+    expect(load?.callers).toEqual(
+      expect.arrayContaining([
+        { path: "a.ts", line: 1, fn: "useCore" },
+        { path: "b.ts", line: 11, fn: "alsoUse" },
+        { path: "b.ts", line: null, fn: null },
+      ]),
+    );
+  });
+
+  it("attaches nothing without a caller index", () => {
+    expect(functionMarkersFor(cg, "core.ts").every((m) => m.callers === undefined)).toBe(true);
   });
 });
 
