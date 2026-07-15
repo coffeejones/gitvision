@@ -18,6 +18,7 @@ import {
   Link2,
   Check,
   Zap,
+  History,
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { CodeLines } from "@/lib/highlight";
@@ -107,6 +108,19 @@ export function CodeView({
     return m;
   }, [functions]);
 
+  // "Since last visit": every line inside a changed function's range gets a
+  // gutter change-bar; the count feeds a header chip.
+  const { changeByLine, changedCount } = useMemo(() => {
+    const map = new Map<number, "new" | "modified">();
+    let count = 0;
+    for (const fn of functions) {
+      if (!fn.changed) continue;
+      count++;
+      for (let ln = fn.startRow + 1; ln <= fn.endRow + 1; ln++) map.set(ln, fn.changed);
+    }
+    return { changeByLine: map, changedCount: count };
+  }, [functions]);
+
   return (
     <div className="flex flex-col min-w-0">
       {/* File header — path + language. */}
@@ -153,7 +167,7 @@ export function CodeView({
       </div>
 
       {/* Chips bar — the file's deterministic findings. */}
-      {chips && <ChipsBar chips={chips} />}
+      {chips && <ChipsBar chips={chips} changedCount={changedCount} />}
 
       {/* Drift banner — the fetched bytes don't hash to what we analyzed. */}
       {!aligned && (
@@ -175,6 +189,10 @@ export function CodeView({
           {lines.map((toks, i) => {
             const lineNo = i + 1;
             const marker = aligned ? markerByLine.get(lineNo) : undefined;
+            const change = aligned ? changeByLine.get(lineNo) : undefined;
+            // git-gutter semantics: green = added, blue = modified.
+            const changeColor =
+              change === "new" ? "#3fb950" : change === "modified" ? "#58a6ff" : "transparent";
             const focused = !!focusLine && lineNo === focusLine;
             const bg = focused ? "rgba(255,255,255,0.07)" : TOK.surface;
             return (
@@ -188,12 +206,20 @@ export function CodeView({
                 <span
                   className="text-right select-none flex-shrink-0"
                   onClick={sessionId ? () => copyLink(`L${lineNo}`, lineNo) : undefined}
-                  title={sessionId ? `Copy link to line ${lineNo}` : undefined}
+                  title={
+                    [
+                      change && `${change} since last sweep`,
+                      sessionId && `Copy link to line ${lineNo}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || undefined
+                  }
                   style={{
                     position: "sticky",
                     left: 0,
                     width: GUTTER_NUM,
                     paddingRight: 12,
+                    borderLeft: `2px solid ${changeColor}`,
                     color:
                       copied === `L${lineNo}`
                         ? TOK.accent
@@ -235,8 +261,21 @@ export function CodeView({
 
 // ─── Chips ────────────────────────────────────────────────────────────────
 
-function ChipsBar({ chips }: { chips: FileChips }) {
+function ChipsBar({ chips, changedCount = 0 }: { chips: FileChips; changedCount?: number }) {
   const items: React.ReactNode[] = [];
+
+  // The "update angle" leads: what changed here since the last sweep.
+  if (changedCount > 0) {
+    items.push(
+      <Chip
+        key="changed"
+        icon={<History size={12} />}
+        tone="accent"
+        label={`${changedCount} changed since last sweep`}
+        title={`${changedCount} function${changedCount === 1 ? "" : "s"} in this file are new or modified since the previous snapshot — the gutter bars mark them.`}
+      />,
+    );
+  }
 
   // Refactor-safety tier — only the two that warrant attention.
   if (chips.tier === "load-bearing") {
@@ -344,6 +383,7 @@ const TONE_COLOR: Record<string, string> = {
   warn: TOK.amber,
   ok: TOK.textSecondary,
   neutral: TOK.textMuted,
+  accent: TOK.accent,
 };
 
 function Chip({
@@ -353,7 +393,7 @@ function Chip({
   title,
 }: {
   icon: React.ReactNode;
-  tone: "bad" | "warn" | "ok" | "neutral";
+  tone: "bad" | "warn" | "ok" | "neutral" | "accent";
   label: string;
   title: string;
 }) {

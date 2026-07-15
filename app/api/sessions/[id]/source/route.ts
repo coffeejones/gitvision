@@ -145,6 +145,8 @@ export async function GET(req: Request, ctx: Ctx) {
   //    a cheap per-path filter (the O(graph) file chips come from the page).
   //    Drop them when the file drifted: their line numbers would be wrong.
   const aligned = isAligned(result.content, expectedHash);
+  // The previous snapshot's graph powers the "since last visit" markers.
+  const prevCg = session.snapshots[session.snapshots.length - 2]?.codeGraph ?? null;
   return NextResponse.json({
     path,
     ref,
@@ -152,6 +154,6 @@ export async function GET(req: Request, ctx: Ctx) {
     bytes: result.bytes,
     content: result.content,
     aligned,
-    functions: aligned ? functionMarkersFor(cg, path) : [],
+    functions: aligned ? functionMarkersFor(cg, path, prevCg) : [],
   });
 }

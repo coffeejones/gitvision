@@ -92,6 +92,39 @@ describe("functionMarkersFor", () => {
   });
 });
 
+describe("functionMarkersFor · since last visit", () => {
+  const cur = graph({
+    contentHashes: { "a.ts": "h" },
+    functions: [
+      { filePath: "a.ts", name: "keep", startRow: 0, endRow: 5, complexity: 3, bodyHash: "AA" },
+      { filePath: "a.ts", name: "touched", startRow: 10, endRow: 15, complexity: 3, bodyHash: "BB2" },
+      { filePath: "a.ts", name: "fresh", startRow: 20, endRow: 25, complexity: 3, bodyHash: "CC" },
+      { filePath: "a.ts", name: "noHash", startRow: 30, endRow: 32, complexity: 2 },
+    ],
+  });
+  const prev = graph({
+    functions: [
+      { filePath: "a.ts", name: "keep", startRow: 0, endRow: 5, complexity: 3, bodyHash: "AA" },
+      { filePath: "a.ts", name: "touched", startRow: 10, endRow: 15, complexity: 3, bodyHash: "BB1" },
+      { filePath: "a.ts", name: "noHash", startRow: 30, endRow: 32, complexity: 2 },
+    ],
+  });
+
+  it("tags new / modified / unchanged vs the previous graph", () => {
+    const m = Object.fromEntries(
+      functionMarkersFor(cur, "a.ts", prev).map((f) => [f.name, f.changed]),
+    );
+    expect(m.keep).toBeUndefined(); // same body hash
+    expect(m.touched).toBe("modified"); // body hash moved
+    expect(m.fresh).toBe("new"); // didn't exist before
+    expect(m.noHash).toBeUndefined(); // no hash on either side — not a false "modified"
+  });
+
+  it("tags nothing when there is no previous graph", () => {
+    expect(functionMarkersFor(cur, "a.ts").every((f) => f.changed === undefined)).toBe(true);
+  });
+});
+
 describe("complexityTone", () => {
   it("marks high at >=15, medium at 8-14, nothing below 8", () => {
     expect(complexityTone(20)).toBe("high");

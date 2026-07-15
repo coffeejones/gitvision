@@ -44,6 +44,18 @@ export interface FnMarker {
   startRow: number;
   endRow: number;
   complexity: number;
+  /** Vs the previous snapshot (the "update angle"): a function that didn't
+   *  exist then is "new", one whose body hash moved is "modified". Undefined
+   *  when unchanged, when there's no previous snapshot, or when body hashes
+   *  aren't available to compare (non-JS/TS, or a cross-analyzer-version diff). */
+  changed?: "new" | "modified";
+}
+
+/** Identify a function within a file across snapshots — name, disambiguated by
+ *  its container (class/struct) when known. Good enough for the change diff;
+ *  a rename reads as new, which is the honest default. */
+function fnKey(f: { name: string; containerType?: string }): string {
+  return f.containerType ? `${f.containerType}.${f.name}` : f.name;
 }
 
 /** Compute the header chips for every analyzed file, keyed by path. One O(graph)
@@ -82,16 +94,44 @@ export function computeFileChips(
 }
 
 /** The per-function line markers for one file — a cheap filter of the graph's
- *  functions. Called by the source route per opened file. */
-export function functionMarkersFor(cg: CodeGraph, path: string): FnMarker[] {
+ *  functions. Called by the source route per opened file. When `prevCg` (the
+ *  previous snapshot's graph) is given, each marker is tagged new/modified vs it
+ *  — the "since last visit" layer. */
+export function functionMarkersFor(
+  cg: CodeGraph,
+  path: string,
+  prevCg?: CodeGraph | null,
+): FnMarker[] {
+  const prev = prevCg
+    ? new Map(
+        prevCg.functions
+          .filter((f) => f.filePath === path)
+          .map((f) => [fnKey(f), f]),
+      )
+    : null;
+
   return cg.functions
     .filter((f) => f.filePath === path)
-    .map((f) => ({
-      name: f.name,
-      startRow: f.startRow,
-      endRow: f.endRow,
-      complexity: f.complexity,
-    }));
+    .map((f) => {
+      const marker: FnMarker = {
+        name: f.name,
+        startRow: f.startRow,
+        endRow: f.endRow,
+        complexity: f.complexity,
+      };
+      if (prev) {
+        const before = prev.get(fnKey(f));
+        if (!before) {
+          marker.changed = "new";
+        } else if (f.bodyHash && before.bodyHash && f.bodyHash !== before.bodyHash) {
+          // Only claim "modified" when BOTH sides carry a body hash — otherwise
+          // an absent hash (regex-fallback language, or an older analyzer) would
+          // masquerade as a change.
+          marker.changed = "modified";
+        }
+      }
+      return marker;
+    });
 }
 
 export type ComplexityTone = "high" | "medium";
