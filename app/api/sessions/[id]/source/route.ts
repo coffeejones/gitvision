@@ -28,7 +28,7 @@ import {
   type SourceOctokit,
   type FetchSourceError,
 } from "@/lib/sourceView";
-import { functionMarkersFor } from "@/lib/sourceAnnotations";
+import { functionMarkersFor, duplicateIndex } from "@/lib/sourceAnnotations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -145,7 +145,9 @@ export async function GET(req: Request, ctx: Ctx) {
   //    a cheap per-path filter (the O(graph) file chips come from the page).
   //    Drop them when the file drifted: their line numbers would be wrong.
   const aligned = isAligned(result.content, expectedHash);
-  // The previous snapshot's graph powers the "since last visit" markers.
+  // The previous snapshot's graph powers the "since last visit" markers; the
+  // duplicate index powers the twin-navigation. Both are computed only when the
+  // source is aligned (otherwise the line anchors would be wrong).
   const prevCg = session.snapshots[session.snapshots.length - 2]?.codeGraph ?? null;
   return NextResponse.json({
     path,
@@ -154,6 +156,6 @@ export async function GET(req: Request, ctx: Ctx) {
     bytes: result.bytes,
     content: result.content,
     aligned,
-    functions: aligned ? functionMarkersFor(cg, path, prevCg) : [],
+    functions: aligned ? functionMarkersFor(cg, path, prevCg, duplicateIndex(cg)) : [],
   });
 }

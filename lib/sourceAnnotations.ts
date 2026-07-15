@@ -10,9 +10,10 @@
 // file up front would be a megabyte on a large repo).
 
 import type { AnalysisSnapshot } from "@/lib/types";
-import type { CodeGraph } from "@/lib/codeAnalysis/types";
+import type { CodeGraph, FunctionDef } from "@/lib/codeAnalysis/types";
 import { computeRefactorSafety, type SafetyTier } from "@/lib/refactorSafety";
 import { isTestFile } from "@/lib/codeAnalysis/testCoverage";
+import { findDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
 
 /** Per-file header chips. All fields optional-ish: a test file or a file with no
  *  safety entry leaves the code-risk fields null, and a repo with no git history
@@ -49,6 +50,21 @@ export interface FnMarker {
    *  when unchanged, when there's no previous snapshot, or when body hashes
    *  aren't available to compare (non-JS/TS, or a cross-analyzer-version diff). */
   changed?: "new" | "modified";
+  /** Other locations whose function body is structurally identical to this one
+   *  (same bodyHash). Present only when this function has ≥1 twin elsewhere. */
+  duplicates?: { path: string; line: number }[];
+}
+
+/** Index the code graph's structural-duplicate groups by body hash — a
+ *  Map<bodyHash, members> the route builds once and hands to functionMarkersFor
+ *  so each function can find its twins. */
+export function duplicateIndex(cg: CodeGraph): Map<string, FunctionDef[]> {
+  const byHash = new Map<string, FunctionDef[]>();
+  for (const group of findDuplicateGroups(cg, { limit: 1_000_000 })) {
+    const hash = group.members[0]?.bodyHash;
+    if (hash) byHash.set(hash, group.members);
+  }
+  return byHash;
 }
 
 /** Identify a function within a file across snapshots — name, disambiguated by
@@ -101,6 +117,7 @@ export function functionMarkersFor(
   cg: CodeGraph,
   path: string,
   prevCg?: CodeGraph | null,
+  dupes?: Map<string, FunctionDef[]> | null,
 ): FnMarker[] {
   const prev = prevCg
     ? new Map(
@@ -128,6 +145,15 @@ export function functionMarkersFor(
           // an absent hash (regex-fallback language, or an older analyzer) would
           // masquerade as a change.
           marker.changed = "modified";
+        }
+      }
+      if (dupes && f.bodyHash) {
+        const group = dupes.get(f.bodyHash);
+        if (group) {
+          const twins = group
+            .filter((m) => !(m.filePath === f.filePath && m.startRow === f.startRow))
+            .map((m) => ({ path: m.filePath, line: m.startRow + 1 }));
+          if (twins.length > 0) marker.duplicates = twins;
         }
       }
       return marker;

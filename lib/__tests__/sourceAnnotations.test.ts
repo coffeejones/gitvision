@@ -5,6 +5,7 @@ import {
   computeFileChips,
   functionMarkersFor,
   complexityTone,
+  duplicateIndex,
 } from "../sourceAnnotations";
 
 function graph(partial: Partial<CodeGraph>): CodeGraph {
@@ -122,6 +123,42 @@ describe("functionMarkersFor · since last visit", () => {
 
   it("tags nothing when there is no previous graph", () => {
     expect(functionMarkersFor(cur, "a.ts").every((f) => f.changed === undefined)).toBe(true);
+  });
+});
+
+describe("duplicate navigation", () => {
+  const dcg = graph({
+    contentHashes: { "a.ts": "1", "b.ts": "2", "c.ts": "3" },
+    functions: [
+      // Complexity >= 5 (findDuplicateGroups' floor — trivial one-liners are ignored).
+      { filePath: "a.ts", name: "f", startRow: 4, endRow: 8, complexity: 6, bodyHash: "DUP" },
+      { filePath: "b.ts", name: "g", startRow: 10, endRow: 14, complexity: 6, bodyHash: "DUP" },
+      { filePath: "c.ts", name: "h", startRow: 0, endRow: 2, complexity: 6, bodyHash: "DUP" },
+      { filePath: "a.ts", name: "unique", startRow: 20, endRow: 22, complexity: 6, bodyHash: "UNIQ" },
+    ],
+  });
+
+  it("indexes groups of >=2 by body hash, skipping singletons", () => {
+    const idx = duplicateIndex(dcg);
+    expect(idx.get("DUP")?.length).toBe(3);
+    expect(idx.get("UNIQ")).toBeUndefined();
+  });
+
+  it("attaches each function's twins (other members, self excluded, as file:line)", () => {
+    const markers = functionMarkersFor(dcg, "a.ts", null, duplicateIndex(dcg));
+    const f = markers.find((m) => m.name === "f");
+    expect(f?.duplicates).toHaveLength(2);
+    expect(f?.duplicates).toEqual(
+      expect.arrayContaining([
+        { path: "b.ts", line: 11 },
+        { path: "c.ts", line: 1 },
+      ]),
+    );
+    expect(markers.find((m) => m.name === "unique")?.duplicates).toBeUndefined();
+  });
+
+  it("attaches nothing without a duplicate index", () => {
+    expect(functionMarkersFor(dcg, "a.ts").every((m) => m.duplicates === undefined)).toBe(true);
   });
 });
 

@@ -20,6 +20,9 @@ import {
   Zap,
   History,
   Pencil,
+  ChevronDown,
+  ChevronRight,
+  CornerDownRight,
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { CodeLines } from "@/lib/highlight";
@@ -125,6 +128,12 @@ export function CodeView({
     return { changeByLine: map, changedCount: count };
   }, [functions]);
 
+  // Structural-duplicate navigation: functions in this file that have a twin
+  // elsewhere. Feeds a clickable chip → the twins panel.
+  const dupeFns = useMemo(() => functions.filter((f) => f.duplicates?.length), [functions]);
+  const [dupesOpen, setDupesOpen] = useState(false);
+  useEffect(() => setDupesOpen(false), [path]);
+
   return (
     <div className="flex flex-col min-w-0">
       {/* File header — path + language. */}
@@ -182,7 +191,21 @@ export function CodeView({
       </div>
 
       {/* Chips bar — the file's deterministic findings. */}
-      {chips && <ChipsBar chips={chips} changedCount={changedCount} />}
+      {chips && (
+        <ChipsBar
+          chips={chips}
+          changedCount={changedCount}
+          dupeCount={dupeFns.length}
+          dupesOpen={dupesOpen}
+          onToggleDupes={() => setDupesOpen((o) => !o)}
+        />
+      )}
+
+      {/* Twin navigation — the duplicated functions in this file + where their
+          structurally-identical copies live. */}
+      {dupesOpen && sessionId && dupeFns.length > 0 && (
+        <DuplicatesPanel sessionId={sessionId} fns={dupeFns} />
+      )}
 
       {/* Drift banner — the fetched bytes don't hash to what we analyzed. */}
       {!aligned && (
@@ -276,7 +299,19 @@ export function CodeView({
 
 // ─── Chips ────────────────────────────────────────────────────────────────
 
-function ChipsBar({ chips, changedCount = 0 }: { chips: FileChips; changedCount?: number }) {
+function ChipsBar({
+  chips,
+  changedCount = 0,
+  dupeCount = 0,
+  dupesOpen = false,
+  onToggleDupes,
+}: {
+  chips: FileChips;
+  changedCount?: number;
+  dupeCount?: number;
+  dupesOpen?: boolean;
+  onToggleDupes?: () => void;
+}) {
   const items: React.ReactNode[] = [];
 
   // The "update angle" leads: what changed here since the last sweep.
@@ -369,16 +404,25 @@ function ChipsBar({ chips, changedCount = 0 }: { chips: FileChips; changedCount?
     );
   }
 
-  // Structural duplication.
-  if (chips.duplicatedFns > 0) {
+  // Structural duplication — clickable: opens the twin-navigation panel.
+  if (dupeCount > 0 && onToggleDupes) {
     items.push(
-      <Chip
+      <button
         key="dupe"
-        icon={<Copy size={12} />}
-        tone="neutral"
-        label={`${chips.duplicatedFns} duplicated`}
-        title={`${chips.duplicatedFns} function${chips.duplicatedFns === 1 ? "" : "s"} in this file are structurally duplicated elsewhere — change one copy and the others drift.`}
-      />,
+        type="button"
+        onClick={onToggleDupes}
+        title={`${dupeCount} function${dupeCount === 1 ? "" : "s"} here have a structurally identical copy elsewhere — click to see where. Change one and the others drift.`}
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-md transition hover:bg-white/[0.04] cursor-pointer"
+        style={{
+          color: dupesOpen ? TOK.textPrimary : TOK.textMuted,
+          background: dupesOpen ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+          border: `1px solid ${TOK.border}`,
+        }}
+      >
+        <Copy size={12} />
+        {dupeCount} with a twin
+        {dupesOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+      </button>,
     );
   }
 
@@ -389,6 +433,40 @@ function ChipsBar({ chips, changedCount = 0 }: { chips: FileChips; changedCount?
       style={{ borderBottom: `1px solid ${TOK.border}`, background: TOK.surface }}
     >
       {items}
+    </div>
+  );
+}
+
+// ─── Twin navigation ────────────────────────────────────────────────────────
+
+function DuplicatesPanel({ sessionId, fns }: { sessionId: string; fns: FnMarker[] }) {
+  return (
+    <div
+      className="px-4 py-3 flex flex-col gap-3 flex-shrink-0"
+      style={{ borderBottom: `1px solid ${TOK.border}`, background: TOK.surfaceElevated }}
+    >
+      {fns.map((f, i) => (
+        <div key={i} className="flex flex-col gap-1">
+          <span className="text-[12px]" style={{ color: TOK.textPrimary, fontFamily: "var(--font-mono)" }}>
+            <span style={{ color: TOK.textMuted }}>ƒ</span> {f.name || "(anonymous)"}
+            <span className="ml-1.5 text-[11px]" style={{ color: TOK.textMuted }}>
+              L{f.startRow + 1} · {f.duplicates!.length} twin{f.duplicates!.length === 1 ? "" : "s"}
+            </span>
+          </span>
+          <div className="flex flex-col gap-0.5 pl-3.5">
+            {f.duplicates!.map((d, j) => (
+              <Link
+                key={j}
+                href={`/session/${sessionId}/source?file=${encodeURIComponent(d.path)}&line=${d.line}`}
+                className="inline-flex items-center gap-1 text-[12px] self-start transition hover:opacity-80"
+                style={{ color: TOK.accent, fontFamily: "var(--font-mono)" }}
+              >
+                <CornerDownRight size={11} className="flex-shrink-0" /> {d.path}:{d.line}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
