@@ -83,10 +83,13 @@ export function HotspotTreemap({
   hotspots,
   width = 800,
   height = 360,
+  sessionId,
 }: {
   hotspots: FileHotspot[];
   width?: number;
   height?: number;
+  /** When set, each tile links into the Source view for that file. */
+  sessionId?: string;
 }) {
   const layout = useMemo(() => {
     if (hotspots.length === 0) return null;
@@ -171,9 +174,12 @@ export function HotspotTreemap({
                 ? displayName.slice(0, maxChars - 1) + "…"
                 : displayName
               : "";
-          return (
-            <g key={i} transform={`translate(${node.x0},${node.y0})`}>
-              <title>{`${file.data.path}\nChurn: ${file.data.churn} commits\nAuthors: ${file.data.authors}\nScore: ${file.data.score.toFixed(2)}`}</title>
+          const href = sessionId
+            ? `/session/${sessionId}/source?file=${encodeURIComponent(file.data.path)}`
+            : null;
+          const inner = (
+            <>
+              <title>{`${file.data.path}\nChurn: ${file.data.churn} commits\nAuthors: ${file.data.authors}\nScore: ${file.data.score.toFixed(2)}${href ? "\nClick to read the source" : ""}`}</title>
               <rect width={w} height={h} fill={style.fill} rx={3} />
               {/* Labels carry a per-tile text colour — light on the dark
                   levels, dark on the light ones — each verified ≥ 5.7:1, so
@@ -204,6 +210,15 @@ export function HotspotTreemap({
                   {file.data.churn}× · {file.data.authors} auth
                 </text>
               )}
+            </>
+          );
+          return href ? (
+            <a key={i} href={href} style={{ cursor: "pointer" }}>
+              <g transform={`translate(${node.x0},${node.y0})`}>{inner}</g>
+            </a>
+          ) : (
+            <g key={i} transform={`translate(${node.x0},${node.y0})`}>
+              {inner}
             </g>
           );
         })}

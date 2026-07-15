@@ -472,7 +472,7 @@ export default async function OverviewPage({
          *  with the hero, not deep tools that deserve their own tab. */}
         <section className="grid lg:grid-cols-3 gap-4 items-start">
           <div className="lg:col-span-2 flex flex-col gap-4">
-            <HotspotTreemap hotspots={current.hotspots} />
+            <HotspotTreemap hotspots={current.hotspots} sessionId={session.id} />
             <CommitActivity snap={current} />
           </div>
           <div className="flex flex-col gap-4">
