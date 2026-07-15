@@ -15,6 +15,7 @@ import { highlightToLines, type CodeLines } from "@/lib/highlight";
 import type { FileChips, FnMarker } from "@/lib/sourceAnnotations";
 import { SourceTree } from "./SourceTree";
 import { CodeView } from "./CodeView";
+import { WhatIfEditor } from "./WhatIfEditor";
 
 type LoadState =
   | { status: "idle" }
@@ -22,6 +23,7 @@ type LoadState =
   | {
       status: "loaded";
       path: string;
+      content: string;
       lines: CodeLines;
       lang: string | null;
       aligned: boolean;
@@ -48,6 +50,8 @@ export function SourcePanel({
     linked && files.includes(linked) ? linked : null,
   );
   const [state, setState] = useState<LoadState>({ status: "idle" });
+  // Read-only vs the what-if scratch editor. Resets whenever the file changes.
+  const [mode, setMode] = useState<"read" | "edit">("read");
 
   // Follow a deep-link that lands while we're already mounted (a soft nav from
   // another Forensics surface changes ?file= without remounting).
@@ -61,6 +65,7 @@ export function SourcePanel({
       return;
     }
     let cancelled = false;
+    setMode("read"); // switching files always returns to read-only
     setState({ status: "loading" });
     (async () => {
       try {
@@ -83,6 +88,7 @@ export function SourcePanel({
           setState({
             status: "loaded",
             path: data.path,
+            content: data.content,
             lines,
             lang,
             aligned: data.aligned,
@@ -129,18 +135,27 @@ export function SourcePanel({
         {state.status === "idle" && <Centered icon={<FileSearch size={26} />} title="Pick a file to read it" body="Every file we analyzed is here. Open one to see its source with CodeTrawl's findings on it." />}
         {state.status === "loading" && <Centered icon={<Loader2 size={22} className="animate-spin" />} title="Fetching source…" body="Live from GitHub, pinned to the commit we analyzed." />}
         {state.status === "error" && <Centered icon={<TriangleAlert size={24} />} title="Couldn't load this file" body={state.message} tone="warn" />}
-        {state.status === "loaded" && (
-          <CodeView
-            sessionId={sessionId}
-            path={state.path}
-            lines={state.lines}
-            aligned={state.aligned}
-            lang={state.lang}
-            chips={chips[state.path] ?? null}
-            functions={state.functions}
-            focusLine={state.path === linked ? linkedLine : null}
-          />
-        )}
+        {state.status === "loaded" &&
+          (mode === "edit" ? (
+            <WhatIfEditor
+              sessionId={sessionId}
+              path={state.path}
+              initialContent={state.content}
+              onExit={() => setMode("read")}
+            />
+          ) : (
+            <CodeView
+              sessionId={sessionId}
+              path={state.path}
+              lines={state.lines}
+              aligned={state.aligned}
+              lang={state.lang}
+              chips={chips[state.path] ?? null}
+              functions={state.functions}
+              focusLine={state.path === linked ? linkedLine : null}
+              onEdit={state.aligned ? () => setMode("edit") : undefined}
+            />
+          ))}
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ import {
   Check,
   Zap,
   History,
+  Pencil,
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { CodeLines } from "@/lib/highlight";
@@ -41,6 +42,7 @@ export function CodeView({
   chips,
   functions = [],
   focusLine,
+  onEdit,
 }: {
   /** When set, the header shows the Simulate + copy-link actions. */
   sessionId?: string;
@@ -52,6 +54,8 @@ export function CodeView({
   functions?: FnMarker[];
   /** 1-indexed line to scroll to + highlight (from a ?line= deep-link). */
   focusLine?: number | null;
+  /** Enter the what-if editor for this file. Shown as a header action. */
+  onEdit?: () => void;
 }) {
   // Copy a shareable deep-link to the file (or a specific line). `copied` holds
   // the tag of whatever was last copied so we can flash confirmation.
@@ -144,6 +148,17 @@ export function CodeView({
         )}
         {sessionId && (
           <div className="ml-auto flex items-center gap-1 flex-shrink-0">
+            {onEdit && aligned && (
+              <button
+                type="button"
+                onClick={onEdit}
+                title="Edit this file in a scratch buffer and simulate what your change breaks"
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded transition hover:bg-white/5"
+                style={{ color: TOK.accent }}
+              >
+                <Pencil size={12} /> What if?
+              </button>
+            )}
             <button
               type="button"
               onClick={() => copyLink("file")}

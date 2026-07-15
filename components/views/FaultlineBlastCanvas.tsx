@@ -30,7 +30,7 @@ const ROW_H = 56;
 // ---------------- custom nodes ----------------
 
 const EpicenterNode = memo(function EpicenterNode({ data }: NodeProps) {
-  const d = data as { label: string };
+  const d = data as { label: string; verb?: string };
   return (
     <div
       style={{
@@ -44,7 +44,7 @@ const EpicenterNode = memo(function EpicenterNode({ data }: NodeProps) {
     >
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
       <div style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.14em", opacity: 0.85 }}>
-        Delete
+        {d.verb ?? "Delete"}
       </div>
       <div
         style={{
@@ -113,7 +113,11 @@ function shortPath(p: string): string {
 
 const ROWS_PER_COL = 8;
 
-function build(epicenter: string, affected: AffectedFile[]): { nodes: Node[]; edges: Edge[] } {
+function build(
+  epicenter: string,
+  affected: AffectedFile[],
+  verb: string,
+): { nodes: Node[]; edges: Edge[] } {
   const shown = affected.slice(0, NODE_CAP);
   // All casualties are direct (hop 1) — lay them in a grid fan to the right of
   // the epicenter, wrapping into columns so a wide blast stays legible.
@@ -125,7 +129,7 @@ function build(epicenter: string, affected: AffectedFile[]): { nodes: Node[]; ed
       id: "__epicenter",
       type: "epicenter",
       position: { x: 0, y: canvasMid - ROW_H / 2 },
-      data: { label: baseName(epicenter) },
+      data: { label: baseName(epicenter), verb },
       draggable: false,
     },
   ];
@@ -166,11 +170,17 @@ function build(epicenter: string, affected: AffectedFile[]): { nodes: Node[]; ed
 export function FaultlineBlastCanvas({
   epicenter,
   affected,
+  verb = "Delete",
 }: {
   epicenter: string;
   affected: AffectedFile[];
+  /** The epicenter action label — "Delete" for Faultline, "Change" for what-if. */
+  verb?: string;
 }) {
-  const { nodes, edges } = useMemo(() => build(epicenter, affected), [epicenter, affected]);
+  const { nodes, edges } = useMemo(
+    () => build(epicenter, affected, verb),
+    [epicenter, affected, verb],
+  );
 
   if (affected.length === 0) {
     return (
