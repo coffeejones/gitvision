@@ -6,7 +6,8 @@
 //   · a complexity marker in the gutter at each non-trivial function's start line.
 // Pure render — no fetching, no highlighting — so it's harness-/snapshot-friendly.
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   ShieldAlert,
@@ -14,6 +15,9 @@ import {
   Flame,
   ArrowLeftToLine,
   Copy,
+  Link2,
+  Check,
+  Zap,
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { CodeLines } from "@/lib/highlight";
@@ -28,6 +32,7 @@ const GUTTER_NUM = 52;
 const GUTTER_MARK = 34;
 
 export function CodeView({
+  sessionId,
   path,
   lines,
   aligned,
@@ -36,6 +41,8 @@ export function CodeView({
   functions = [],
   focusLine,
 }: {
+  /** When set, the header shows the Simulate + copy-link actions. */
+  sessionId?: string;
   path: string;
   lines: CodeLines;
   aligned: boolean;
@@ -45,6 +52,16 @@ export function CodeView({
   /** 1-indexed line to scroll to + highlight (from a ?line= deep-link). */
   focusLine?: number | null;
 }) {
+  // Copy a shareable deep-link to the file (or a specific line). `copied` holds
+  // the tag of whatever was last copied so we can flash confirmation.
+  const [copied, setCopied] = useState<string | null>(null);
+  function copyLink(tag: string, line?: number) {
+    if (typeof window === "undefined" || !sessionId) return;
+    const q = `?file=${encodeURIComponent(path)}${line ? `&line=${line}` : ""}`;
+    void navigator.clipboard?.writeText(`${window.location.origin}/session/${sessionId}/source${q}`);
+    setCopied(tag);
+    window.setTimeout(() => setCopied((t) => (t === tag ? null : t)), 1500);
+  }
   // Scroll the deep-linked line into view once its content is rendered. We can't
   // use el.scrollIntoView(): the code block is `overflow-x: auto`, which the CSS
   // spec promotes to a vertical scroll container too — so scrollIntoView "traps"
@@ -111,6 +128,28 @@ export function CodeView({
             {lang}
           </span>
         )}
+        {sessionId && (
+          <div className="ml-auto flex items-center gap-1 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => copyLink("file")}
+              title="Copy a link to this file"
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded transition hover:bg-white/5"
+              style={{ color: TOK.textMuted }}
+            >
+              {copied === "file" ? <Check size={12} /> : <Link2 size={12} />}
+              {copied === "file" ? "Copied" : "Copy link"}
+            </button>
+            <Link
+              href={`/session/${sessionId}/faultline?file=${encodeURIComponent(path)}`}
+              title="Simulate deleting this file in Faultline"
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded transition hover:bg-white/5"
+              style={{ color: TOK.textMuted }}
+            >
+              <Zap size={12} /> Simulate deleting
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Chips bar — the file's deterministic findings. */}
@@ -148,14 +187,22 @@ export function CodeView({
               >
                 <span
                   className="text-right select-none flex-shrink-0"
+                  onClick={sessionId ? () => copyLink(`L${lineNo}`, lineNo) : undefined}
+                  title={sessionId ? `Copy link to line ${lineNo}` : undefined}
                   style={{
                     position: "sticky",
                     left: 0,
                     width: GUTTER_NUM,
                     paddingRight: 12,
-                    color: focused ? TOK.textSecondary : TOK.textMuted,
+                    color:
+                      copied === `L${lineNo}`
+                        ? TOK.accent
+                        : focused
+                          ? TOK.textSecondary
+                          : TOK.textMuted,
                     background: bg,
                     lineHeight: `${LINE_HEIGHT}px`,
+                    cursor: sessionId ? "pointer" : undefined,
                   }}
                 >
                   {lineNo}

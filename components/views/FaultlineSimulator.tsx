@@ -12,8 +12,9 @@
 // this is a single fetch → local state, no job poll. F-2 adds a live dependency
 // canvas beside this that lights up the blast reach.
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Zap, Search, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { SimulateResult, RequiredAction } from "@/lib/shadowGraph/simulate";
@@ -122,6 +123,13 @@ export function FaultlineSimulator({ sessionId, files, suggested }: Props) {
     },
     [sessionId],
   );
+
+  // Deep-link from the Source view: /faultline?file=… preselects + runs it.
+  const searchParams = useSearchParams();
+  const linkedFile = searchParams.get("file");
+  useEffect(() => {
+    if (linkedFile && files.includes(linkedFile)) runSimulate(linkedFile);
+  }, [linkedFile, files, runSimulate]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6">

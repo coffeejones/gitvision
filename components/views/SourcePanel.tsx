@@ -131,6 +131,7 @@ export function SourcePanel({
         {state.status === "error" && <Centered icon={<TriangleAlert size={24} />} title="Couldn't load this file" body={state.message} tone="warn" />}
         {state.status === "loaded" && (
           <CodeView
+            sessionId={sessionId}
             path={state.path}
             lines={state.lines}
             aligned={state.aligned}
