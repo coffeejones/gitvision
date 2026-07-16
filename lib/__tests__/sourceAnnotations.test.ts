@@ -205,12 +205,14 @@ describe("function fan-in (callers)", () => {
 });
 
 describe("complexityTone", () => {
-  it("marks high at >=15, medium at 8-14, nothing below 8", () => {
+  it("high >=15, medium 8-14, low 2-7 (the explain floor), nothing at trivial complexity 1", () => {
     expect(complexityTone(20)).toBe("high");
     expect(complexityTone(15)).toBe("high");
     expect(complexityTone(14)).toBe("medium");
     expect(complexityTone(8)).toBe("medium");
-    expect(complexityTone(7)).toBe(null);
-    expect(complexityTone(1)).toBe(null);
+    expect(complexityTone(7)).toBe("low");
+    expect(complexityTone(5)).toBe("low"); // e.g. fetchOsvBatch
+    expect(complexityTone(2)).toBe("low");
+    expect(complexityTone(1)).toBe(null); // trivial getter/setter — unmarked
   });
 });

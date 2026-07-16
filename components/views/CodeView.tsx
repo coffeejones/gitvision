@@ -668,7 +668,9 @@ function ComplexityMarker({
   open?: boolean;
 }) {
   const tone = complexityTone(fn.complexity);
-  const color = tone === "high" ? TOK.rose : TOK.amber;
+  // Tone = risk: high rose, medium amber, low a quiet muted grey (explainable
+  // but not risky — keeps the busier gutter calm).
+  const color = tone === "high" ? TOK.rose : tone === "medium" ? TOK.amber : TOK.textMuted;
 
   // Non-interactive (e.g. the read-only public preview) — a plain badge.
   if (!onExplain) {
