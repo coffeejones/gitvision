@@ -28,7 +28,12 @@ import {
   type SourceOctokit,
   type FetchSourceError,
 } from "@/lib/sourceView";
-import { functionMarkersFor, duplicateIndex, callerIndex } from "@/lib/sourceAnnotations";
+import {
+  functionMarkersFor,
+  duplicateIndex,
+  callerIndex,
+  calleeIndex,
+} from "@/lib/sourceAnnotations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -157,7 +162,14 @@ export async function GET(req: Request, ctx: Ctx) {
     content: result.content,
     aligned,
     functions: aligned
-      ? functionMarkersFor(cg, path, prevCg, duplicateIndex(cg), callerIndex(cg))
+      ? functionMarkersFor(
+          cg,
+          path,
+          prevCg,
+          duplicateIndex(cg),
+          callerIndex(cg),
+          calleeIndex(cg),
+        )
       : [],
   });
 }

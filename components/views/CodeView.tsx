@@ -24,6 +24,7 @@ import {
   ChevronRight,
   CornerDownRight,
   Waypoints,
+  Share2,
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { CodeLines } from "@/lib/highlight";
@@ -147,6 +148,16 @@ export function CodeView({
   );
   const [callersOpen, setCallersOpen] = useState(false);
   useEffect(() => setCallersOpen(false), [path]);
+
+  // Orchestrator functions — the mirror of hubs: they call >=3 of the repo's own
+  // functions, so they're the natural entry points to a flow. Fan-out completes
+  // the call-graph navigation (walk it both ways from a function's neighbours).
+  const orchestratorFns = useMemo(
+    () => functions.filter((f) => (f.callees?.length ?? 0) >= 3),
+    [functions],
+  );
+  const [calleesOpen, setCalleesOpen] = useState(false);
+  useEffect(() => setCalleesOpen(false), [path]);
 
   // AI explainer: which function's inline insight panel is open (its displayed
   // line), plus a per-session cache of loaded results so re-opening is instant.
@@ -310,6 +321,9 @@ export function CodeView({
           hubCount={hubFns.length}
           callersOpen={callersOpen}
           onToggleCallers={() => setCallersOpen((o) => !o)}
+          orchestratorCount={orchestratorFns.length}
+          calleesOpen={calleesOpen}
+          onToggleCallees={() => setCalleesOpen((o) => !o)}
         />
       )}
 
@@ -323,6 +337,11 @@ export function CodeView({
           change ripples into. */}
       {callersOpen && sessionId && hubFns.length > 0 && (
         <CallersPanel sessionId={sessionId} fns={hubFns} />
+      )}
+
+      {/* Orchestrators — what each calls, so you can jump into a flow's pieces. */}
+      {calleesOpen && sessionId && orchestratorFns.length > 0 && (
+        <CalleesPanel sessionId={sessionId} fns={orchestratorFns} />
       )}
 
       {/* Drift banner — the fetched bytes don't hash to what we analyzed. */}
@@ -392,6 +411,9 @@ function ChipsBar({
   hubCount = 0,
   callersOpen = false,
   onToggleCallers,
+  orchestratorCount = 0,
+  calleesOpen = false,
+  onToggleCallees,
 }: {
   chips: FileChips;
   changedCount?: number;
@@ -401,6 +423,9 @@ function ChipsBar({
   hubCount?: number;
   callersOpen?: boolean;
   onToggleCallers?: () => void;
+  orchestratorCount?: number;
+  calleesOpen?: boolean;
+  onToggleCallees?: () => void;
 }) {
   const items: React.ReactNode[] = [];
 
@@ -538,6 +563,28 @@ function ChipsBar({
     );
   }
 
+  // Orchestrators — clickable: opens the "what it calls" panel (fan-out).
+  if (orchestratorCount > 0 && onToggleCallees) {
+    items.push(
+      <button
+        key="orch"
+        type="button"
+        onClick={onToggleCallees}
+        title={`${orchestratorCount} function${orchestratorCount === 1 ? "" : "s"} here call into 3+ of the repo's own functions — click to jump into what they call. Good entry points to a flow.`}
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-md transition hover:bg-white/[0.04] cursor-pointer"
+        style={{
+          color: calleesOpen ? TOK.textPrimary : TOK.textMuted,
+          background: calleesOpen ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+          border: `1px solid ${TOK.border}`,
+        }}
+      >
+        <Share2 size={12} />
+        {orchestratorCount} orchestrator{orchestratorCount === 1 ? "" : "s"}
+        {calleesOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+      </button>,
+    );
+  }
+
   if (items.length === 0) return null;
   return (
     <div
@@ -614,6 +661,46 @@ function CallersPanel({ sessionId, fns }: { sessionId: string; fns: FnMarker[] }
                 <CornerDownRight size={11} className="flex-shrink-0" />
                 {c.path}
                 {c.fn ? ` · ${c.fn}()` : " · module scope"}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Callee navigation (function-level fan-out) ─────────────────────────────
+
+function CalleesPanel({ sessionId, fns }: { sessionId: string; fns: FnMarker[] }) {
+  return (
+    <div
+      className="px-4 py-3 flex flex-col gap-3 flex-shrink-0"
+      style={{ borderBottom: `1px solid ${TOK.border}`, background: TOK.surfaceElevated }}
+    >
+      {fns.map((f, i) => (
+        <div key={i} className="flex flex-col gap-1">
+          <span className="text-[12px]" style={{ color: TOK.textPrimary, fontFamily: "var(--font-mono)" }}>
+            <span style={{ color: TOK.textMuted }}>ƒ</span> {f.name || "(anonymous)"}
+            <span className="ml-1.5 text-[11px]" style={{ color: TOK.textMuted }}>
+              L{f.startRow + 1} · calls {f.callees!.length} function{f.callees!.length === 1 ? "" : "s"}
+            </span>
+          </span>
+          <div className="flex flex-col gap-0.5 pl-3.5">
+            {f.callees!.map((c, j) => (
+              <Link
+                key={j}
+                href={
+                  c.line
+                    ? `/session/${sessionId}/source?file=${encodeURIComponent(c.path)}&line=${c.line}`
+                    : `/session/${sessionId}/source?file=${encodeURIComponent(c.path)}`
+                }
+                className="inline-flex items-center gap-1 text-[12px] self-start transition hover:opacity-80"
+                style={{ color: TOK.accent, fontFamily: "var(--font-mono)" }}
+              >
+                <CornerDownRight size={11} className="flex-shrink-0" />
+                {c.fn ? `${c.fn}()` : c.path}
+                <span style={{ color: TOK.textMuted }}> · {c.path}</span>
               </Link>
             ))}
           </div>

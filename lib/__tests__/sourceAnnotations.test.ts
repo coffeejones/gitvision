@@ -7,6 +7,7 @@ import {
   complexityTone,
   duplicateIndex,
   callerIndex,
+  calleeIndex,
 } from "../sourceAnnotations";
 
 function graph(partial: Partial<CodeGraph>): CodeGraph {
@@ -201,6 +202,87 @@ describe("function fan-in (callers)", () => {
 
   it("attaches nothing without a caller index", () => {
     expect(functionMarkersFor(cg, "core.ts").every((m) => m.callers === undefined)).toBe(true);
+  });
+});
+
+describe("function fan-out (callees)", () => {
+  const cg = graph({
+    contentHashes: { "a.ts": "1", "core.ts": "2", "util.ts": "3" },
+    functions: [
+      { filePath: "a.ts", name: "orchestrate", startRow: 0, endRow: 20, complexity: 6 },
+      { filePath: "core.ts", name: "load", startRow: 4, endRow: 10, complexity: 3 },
+      { filePath: "util.ts", name: "fmt", startRow: 2, endRow: 6, complexity: 2 },
+    ],
+    calls: [
+      // orchestrate → load (twice, deduped) and → fmt
+      { fromFile: "a.ts", fromFunction: "orchestrate", calleeName: "load", toFile: "core.ts", toFunction: "load" },
+      { fromFile: "a.ts", fromFunction: "orchestrate", calleeName: "load", toFile: "core.ts", toFunction: "load" },
+      { fromFile: "a.ts", fromFunction: "orchestrate", calleeName: "fmt", toFile: "util.ts", toFunction: "fmt" },
+      // external/unresolved call — dropped (no toFile)
+      { fromFile: "a.ts", fromFunction: "orchestrate", calleeName: "fetch", toFile: null, toFunction: null },
+      // module-scope call — dropped (no fromFunction)
+      { fromFile: "a.ts", fromFunction: null, calleeName: "load", toFile: "core.ts", toFunction: "load" },
+    ],
+  });
+
+  it("indexes resolved edges by source function, dropping unresolved + module-scope", () => {
+    const idx = calleeIndex(cg);
+    expect(idx.size).toBe(1); // only a.ts/orchestrate
+    expect([...idx.values()][0].length).toBe(3); // load, load, fmt (external + module-scope dropped)
+  });
+
+  it("attaches deduped callees with their definition lines (jump-to-definition)", () => {
+    const markers = functionMarkersFor(cg, "a.ts", null, null, null, calleeIndex(cg));
+    const orch = markers.find((m) => m.name === "orchestrate");
+    expect(orch?.callees).toHaveLength(2); // load (deduped), fmt
+    expect(orch?.callees).toEqual(
+      expect.arrayContaining([
+        { path: "core.ts", line: 5, fn: "load" }, // startRow 4 + 1
+        { path: "util.ts", line: 3, fn: "fmt" }, // startRow 2 + 1
+      ]),
+    );
+  });
+
+  it("attaches nothing without a callee index", () => {
+    expect(functionMarkersFor(cg, "a.ts").every((m) => m.callees === undefined)).toBe(true);
+  });
+
+  it("skips callees for a source name that isn't unique in its file (unattributable)", () => {
+    // Two same-named methods in one file (Python's classic Blueprint.__init__ /
+    // SetupState.__init__). The edge carries no SOURCE container, so a call from
+    // "register" can't be pinned to one — don't show a union of both.
+    const amb = graph({
+      contentHashes: { "bp.ts": "1", "t.ts": "2" },
+      functions: [
+        { filePath: "bp.ts", name: "register", containerType: "Blueprint", startRow: 0, endRow: 5, complexity: 4 },
+        { filePath: "bp.ts", name: "register", containerType: "SetupState", startRow: 10, endRow: 15, complexity: 4 },
+        { filePath: "t.ts", name: "target", startRow: 0, endRow: 3, complexity: 2 },
+      ],
+      calls: [
+        { fromFile: "bp.ts", fromFunction: "register", calleeName: "target", toFile: "t.ts", toFunction: "target" },
+      ],
+    });
+    const markers = functionMarkersFor(amb, "bp.ts", null, null, null, calleeIndex(amb));
+    expect(markers.every((m) => m.callees === undefined)).toBe(true);
+  });
+
+  it("resolves a callee's definition line by container, not the last same-named def", () => {
+    const over = graph({
+      contentHashes: { "a.ts": "1", "h.ts": "2" },
+      functions: [
+        { filePath: "a.ts", name: "orchestrate", startRow: 0, endRow: 10, complexity: 5 },
+        { filePath: "h.ts", name: "process", containerType: "A", startRow: 5, endRow: 8, complexity: 2 },
+        { filePath: "h.ts", name: "process", containerType: "B", startRow: 40, endRow: 44, complexity: 2 },
+      ],
+      calls: [
+        { fromFile: "a.ts", fromFunction: "orchestrate", calleeName: "process", toFile: "h.ts", toFunction: "process", toContainerType: "A" },
+      ],
+    });
+    const orch = functionMarkersFor(over, "a.ts", null, null, null, calleeIndex(over)).find(
+      (m) => m.name === "orchestrate",
+    );
+    // A.process is at startRow 5 → line 6, NOT B.process's line 41.
+    expect(orch?.callees).toEqual([{ path: "h.ts", line: 6, fn: "process" }]);
   });
 });
 
