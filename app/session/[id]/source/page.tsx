@@ -34,6 +34,13 @@ export default async function SourcePage({
   const entitled = isDemo || !!authSession;
 
   const files = Object.keys(current.codeGraph?.contentHashes ?? {}).sort();
+  // Symbol index for the finder's jump-to-definition. Named functions only
+  // (anonymous ones aren't searchable); capped so a mega-repo can't bloat the
+  // page payload — files still cover everything past the cap.
+  const symbols = (current.codeGraph?.functions ?? [])
+    .filter((f) => f.name)
+    .map((f) => ({ name: f.name, path: f.filePath, line: f.startRow + 1 }))
+    .slice(0, 10000);
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-8 max-w-7xl mx-auto w-full">
@@ -85,6 +92,7 @@ export default async function SourcePage({
           sessionId={session.id}
           files={files}
           chips={computeFileChips(current)}
+          symbols={symbols}
           repoPrivate={current.repo.private === true}
         />
       )}
