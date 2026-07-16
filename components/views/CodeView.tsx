@@ -32,6 +32,7 @@ import {
   type FileChips,
   type FnMarker,
 } from "@/lib/sourceAnnotations";
+import { FunctionInsight, type InsightResult } from "./FunctionInsight";
 
 const LINE_HEIGHT = 20;
 const GUTTER_NUM = 52;
@@ -47,6 +48,7 @@ export function CodeView({
   functions = [],
   focusLine,
   onEdit,
+  repoPrivate = false,
 }: {
   /** When set, the header shows the Simulate + copy-link actions. */
   sessionId?: string;
@@ -60,6 +62,8 @@ export function CodeView({
   focusLine?: number | null;
   /** Enter the what-if editor for this file. Shown as a header action. */
   onEdit?: () => void;
+  /** Private-repo source → the AI explainer asks for a one-time consent first. */
+  repoPrivate?: boolean;
 }) {
   // Copy a shareable deep-link to the file (or a specific line). `copied` holds
   // the tag of whatever was last copied so we can flash confirmation.
@@ -143,6 +147,101 @@ export function CodeView({
   );
   const [callersOpen, setCallersOpen] = useState(false);
   useEffect(() => setCallersOpen(false), [path]);
+
+  // AI explainer: which function's inline insight panel is open (its displayed
+  // line), plus a per-session cache of loaded results so re-opening is instant.
+  const [openInsight, setOpenInsight] = useState<number | null>(null);
+  const [insights, setInsights] = useState<Map<number, InsightResult>>(new Map());
+  useEffect(() => {
+    setOpenInsight(null);
+    setInsights(new Map());
+  }, [path]);
+
+  // The function whose insight is open (only complexity-marked functions can be
+  // explained), and the 0-indexed line to split the code around so the panel
+  // spans full width outside the horizontal scroll.
+  const openMarker =
+    openInsight != null && aligned && sessionId ? markerByLine.get(openInsight) : undefined;
+  const splitIdx = openMarker ? openInsight! - 1 : null;
+
+  // One code line, gutter + marker + syntax. Extracted so it can render into
+  // either half of a split (around an open insight panel) with the right
+  // absolute line index.
+  const renderRow = (toks: CodeLines[number], i: number) => {
+    const lineNo = i + 1;
+    const marker = aligned ? markerByLine.get(lineNo) : undefined;
+    const change = aligned ? changeByLine.get(lineNo) : undefined;
+    // git-gutter semantics: green = added, blue = modified.
+    const changeColor =
+      change === "new" ? "#3fb950" : change === "modified" ? "#58a6ff" : "transparent";
+    const focused = !!focusLine && lineNo === focusLine;
+    const bg = focused ? "rgba(255,255,255,0.07)" : TOK.surface;
+    return (
+      <div
+        key={i}
+        id={`L${lineNo}`}
+        ref={focused ? focusRef : undefined}
+        className="flex items-stretch"
+        style={{ minWidth: "max-content", height: LINE_HEIGHT, background: bg }}
+      >
+        <span
+          className="text-right select-none flex-shrink-0"
+          onClick={sessionId ? () => copyLink(`L${lineNo}`, lineNo) : undefined}
+          title={
+            [
+              change && `${change} since last sweep`,
+              sessionId && `Copy link to line ${lineNo}`,
+            ]
+              .filter(Boolean)
+              .join(" · ") || undefined
+          }
+          style={{
+            position: "sticky",
+            left: 0,
+            width: GUTTER_NUM,
+            paddingRight: 12,
+            borderLeft: `2px solid ${changeColor}`,
+            color:
+              copied === `L${lineNo}`
+                ? TOK.accent
+                : focused
+                  ? TOK.textSecondary
+                  : TOK.textMuted,
+            background: bg,
+            lineHeight: `${LINE_HEIGHT}px`,
+            cursor: sessionId ? "pointer" : undefined,
+          }}
+        >
+          {lineNo}
+        </span>
+        <span
+          className="flex items-center justify-center select-none flex-shrink-0"
+          style={{ width: GUTTER_MARK, background: bg, position: "sticky", left: GUTTER_NUM }}
+        >
+          {marker && (
+            <ComplexityMarker
+              fn={marker}
+              onExplain={sessionId ? () => setOpenInsight((o) => (o === lineNo ? null : lineNo)) : undefined}
+              open={openInsight === lineNo}
+            />
+          )}
+        </span>
+        <code style={{ whiteSpace: "pre", lineHeight: `${LINE_HEIGHT}px`, paddingRight: 24 }}>
+          {toks.length === 0 ? (
+            "​"
+          ) : (
+            toks.map((t, j) => (
+              <span key={j} style={t.color ? { color: t.color } : undefined}>
+                {t.content}
+              </span>
+            ))
+          )}
+        </code>
+      </div>
+    );
+  };
+
+  const mono = { fontFamily: "var(--font-mono)", fontSize: 12.5 } as const;
 
   return (
     <div className="flex flex-col min-w-0">
@@ -240,77 +339,43 @@ export function CodeView({
         </div>
       )}
 
-      {/* Code — one horizontal scroll region; the gutter sticks left. */}
-      <div className="overflow-x-auto" style={{ background: TOK.surface }}>
-        <div style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}>
-          {lines.map((toks, i) => {
-            const lineNo = i + 1;
-            const marker = aligned ? markerByLine.get(lineNo) : undefined;
-            const change = aligned ? changeByLine.get(lineNo) : undefined;
-            // git-gutter semantics: green = added, blue = modified.
-            const changeColor =
-              change === "new" ? "#3fb950" : change === "modified" ? "#58a6ff" : "transparent";
-            const focused = !!focusLine && lineNo === focusLine;
-            const bg = focused ? "rgba(255,255,255,0.07)" : TOK.surface;
-            return (
-              <div
-                key={i}
-                id={`L${lineNo}`}
-                ref={focused ? focusRef : undefined}
-                className="flex items-stretch"
-                style={{ minWidth: "max-content", height: LINE_HEIGHT, background: bg }}
-              >
-                <span
-                  className="text-right select-none flex-shrink-0"
-                  onClick={sessionId ? () => copyLink(`L${lineNo}`, lineNo) : undefined}
-                  title={
-                    [
-                      change && `${change} since last sweep`,
-                      sessionId && `Copy link to line ${lineNo}`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || undefined
-                  }
-                  style={{
-                    position: "sticky",
-                    left: 0,
-                    width: GUTTER_NUM,
-                    paddingRight: 12,
-                    borderLeft: `2px solid ${changeColor}`,
-                    color:
-                      copied === `L${lineNo}`
-                        ? TOK.accent
-                        : focused
-                          ? TOK.textSecondary
-                          : TOK.textMuted,
-                    background: bg,
-                    lineHeight: `${LINE_HEIGHT}px`,
-                    cursor: sessionId ? "pointer" : undefined,
-                  }}
-                >
-                  {lineNo}
-                </span>
-                <span
-                  className="flex items-center justify-center select-none flex-shrink-0"
-                  style={{ width: GUTTER_MARK, background: bg, position: "sticky", left: GUTTER_NUM }}
-                >
-                  {marker && <ComplexityMarker fn={marker} />}
-                </span>
-                <code style={{ whiteSpace: "pre", lineHeight: `${LINE_HEIGHT}px`, paddingRight: 24 }}>
-                  {toks.length === 0 ? (
-                    "​"
-                  ) : (
-                    toks.map((t, j) => (
-                      <span key={j} style={t.color ? { color: t.color } : undefined}>
-                        {t.content}
-                      </span>
-                    ))
-                  )}
-                </code>
+      {/* Code — the gutter sticks left in each horizontal scroll region. When a
+          function's AI insight is open, the code splits around its start line so
+          the panel spans full width, outside the horizontal scroll. */}
+      <div style={{ background: TOK.surface }}>
+        {splitIdx == null || !openMarker ? (
+          <div className="overflow-x-auto">
+            <div style={mono}>{lines.map((toks, i) => renderRow(toks, i))}</div>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <div style={mono}>
+                {lines.slice(0, splitIdx + 1).map((toks, i) => renderRow(toks, i))}
               </div>
-            );
-          })}
-        </div>
+            </div>
+            <FunctionInsight
+              // Remount when the target function changes — otherwise switching
+              // straight from one open insight to another keeps the first's
+              // fetched state (useState/effect run only on mount).
+              key={`${path}:${openInsight}`}
+              sessionId={sessionId!}
+              path={path}
+              marker={openMarker}
+              repoPrivate={repoPrivate}
+              initial={insights.get(openInsight!)}
+              onLoaded={(r) => setInsights((m) => new Map(m).set(openInsight!, r))}
+              onClose={() => setOpenInsight(null)}
+            />
+            <div className="overflow-x-auto">
+              <div style={mono}>
+                {lines
+                  .slice(splitIdx + 1)
+                  .map((toks, i) => renderRow(toks, splitIdx + 1 + i))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -592,16 +657,48 @@ function Chip({
   );
 }
 
-function ComplexityMarker({ fn }: { fn: FnMarker }) {
+function ComplexityMarker({
+  fn,
+  onExplain,
+  open,
+}: {
+  fn: FnMarker;
+  /** When set, the marker is a button that opens the AI insight for this fn. */
+  onExplain?: () => void;
+  open?: boolean;
+}) {
   const tone = complexityTone(fn.complexity);
   const color = tone === "high" ? TOK.rose : TOK.amber;
+
+  // Non-interactive (e.g. the read-only public preview) — a plain badge.
+  if (!onExplain) {
+    return (
+      <span
+        title={`${fn.name || "(anonymous)"} · complexity ${fn.complexity}`}
+        className="text-[9px] font-semibold leading-none rounded px-1 py-0.5 cursor-default"
+        style={{ color, background: "rgba(255,255,255,0.05)", fontFamily: "var(--font-mono)" }}
+      >
+        {fn.complexity}
+      </span>
+    );
+  }
+
+  // Interactive: the complexity number doubles as "explain this function". Filled
+  // accent when its panel is open; a hover lift otherwise for discoverability.
   return (
-    <span
-      title={`${fn.name || "(anonymous)"} · complexity ${fn.complexity}`}
-      className="text-[9px] font-semibold leading-none rounded px-1 py-0.5 cursor-default"
-      style={{ color, background: "rgba(255,255,255,0.05)", fontFamily: "var(--font-mono)" }}
+    <button
+      type="button"
+      onClick={onExplain}
+      title={`Explain ${fn.name || "this function"} with AI · complexity ${fn.complexity}`}
+      className="text-[9px] font-semibold leading-none rounded px-1 py-0.5 transition cursor-pointer hover:brightness-125"
+      style={{
+        color: open ? "#0a0a0c" : color,
+        background: open ? color : "rgba(255,255,255,0.05)",
+        boxShadow: open ? "none" : `inset 0 0 0 1px rgba(255,255,255,0.06)`,
+        fontFamily: "var(--font-mono)",
+      }}
     >
       {fn.complexity}
-    </span>
+    </button>
   );
 }

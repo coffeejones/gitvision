@@ -1,0 +1,421 @@
+"use client";
+
+// The per-function AI insight panel — the source-aware layer of the Source view.
+// Opens inline under a function when its gutter marker is clicked. It POSTs to
+// /api/sessions/[id]/source/explain, which reads the function's source + the
+// deterministic signals and returns a grounded { does, risk, suggestion }.
+//
+// The panel LEADS with the computed evidence (the same signals the model was
+// given) and only then shows the AI reading — the grounded frame made visible,
+// so the narrative always sits on top of the facts, never floats free of them.
+//
+// Privacy: this is the one action that sends repository source to Anthropic. It
+// discloses that in the footer, and for a private repo it asks for a one-time
+// consent before the first call (the source is the user's own, not public).
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import {
+  Sparkles,
+  X,
+  Loader2,
+  TriangleAlert,
+  ShieldAlert,
+  Lightbulb,
+  Info,
+  Flame,
+  FlaskConical,
+  Copy,
+  ArrowLeftToLine,
+  History,
+  Waypoints,
+} from "lucide-react";
+import { TOK } from "@/lib/sessionTheme";
+import { complexityTone, type FnMarker } from "@/lib/sourceAnnotations";
+import type { FunctionSignals, FunctionExplanation } from "@/lib/functionExplain";
+
+const CONSENT_KEY_PRIVATE = "ct-explain-consent-private";
+
+export interface InsightResult {
+  signals: FunctionSignals;
+  explanation: FunctionExplanation;
+  cached: boolean;
+}
+
+type Phase =
+  | { status: "consent" } // private repo, first use — awaiting opt-in
+  | { status: "loading" }
+  | { status: "error"; message: string; drifted?: boolean; signIn?: boolean }
+  | { status: "loaded"; result: InsightResult };
+
+export function FunctionInsight({
+  sessionId,
+  path,
+  marker,
+  repoPrivate,
+  initial,
+  onLoaded,
+  onClose,
+}: {
+  sessionId: string;
+  path: string;
+  marker: FnMarker;
+  repoPrivate: boolean;
+  /** A result already fetched this session — render it instantly, no re-fetch. */
+  initial?: InsightResult;
+  /** Lift a freshly-fetched result up so re-opening this function is instant. */
+  onLoaded?: (result: InsightResult) => void;
+  onClose: () => void;
+}) {
+  const line = marker.startRow + 1;
+  const fnName = marker.name || "(anonymous)";
+
+  const [phase, setPhase] = useState<Phase>(() => {
+    if (initial) return { status: "loaded", result: initial };
+    if (repoPrivate && !hasPrivateConsent()) return { status: "consent" };
+    return { status: "loading" };
+  });
+
+  // Guard against setting state after unmount / a superseded fetch.
+  const reqId = useRef(0);
+
+  async function run() {
+    const my = ++reqId.current;
+    setPhase({ status: "loading" });
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/source/explain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, fn: marker.name, line }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        signals?: FunctionSignals;
+        explanation?: FunctionExplanation;
+        cached?: boolean;
+        error?: string;
+        drifted?: boolean;
+        signIn?: boolean;
+      };
+      if (my !== reqId.current) return;
+      if (!res.ok || !body.explanation || !body.signals) {
+        setPhase({
+          status: "error",
+          message: body.error || `Couldn't explain this function (HTTP ${res.status}).`,
+          drifted: body.drifted,
+          signIn: body.signIn,
+        });
+        return;
+      }
+      const result: InsightResult = {
+        signals: body.signals,
+        explanation: body.explanation,
+        cached: body.cached ?? false,
+      };
+      setPhase({ status: "loaded", result });
+      onLoaded?.(result);
+    } catch (err) {
+      if (my !== reqId.current) return;
+      setPhase({
+        status: "error",
+        message: err instanceof Error ? err.message : "Couldn't reach the explainer.",
+      });
+    }
+  }
+
+  // Kick off automatically unless we're waiting on private-repo consent or
+  // already have a result.
+  useEffect(() => {
+    if (phase.status === "loading") void run();
+    return () => {
+      reqId.current++;
+    };
+    // Run once on mount; subsequent retries go through the buttons.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function grantConsentAndRun() {
+    try {
+      window.localStorage.setItem(CONSENT_KEY_PRIVATE, "1");
+    } catch {
+      /* private mode / storage blocked — proceed for this session anyway */
+    }
+    void run();
+  }
+
+  return (
+    <div
+      className="flex flex-col flex-shrink-0"
+      style={{
+        borderTop: `1px solid ${TOK.border}`,
+        borderBottom: `1px solid ${TOK.border}`,
+        background: TOK.surfaceElevated,
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 h-9" style={{ borderBottom: `1px solid ${TOK.border}` }}>
+        <Sparkles size={13} style={{ color: TOK.accent }} className="flex-shrink-0" />
+        <span className="text-[12px] font-medium" style={{ color: TOK.textPrimary, fontFamily: "var(--font-mono)" }}>
+          {fnName}
+        </span>
+        <span className="text-[11px]" style={{ color: TOK.textMuted }}>
+          L{line} · AI reading
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          title="Close"
+          className="ml-auto inline-flex items-center justify-center w-6 h-6 rounded transition hover:bg-white/5"
+          style={{ color: TOK.textMuted }}
+        >
+          <X size={13} />
+        </button>
+      </div>
+
+      <div className="px-4 py-3 flex flex-col gap-3">
+        {phase.status === "consent" && (
+          <ConsentGate repoPrivate={repoPrivate} onConfirm={grantConsentAndRun} onCancel={onClose} />
+        )}
+
+        {phase.status === "loading" && (
+          <div className="flex items-center gap-2 text-[12.5px] py-2" style={{ color: TOK.textSecondary }}>
+            <Loader2 size={14} className="animate-spin" style={{ color: TOK.accent }} />
+            Reading the function and its signals…
+          </div>
+        )}
+
+        {phase.status === "error" && (
+          <div className="flex flex-col gap-2">
+            <div
+              className="flex items-start gap-2 text-[12.5px]"
+              style={{ color: phase.signIn ? TOK.textSecondary : TOK.amber }}
+            >
+              {phase.signIn ? (
+                <Sparkles size={14} className="flex-shrink-0 mt-0.5" style={{ color: TOK.accent }} />
+              ) : (
+                <TriangleAlert size={14} className="flex-shrink-0 mt-0.5" />
+              )}
+              <span>{phase.message}</span>
+            </div>
+            {phase.signIn ? (
+              <Link
+                href={`/login?next=${encodeURIComponent(`/session/${sessionId}/source?file=${path}`)}`}
+                className="self-start inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-md transition hover:opacity-90"
+                style={{ background: TOK.accent, color: "#0a0a0c" }}
+              >
+                <Sparkles size={12} /> Sign in — it&rsquo;s free
+              </Link>
+            ) : phase.drifted ? null : (
+              <button
+                type="button"
+                onClick={() => void run()}
+                className="self-start text-[11px] px-2 py-1 rounded transition hover:bg-white/5"
+                style={{ color: TOK.accent, border: `1px solid ${TOK.border}` }}
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
+
+        {phase.status === "loaded" && <InsightBody result={phase.result} />}
+      </div>
+
+      {/* Footer — the honest disclosure, always present once past consent. */}
+      {phase.status !== "consent" && (
+        <div
+          className="flex items-center gap-1.5 px-4 py-2 text-[10.5px]"
+          style={{ borderTop: `1px solid ${TOK.border}`, color: TOK.textMuted }}
+        >
+          <Info size={11} className="flex-shrink-0" />
+          <span>
+            Reads this function&rsquo;s source with AI — sent to Anthropic on your click, never stored.
+          </span>
+          {phase.status === "loaded" && (
+            <span className="ml-auto flex items-center gap-2 flex-shrink-0">
+              {phase.result.cached && <span>cached</span>}
+              <span style={{ fontFamily: "var(--font-mono)" }}>{modelLabel(phase.result.explanation.model)}</span>
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Consent gate (private repos, first use) ────────────────────────────────
+
+function ConsentGate({
+  repoPrivate,
+  onConfirm,
+  onCancel,
+}: {
+  repoPrivate: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-start gap-2 text-[12.5px] leading-relaxed" style={{ color: TOK.textSecondary }}>
+        <ShieldAlert size={14} className="flex-shrink-0 mt-0.5" style={{ color: TOK.amber }} />
+        <span>
+          This sends {repoPrivate ? "this function’s source from your private repo" : "this function’s source"} to
+          Anthropic to read it, one function at a time. It is never stored — only the explanation is kept, in memory.
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-md transition hover:opacity-90"
+          style={{ background: TOK.accent, color: "#0a0a0c" }}
+        >
+          <Sparkles size={12} /> Read with AI
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-[12px] px-3 py-1.5 rounded-md transition hover:bg-white/5"
+          style={{ color: TOK.textMuted, border: `1px solid ${TOK.border}` }}
+        >
+          Not now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Loaded body: evidence chips (the frame) then the AI reading ────────────
+
+function InsightBody({ result }: { result: InsightResult }) {
+  const { signals, explanation } = result;
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Grounded evidence — shown FIRST: the deterministic facts the AI was
+          handed. The narrative below sits on top of these, never floats free. */}
+      <EvidenceRow signals={signals} />
+
+      <Part
+        icon={<Info size={13} />}
+        label="What it does"
+        text={explanation.does}
+        color={TOK.textSecondary}
+      />
+      <Part
+        icon={<ShieldAlert size={13} />}
+        label="Where the risk is"
+        text={explanation.risk}
+        color={TOK.textPrimary}
+      />
+      {explanation.suggestion && (
+        <Part
+          icon={<Lightbulb size={13} />}
+          label="Worth considering"
+          text={explanation.suggestion}
+          color={TOK.textSecondary}
+          accent
+        />
+      )}
+    </div>
+  );
+}
+
+function EvidenceRow({ signals }: { signals: FunctionSignals }) {
+  const chips: React.ReactNode[] = [];
+  const tone = complexityTone(signals.complexity);
+  chips.push(
+    <EvChip
+      key="cx"
+      icon={<Waypoints size={11} />}
+      label={`Complexity ${signals.complexity}`}
+      color={tone === "high" ? TOK.rose : tone === "medium" ? TOK.amber : TOK.textMuted}
+    />,
+  );
+  if (signals.changed) {
+    chips.push(
+      <EvChip key="chg" icon={<History size={11} />} label={signals.changed === "new" ? "New" : "Modified"} color={TOK.accent} />,
+    );
+  }
+  if (signals.callerCount > 0) {
+    chips.push(
+      <EvChip key="cal" icon={<Waypoints size={11} />} label={`Called from ${signals.callerCount}`} color={TOK.textMuted} />,
+    );
+  }
+  if (signals.duplicateCount > 0) {
+    chips.push(
+      <EvChip key="dup" icon={<Copy size={11} />} label={`${signals.duplicateCount} twin${signals.duplicateCount === 1 ? "" : "s"}`} color={TOK.amber} />,
+    );
+  }
+  if (signals.fileTested === false) {
+    chips.push(<EvChip key="test" icon={<FlaskConical size={11} />} label="No test guards it" color={TOK.amber} />);
+  }
+  if (signals.fileFanIn > 0) {
+    chips.push(
+      <EvChip key="fin" icon={<ArrowLeftToLine size={11} />} label={`${signals.fileFanIn} dependent${signals.fileFanIn === 1 ? "" : "s"}`} color={TOK.textMuted} />,
+    );
+  }
+  if (signals.soloAuthor) {
+    chips.push(<EvChip key="bus" icon={<Flame size={11} />} label="Bus factor 1" color={TOK.rose} />);
+  }
+  return <div className="flex items-center gap-1.5 flex-wrap">{chips}</div>;
+}
+
+function EvChip({ icon, label, color }: { icon: React.ReactNode; label: string; color: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10.5px] font-medium px-1.5 py-0.5 rounded"
+      style={{ color, background: "rgba(255,255,255,0.03)", border: `1px solid ${TOK.border}` }}
+    >
+      <span className="flex-shrink-0" style={{ color }}>
+        {icon}
+      </span>
+      {label}
+    </span>
+  );
+}
+
+function Part({
+  icon,
+  label,
+  text,
+  color,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  text: string;
+  color: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className="flex flex-col gap-1"
+      style={accent ? { borderLeft: `2px solid ${TOK.accent}`, paddingLeft: 10 } : undefined}
+    >
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em]" style={{ color: TOK.textMuted }}>
+        <span className="flex-shrink-0">{icon}</span>
+        {label}
+      </div>
+      <p className="text-[12.5px] leading-relaxed" style={{ color }}>
+        {text}
+      </p>
+    </div>
+  );
+}
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function hasPrivateConsent(): boolean {
+  try {
+    return window.localStorage.getItem(CONSENT_KEY_PRIVATE) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** "claude-haiku-4-5" → "Haiku 4.5". Best-effort; falls back to the raw id. */
+function modelLabel(model: string): string {
+  const m = model.match(/claude-(\w+)-(\d+)-(\d+)/);
+  if (!m) return model;
+  const name = m[1].charAt(0).toUpperCase() + m[1].slice(1);
+  return `${name} ${m[2]}.${m[3]}`;
+}

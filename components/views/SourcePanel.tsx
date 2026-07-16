@@ -35,10 +35,13 @@ export function SourcePanel({
   sessionId,
   files,
   chips,
+  repoPrivate = false,
 }: {
   sessionId: string;
   files: string[];
   chips: Record<string, FileChips>;
+  /** Threaded to the AI explainer for the one-time private-repo consent. */
+  repoPrivate?: boolean;
 }) {
   const tree = useMemo(() => buildFileTree(files), [files]);
   const defaultOpen = useMemo(() => defaultExpanded(tree), [tree]);
@@ -154,6 +157,7 @@ export function SourcePanel({
               functions={state.functions}
               focusLine={state.path === linked ? linkedLine : null}
               onEdit={state.aligned ? () => setMode("edit") : undefined}
+              repoPrivate={repoPrivate}
             />
           ))}
       </div>

@@ -81,7 +81,12 @@ export default async function SourcePage({
           }
         />
       ) : (
-        <SourcePanel sessionId={session.id} files={files} chips={computeFileChips(current)} />
+        <SourcePanel
+          sessionId={session.id}
+          files={files}
+          chips={computeFileChips(current)}
+          repoPrivate={current.repo.private === true}
+        />
       )}
     </main>
   );
