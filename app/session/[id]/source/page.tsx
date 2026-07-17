@@ -15,6 +15,7 @@ import { SourcePanel } from "@/components/views/SourcePanel";
 import { SignInToUnlock } from "@/components/billing/SignInToUnlock";
 import { EmptyPanel } from "@/components/EmptyPanel";
 import { computeFileChips } from "@/lib/sourceAnnotations";
+import { rankStartHere } from "@/lib/startHere";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,10 @@ export default async function SourcePage({
     .filter((f) => f.name)
     .map((f) => ({ name: f.name, path: f.filePath, line: f.startRow + 1 }))
     .slice(0, 10000);
+  // Per-file chips (one O(graph) pass) power both the header chips and the
+  // "start here" onboarding ranking, so compute once and hand both down.
+  const chips = computeFileChips(current);
+  const startHere = rankStartHere(chips, 6);
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-8 max-w-7xl mx-auto w-full">
@@ -91,8 +96,9 @@ export default async function SourcePage({
         <SourcePanel
           sessionId={session.id}
           files={files}
-          chips={computeFileChips(current)}
+          chips={chips}
           symbols={symbols}
+          startHere={startHere}
           repoPrivate={current.repo.private === true}
         />
       )}

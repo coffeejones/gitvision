@@ -8,12 +8,23 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { FileSearch, Loader2, TriangleAlert, Search, X, FileCode2, Braces } from "lucide-react";
+import {
+  FileSearch,
+  Loader2,
+  TriangleAlert,
+  Search,
+  X,
+  FileCode2,
+  Braces,
+  Compass,
+  ChevronRight,
+} from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import { buildFileTree, defaultExpanded } from "@/lib/fileTree";
 import { highlightToLines, type CodeLines } from "@/lib/highlight";
 import type { FileChips, FnMarker } from "@/lib/sourceAnnotations";
 import { searchSources, type SearchSymbol, type SearchResult } from "@/lib/symbolSearch";
+import type { StartHereItem } from "@/lib/startHere";
 import { SourceTree } from "./SourceTree";
 import { CodeView } from "./CodeView";
 import { WhatIfEditor } from "./WhatIfEditor";
@@ -37,6 +48,7 @@ export function SourcePanel({
   files,
   chips,
   symbols = [],
+  startHere = [],
   repoPrivate = false,
 }: {
   sessionId: string;
@@ -44,6 +56,8 @@ export function SourcePanel({
   chips: Record<string, FileChips>;
   /** Every analyzed function, for the finder's jump-to-definition. */
   symbols?: SearchSymbol[];
+  /** The onboarding "read these first" ranking, shown in the empty state. */
+  startHere?: StartHereItem[];
   /** Threaded to the AI explainer for the one-time private-repo consent. */
   repoPrivate?: boolean;
 }) {
@@ -53,10 +67,13 @@ export function SourcePanel({
   const searchParams = useSearchParams();
   const linked = searchParams.get("file");
   const linkedLine = Number(searchParams.get("line")) || null;
-  const [selected, setSelected] = useState<string | null>(
-    linked && files.includes(linked) ? linked : null,
+  const deepLinked = linked && files.includes(linked) ? linked : null;
+  const [selected, setSelected] = useState<string | null>(deepLinked);
+  // Start in "loading" (not "idle") when a deep-link pre-selects a file, so the
+  // Start-here tour doesn't flash for one frame before the load effect fires.
+  const [state, setState] = useState<LoadState>(
+    deepLinked ? { status: "loading" } : { status: "idle" },
   );
-  const [state, setState] = useState<LoadState>({ status: "idle" });
   // Read-only vs the what-if scratch editor. Resets whenever the file changes.
   const [mode, setMode] = useState<"read" | "edit">("read");
 
@@ -226,7 +243,12 @@ export function SourcePanel({
 
       {/* Code pane */}
       <div className="flex-1 min-w-0 overflow-y-auto">
-        {state.status === "idle" && <Centered icon={<FileSearch size={26} />} title="Pick a file to read it" body="Every file we analyzed is here. Open one to see its source with CodeTrawl's findings on it." />}
+        {state.status === "idle" &&
+          (!query && startHere.length > 0 ? (
+            <StartHerePanel items={startHere} onOpen={onSelect} />
+          ) : (
+            <Centered icon={<FileSearch size={26} />} title="Pick a file to read it" body="Every file we analyzed is here. Open one to see its source with CodeTrawl's findings on it." />
+          ))}
         {state.status === "loading" && <Centered icon={<Loader2 size={22} className="animate-spin" />} title="Fetching source…" body="Live from GitHub, pinned to the commit we analyzed." />}
         {state.status === "error" && <Centered icon={<TriangleAlert size={24} />} title="Couldn't load this file" body={state.message} tone="warn" />}
         {state.status === "loaded" &&
@@ -251,6 +273,65 @@ export function SourcePanel({
               repoPrivate={repoPrivate}
             />
           ))}
+      </div>
+    </div>
+  );
+}
+
+function StartHerePanel({
+  items,
+  onOpen,
+}: {
+  items: StartHereItem[];
+  onOpen: (path: string) => void;
+}) {
+  return (
+    <div className="h-full overflow-y-auto px-6 py-8">
+      <div className="max-w-2xl mx-auto flex flex-col">
+        <div className="flex items-center gap-2 mb-1.5">
+          <Compass size={16} style={{ color: TOK.accent }} />
+          <h2 className="text-[15px] font-semibold" style={{ color: TOK.textPrimary }}>
+            Start here
+          </h2>
+        </div>
+        <p className="text-[13px] leading-relaxed mb-4" style={{ color: TOK.textSecondary }}>
+          New to this repo? These are the files to read first — ranked by how central and involved
+          they are, so you build a mental model fast. Every reason is a computed fact, not a guess.
+        </p>
+        <div className="flex flex-col gap-2">
+          {items.map((it, i) => (
+            <button
+              key={it.path}
+              type="button"
+              onClick={() => onOpen(it.path)}
+              className="group text-left flex items-start gap-3 rounded-lg px-3 py-2.5 transition hover:bg-white/[0.04]"
+              style={{ border: `1px solid ${TOK.border}`, background: TOK.surfaceElevated }}
+            >
+              <span
+                className="flex-shrink-0 mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded text-[11px] font-semibold tabular-nums"
+                style={{ color: TOK.accent, background: "rgba(255,255,255,0.05)" }}
+              >
+                {i + 1}
+              </span>
+              <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                <span
+                  className="text-[12.5px] truncate"
+                  style={{ color: TOK.textPrimary, fontFamily: "var(--font-mono)" }}
+                >
+                  {it.path}
+                </span>
+                <span className="text-[12px] leading-snug" style={{ color: TOK.textMuted }}>
+                  {it.reason}
+                </span>
+              </span>
+              <ChevronRight
+                size={15}
+                className="flex-shrink-0 mt-1 opacity-0 group-hover:opacity-60 transition"
+                style={{ color: TOK.textMuted }}
+              />
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
