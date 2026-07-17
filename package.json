@@ -2,6 +2,9 @@
   "name": "repojury",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9"
+  },
   "bin": {
     "repojury-mcp": "./mcp/dist/mcp/server.js"
   },

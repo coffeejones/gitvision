@@ -1,0 +1,29 @@
+name: CI
+
+# Dogfooding the pitch: a product that sells verifiable, deterministic gates
+# runs its own checks on every push and PR. Type check → the 1800+ test suite
+# (incl. the determinism guard) → production build. Lint is intentionally not
+# here yet — the eslint config is unscoped and currently reports thousands of
+# problems on generated/vendored files; wire it in once that's fixed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Tests
+        run: npm run test:run
+      - name: Production build
+        run: npm run build
