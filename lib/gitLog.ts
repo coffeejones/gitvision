@@ -229,6 +229,8 @@ export async function analyzeRepoHistory(
       elapsedMs: Date.now() - started,
     };
   } finally {
-    fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    // Await so the clone is actually gone before we return — the "deleted right
+    // after" promise, guaranteed even on the early-return paths above.
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
 }

@@ -100,7 +100,7 @@ export function CTWorkflow() {
         className="wf"
         viewBox="0 0 1180 424"
         role="img"
-        aria-label="How a sweep runs: a repository URL is cloned bloblessly in memory, parsed with tree-sitter, examined by four lenses — history, structure, security, supply — which produce twenty deterministic signals; the signals compute the surface grade, and the AI briefing only narrates the signals."
+        aria-label="How a sweep runs: a repository URL is cloned bloblessly into an isolated temp workspace, parsed with tree-sitter, examined by four lenses — history, structure, security, supply — which produce twenty deterministic signals; the signals compute the surface grade, and the AI briefing only narrates the signals."
       >
         <defs>
           <marker
@@ -164,7 +164,7 @@ export function CTWorkflow() {
             github.com/owner/repo
           </text>
         </g>
-        <Box x={228} y={MID - 34} w={160} h={68} title="clone" sub="blobless · in-memory" wi={2} />
+        <Box x={228} y={MID - 34} w={160} h={68} title="clone" sub="blobless · temp" wi={2} />
         <Box x={424} y={MID - 34} w={160} h={68} title="parse" sub="tree-sitter · 8 langs" wi={4} />
         {LENS_YS.map((y, i) => (
           <g className="wf-n" style={{ "--wi": 5 + i } as React.CSSProperties} key={i}>

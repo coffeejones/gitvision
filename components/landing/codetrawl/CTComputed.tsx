@@ -59,8 +59,9 @@ export function CTComputed() {
             (oss-maintainer, eng-manager, staff-eng) — only what's true. */}
         <CTReveal className="rv-block">
           <p className="trust-line">
-            Repos are cloned in memory, read once, and discarded — we keep the
-            findings, never your files. Public or private, your sweep is free.
+            Repos are cloned blobless into an isolated temp workspace, parsed
+            once, and deleted right after — we keep the findings, not your code.
+            Public or private, your sweep is free.
           </p>
           <a href="#analyze" className="ct-cta-ghost">
             Analyze a repo
