@@ -27,7 +27,6 @@ function emptyGraph(): CodeGraph {
     fileComplexity: {},
     filesByExt: {},
     byPlugin: {},
-    generatedAt: "2026-05-07T00:00:00Z",
   };
 }
 

@@ -10,6 +10,7 @@
 // trivial; this file just counts what it was handed.
 
 import type { CodeGraph, TestCaseMeta } from "./codeAnalysis/types";
+import { cmpStr } from "./deterministicSort";
 
 /** File tiers, worst-first (ordering matters — UI + counts iterate in order). */
 export const WEAK_SUITE_TIERS = ["hollow", "thin", "solid"] as const;
@@ -121,7 +122,7 @@ export function computeWeakSuite(
 
   if (totCases === 0) return null;
 
-  files.sort((a, b) => b.rank - a.rank || a.file.localeCompare(b.file));
+  files.sort((a, b) => b.rank - a.rank || cmpStr(a.file, b.file));
 
   return {
     files,

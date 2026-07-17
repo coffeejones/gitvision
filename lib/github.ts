@@ -55,6 +55,7 @@ import {
 import { scanForRiskyPatterns } from "./security/riskyPatterns";
 import type { RiskyPatternScanResult } from "./security/riskyPatterns";
 import type { SecretScanResult } from "./security/types";
+import { cmpStr } from "./deterministicSort";
 
 /** Build a new Octokit instance authenticated with the given token, or
  *  unauthenticated if `null`/`undefined` is passed (60 req/hr). Used by
@@ -589,7 +590,7 @@ export function computeCommitActivity(commits: CommitSummary[]): { week: string;
   }
   return [...buckets.entries()]
     .map(([week, count]) => ({ week, count }))
-    .sort((a, b) => a.week.localeCompare(b.week));
+    .sort((a, b) => cmpStr(a.week, b.week));
 }
 
 /**

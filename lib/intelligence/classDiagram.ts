@@ -16,6 +16,7 @@
 // inline-in-Markdown rendering and ships natively in GitHub
 // flavoured markdown.
 
+import { cmpStr } from "../deterministicSort";
 import type {
   ClassDef,
   ClassMemberVisibility,
@@ -98,7 +99,7 @@ export function computeScopeOptions(
   }
 
   return [...folderCounts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .sort((a, b) => b[1] - a[1] || cmpStr(a[0], b[0]))
     .slice(0, limit)
     .map(([folder, classCount]) => ({ folder, classCount }));
 }
@@ -314,7 +315,7 @@ function groupByNamespace(classes: ClassDef[]): NamespaceGroup[] {
   // Sort alphabetically by folder so the diagram source is deterministic
   // (otherwise insertion order leaks file-system traversal order into
   // the output, making git diffs noisy).
-  groups.sort((a, b) => a.folder.localeCompare(b.folder));
+  groups.sort((a, b) => cmpStr(a.folder, b.folder));
   return groups;
 }
 

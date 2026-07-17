@@ -16,6 +16,7 @@
 import { db } from "./db";
 import * as schema from "./db/schema";
 import { listSessions } from "./storage";
+import { cmpStr } from "./deterministicSort";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -147,7 +148,7 @@ export function aggregateMetrics(
     if (s.createdAtMs > lastAnalysisMs) lastAnalysisMs = s.createdAtMs;
   }
   const sortedRepos = [...repoAgg.entries()].sort(
-    (a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0])
+    (a, b) => b[1].count - a[1].count || cmpStr(a[0], b[0])
   );
   const iso = (ms: number) => (ms > 0 ? new Date(ms).toISOString() : null);
 

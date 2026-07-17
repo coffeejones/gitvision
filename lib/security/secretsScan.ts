@@ -19,6 +19,7 @@ import {
 } from "./filters";
 import { PATTERNS } from "./patterns";
 import type { SecretFinding, SecretScanResult } from "./types";
+import { cmpStr } from "../deterministicSort";
 
 export interface ScanOptions {
   /** Minimum confidence (0-1) for a finding to surface. Default 0.5. */
@@ -102,7 +103,7 @@ export function scanForSecrets(
     }
     if (b.confidence !== a.confidence) return b.confidence - a.confidence;
     if (a.filePath !== b.filePath) {
-      return a.filePath.localeCompare(b.filePath);
+      return cmpStr(a.filePath, b.filePath);
     }
     return a.line - b.line;
   });

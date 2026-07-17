@@ -68,7 +68,6 @@ function emptyGraph(): CodeGraph {
     byPlugin: {
       javascript: { files: 5, functions: 5, calls: 0, imports: 0 },
     },
-    generatedAt: "2026-05-03T00:00:00Z",
   };
 }
 

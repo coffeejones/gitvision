@@ -31,6 +31,7 @@
 //     module heuristic shared between blast-radius and this engine.
 
 import type { DiffResult, ChangedFunction } from "./diffAware";
+import { cmpStr } from "../deterministicSort";
 
 export type Severity = "critical" | "warning" | "info";
 
@@ -86,9 +87,9 @@ export function evaluateVerificationRules(
     // Stable tiebreaker: ruleId, then text. Avoids non-determinism
     // when two rules produce equally-prioritized suggestions on
     // distinct functions.
-    const rd = a.ruleId.localeCompare(b.ruleId);
+    const rd = cmpStr(a.ruleId, b.ruleId);
     if (rd !== 0) return rd;
-    return a.text.localeCompare(b.text);
+    return cmpStr(a.text, b.text);
   });
   return all.slice(0, maxResults);
 }

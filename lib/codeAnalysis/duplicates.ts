@@ -19,6 +19,7 @@
 // methods) — but the structure is the same. Real-world refactor signal.
 
 import type { CodeGraph, FunctionDef } from "./types";
+import { cmpStr } from "../deterministicSort";
 
 export interface DuplicateGroup {
   /** The shared body hash. Internal — not surfaced to users. */
@@ -88,7 +89,7 @@ export function findDuplicateGroups(
       return b.maxComplexity - a.maxComplexity;
     if (b.members.length !== a.members.length)
       return b.members.length - a.members.length;
-    return a.members[0].filePath.localeCompare(b.members[0].filePath);
+    return cmpStr(a.members[0].filePath, b.members[0].filePath);
   });
 
   return groups.slice(0, limit);

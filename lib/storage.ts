@@ -8,6 +8,7 @@ import path from "node:path";
 import { nanoid } from "nanoid";
 import { atomicWriteJson } from "./atomicWrite";
 import type { Session, SessionSummary, AnalysisSnapshot } from "./types";
+import { cmpStr } from "./deterministicSort";
 
 // Read env lazily on each storage call so tests can swap
 // REPOBARON_DATA_DIR per-test without module-import timing dances —
@@ -126,7 +127,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
         // skip corrupted session file
       }
     }
-    summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    summaries.sort((a, b) => cmpStr(b.updatedAt, a.updatedAt));
     return summaries;
   } catch {
     return [];

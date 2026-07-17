@@ -31,6 +31,7 @@
 
 import { extractHealthSignals } from "./signals";
 import type { AnalysisSnapshot, HealthSignal, HealthSignals } from "./types";
+import { cmpStr } from "./deterministicSort";
 
 /** The product dimension a recommendation belongs to — drives grouping + icon
  *  choice in the UI, and the intrinsic-importance weight in prioritization. */
@@ -403,7 +404,7 @@ export function recommendationsFromSignals(
     // deterministic (matters for tests + a stable UI ordering).
     .sort(
       (a, b) =>
-        b.priority - a.priority || a.signalId.localeCompare(b.signalId)
+        b.priority - a.priority || cmpStr(a.signalId, b.signalId)
     );
 
   return { items, topActions: items.slice(0, Math.max(0, topN)) };

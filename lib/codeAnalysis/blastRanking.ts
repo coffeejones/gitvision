@@ -28,6 +28,7 @@
 
 import type { CodeGraph } from "./types";
 import { isTestFile } from "./testCoverage";
+import { cmpStr } from "../deterministicSort";
 
 export interface RankedBlastFunction {
   filePath: string;
@@ -201,7 +202,10 @@ export function rankFunctionsByBlast(
     if (!fnInfo) continue;
     candidates.push({ id, direct, fnInfo });
   }
-  candidates.sort((a, b) => b.direct - a.direct);
+  // Stable tie-break before slicing the pool: without it, candidates with equal
+  // `direct` counts keep insertion order, so pool membership at the cutoff is
+  // nondeterministic.
+  candidates.sort((a, b) => b.direct - a.direct || cmpStr(a.id, b.id));
   const pool = candidates.slice(0, candidatePoolSize);
 
   // BFS each candidate. Reuses adjacencies built above — cheap.
@@ -231,7 +235,7 @@ export function rankFunctionsByBlast(
     if (b.complexity !== a.complexity) {
       return b.complexity - a.complexity;
     }
-    return a.name.localeCompare(b.name);
+    return cmpStr(a.name, b.name);
   });
 
   return ranked.slice(0, limit);

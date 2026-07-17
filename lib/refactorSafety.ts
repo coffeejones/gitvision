@@ -13,6 +13,7 @@ import type { CodeGraph } from "./codeAnalysis/types";
 import { isTestFile } from "./codeAnalysis/testCoverage";
 import { findDuplicateGroups } from "./codeAnalysis/duplicates";
 import { deriveTestedFiles } from "./impact";
+import { cmpStr } from "./deterministicSort";
 
 /** Named safety tiers, most-load-bearing first. Ordering matters — the UI and
  *  the counts iterate in this order. */
@@ -214,7 +215,7 @@ export function computeRefactorSafety(
       }
       testsToRun = [...guardCounts.entries()]
         .map(([f, guards]) => ({ file: f, guards }))
-        .sort((a, b) => b.guards - a.guards || a.file.localeCompare(b.file))
+        .sort((a, b) => b.guards - a.guards || cmpStr(a.file, b.file))
         .slice(0, 6);
     }
 
@@ -238,7 +239,7 @@ export function computeRefactorSafety(
     });
   }
 
-  files.sort((a, b) => b.rank - a.rank || a.file.localeCompare(b.file));
+  files.sort((a, b) => b.rank - a.rank || cmpStr(a.file, b.file));
 
   const counts = { "load-bearing": 0, "handle-with-care": 0, moderate: 0, safe: 0 } as Record<
     SafetyTier,

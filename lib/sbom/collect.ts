@@ -5,6 +5,7 @@
 import type { AnalysisSnapshot } from "../types";
 import type { SbomComponentInput, SbomInput } from "./types";
 import { toPurl } from "./purl";
+import { cmpStr } from "../deterministicSort";
 
 export function collectSbom(snap: AnalysisSnapshot): SbomInput | null {
   const healths =
@@ -29,7 +30,7 @@ export function collectSbom(snap: AnalysisSnapshot): SbomInput | null {
   }
 
   if (components.length === 0) return null;
-  components.sort((a, b) => a.purl.localeCompare(b.purl));
+  components.sort((a, b) => cmpStr(a.purl, b.purl));
 
   return {
     repoName: snap.repo.fullName,

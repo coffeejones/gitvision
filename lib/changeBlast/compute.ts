@@ -18,6 +18,7 @@ import {
 } from "../refactorSafety";
 import { isTestFile } from "../codeAnalysis/testCoverage";
 import type { ChangeBlastReport, ChangeKind, ChangedFileBlast } from "./types";
+import { cmpStr } from "../deterministicSort";
 
 /** A per-file fingerprint: aggregate complexity + the sorted set of its
  *  function body signatures. Two files with the same fingerprint are
@@ -134,7 +135,7 @@ export function computeChangeBlast(
       Number(a.isTest) - Number(b.isTest) ||
       (TIER_ORDER.get(a.tier) ?? 9) - (TIER_ORDER.get(b.tier) ?? 9) ||
       b.dependents - a.dependents ||
-      a.file.localeCompare(b.file),
+      cmpStr(a.file, b.file),
   );
 
   const prod = changedFiles.filter((f) => !f.isTest);

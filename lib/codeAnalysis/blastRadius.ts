@@ -22,6 +22,7 @@
 // every selection change.
 
 import type { CodeGraph } from "./types";
+import { cmpStr } from "../deterministicSort";
 
 export interface BlastRadiusEntry {
   filePath: string;
@@ -363,7 +364,7 @@ function bfs(
     if (file === start) continue;
     entries.push({ filePath: file, hop });
   }
-  entries.sort((a, b) => a.hop - b.hop || a.filePath.localeCompare(b.filePath));
+  entries.sort((a, b) => a.hop - b.hop || cmpStr(a.filePath, b.filePath));
   return { entries, truncated };
 }
 

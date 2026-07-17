@@ -8,6 +8,7 @@
 // workspaceSummary.ts and are server-only.
 
 import type { Headline } from "./headline";
+import { cmpStr } from "../deterministicSort";
 import type {
   DimensionStatus,
   DimensionSummary,
@@ -51,7 +52,7 @@ export function sortWorkspaceByPriority(
     const aWarn = countStatus(a.dimensions, "warning");
     const bWarn = countStatus(b.dimensions, "warning");
     if (bWarn !== aWarn) return bWarn - aWarn;
-    return b.updatedAt.localeCompare(a.updatedAt);
+    return cmpStr(b.updatedAt, a.updatedAt);
   });
 }
 

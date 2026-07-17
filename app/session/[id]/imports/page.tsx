@@ -55,7 +55,6 @@ export default async function ImportsPage({
           fileComplexity: {},
           filesByExt: {},
           byPlugin: {},
-          generatedAt: cg.generatedAt,
         }
       : null;
 

@@ -2,6 +2,8 @@
 // into a nested tree for the Source view's file explorer. Pure + deterministic —
 // no new data, just a reshape of paths we already have.
 
+import { cmpStr } from "./deterministicSort";
+
 export interface TreeFile {
   type: "file";
   name: string;
@@ -49,7 +51,8 @@ export function buildFileTree(paths: string[]): TreeNode[] {
 function sortLevel(dir: TreeDir): void {
   dir.children.sort((a, b) => {
     if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
-    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    // Case-insensitive, but locale-independent (see deterministicSort).
+    return cmpStr(a.name.toLowerCase(), b.name.toLowerCase()) || cmpStr(a.name, b.name);
   });
   for (const child of dir.children) {
     if (child.type === "dir") sortLevel(child);

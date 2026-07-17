@@ -30,6 +30,7 @@ import type { EcosystemPlugin, DeclaredPackage } from "./types";
 import { npmPlugin } from "./ecosystems/npm";
 import { cargoPlugin } from "./ecosystems/cargo";
 import { pypiPlugin } from "./ecosystems/pypi";
+import { cmpStr } from "../deterministicSort";
 
 const PLUGINS: EcosystemPlugin[] = [npmPlugin, cargoPlugin, pypiPlugin];
 
@@ -285,7 +286,7 @@ async function runPluginPipeline(
     });
   }
   components.sort(
-    (a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version)
+    (a, b) => cmpStr(a.name, b.name) || cmpStr(a.version, b.version)
   );
 
   return {

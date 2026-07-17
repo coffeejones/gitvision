@@ -18,6 +18,7 @@ import os from "node:os";
 import { pipeline } from "node:stream/promises";
 import { nanoid } from "nanoid";
 import * as tar from "tar";
+import { cmpStr } from "./deterministicSort";
 import type {
   FileGraph,
   FileGraphEdge,
@@ -1179,7 +1180,7 @@ function computeLayout(
     arr.sort((a, b) => {
       const ga = a.rel.split("/").slice(0, -1).join("/");
       const gb = b.rel.split("/").slice(0, -1).join("/");
-      return ga.localeCompare(gb) || a.rel.localeCompare(b.rel);
+      return cmpStr(ga, gb) || cmpStr(a.rel, b.rel);
     });
   }
 

@@ -19,6 +19,7 @@
 
 import type { CodeGraph } from "./codeAnalysis/types";
 import { fileFanIn } from "./impact";
+import { cmpStr } from "./deterministicSort";
 
 export interface RiskDrift {
   /** Repo-relative path of the file whose blast reach grew. */
@@ -58,7 +59,7 @@ export function computeRiskDrift(
   }
 
   drifts.sort(
-    (a, b) => b.delta - a.delta || b.to - a.to || a.file.localeCompare(b.file)
+    (a, b) => b.delta - a.delta || b.to - a.to || cmpStr(a.file, b.file)
   );
   return drifts.slice(0, Math.max(0, limit));
 }

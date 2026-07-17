@@ -18,6 +18,7 @@ import type { AnalysisSnapshot, CodeGraph } from "../types";
 import type { FunctionDef } from "../codeAnalysis/types";
 import { findDuplicateGroups } from "../codeAnalysis/duplicates";
 import { computeTestCoverage } from "../codeAnalysis/testCoverage";
+import { cmpStr } from "../deterministicSort";
 
 export interface StructuralFnRef {
   filePath: string;
@@ -162,7 +163,7 @@ function diffFunctions(prev: CodeGraph, curr: CodeGraph): FunctionDiffResult {
   // the displayed list. Tie-breaker: name ascending for stability.
   const byComplexity = (a: StructuralFnRef, b: StructuralFnRef): number => {
     if (b.complexity !== a.complexity) return b.complexity - a.complexity;
-    return a.name.localeCompare(b.name);
+    return cmpStr(a.name, b.name);
   };
   added.sort(byComplexity);
   removed.sort(byComplexity);

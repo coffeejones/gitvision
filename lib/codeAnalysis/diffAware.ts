@@ -27,6 +27,7 @@
 // extended with branchChanges / renameOf / etc. without breaking callers.
 
 import type { CodeGraph, FunctionDef } from "./types";
+import { cmpStr } from "../deterministicSort";
 
 export interface ChangedFunction {
   filePath: string;
@@ -162,7 +163,7 @@ export function computeDiff(
 
   // Step 4: sort by filePath then by source row (prefer post-diff row).
   changes.sort((a, b) => {
-    const fileCmp = a.filePath.localeCompare(b.filePath);
+    const fileCmp = cmpStr(a.filePath, b.filePath);
     if (fileCmp !== 0) return fileCmp;
     const aRow = a.startRowAfter ?? a.startRowBefore ?? 0;
     const bRow = b.startRowAfter ?? b.startRowBefore ?? 0;

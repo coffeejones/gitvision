@@ -636,7 +636,6 @@ describe("buildCodeGraph", () => {
       truncated: "MAX_FILES capped",
     });
     expect(g.truncated).toBe("MAX_FILES capped");
-    expect(g.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   // ---------------- Class aggregation (v0.70) ----------------

@@ -15,6 +15,7 @@
 
 import type { CodeGraph } from "./codeAnalysis/types";
 import { isTestFile } from "./codeAnalysis/testCoverage";
+import { cmpStr } from "./deterministicSort";
 
 /** True when a repo-relative path looks like a test file.
  *
@@ -89,7 +90,7 @@ export function rankFilesByFanIn(
 ): FileImpactRank[] {
   return [...fileFanIn(cg).entries()]
     .map(([file, dependents]) => ({ file, dependents }))
-    .sort((a, b) => b.dependents - a.dependents || a.file.localeCompare(b.file))
+    .sort((a, b) => b.dependents - a.dependents || cmpStr(a.file, b.file))
     .slice(0, Math.max(0, topN));
 }
 
@@ -142,7 +143,7 @@ export function rankFunctionsInFile(
     });
   }
   ranked.sort(
-    (a, b) => b.callers - a.callers || a.name.localeCompare(b.name)
+    (a, b) => b.callers - a.callers || cmpStr(a.name, b.name)
   );
   return ranked.slice(0, Math.max(0, topN));
 }

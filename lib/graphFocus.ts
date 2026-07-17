@@ -1,3 +1,4 @@
+import { cmpStr } from "./deterministicSort";
 // Graph-topology helper for the dependency canvas's focus mode.
 //
 // When a file is clicked, the canvas prunes to that file's N-hop neighborhood
@@ -87,7 +88,7 @@ export function neighborhood(
     return { ids: new Set(hops.keys()), hops, dropped: 0 };
   }
   const sorted = [...hops.entries()].sort(
-    (a, b) => a[1] - b[1] || a[0].localeCompare(b[0])
+    (a, b) => a[1] - b[1] || cmpStr(a[0], b[0])
   );
   const kept = new Map<string, number>();
   let dropped = 0;

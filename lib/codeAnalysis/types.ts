@@ -402,7 +402,6 @@ export interface CodeGraph {
   testFiles?: TestFileGraphEntry[];
   /** Truncation reason if any cap was hit. */
   truncated?: string;
-  generatedAt: string;
 }
 
 /** A test file's assertion-quality metadata, path-tagged for the graph layer. */

@@ -242,7 +242,6 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
     classes: classes.length > 0 ? classes : undefined,
     testFiles: testFiles.length > 0 ? testFiles : undefined,
     truncated,
-    generatedAt: new Date().toISOString(),
   };
 }
 

@@ -33,7 +33,6 @@ function graph(functions: FunctionDef[], calls: CallEdge[]): CodeGraph {
     fileComplexity: {},
     filesByExt: {},
     byPlugin: {},
-    generatedAt: "2026-01-01T00:00:00Z",
   };
 }
 
