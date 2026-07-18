@@ -8,11 +8,11 @@ let dir: string;
 
 beforeEach(async () => {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), "rj-seen-"));
-  process.env.REPOBARON_DATA_DIR = dir;
+  process.env.CODETRAWL_DATA_DIR = dir;
 });
 
 afterEach(async () => {
-  delete process.env.REPOBARON_DATA_DIR;
+  delete process.env.CODETRAWL_DATA_DIR;
   await fs.rm(dir, { recursive: true, force: true });
 });
 

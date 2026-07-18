@@ -10,7 +10,7 @@ import os from "node:os";
 import { savePreview, getPreview } from "../previewStore";
 import type { PreviewResult } from "../changeBlast/preview";
 
-const original = process.env.REPOBARON_DATA_DIR;
+const original = process.env.CODETRAWL_DATA_DIR;
 let tmp: string;
 
 const result: PreviewResult = {
@@ -33,7 +33,7 @@ const result: PreviewResult = {
 
 beforeAll(async () => {
   tmp = await fs.mkdtemp(path.join(os.tmpdir(), "preview-store-test-"));
-  process.env.REPOBARON_DATA_DIR = tmp;
+  process.env.CODETRAWL_DATA_DIR = tmp;
   // A "secret" living OUTSIDE the previews dir that a traversal id would reach:
   // <tmp>/previews/../sessions/secret.json  ==  <tmp>/sessions/secret.json
   await fs.mkdir(path.join(tmp, "sessions"), { recursive: true });
@@ -44,8 +44,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (original === undefined) delete process.env.REPOBARON_DATA_DIR;
-  else process.env.REPOBARON_DATA_DIR = original;
+  if (original === undefined) delete process.env.CODETRAWL_DATA_DIR;
+  else process.env.CODETRAWL_DATA_DIR = original;
   await fs.rm(tmp, { recursive: true, force: true });
 });
 

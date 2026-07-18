@@ -15,7 +15,7 @@
 import type { Octokit } from "octokit";
 
 import { getInstallationClient } from "./auth";
-import { COMMENT_MARKER } from "./comment";
+import { COMMENT_MARKER, LEGACY_COMMENT_MARKER } from "./comment";
 
 export interface PostCommentInput {
   installationId: number;
@@ -71,7 +71,9 @@ export async function postPrComment(
       { owner, repo, issue_number: prNumber, per_page: 100 },
     );
     const ours = comments.find(
-      (c) => typeof c.body === "string" && c.body.includes(COMMENT_MARKER),
+      (c) =>
+        typeof c.body === "string" &&
+        (c.body.includes(COMMENT_MARKER) || c.body.includes(LEGACY_COMMENT_MARKER)),
     );
     existingId = ours?.id;
   } catch (err) {

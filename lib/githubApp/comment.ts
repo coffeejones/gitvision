@@ -26,7 +26,10 @@ import type { PipelineResult } from "./pipeline";
  * find-or-update path — older comments with v1 marker keep getting
  * updated; a new format would be v2 and not match v1 comments.
  */
-export const COMMENT_MARKER = "<!-- repobaron:pr-review v2 -->";
+export const COMMENT_MARKER = "<!-- codetrawl:pr-review v2 -->";
+/** The pre-rename marker (RepoBaron era). The finder still matches it, so a PR
+ *  comment posted before the rename is updated in place, not duplicated. */
+export const LEGACY_COMMENT_MARKER = "<!-- repobaron:pr-review v2 -->";
 
 export interface FormatContext {
   /** Base URL of the workspace (e.g. "https://codetrawl.com"). Used

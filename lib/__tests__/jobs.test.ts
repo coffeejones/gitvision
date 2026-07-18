@@ -20,7 +20,7 @@ const TMP_ROOT = path.join(
   os.tmpdir(),
   `repobaron-jobs-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 );
-process.env.REPOBARON_DATA_DIR = TMP_ROOT;
+process.env.CODETRAWL_DATA_DIR = TMP_ROOT;
 
 import {
   createJob,

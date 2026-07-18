@@ -26,7 +26,7 @@ function minimalSnapshot(): AnalysisSnapshot {
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "repobaron-storage-"));
-  vi.stubEnv("REPOBARON_DATA_DIR", tmpDir);
+  vi.stubEnv("CODETRAWL_DATA_DIR", tmpDir);
 });
 
 afterEach(async () => {

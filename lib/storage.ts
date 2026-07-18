@@ -16,7 +16,7 @@ import { cmpStr } from "./deterministicSort";
 // (couple of path.join calls per operation).
 function storeDir(): string {
   const dataDir =
-    process.env.REPOBARON_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
+    process.env.CODETRAWL_DATA_DIR ?? process.env.REPOBARON_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
   return path.join(dataDir, "sessions");
 }
 

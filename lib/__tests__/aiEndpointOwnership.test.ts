@@ -8,7 +8,7 @@
 // rejection path (caller doesn't own the session) is covered at the
 // unit level in ownership.test.ts — testing it end-to-end here would
 // require mocking the storage module to plant a session in a directory
-// that getSession looks at, because REPOBARON_DATA_DIR is captured at
+// that getSession looks at, because CODETRAWL_DATA_DIR is captured at
 // module-import time and can't be overridden per-test (a known audit
 // finding in audit/when-time/ — QUAL-025).
 //

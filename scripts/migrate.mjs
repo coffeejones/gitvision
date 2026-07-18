@@ -21,7 +21,7 @@ import path from "node:path";
 import fs from "node:fs";
 
 const dataDir =
-  process.env.REPOBARON_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
+  process.env.CODETRAWL_DATA_DIR ?? process.env.REPOBARON_DATA_DIR ?? path.join(process.cwd(), ".gitvision");
 fs.mkdirSync(dataDir, { recursive: true });
 
 const dbPath = path.join(dataDir, "auth.db");

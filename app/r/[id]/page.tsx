@@ -43,7 +43,7 @@ export default async function ReceiptPage({
   // public page (issued receipts only ever carry the three known verdicts).
   const v = VERDICT[r.verdict] ?? { label: String(r.verdict), color: DIM };
   const issued = new Date(r.issuedAt);
-  const base = (process.env.REPOBARON_PUBLIC_URL ?? "").replace(/\/+$/, "");
+  const base = ((process.env.CODETRAWL_PUBLIC_URL ?? process.env.REPOBARON_PUBLIC_URL) ?? "").replace(/\/+$/, "");
   const analysisUrl = `${base}/session/${r.headSessionId}`;
 
   return (

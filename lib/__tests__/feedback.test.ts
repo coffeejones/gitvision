@@ -18,10 +18,10 @@ const TMP_ROOT = path.join(
   os.tmpdir(),
   `repobaron-feedback-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 );
-process.env.REPOBARON_DATA_DIR = TMP_ROOT;
+process.env.CODETRAWL_DATA_DIR = TMP_ROOT;
 // Make sure no webhook gets called during tests even if the dev shell
-// has REPOBARON_FEEDBACK_WEBHOOK_URL set.
-delete process.env.REPOBARON_FEEDBACK_WEBHOOK_URL;
+// has CODETRAWL_FEEDBACK_WEBHOOK_URL set.
+delete process.env.CODETRAWL_FEEDBACK_WEBHOOK_URL;
 
 import { submitFeedback } from "../feedback";
 import {

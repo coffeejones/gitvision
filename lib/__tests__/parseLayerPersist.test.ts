@@ -15,17 +15,17 @@ import { universeDigest, type ParseLayer } from "../shadowGraph/parseCache";
 import { parseLayerWriter, loadLayer } from "../shadowGraph/persist";
 
 describe("parse-layer persistence seam (Stage 1d)", () => {
-  const originalEnv = process.env.REPOBARON_DATA_DIR;
+  const originalEnv = process.env.CODETRAWL_DATA_DIR;
   let tmp: string;
 
   beforeAll(async () => {
     tmp = await fs.mkdtemp(path.join(os.tmpdir(), "persist-test-"));
-    process.env.REPOBARON_DATA_DIR = tmp;
+    process.env.CODETRAWL_DATA_DIR = tmp;
     await javascriptPlugin.load();
   });
   afterAll(async () => {
-    if (originalEnv === undefined) delete process.env.REPOBARON_DATA_DIR;
-    else process.env.REPOBARON_DATA_DIR = originalEnv;
+    if (originalEnv === undefined) delete process.env.CODETRAWL_DATA_DIR;
+    else process.env.CODETRAWL_DATA_DIR = originalEnv;
     await fs.rm(tmp, { recursive: true, force: true });
   });
 

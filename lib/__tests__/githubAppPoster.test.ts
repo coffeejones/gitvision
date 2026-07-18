@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { COMMENT_MARKER } from "../githubApp/comment";
+import { COMMENT_MARKER, LEGACY_COMMENT_MARKER } from "../githubApp/comment";
 import { type PosterDeps, postPrComment } from "../githubApp/poster";
 
 // ---------------- mock Octokit ----------------
@@ -233,6 +233,15 @@ describe("postPrComment — call ordering", () => {
       existingComments: [
         { id: 1, body: `${COMMENT_MARKER}\nold` },
       ],
+    });
+    await postPrComment(INPUT, makeDeps(octo));
+    expect(octo.rest.issues.createComment).not.toHaveBeenCalled();
+    expect(octo.rest.issues.updateComment).toHaveBeenCalled();
+  });
+
+  it("updates a comment left with the legacy (pre-rename) marker, not a duplicate", async () => {
+    const octo = makeOctokit({
+      existingComments: [{ id: 9, body: `${LEGACY_COMMENT_MARKER}\nold` }],
     });
     await postPrComment(INPUT, makeDeps(octo));
     expect(octo.rest.issues.createComment).not.toHaveBeenCalled();

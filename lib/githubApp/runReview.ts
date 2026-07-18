@@ -75,7 +75,7 @@ export function defaultRunReviewDeps(): RunReviewDeps {
       releaseConcurrencySlot,
     },
     workspaceBaseUrl:
-      process.env.REPOBARON_PUBLIC_URL?.replace(/\/+$/, "") ||
+      (process.env.CODETRAWL_PUBLIC_URL ?? process.env.REPOBARON_PUBLIC_URL)?.replace(/\/+$/, "") ||
       "http://localhost:3000",
   };
 }

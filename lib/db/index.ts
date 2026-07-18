@@ -38,7 +38,7 @@ const globalForDb = globalThis as unknown as {
  *  import-timing dances — same pattern lib/storage.ts uses. */
 function dbPath(): string {
   const dataDir =
-    process.env.REPOBARON_DATA_DIR ??
+    process.env.CODETRAWL_DATA_DIR ?? process.env.REPOBARON_DATA_DIR ??
     path.join(process.cwd(), ".gitvision");
   // Ensure dir exists; SQLite won't auto-create the parent directory.
   fs.mkdirSync(dataDir, { recursive: true });

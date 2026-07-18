@@ -28,18 +28,18 @@ const DATA = {
 };
 
 describe("receipt store", () => {
-  const savedDir = process.env.REPOBARON_DATA_DIR;
+  const savedDir = process.env.CODETRAWL_DATA_DIR;
   const savedSecret = process.env.RECEIPT_SECRET;
   let tmp: string;
 
   beforeAll(async () => {
     tmp = await fs.mkdtemp(path.join(os.tmpdir(), "receipts-test-"));
-    process.env.REPOBARON_DATA_DIR = tmp;
+    process.env.CODETRAWL_DATA_DIR = tmp;
     process.env.RECEIPT_SECRET = SECRET;
   });
   afterAll(async () => {
-    if (savedDir === undefined) delete process.env.REPOBARON_DATA_DIR;
-    else process.env.REPOBARON_DATA_DIR = savedDir;
+    if (savedDir === undefined) delete process.env.CODETRAWL_DATA_DIR;
+    else process.env.CODETRAWL_DATA_DIR = savedDir;
     if (savedSecret === undefined) delete process.env.RECEIPT_SECRET;
     else process.env.RECEIPT_SECRET = savedSecret;
     await fs.rm(tmp, { recursive: true, force: true });
