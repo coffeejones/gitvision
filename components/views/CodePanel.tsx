@@ -58,6 +58,7 @@ import {
   summarizeDuplicates,
   type DuplicateGroup,
 } from "@/lib/codeAnalysis/duplicates";
+import { computeCallResolution } from "@/lib/codeAnalysis/callResolution";
 
 const INITIAL_LIST_SIZE = 10;
 const EXPANDED_LIST_SIZE = 60;
@@ -440,6 +441,13 @@ function CoverageChip({ cg }: { cg: CodeGraph }) {
   const langList =
     activeAstLangs.length > 0 ? activeAstLangs.join(", ") : undefined;
 
+  // Honest coverage: how many call sites actually resolved to a target. The
+  // rest are dynamic dispatch we can't pin statically — so the call graph (and
+  // the blast radius built on it) is high-confidence but not exhaustive, and
+  // lower on dynamic languages. Show it rather than imply completeness.
+  const resolution = computeCallResolution(cg);
+  const resolvedPct = Math.round(resolution.rate * 100);
+
   // Apple-style stat-tile grid (matches PackagesPanel summary tiles).
   // Three primary tiles always render (AST files / functions / call
   // sites); the regex-fallback tile only appears when there are
@@ -465,6 +473,18 @@ function CoverageChip({ cg }: { cg: CodeGraph }) {
       <CodeStatTile
         label="Call sites"
         count={totalCalls}
+        sublabel={
+          resolution.total > 0
+            ? `${resolution.resolved.toLocaleString()} resolved · ${resolvedPct}%`
+            : undefined
+        }
+        title={
+          "Call sites resolved to a specific definition. The rest are dynamic dispatch " +
+          "— duck typing, metaprogramming, calls into libraries — which static analysis " +
+          "can't pin to a target without running the code. The call graph and blast " +
+          "radius are built from the resolved calls: high-confidence, but not exhaustive, " +
+          "and lower on dynamic languages."
+        }
         icon={<Network size={13} />}
       />
       {fbFiles > 0 && (
@@ -492,16 +512,20 @@ function CodeStatTile({
   sublabel,
   icon,
   muted,
+  title,
 }: {
   label: string;
   count: number;
   sublabel?: string;
   icon?: React.ReactNode;
   muted?: boolean;
+  /** Hover explanation — used to keep the call-resolution coverage honest. */
+  title?: string;
 }) {
   return (
     <div
       className="rounded-xl p-4 flex flex-col gap-1.5"
+      title={title}
       style={{
         background: TOK.surface,
         border: `1px solid ${TOK.border}`,
