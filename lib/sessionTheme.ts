@@ -18,7 +18,8 @@
 // CodeTrawl, International Orange (#FF4F00) is RATIONED to genuine criticals,
 // and severity reads in TONE, not colour. So:
 //   accent  (brand + good)  → neutral bone   (active nav, links, a cleared seal)
-//   amber   (warning)       → neutral dim    (conditional, mid severity)
+//   amber   (warning)       → muted caution gold (conditional, mid severity —
+//                             distinct from both the bone and the orange)
 //   rose    (bad / critical)→ International Orange (a returned verdict, a CVE)
 // A healthy state therefore goes quiet/neutral and the one warm colour means
 // "critical" everywhere on the surface.
@@ -48,7 +49,7 @@ export const TOK = {
   accentSoft: CH.accentSoft,
   accentStrong: CH.accent,
 
-  // Status — amber → neutral dim (warning/conditional reads in tone), rose →
+  // Status — amber → muted caution gold (warning/conditional), rose →
   // International Orange (the one rationed heat: a genuine critical).
   amber: CH.warning,
   amberSoft: CH.warningSoft,

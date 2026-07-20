@@ -43,8 +43,13 @@ export const CH = {
   // severity by tone, warmth reserved for criticals.
   critical: "#ff4f00",
   criticalSoft: "rgba(255,79,0,0.13)",
-  warning: "#9b9794",
-  warningSoft: "rgba(255,255,255,0.07)",
+  // Muted caution gold — a distinct mid-severity tier that reads as "warning"
+  // without spending the rationed International Orange (#ff4f00, reserved for
+  // genuine criticals) and without collapsing into textDim grey (#9b9794),
+  // which it used to equal, leaving every medium-severity tile visually
+  // indistinguishable from plain secondary text.
+  warning: "#c99a4e",
+  warningSoft: "rgba(201,154,78,0.14)",
   ok: "#8a8783",
 
   // Brass — retired with the courtroom crest; kept as neutral aliases so any
