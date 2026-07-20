@@ -612,3 +612,49 @@ describe("diffHealthSummaries · status transitions", () => {
     expect(team.change).toBe("unchanged");
   });
 });
+
+// ---------------- Honest capability-gap details ----------------
+//
+// "Refresh to populate" is a lie when the gap is a CAPABILITY: a refresh
+// can never populate an unparsed language or a missing manifest. The
+// builder now sets an honest detail for those unknown tiles (Rick hit
+// this on a pure-Dart repo).
+
+describe("summarizeHealth · capability-gap details", () => {
+  const emptyCg = {
+    functions: [],
+    calls: [],
+    imports: [],
+    fileComplexity: {},
+    filesByExt: {},
+    byPlugin: {},
+  } as unknown as NonNullable<AnalysisSnapshot["codeGraph"]>;
+
+  it("names the unparsed dominant language on the code tile", () => {
+    const dims = summarizeHealth(
+      snap({ codeGraph: emptyCg, languages: { Dart: 235907, Shell: 6341 } })
+    );
+    const code = dims.find((d) => d.id === "code")!;
+    expect(code.status).toBe("unknown");
+    expect(code.detail).toBe("Dart isn't parsed yet");
+  });
+
+  it("says no supported manifests on the deps tile", () => {
+    const dims = summarizeHealth(
+      snap({ codeGraph: emptyCg, languages: { Dart: 235907 } })
+    );
+    const deps = dims.find((d) => d.id === "deps")!;
+    expect(deps.status).toBe("unknown");
+    expect(deps.detail).toBe("No supported package manifests (npm, Cargo, PyPI)");
+  });
+
+  it("leaves legacy snapshots (no codeGraph at all) on the generic fallback", () => {
+    const dims = summarizeHealth(snap({ languages: { Dart: 235907 } }));
+    const code = dims.find((d) => d.id === "code")!;
+    const deps = dims.find((d) => d.id === "deps")!;
+    // undefined detail → the UI's "Refresh to populate" fallback, which is
+    // truthful for pre-code-analysis snapshots.
+    expect(code.detail).toBeUndefined();
+    expect(deps.detail).toBeUndefined();
+  });
+});

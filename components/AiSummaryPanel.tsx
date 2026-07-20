@@ -58,10 +58,6 @@ export function AiSummaryPanel({
     });
   }
 
-  const usd = summary?.usage
-    ? ((summary.usage.inputTokens * 3 + summary.usage.outputTokens * 15) / 1_000_000).toFixed(4)
-    : null;
-
   return (
     <section
       className="flex flex-col gap-3"
@@ -147,18 +143,6 @@ export function AiSummaryPanel({
           >
             {summary.text}
           </div>
-          {summary.usage && (
-            <div
-              className="mt-2 pt-3 border-t flex items-center justify-between text-[11px] font-mono"
-              style={{ borderColor: TOK.border, color: TOK.textMuted }}
-            >
-              <span>
-                {summary.usage.inputTokens.toLocaleString()} tokens in ·{" "}
-                {summary.usage.outputTokens.toLocaleString()} out
-              </span>
-              {usd && <span>~${usd}</span>}
-            </div>
-          )}
         </article>
       )}
 

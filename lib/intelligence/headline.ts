@@ -30,6 +30,7 @@
 // browser deps), no AI calls (deterministic).
 
 import { findDuplicateGroups } from "../codeAnalysis/duplicates";
+import { unsupportedLanguageNote } from "../codeAnalysis/languageSupport";
 import { computeTestCoverage } from "../codeAnalysis/testCoverage";
 import { isCodeFile } from "../signals";
 import type { AnalysisSnapshot } from "../types";
@@ -43,6 +44,7 @@ export type HeadlineKind =
   | "low-coverage"
   | "high-churn-hotspot"
   | "stale-repo"
+  | "no-code-parsed"
   | "generic-healthy"
   | "no-data";
 
@@ -249,7 +251,26 @@ export function pickHeadline(snap: AnalysisSnapshot): Headline {
     };
   }
 
-  // 6. Generic healthy — fallback when no concrete signal stands out.
+  // 6. Nothing parsed — the graph exists but is EMPTY. Never fall through to
+  //    "looks healthy": nothing was analyzed, so say so honestly. Rick hit
+  //    this on a pure-Dart repo — the old copy claimed "0 functions … repo
+  //    looks healthy at first pass", which reads as broken (correctly).
+  if (cg.functions.length === 0) {
+    const unsupported = unsupportedLanguageNote(snap.languages);
+    return {
+      kind: "no-code-parsed",
+      severity: "info",
+      primary: unsupported
+        ? `${unsupported} isn't a language CodeTrawl parses yet`
+        : "No parseable code found in this repo",
+      detail:
+        "Code-level views (Source, Code, Faultline) will be empty here. Git history, security scanning, and hygiene checks below still apply.",
+      ctaLink: "signals",
+      ctaLabel: "See what still applies",
+    };
+  }
+
+  // 7. Generic healthy — fallback when no concrete signal stands out.
   const astLanguages = Object.keys(cg.byPlugin || {}).filter(
     (p) => p !== "regex-fallback" && (cg.byPlugin[p]?.files ?? 0) > 0
   ).length;

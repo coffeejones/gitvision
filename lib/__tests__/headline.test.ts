@@ -568,3 +568,49 @@ describe("pickHeadline · waterfall priority", () => {
     expect(headline.kind).toBe("high-churn-hotspot");
   });
 });
+
+// ------------------- Rule 6: no-code-parsed -------------------
+//
+// The graph EXISTS but is empty — nothing was parsed. Must never fall
+// through to generic-healthy ("0 functions … looks healthy" read as
+// broken on a pure-Dart repo, correctly). Names the dominant language
+// when it's one we don't parse.
+
+describe("pickHeadline · no-code-parsed", () => {
+  it("names the dominant unsupported language (Dart)", () => {
+    const cg = emptyGraph();
+    cg.byPlugin = {};
+    const headline = pickHeadline(
+      snap({
+        codeGraph: cg,
+        languages: { Dart: 235907, Shell: 6341 },
+      })
+    );
+    expect(headline.kind).toBe("no-code-parsed");
+    expect(headline.primary).toContain("Dart isn't a language CodeTrawl parses yet");
+    expect(headline.detail).toContain("still apply");
+    expect(headline.primary).not.toContain("healthy");
+  });
+
+  it("uses the neutral message when the dominant language IS supported", () => {
+    const cg = emptyGraph();
+    cg.byPlugin = {};
+    const headline = pickHeadline(
+      snap({
+        codeGraph: cg,
+        languages: { TypeScript: 1000 },
+      })
+    );
+    expect(headline.kind).toBe("no-code-parsed");
+    expect(headline.primary).toBe("No parseable code found in this repo");
+  });
+
+  it("does NOT fire when functions were parsed", () => {
+    const cg = emptyGraph();
+    cg.functions = [fn("src/foo.ts", "f", 2)];
+    const headline = pickHeadline(
+      snap({ codeGraph: cg, languages: { Dart: 999999 } })
+    );
+    expect(headline.kind).toBe("generic-healthy");
+  });
+});

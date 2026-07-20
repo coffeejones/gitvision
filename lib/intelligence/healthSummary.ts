@@ -18,7 +18,8 @@
 // the Insights page.
 
 import type { AnalysisSnapshot, HealthSignal } from "../types";
-import { extractHealthSignals } from "../signals";
+import { extractHealthSignals, getDependencyHealths } from "../signals";
+import { unsupportedLanguageNote } from "../codeAnalysis/languageSupport";
 
 export type DimensionId =
   | "activity"
@@ -374,11 +375,43 @@ export function summarizeHealth(snap: AnalysisSnapshot): DimensionSummary[] {
       label: DIMENSION_LABELS[id],
       status,
       statusLabel,
-      detail: lead ? shortDetail(lead) : undefined,
+      detail: lead ? shortDetail(lead) : capabilityGapDetail(id, status, snap),
       signalCount:
         matched.working.length +
         matched.needsWork.length +
         matched.questions.length,
     };
   });
+}
+
+/** Honest detail for "unknown" tiles when the gap is a CAPABILITY, not a
+ *  stale snapshot. Without this, the UI falls back to "Refresh to populate"
+ *  — a lie when the repo's language isn't parsed or no supported package
+ *  manifest exists (a refresh can never populate those). Returns undefined
+ *  when the generic fallback is the right message (e.g. genuinely old
+ *  snapshots from before code analysis shipped). */
+function capabilityGapDetail(
+  id: DimensionId,
+  status: DimensionStatus,
+  snap: AnalysisSnapshot
+): string | undefined {
+  if (status !== "unknown") return undefined;
+  if (id === "code") {
+    // Graph present but empty = we swept and parsed nothing.
+    const cg = snap.codeGraph;
+    if (cg && cg.functions.length === 0) {
+      const unsupported = unsupportedLanguageNote(snap.languages);
+      return unsupported
+        ? `${unsupported} isn't parsed yet`
+        : "No parseable code found";
+    }
+  }
+  if (id === "deps") {
+    // Snapshot complete but no dependency healths = no manifest we read.
+    const healths = getDependencyHealths(snap);
+    if (snap.codeGraph && healths.length === 0) {
+      return "No supported package manifests (npm, Cargo, PyPI)";
+    }
+  }
+  return undefined;
 }

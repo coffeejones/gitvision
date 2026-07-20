@@ -24,8 +24,9 @@ import type {
 
 /** Aggregate dependency-health across all ecosystems present on a snapshot.
  *  Handles the pre-v0.9 singular shape AND the new array shape so old and
- *  new snapshots both produce correct signals without migration. */
-function getDependencyHealths(snap: AnalysisSnapshot): DependencyHealth[] {
+ *  new snapshots both produce correct signals without migration. Exported as
+ *  the canonical normalizer (healthSummary uses it for honest empty states). */
+export function getDependencyHealths(snap: AnalysisSnapshot): DependencyHealth[] {
   if (snap.dependencyHealths && snap.dependencyHealths.length > 0) {
     return snap.dependencyHealths;
   }
