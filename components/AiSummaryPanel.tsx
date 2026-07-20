@@ -133,8 +133,14 @@ export function AiSummaryPanel({
           // rather than "a flat colored rectangle".
           className="rounded-xl p-6 flex flex-col gap-3"
           style={{
-            background: TOK.surface,
+            // The material recipe the family uses (diagonal bone lift over
+            // surface) — the AI briefing is the anchor of the page, so it also
+            // earns a genuine soft shadow: it reads as a printed page catching
+            // light, not a flat colored rectangle.
+            background: `linear-gradient(135deg, ${TOK.surfaceElevated} 0%, ${TOK.surface} 62%)`,
             border: `1px solid ${TOK.border}`,
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,0.04), 0 14px 30px -16px rgba(0,0,0,0.55)",
           }}
         >
           <div

@@ -210,12 +210,17 @@ function StatTile({
 }) {
   const isZero = count === 0;
   const activeColor = color && !isZero ? color : TOK.textPrimary;
+  // The material recipe the family uses (HeadlineFinding, SinceLastVisit): a
+  // diagonal tint over surface so the tiles read as objects on the page, not
+  // spreadsheet cells. Severity tiles (with a colorBg) tint by their status
+  // when non-zero; the rest get a neutral bone lift.
+  const tint = color && colorBg && !isZero ? colorBg : TOK.surfaceElevated;
   return (
     <div
       className="rounded-xl p-4 flex flex-col gap-1.5"
       style={{
-        background: TOK.surface,
-        border: `1px solid ${TOK.border}`,
+        background: `linear-gradient(135deg, ${tint} 0%, transparent 60%), ${TOK.surface}`,
+        border: `1px solid ${color && !isZero ? `${color}44` : TOK.border}`,
       }}
     >
       <div className="flex items-start justify-between gap-2">
