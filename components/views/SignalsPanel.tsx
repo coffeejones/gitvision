@@ -36,6 +36,19 @@ import {
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { HealthSignal, HealthSignals } from "@/lib/types";
+import { TermInfo } from "@/components/TermInfo";
+import type { GlossaryKey } from "@/lib/glossary";
+
+// Signal ids whose concept has a glossary "what/why". The card title already
+// says WHAT fired; TermInfo adds the plain-language meaning + downstream impact
+// (Rick Segal's ask). Only the jargon-heavy ones — self-evident signals
+// (e.g. "very-active") get nothing, on purpose.
+const SIGNAL_TERMS: Partial<Record<string, GlossaryKey>> = {
+  "untested-hotspots": "untested-hotspot",
+  "bus-factor-risk": "bus-factor",
+  "deep-dependency-chains": "import-depth",
+  "cross-boundary-coupling": "cross-boundary",
+};
 
 interface Props {
   signals: HealthSignals;
@@ -432,10 +445,11 @@ function SignalCard({ signal, columnAccent }: SignalCardProps) {
       </header>
 
       <h3
-        className="text-sm font-semibold tracking-tight"
+        className="text-sm font-semibold tracking-tight inline-flex items-center gap-1.5"
         style={{ color: TOK.textPrimary, letterSpacing: "-0.01em" }}
       >
         {signal.title}
+        {SIGNAL_TERMS[signal.id] && <TermInfo term={SIGNAL_TERMS[signal.id]!} />}
       </h3>
 
       <p

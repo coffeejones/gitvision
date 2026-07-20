@@ -29,6 +29,17 @@ import type {
   DimensionTrend,
 } from "@/lib/intelligence/healthSummary";
 import { STYLE, TOK } from "@/lib/sessionTheme";
+import { TermInfo } from "@/components/TermInfo";
+import type { GlossaryKey } from "@/lib/glossary";
+
+// The concept a dimension's status is really about — a TermInfo on the tile
+// answers "what does 'Team: Needs work' actually mean?" (Rick Segal's ask).
+// Only the ones whose meaning isn't self-evident from the label; Activity,
+// PR flow, Hygiene are plain enough on their own.
+const DIMENSION_TERMS: Partial<Record<DimensionId, GlossaryKey>> = {
+  team: "bus-factor",
+  code: "untested-hotspot",
+};
 
 /** Map a tile's status to the relevant Health-check column anchor on
  *  /insights. critical + warning tiles want the "needs work" column;
@@ -299,16 +310,27 @@ function HealthTile({
     minHeight: 96,
   };
 
-  if (isInteractive) {
-    return (
-      <Link href={href} className={className} style={inlineStyle}>
-        {Body}
-      </Link>
-    );
-  }
-  return (
+  // A TermInfo sits absolutely in the top-right corner — OUTSIDE the tile's
+  // Link, so we never nest a button inside an anchor. Only for dimensions
+  // whose concept warrants it (DIMENSION_TERMS).
+  const term = DIMENSION_TERMS[summary.id];
+  const tile = isInteractive ? (
+    <Link href={href} className={className} style={inlineStyle}>
+      {Body}
+    </Link>
+  ) : (
     <div className={className} style={inlineStyle}>
       {Body}
+    </div>
+  );
+
+  if (!term) return tile;
+  return (
+    <div className="relative">
+      {tile}
+      <span className="absolute top-2 right-2">
+        <TermInfo term={term} size={12} />
+      </span>
     </div>
   );
 }
