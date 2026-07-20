@@ -13,8 +13,8 @@ export function CTStripe() {
         <p>
           <b>COMPUTED, NEVER GENERATED</b> — every grade and signal is
           deterministic: tree-sitter AST parsing · full-history git analysis ·
-          resolved dependency graphs. The model only narrates what was
-          measured.
+          resolved dependency graphs. The model narrates — it never decides
+          the grade.
         </p>
       </div>
     </section>

@@ -4,8 +4,8 @@
 
 CodeTrawl is a **deterministic verification layer for code in the AI era.** Paste
 a public GitHub repo and get blast radius, untested hotspots, structural
-duplicates, a dependency-health panel, and architecture diagrams in under 20
-seconds — then *simulate* a change and get a cited, sub-second verdict on what it
+duplicates, a dependency-health panel, and architecture diagrams in about a
+minute — then *simulate* a change and get a cited, sub-second verdict on what it
 would break. The same engine backs a human workspace, a GitHub PR gate with a
 signed merge receipt, and an MCP server that gives AI agents a conscience.
 

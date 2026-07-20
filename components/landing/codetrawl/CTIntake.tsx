@@ -180,7 +180,7 @@ export function CTIntake({ value, onChange }: Props) {
         public or private · free account · zero config · survey in ~60s
       </div>
       <div className="samples">
-        <span>or see a live demo —</span>
+        <span>or see a live demo — no sign-up:</span>
         {DEMO_SESSIONS.map((s) => (
           <button
             key={s.label}

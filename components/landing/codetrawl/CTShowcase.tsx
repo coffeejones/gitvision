@@ -115,7 +115,7 @@ export function CTShowcase() {
           <h2 className="sec-h2">What the survey actually shows.</h2>
           <p className="sc-deck">
             Six of the views CodeTrawl renders from a sweep — real layouts,
-            real data. Pick one.
+            sample data. Pick one.
           </p>
         </CTReveal>
 

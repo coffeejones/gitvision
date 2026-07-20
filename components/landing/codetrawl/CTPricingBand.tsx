@@ -15,7 +15,7 @@ export function CTPricingBand() {
               itself is free (public or private) — paid = keeping many repos. */}
           <p className="price-line">
             The whole tool is free on one repo — private repos included. Paid
-            plans keep unlimited repos on watch.
+            plans keep more repos on watch — 5 on Plus, unlimited on Pro.
           </p>
           <Link href="/pricing" className="price-cta">
             See pricing
