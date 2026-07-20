@@ -104,6 +104,9 @@ export function CTScreenshot({
   bleed,
   fade,
   wide = false,
+  width,
+  height,
+  priority = false,
 }: {
   src: string;
   alt: string;
@@ -126,6 +129,12 @@ export function CTScreenshot({
   /** let the frame fill its container instead of capping at 980px — for a big
    *  full-width establishing shot (e.g. the hero). */
   wide?: boolean;
+  /** intrinsic image dimensions — reserves layout space so the page never
+   *  shifts while screenshots load (CLS). */
+  width?: number;
+  height?: number;
+  /** above-the-fold shot: eager + high fetch priority; everything else lazy. */
+  priority?: boolean;
 }) {
   const basePad = tight
     ? { y: "clamp(16px, 3vw, 44px)", x: "clamp(10px, 2vw, 30px)" }
@@ -170,7 +179,16 @@ export function CTScreenshot({
         <span style={{ width: 47 }} />
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} style={{ display: "block", width: "100%", height: "auto" }} />
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        loading={priority ? undefined : "lazy"}
+        fetchPriority={priority ? "high" : undefined}
+        decoding="async"
+        style={{ display: "block", width: "100%", height: "auto" }}
+      />
     </div>
   );
 

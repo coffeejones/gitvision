@@ -10,8 +10,9 @@
 // Self-contained inline styles (bitumen + bone, no orange) so it renders
 // consistently across every theme island without depending on the `.ct`
 // scope or any stylesheet. Reads/writes the shared lib/cookieConsent state,
-// which the functional-storage call sites (e.g. the owner-id in CTIntake)
-// already gate on — so "Decline" genuinely suppresses non-essential storage.
+// which the functional-storage call sites (e.g. the owner-id in
+// CTLandingIntake) already gate on — so "Decline" genuinely suppresses
+// non-essential storage.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";

@@ -1,7 +1,7 @@
 "use client";
 
-// DraftMotion — the motion layer for the landing draft. THROWAWAY (ports to the
-// real landing later). Four jobs, all restraint-first and transform-only:
+// CTMotion — the landing motion layer. Restraint-first, transform-only:
+
 //   1. Lenis smooth scroll (the "buttery" feel; anchors included)
 //   2. Reveal engine: adds .in to [data-rv] elements as they enter the viewport
 //      (one-shot; CSS owns the actual transition — springy, small, directional)
@@ -13,7 +13,7 @@
 import { useEffect } from "react";
 import Lenis from "lenis";
 
-export function DraftMotion() {
+export function CTMotion() {
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const rvs = Array.from(document.querySelectorAll<HTMLElement>("[data-rv]"));

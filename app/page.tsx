@@ -16,14 +16,38 @@ import { CodeTrawlLanding } from "@/components/landing/codetrawl/CodeTrawlLandin
 
 export const dynamic = "force-dynamic";
 
+const TITLE = "CodeTrawl — get to know any codebase";
+const DESCRIPTION =
+  "Paste a GitHub repo and read it like a manual — what every part does, how it all connects, and what breaks if you touch it. One sweep, about a minute. Free on one repo, private repos included.";
+
 export const metadata: Metadata = {
-  title: "CodeTrawl — see to the bottom of any codebase",
-  description:
-    "One deterministic sweep — git history, structure, security, supply chain — and a survey deep enough to dig into. Computed, never generated.",
+  title: TITLE,
+  description: DESCRIPTION,
   // Pin the home canonical to the production origin so Railway preview /
   // branch hosts (the metadataBase resolves per-host) don't get indexed as
   // a duplicate of the landing page.
   alternates: { canonical: "/" },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: "/",
+    siteName: "CodeTrawl",
+    type: "website",
+    images: [
+      {
+        url: "/landing/og.jpg",
+        width: 1200,
+        height: 630,
+        alt: "CodeTrawl reading pallets/flask — a repo read like a manual",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: ["/landing/og.jpg"],
+  },
 };
 
 export default async function Home() {
