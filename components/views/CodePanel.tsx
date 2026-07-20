@@ -41,6 +41,8 @@ import type { AnalysisSnapshot, CodeGraph } from "@/lib/types";
 import { STYLE, TOK } from "@/lib/sessionTheme";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { HelpHint } from "@/components/HelpHint";
+import { TermInfo } from "@/components/TermInfo";
+import type { GlossaryKey } from "@/lib/glossary";
 import { EmptyPanel } from "@/components/EmptyPanel";
 import { SearchInput } from "@/components/SearchInput";
 import {
@@ -478,13 +480,7 @@ function CoverageChip({ cg }: { cg: CodeGraph }) {
             ? `${resolution.resolved.toLocaleString()} resolved · ${resolvedPct}%`
             : undefined
         }
-        title={
-          "Call sites resolved to a specific definition. The rest are dynamic dispatch " +
-          "— duck typing, metaprogramming, calls into libraries — which static analysis " +
-          "can't pin to a target without running the code. The call graph and blast " +
-          "radius are built from the resolved calls: high-confidence, but not exhaustive, " +
-          "and lower on dynamic languages."
-        }
+        term="call-resolution"
         icon={<Network size={13} />}
       />
       {fbFiles > 0 && (
@@ -513,6 +509,7 @@ function CodeStatTile({
   icon,
   muted,
   title,
+  term,
 }: {
   label: string;
   count: number;
@@ -521,11 +518,13 @@ function CodeStatTile({
   muted?: boolean;
   /** Hover explanation — used to keep the call-resolution coverage honest. */
   title?: string;
+  /** Optional glossary key — renders a what/why popover next to the label. */
+  term?: GlossaryKey;
 }) {
   return (
     <div
       className="rounded-xl p-4 flex flex-col gap-1.5"
-      title={title}
+      title={term ? undefined : title}
       style={{
         background: TOK.surface,
         border: `1px solid ${TOK.border}`,
@@ -533,10 +532,11 @@ function CodeStatTile({
     >
       <div className="flex items-start justify-between gap-2">
         <span
-          className="text-[10px] uppercase tracking-[0.18em] font-medium"
+          className="text-[10px] uppercase tracking-[0.18em] font-medium inline-flex items-center gap-1.5"
           style={{ color: TOK.textMuted }}
         >
           {label}
+          {term && <TermInfo term={term} size={10} />}
         </span>
         {icon && (
           <span
@@ -1220,9 +1220,15 @@ function HeavyFilesList({
         <FileCode size={13} />
         <span>Heaviest files</span>
         <span style={{ color: TOK.textMuted, textTransform: "none" }}>
-          (by file complexity, not function count)
+          (by file complexity)
         </span>
+        <TermInfo term="file-complexity" />
       </div>
+      <p className="text-[11px] leading-snug" style={{ color: TOK.textMuted }}>
+        The number on the left is complexity — how many independent paths run
+        through the file. Higher means harder to change safely. The chip on the
+        right is test coverage: how many of its functions a test actually calls.
+      </p>
 
       <ul className="flex flex-col gap-0.5">
         {top.map(({ file, complexity }) => {
@@ -1336,10 +1342,7 @@ function UntestedHotspotsPanel({
             style={{ color: TOK.textPrimary }}
           >
             Untested hotspots
-            <HelpHint
-              anchor="untested-duplicates"
-              label="How untested coverage is detected and ranked"
-            />
+            <TermInfo term="untested-hotspot" />
           </span>
           <span style={{ color: TOK.textMuted }}>·</span>
           <span className="text-xs truncate" style={{ color: TOK.textSecondary }}>
