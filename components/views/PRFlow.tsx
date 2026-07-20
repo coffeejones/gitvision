@@ -9,6 +9,8 @@ import { GitPullRequest } from "lucide-react";
 import type { PullRequestSummary } from "@/lib/types";
 import { isBotAuthor } from "@/lib/botDetection";
 import { TOK } from "@/lib/sessionTheme";
+import { TermInfo } from "@/components/TermInfo";
+import type { GlossaryKey } from "@/lib/glossary";
 import { MUTED, VIZ_NEUTRAL, CYCLE_TIME_RAMP } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
 
@@ -241,6 +243,7 @@ export function PRFlow({ prs }: Props) {
         />
         <Stat
           label="Median time to merge"
+          term="time-to-merge"
           value={
             summary.medianTimeToMerge > 0
               ? fmtDuration(summary.medianTimeToMerge)
@@ -330,10 +333,12 @@ function Stat({
   label,
   value,
   note,
+  term,
 }: {
   label: string;
   value: string;
   note?: string;
+  term?: GlossaryKey;
 }) {
   return (
     <div
@@ -344,10 +349,11 @@ function Stat({
       }}
     >
       <div
-        className="text-[10px] uppercase tracking-[0.18em] font-medium"
+        className="text-[10px] uppercase tracking-[0.18em] font-medium inline-flex items-center gap-1.5"
         style={{ color: TOK.textMuted }}
       >
         {label}
+        {term && <TermInfo term={term} size={10} />}
       </div>
       <div
         className="text-2xl font-semibold mt-1 tabular-nums"

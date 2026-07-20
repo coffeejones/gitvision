@@ -488,6 +488,7 @@ function CoverageChip({ cg }: { cg: CodeGraph }) {
           label="Regex fallback"
           count={fbFiles}
           sublabel="imports only"
+          term="regex-fallback"
           icon={<ShieldOff size={13} />}
           muted
         />

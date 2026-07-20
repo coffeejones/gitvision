@@ -17,6 +17,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Zap, Search, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
+import { TermInfo } from "@/components/TermInfo";
+import type { GlossaryKey } from "@/lib/glossary";
 import type { SimulateResult, RequiredAction } from "@/lib/shadowGraph/simulate";
 import type { ChangeBlastReport } from "@/lib/changeBlast/types";
 import { FaultlineBlastCanvas } from "@/components/views/FaultlineBlastCanvas";
@@ -411,6 +413,7 @@ function Verdict({
             one="load-bearing wall"
             many="load-bearing walls"
             accent={report.loadBearingTouched.length > 0 ? TOK.rose : undefined}
+            term="load-bearing"
           />
           <Stat n={report.testsToRun.length} one="guarding test" many="guarding tests" />
         </div>
@@ -501,16 +504,19 @@ function Stat({
   one,
   many,
   accent,
+  term,
 }: {
   n: number;
   one: string;
   many: string;
   accent?: string;
+  term?: GlossaryKey;
 }) {
   return (
-    <span style={{ color: accent ?? TOK.textMuted }}>
+    <span className="inline-flex items-center gap-1" style={{ color: accent ?? TOK.textMuted }}>
       <strong style={{ color: accent ?? TOK.textSecondary, fontWeight: 700 }}>{n}</strong>{" "}
       {n === 1 ? one : many}
+      {term && <TermInfo term={term} size={11} />}
     </span>
   );
 }

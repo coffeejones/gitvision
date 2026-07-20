@@ -25,6 +25,8 @@ import type {
 import { TOK } from "@/lib/sessionTheme";
 import { SearchInput } from "@/components/SearchInput";
 import { HelpHint } from "@/components/HelpHint";
+import { TermInfo } from "@/components/TermInfo";
+import type { GlossaryKey } from "@/lib/glossary";
 import { EmptyPanel } from "@/components/EmptyPanel";
 
 // ------------------- Link builders -------------------
@@ -122,6 +124,7 @@ export function PackagesPanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
           color={TOK.rose}
           colorBg={TOK.roseSoft}
           icon={<ShieldAlert size={13} />}
+          term="cve"
         />
         <StatTile
           label="Outdated"
@@ -195,6 +198,7 @@ function StatTile({
   color,
   colorBg,
   icon,
+  term,
 }: {
   label: string;
   count: number;
@@ -202,6 +206,7 @@ function StatTile({
   color?: string;
   colorBg?: string;
   icon?: React.ReactNode;
+  term?: GlossaryKey;
 }) {
   const isZero = count === 0;
   const activeColor = color && !isZero ? color : TOK.textPrimary;
@@ -215,10 +220,11 @@ function StatTile({
     >
       <div className="flex items-start justify-between gap-2">
         <span
-          className="text-[10px] uppercase tracking-[0.18em] font-medium"
+          className="text-[10px] uppercase tracking-[0.18em] font-medium inline-flex items-center gap-1.5"
           style={{ color: TOK.textMuted }}
         >
           {label}
+          {term && <TermInfo term={term} size={10} />}
         </span>
         {icon && color && colorBg && !isZero && (
           <span

@@ -100,6 +100,58 @@ export const GLOSSARY = {
     why: "Tightly coupled modules are harder to change, test, or lift out on their own.",
     anchor: "architecture",
   },
+  "co-change": {
+    term: "Co-change",
+    what: "Files that keep changing together in the same commits, even when neither imports the other.",
+    why: "Hidden coupling — change one and you'll probably have to change its partner, which import graphs alone won't warn you about.",
+  },
+  "load-bearing": {
+    term: "Load-bearing file",
+    what: "A file that many others depend on — deleting or breaking it cascades widely.",
+    why: "The kind of file where a careless change takes down features far from where you touched.",
+    anchor: "blast-radius",
+  },
+  "hollow-test": {
+    term: "Hollow test",
+    what: "A test case that runs code but asserts nothing meaningful about the result.",
+    why: "It goes green whether the code is right or wrong — coverage that gives false confidence.",
+    anchor: "testquality",
+  },
+  "assertion-density": {
+    term: "Assertion density",
+    what: "The average number of meaningful assertions per test case.",
+    why: "Low density means the suite mostly checks that code runs, not that it's correct.",
+    anchor: "testquality",
+  },
+  "time-to-merge": {
+    term: "Time to merge",
+    what: "How long a pull request stayed open before it was merged.",
+    why: "Consistently slow times can signal heavy review, blocked work, or an overloaded team.",
+  },
+  cve: {
+    term: "CVE",
+    what: "A publicly catalogued security vulnerability (Common Vulnerabilities and Exposures).",
+    why: "A dependency with an open CVE is a known way in — worth patching before you build on it.",
+    anchor: "dep-health",
+  },
+  sbom: {
+    term: "SBOM",
+    what: "A software bill of materials — the full inventory of packages this repo pulls in.",
+    why: "It's what you'd hand an auditor, or check before trusting someone else's dependency tree.",
+    anchor: "dep-health",
+  },
+  "dynamic-execution": {
+    term: "Dynamic execution",
+    what: "Code that runs strings as code at runtime — eval, exec, new Function.",
+    why: "If any of that input is attacker-influenced, it's remote code execution waiting to happen.",
+    anchor: "code-panel",
+  },
+  "regex-fallback": {
+    term: "Regex fallback",
+    what: "Languages we don't fully parse yet, read with regular expressions for imports only.",
+    why: "You still get the dependency graph, but not functions, calls, or complexity for those files.",
+    anchor: "code-panel",
+  },
 } satisfies Record<string, GlossaryEntry>;
 
 export type GlossaryKey = keyof typeof GLOSSARY;

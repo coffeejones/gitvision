@@ -13,6 +13,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronRight, Lock, FlaskConical, Dot } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
+import { TermInfo } from "@/components/TermInfo";
 import {
   WEAK_SUITE_TIERS,
   type WeakSuiteTier,
@@ -87,16 +88,18 @@ export function WeakSuitePanel({
             >
               {pct(totals.smokeOnlyRatio)}
             </span>
-            <span className="text-[12px]" style={{ color: TOK.textMuted }}>
+            <span className="text-[12px] inline-flex items-center gap-1.5" style={{ color: TOK.textMuted }}>
               of test cases assert nothing meaningful
+              <TermInfo term="hollow-test" size={11} />
             </span>
           </div>
           <div className="flex flex-col">
             <span className="text-3xl font-semibold tabular-nums" style={{ ...MONO, color: TOK.textPrimary }}>
               {totals.assertionDensity}
             </span>
-            <span className="text-[12px]" style={{ color: TOK.textMuted }}>
+            <span className="text-[12px] inline-flex items-center gap-1.5" style={{ color: TOK.textMuted }}>
               assertions per test case
+              <TermInfo term="assertion-density" size={11} />
             </span>
           </div>
           <div className="flex flex-col">
