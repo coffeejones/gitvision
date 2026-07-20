@@ -262,7 +262,7 @@ function EmptyClasses({ totalAvailable }: { totalAvailable: number }) {
           That&apos;s expected, not an error.
         </>
       }
-      hint="Python and Ruby class extraction lands in v0.77; other languages already extract."
+      hint="Class extraction covers every parsed language — a repo that leans functional simply has few classes to draw."
     />
   );
 }

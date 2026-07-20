@@ -75,6 +75,11 @@ const SECTIONS: SectionMeta[] = [
     title: "Untested hotspots & near-duplicates",
     hint: "Coverage detection, complexity ranking, AST duplicate groups",
   },
+  {
+    id: "testquality",
+    title: "Test quality",
+    hint: "Assertion density, hollow tests, trivial oracles",
+  },
 ];
 
 export default function HelpPage() {

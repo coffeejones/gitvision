@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { sankey, sankeyLinkHorizontal } from "d3-sankey";
 import { GitPullRequest } from "lucide-react";
 import type { PullRequestSummary } from "@/lib/types";
+import { isBotAuthor } from "@/lib/botDetection";
 import { TOK } from "@/lib/sessionTheme";
 import { MUTED, VIZ_NEUTRAL, CYCLE_TIME_RAMP } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
@@ -90,12 +91,20 @@ export function PRFlow({ prs }: Props) {
       else linkMap.set(key, { source, target, value: 1, key });
     };
 
+    // Bot-authored PRs (dependabot, renovate, release bots…) are excluded so
+    // the throughput + cycle-time reads reflect HUMAN review — matching the
+    // PR signals (lib/signals.ts filters the same way; invariant #4). Without
+    // this, auto-merged bot PRs inflate the merge rate and skew time-to-merge
+    // fast. The exclusion is surfaced in the header, never silent.
+    const humanPrs = prs.filter((p) => !isBotAuthor(p.authorLogin));
+    const botExcluded = prs.length - humanPrs.length;
+
     let merged = 0;
     let closedUnmerged = 0;
     let stillOpen = 0;
     const timeToMerge: number[] = [];
 
-    for (const pr of prs) {
+    for (const pr of humanPrs) {
       const created = new Date(pr.createdAt).getTime();
       if (pr.merged && pr.mergedAt) {
         merged += 1;
@@ -141,11 +150,12 @@ export function PRFlow({ prs }: Props) {
       nodes: sankeyNodes,
       links: sankeyLinks,
       summary: {
-        total: prs.length,
+        total: humanPrs.length,
         merged,
         closedUnmerged,
         stillOpen,
         medianTimeToMerge: median,
+        botExcluded,
       },
     };
   }, [prs]);
@@ -207,7 +217,15 @@ export function PRFlow({ prs }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat label="Total PRs" value={String(summary.total)} />
+        <Stat
+          label="Human PRs"
+          value={String(summary.total)}
+          note={
+            summary.botExcluded > 0
+              ? `${summary.botExcluded} bot PR${summary.botExcluded === 1 ? "" : "s"} excluded`
+              : undefined
+          }
+        />
         <Stat
           label="Merged"
           value={String(summary.merged)}
