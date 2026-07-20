@@ -16,6 +16,7 @@
 //   secrets   → title = path:line, detail = redacted preview
 //   patterns  → title = path:line, detail = source snippet
 
+import Link from "next/link";
 import { ArrowUpRight, ShieldCheck } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { IncidentMatch } from "@/lib/security/knownIncidents";
@@ -42,12 +43,14 @@ interface Props {
   incidentMatches: IncidentMatch[];
   secretFindings: SecretFinding[];
   patternFindings: RiskyPatternFinding[];
+  sessionId: string;
 }
 
 export function FindingsList({
   incidentMatches,
   secretFindings,
   patternFindings,
+  sessionId,
 }: Props) {
   const all: UnifiedFinding[] = [
     ...incidentMatches.map(
@@ -103,7 +106,7 @@ export function FindingsList({
 
       <div className="flex flex-col gap-2">
         {all.map((f, i) => (
-          <FindingRow key={rowKey(f, i)} finding={f} />
+          <FindingRow key={rowKey(f, i)} finding={f} sessionId={sessionId} />
         ))}
       </div>
     </section>
@@ -120,7 +123,13 @@ function rowKey(f: UnifiedFinding, fallbackIdx: number): string {
 
 // ─── Row ─────────────────────────────────────────────────────────
 
-function FindingRow({ finding }: { finding: UnifiedFinding }) {
+function FindingRow({
+  finding,
+  sessionId,
+}: {
+  finding: UnifiedFinding;
+  sessionId: string;
+}) {
   return (
     <article
       className="flex items-start gap-3 px-4 py-3 rounded-lg"
@@ -136,13 +145,44 @@ function FindingRow({ finding }: { finding: UnifiedFinding }) {
           <IncidentRowContent data={finding.data} />
         )}
         {finding.kind === "secret" && (
-          <SecretRowContent data={finding.data} />
+          <SecretRowContent data={finding.data} sessionId={sessionId} />
         )}
         {finding.kind === "pattern" && (
-          <PatternRowContent data={finding.data} />
+          <PatternRowContent data={finding.data} sessionId={sessionId} />
         )}
       </div>
     </article>
+  );
+}
+
+/** The file:line label, made a deep-link into the Source view at that line.
+ *  Turns a dead evidence string into a jump-to-the-code affordance (audit
+ *  Move F). Underline-on-hover + arrow so it reads as navigable. */
+function SourcePathLink({
+  sessionId,
+  filePath,
+  line,
+}: {
+  sessionId: string;
+  filePath: string;
+  line: number;
+}) {
+  return (
+    <Link
+      href={`/session/${sessionId}/source?file=${encodeURIComponent(filePath)}&line=${line}`}
+      title={`Open ${filePath}:${line} in Source`}
+      className="text-sm font-mono truncate inline-flex items-center gap-1 group/pl hover:underline"
+      style={{ color: TOK.textPrimary }}
+    >
+      <span className="truncate">
+        {filePath}:{line}
+      </span>
+      <ArrowUpRight
+        size={12}
+        className="flex-shrink-0 opacity-0 group-hover/pl:opacity-100 transition-opacity"
+        style={{ color: TOK.textMuted }}
+      />
+    </Link>
   );
 }
 
@@ -246,17 +286,17 @@ function IncidentRowContent({ data }: { data: IncidentMatch }) {
   );
 }
 
-function SecretRowContent({ data }: { data: SecretFinding }) {
+function SecretRowContent({
+  data,
+  sessionId,
+}: {
+  data: SecretFinding;
+  sessionId: string;
+}) {
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <span
-          className="text-sm font-mono truncate"
-          style={{ color: TOK.textPrimary }}
-          title={`${data.filePath}:${data.line}`}
-        >
-          {data.filePath}:{data.line}
-        </span>
+        <SourcePathLink sessionId={sessionId} filePath={data.filePath} line={data.line} />
         <span
           className="text-xs flex-shrink-0"
           style={{ color: TOK.textMuted }}
@@ -283,7 +323,13 @@ function SecretRowContent({ data }: { data: SecretFinding }) {
   );
 }
 
-function PatternRowContent({ data }: { data: RiskyPatternFinding }) {
+function PatternRowContent({
+  data,
+  sessionId,
+}: {
+  data: RiskyPatternFinding;
+  sessionId: string;
+}) {
   const compactSnippet =
     data.snippet.length > 100
       ? data.snippet.slice(0, 100) + "…"
@@ -291,13 +337,7 @@ function PatternRowContent({ data }: { data: RiskyPatternFinding }) {
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <span
-          className="text-sm font-mono truncate"
-          style={{ color: TOK.textPrimary }}
-          title={`${data.filePath}:${data.line}`}
-        >
-          {data.filePath}:{data.line}
-        </span>
+        <SourcePathLink sessionId={sessionId} filePath={data.filePath} line={data.line} />
         <span
           className="text-xs flex-shrink-0"
           style={{ color: TOK.textMuted }}

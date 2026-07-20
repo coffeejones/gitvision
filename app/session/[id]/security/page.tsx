@@ -60,7 +60,7 @@ export default async function SecurityRoute({
         </p>
       </header>
 
-      <SecurityPanel snapshot={current} />
+      <SecurityPanel snapshot={current} sessionId={id} />
     </main>
   );
 }

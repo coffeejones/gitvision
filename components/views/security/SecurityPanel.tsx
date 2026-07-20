@@ -21,9 +21,10 @@ import { FindingsList } from "./FindingsList";
 
 interface Props {
   snapshot: AnalysisSnapshot;
+  sessionId: string;
 }
 
-export function SecurityPanel({ snapshot }: Props) {
+export function SecurityPanel({ snapshot, sessionId }: Props) {
   const incidentMatches = findIncidentMatches(snapshot);
   const secretFindings = snapshot.secretFindings?.findings ?? [];
   const patternFindings = snapshot.riskyPatternFindings?.findings ?? [];
@@ -87,6 +88,7 @@ export function SecurityPanel({ snapshot }: Props) {
         incidentMatches={incidentMatches}
         secretFindings={secretFindings}
         patternFindings={patternFindings}
+        sessionId={sessionId}
       />
     </div>
   );
