@@ -68,6 +68,7 @@ import {
   diffHealthSummaries,
   summarizeHealth,
 } from "@/lib/intelligence/healthSummary";
+import type { DimensionStatus } from "@/lib/intelligence/healthSummary";
 import {
   structuralDiff,
   structuralDiffHasContent,
@@ -87,6 +88,9 @@ import { ContributorList } from "@/components/views/ContributorList";
 import { LanguageBar } from "@/components/views/LanguageBar";
 import { BusFactorPanel } from "@/components/views/BusFactorPanel";
 import { CommitActivity } from "@/components/views/CommitActivity";
+import { OrientationStrip } from "@/components/views/OrientationStrip";
+import { RollupBar } from "@/components/views/RollupBar";
+import { AnchorGlow } from "@/components/views/AnchorGlow";
 
 export const dynamic = "force-dynamic";
 
@@ -172,6 +176,38 @@ export default async function OverviewPage({
   // v0.59: traffic-light health summary. Pure mapping over the existing
   // signal layer — no new compute. Six dimensions, one tile each.
   const healthSummaries = summarizeHealth(current);
+
+  // Phase 2 (Move E): a posture rollup — the SAME six-dimension array the
+  // HealthSummary strip renders, folded to one status tally above the fold. A
+  // pure reduce, zero new analysis. Deliberately a tally (all five statuses
+  // stay visible), never a grade: it shows the split, it doesn't score it.
+  // Colors mirror HealthSummary's STATUS_STYLES so the bar and the tiles agree.
+  const ROLLUP_TIERS: {
+    status: DimensionStatus;
+    color: string;
+    label: string;
+  }[] = [
+    { status: "critical", color: TOK.rose, label: "critical" },
+    { status: "warning", color: TOK.amber, label: "need work" },
+    { status: "healthy", color: TOK.accent, label: "healthy" },
+    { status: "solo", color: TOK.textSecondary, label: "solo" },
+    { status: "unknown", color: TOK.textMuted, label: "not measured" },
+  ];
+  const healthRollup = ROLLUP_TIERS.map((t) => ({
+    count: healthSummaries.filter((s) => s.status === t.status).length,
+    color: t.color,
+    label: t.label,
+  }));
+  // Skip the rollup when there's genuinely nothing measured (matches the
+  // HealthSummary strip, which hides itself in the all-unknown case).
+  const showHealthRollup = healthSummaries.some((s) => s.status !== "unknown");
+
+  // The orientation lead. On a refresh the "since last visit" banner renders
+  // before the top finding, so the "start here" beat has to be honest about
+  // what's actually first — condition it on whether there's a diff.
+  const overviewLine = diff
+    ? "What changed since your last visit, the top finding, then six rule-based health tiles. Start at the top, then open any card."
+    : "The top finding, then six rule-based health tiles. Start with the finding, then open any card.";
 
   // v0.62: per-dimension diff vs. previous snapshot. Drives the
   // tiny TrendingUp/Down indicators on each tile so refresh-visitors
@@ -310,6 +346,22 @@ export default async function OverviewPage({
           )}
         </header>
 
+        {/* Orientation + posture (Phase 2 / Moves B + E). The hero owns the
+         *  identity (eyebrow + name), so the strip here carries only the "what
+         *  to do" lead and the six-dimension status rollup — the "am I okay, at
+         *  a glance" the Overview otherwise makes you scroll for. */}
+        <OrientationStrip
+          line={overviewLine}
+          rollup={
+            showHealthRollup ? (
+              <RollupBar
+                segments={healthRollup}
+                total={healthSummaries.length}
+              />
+            ) : undefined
+          }
+        />
+
         {/* Since last visit — only when there's a diff */}
         {diff && (
           <SinceLastVisit
@@ -336,8 +388,12 @@ export default async function OverviewPage({
 
         {/* Headline finding (v0.57) — the 30-second-rule signal. One
          *  concrete actionable thing per session, picked by the waterfall
-         *  in lib/intelligence/headline.ts. */}
-        <HeadlineFinding headline={headline} sessionId={session.id} />
+         *  in lib/intelligence/headline.ts. Phase 2: the page's ONE rationed
+         *  light-behind anchor — light magnetizes the eye to the thing that
+         *  matters; warm only when the finding is genuinely critical. */}
+        <AnchorGlow tone={headline.severity === "critical" ? "warm" : "bone"}>
+          <HeadlineFinding headline={headline} sessionId={session.id} />
+        </AnchorGlow>
 
         {/* Health at a glance (v0.59 + v0.62 deltas + v0.68 trend) —
          *  six traffic-light tiles. Optional delta arrows when there's
@@ -361,7 +417,7 @@ export default async function OverviewPage({
         {/* Quick-look cards: navigation that tells a story. Each card
          *  shows the headline stat for its tab so users can scan
          *  "where the interesting work is" before clicking in. */}
-        <section className="flex flex-col gap-3">
+        <section className="flex flex-col gap-3" data-rv>
           <div className="flex items-baseline gap-2">
             <span
               className={STYLE.eyebrow}
@@ -470,7 +526,7 @@ export default async function OverviewPage({
         {/* Demographics — high-level read of the repo. Stays on
          *  Overview because these are at-a-glance stats that pair
          *  with the hero, not deep tools that deserve their own tab. */}
-        <section className="grid lg:grid-cols-3 gap-4 items-start">
+        <section className="grid lg:grid-cols-3 gap-4 items-start" data-rv>
           <div className="lg:col-span-2 flex flex-col gap-4">
             <HotspotTreemap hotspots={current.hotspots} sessionId={session.id} />
             <CommitActivity snap={current} />

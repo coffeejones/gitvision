@@ -54,6 +54,7 @@ import type { AnalysisSnapshot } from "@/lib/types";
 import { STYLE, TOK } from "@/lib/sessionTheme";
 import { CH_FOCUS } from "@/components/chambers/theme";
 import { CommandPalette } from "./CommandPalette";
+import { WorkspaceMotion } from "./views/WorkspaceMotion";
 
 interface Props {
   sessionId: string;
@@ -552,7 +553,11 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
   );
 
   return (
-    <div className="flex w-full">
+    <div className="ct-ws flex w-full">
+      {/* Reveal engine (Phase 2 / Move D). Scoped to this .ct-ws subtree; tags
+          only take effect where a page opts in with data-rv. Renders a <style>
+          + a null observer — no layout, no scroll hijack. */}
+      <WorkspaceMotion />
       {/* Desktop sidebar — hidden below md (would crush the content) and
           hidden entirely in focus mode (user toggled it away). */}
       <aside
