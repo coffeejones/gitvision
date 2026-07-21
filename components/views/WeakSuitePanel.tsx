@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronRight, Lock, FlaskConical, Dot } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import { TermInfo } from "@/components/TermInfo";
+import { AnchorGlow } from "@/components/views/AnchorGlow";
 import {
   WEAK_SUITE_TIERS,
   type WeakSuiteTier,
@@ -71,7 +72,9 @@ export function WeakSuitePanel({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Aggregate hook — the one screenshot-worthy number. */}
+      {/* Aggregate hook — the one screenshot-worthy number. The page's ONE
+          rationed light-behind anchor (Phase 2): the smoke-only verdict. */}
+      <AnchorGlow tone={totals.smokeOnlyRatio >= 0.2 ? "warm" : "bone"}>
       <div
         className="rounded-xl p-5 flex flex-col gap-4"
         style={{ background: TOK.surface, border: `1px solid ${TOK.border}` }}
@@ -131,6 +134,7 @@ export function WeakSuitePanel({
           })}
         </div>
       </div>
+      </AnchorGlow>
 
       {/* Per-file breakdown (Plus). */}
       {!entitled ? (
@@ -152,7 +156,11 @@ export function WeakSuitePanel({
           </span>
         </Link>
       ) : files && files.length > 0 ? (
-        <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${TOK.border}` }}>
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{ border: `1px solid ${TOK.border}` }}
+          data-rv
+        >
           {files.map((f) => (
             <FileRow key={f.file} f={f} />
           ))}

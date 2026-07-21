@@ -19,6 +19,7 @@ import { SignInToUnlock } from "@/components/billing/SignInToUnlock";
 import { EmptyPanel } from "@/components/EmptyPanel";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
 import { RollupBar } from "@/components/views/RollupBar";
+import { AnchorGlow } from "@/components/views/AnchorGlow";
 
 export const dynamic = "force-dynamic";
 
@@ -113,11 +114,13 @@ export default async function FaultlinePage({
             }
           />
         ) : (
-          <FaultlineSimulator
-            sessionId={session.id}
-            files={Object.keys(graph!.contentHashes!).sort()}
-            suggested={suggested}
-          />
+          <AnchorGlow>
+            <FaultlineSimulator
+              sessionId={session.id}
+              files={Object.keys(graph!.contentHashes!).sort()}
+              suggested={suggested}
+            />
+          </AnchorGlow>
         )}
       </div>
     </main>

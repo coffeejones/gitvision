@@ -18,6 +18,7 @@ import { findIncidentMatches } from "@/lib/security/knownIncidents";
 import { KNOWN_INCIDENTS } from "@/lib/security/knownIncidents";
 import { TOK } from "@/lib/sessionTheme";
 import { RollupBar } from "@/components/views/RollupBar";
+import { AnchorGlow } from "@/components/views/AnchorGlow";
 import { StatusGrid } from "./StatusGrid";
 import { FindingsList } from "./FindingsList";
 
@@ -87,6 +88,7 @@ export function SecurityPanel({ snapshot, sessionId }: Props) {
             : undefined
         }
       />
+      <AnchorGlow>
       <StatusGrid
         incidents={{
           title: "Incidents",
@@ -116,13 +118,16 @@ export function SecurityPanel({ snapshot, sessionId }: Props) {
               : `${patternFindings.length} in ${patternsFileCount} files`,
         }}
       />
+      </AnchorGlow>
 
-      <FindingsList
-        incidentMatches={incidentMatches}
-        secretFindings={secretFindings}
-        patternFindings={patternFindings}
-        sessionId={sessionId}
-      />
+      <div data-rv>
+        <FindingsList
+          incidentMatches={incidentMatches}
+          secretFindings={secretFindings}
+          patternFindings={patternFindings}
+          sessionId={sessionId}
+        />
+      </div>
     </div>
   );
 }

@@ -139,6 +139,7 @@ export function HealthPanel({
     <section
       className="flex flex-col gap-3"
       aria-label="Repository health check"
+      data-rv
     >
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <div className="flex items-baseline gap-2">

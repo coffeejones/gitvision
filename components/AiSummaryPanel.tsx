@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { RotateCw, Sparkles } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { TOK } from "@/lib/sessionTheme";
+import { AnchorGlow } from "@/components/views/AnchorGlow";
 
 interface Props {
   sessionId: string;
@@ -126,6 +127,7 @@ export function AiSummaryPanel({
       )}
 
       {summary && (
+        <AnchorGlow>
         <article
           // Material card — same diagonal gradient + layered shadow
           // recipe as the WorkspaceCard / featured-finding hero on
@@ -150,6 +152,7 @@ export function AiSummaryPanel({
             {summary.text}
           </div>
         </article>
+        </AnchorGlow>
       )}
 
       {error && (

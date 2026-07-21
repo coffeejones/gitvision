@@ -14,6 +14,7 @@ import type { GlossaryKey } from "@/lib/glossary";
 import { MUTED, VIZ_NEUTRAL, CYCLE_TIME_RAMP } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
 import { RollupBar } from "@/components/views/RollupBar";
+import { AnchorGlow } from "@/components/views/AnchorGlow";
 
 interface Props {
   prs: PullRequestSummary[];
@@ -279,6 +280,7 @@ export function PRFlow({ prs }: Props) {
         }
       />
 
+      <AnchorGlow>
       <div
         className="rounded-xl overflow-hidden"
         style={{
@@ -347,6 +349,7 @@ export function PRFlow({ prs }: Props) {
           </g>
         </svg>
       </div>
+      </AnchorGlow>
 
       <p className="text-xs" style={{ color: TOK.textMuted }}>
         Hover a flow to see PR counts. Opened → Merged / Closed / Still-open;

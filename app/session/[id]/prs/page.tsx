@@ -54,7 +54,9 @@ export default async function PRsRoute({
       <div id="screenshot-target" className="flex flex-col gap-4">
         <PRFlow prs={current.pullRequests ?? []} />
       </div>
-      <PRBotCallout userTier={userTier} />
+      <div data-rv>
+        <PRBotCallout userTier={userTier} />
+      </div>
     </main>
   );
 }

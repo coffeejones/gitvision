@@ -43,6 +43,7 @@ import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { HelpHint } from "@/components/HelpHint";
 import { TermInfo } from "@/components/TermInfo";
 import type { GlossaryKey } from "@/lib/glossary";
+import { AnchorGlow } from "@/components/views/AnchorGlow";
 import { EmptyPanel } from "@/components/EmptyPanel";
 import { SearchInput } from "@/components/SearchInput";
 import {
@@ -321,7 +322,9 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
 
       {/* Hero: selected file + blast radius (file mode or function mode).
        *  Material card recipe (diagonal gradient + 1px ambient shadow)
-       *  matches the StatTile row above and the rest of the page. */}
+       *  matches the StatTile row above and the rest of the page. The page's
+       *  ONE rationed light-behind anchor (Phase 2). */}
+      <AnchorGlow>
       <div
         ref={blastRadiusRef}
         className="rounded-xl p-5 flex flex-col gap-4"
@@ -359,6 +362,7 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
           blast && <BlastRadiusView blast={blast} file={selected!} />
         )}
       </div>
+      </AnchorGlow>
 
       {/* Untested hotspots — v0.29 actionable insight panel. Only renders
        *  when the repo has at least one test file we identified, so brand
@@ -388,7 +392,7 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
       )}
 
       {/* Twin lists: heavy files + top complex functions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-rv>
         <HeavyFilesList
           files={heavyFiles}
           coverage={coverage}
@@ -1327,29 +1331,34 @@ function UntestedHotspotsPanel({
       }}
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <button
-          onClick={toggle}
-          className="flex items-center gap-2 text-left -m-1 p-1 rounded transition cursor-pointer min-w-0 flex-1"
-          title={isExpanded ? "Collapse panel" : "Expand panel"}
-        >
-          {isExpanded ? (
-            <ChevronDown size={14} style={{ color: TOK.textMuted }} />
-          ) : (
-            <ChevronRight size={14} style={{ color: TOK.textMuted }} />
-          )}
-          <ShieldOff size={15} style={{ color: TOK.amber }} />
-          <span
-            className={`${STYLE.eyebrow} inline-flex items-center gap-1.5`}
-            style={{ color: TOK.textPrimary }}
+        {/* The TermInfo (itself a <button>) sits OUTSIDE the collapse button —
+            a button can't nest a button (invalid HTML + a hydration error). The
+            toggle wraps only the chevron + icon + label. */}
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <button
+            onClick={toggle}
+            className="flex items-center gap-2 text-left -m-1 p-1 rounded transition cursor-pointer min-w-0"
+            title={isExpanded ? "Collapse panel" : "Expand panel"}
           >
-            Untested hotspots
-            <TermInfo term="untested-hotspot" />
-          </span>
+            {isExpanded ? (
+              <ChevronDown size={14} style={{ color: TOK.textMuted }} />
+            ) : (
+              <ChevronRight size={14} style={{ color: TOK.textMuted }} />
+            )}
+            <ShieldOff size={15} style={{ color: TOK.amber }} />
+            <span
+              className={STYLE.eyebrow}
+              style={{ color: TOK.textPrimary }}
+            >
+              Untested hotspots
+            </span>
+          </button>
+          <TermInfo term="untested-hotspot" />
           <span style={{ color: TOK.textMuted }}>·</span>
           <span className="text-xs truncate" style={{ color: TOK.textSecondary }}>
             most complex functions with no direct test callers
           </span>
-        </button>
+        </div>
         <div className="flex items-center gap-2 shrink-0">
           <span
             className="text-[11px] font-mono inline-flex items-center gap-1.5"
