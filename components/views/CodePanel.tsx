@@ -19,7 +19,8 @@
 // regex-fallback plugin. Honest accounting beats over-promised UI.
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -44,6 +45,7 @@ import { HelpHint } from "@/components/HelpHint";
 import { TermInfo } from "@/components/TermInfo";
 import type { GlossaryKey } from "@/lib/glossary";
 import { AnchorGlow } from "@/components/views/AnchorGlow";
+import { BlastRadiusDiagram } from "@/components/views/BlastRadiusDiagram";
 import { EmptyPanel } from "@/components/EmptyPanel";
 import { SearchInput } from "@/components/SearchInput";
 import {
@@ -853,6 +855,12 @@ function BlastRadiusView({
   blast: BlastRadius;
   file: string;
 }) {
+  const params = useParams();
+  const sessionId = String(params?.id ?? "");
+  const sourceHref = (e: BlastListEntry) =>
+    sessionId
+      ? `/session/${sessionId}/source?file=${encodeURIComponent(e.primary)}&line=1`
+      : undefined;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-end -mb-1">
@@ -869,6 +877,13 @@ function BlastRadiusView({
           title="Copy link to this file's blast radius"
         />
       </div>
+
+      {/* Phase 3: the blast radius drawn — center file → hop rings, incoming
+       *  left / outgoing right, every dot a real file (hover to name, click to
+       *  open in Source). The ranked lists below stay as the complete, keyboard-
+       *  accessible "which files". */}
+      <BlastRadiusDiagram blast={blast} file={file} />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <BlastSection
           title="Incoming — what breaks if this changes"
@@ -882,6 +897,7 @@ function BlastRadiusView({
           }))}
           byHop={blast.byHop.incoming}
           crossModuleCount={blast.crossModuleCounts.incoming}
+          sourceHref={sourceHref}
         />
         <BlastSection
           title="Outgoing — what this depends on"
@@ -895,6 +911,7 @@ function BlastRadiusView({
           }))}
           byHop={blast.byHop.outgoing}
           crossModuleCount={blast.crossModuleCounts.outgoing}
+          sourceHref={sourceHref}
         />
         {blast.truncated && (
           <div
@@ -1044,6 +1061,7 @@ function BlastSection({
   entries,
   byHop,
   crossModuleCount = 0,
+  sourceHref,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -1055,6 +1073,10 @@ function BlastSection({
    *  the blast target. v0.79+. Renders an additional chip in the by-hop
    *  row + a small Network icon next to each cross-module entry. */
   crossModuleCount?: number;
+  /** Optional resolver → Source deep-link for an entry. When it returns a
+   *  URL, the entry's primary text becomes a keyboard-accessible link into
+   *  the Source view (Phase 3, mirrors the clickable diagram dots). */
+  sourceHref?: (e: BlastListEntry) => string | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
   const limit = expanded ? EXPANDED_LIST_SIZE : INITIAL_LIST_SIZE;
@@ -1144,9 +1166,20 @@ function BlastSection({
                 {e.hop}
               </span>
               <div className="flex-1 min-w-0 flex flex-col">
-                <span className="truncate" title={e.primary}>
-                  {e.primary}
-                </span>
+                {sourceHref?.(e) ? (
+                  <Link
+                    href={sourceHref(e)!}
+                    className="truncate transition hover:underline"
+                    style={{ color: TOK.textSecondary }}
+                    title={`Open ${e.primary} in Source`}
+                  >
+                    {e.primary}
+                  </Link>
+                ) : (
+                  <span className="truncate" title={e.primary}>
+                    {e.primary}
+                  </span>
+                )}
                 {e.secondary && (
                   <span
                     className="truncate text-[10px]"
