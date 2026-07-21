@@ -18,6 +18,7 @@ import { getUserTier } from "@/lib/billing/gates";
 import { isDemoSession } from "@/lib/demoSessions";
 import { PRFlow } from "@/components/views/PRFlow";
 import { PRBotCallout } from "@/components/views/PRBotCallout";
+import { OrientationStrip } from "@/components/views/OrientationStrip";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,12 @@ export default async function PRsRoute({
       : "open-case";
 
   return (
-    <main className="px-8 py-8 flex flex-col gap-4 max-w-7xl mx-auto w-full">
+    <main className="px-8 pt-12 pb-16 flex flex-col gap-8 max-w-7xl mx-auto w-full">
+      <OrientationStrip
+        eyebrow="PRs"
+        title="How pull requests resolve."
+        line="Where human PRs ended up, and how long merges took. Start with the split below, then trace the slow flows. Automated PRs are excluded."
+      />
       <div id="screenshot-target" className="flex flex-col gap-4">
         <PRFlow prs={current.pullRequests ?? []} />
       </div>

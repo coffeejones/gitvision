@@ -16,6 +16,8 @@ import { computeWeakSuite } from "@/lib/weakSuite";
 import { WeakSuitePanel } from "@/components/views/WeakSuitePanel";
 import { HelpHint } from "@/components/HelpHint";
 import { EmptyPanel } from "@/components/EmptyPanel";
+import { OrientationStrip } from "@/components/views/OrientationStrip";
+import { RollupBar } from "@/components/views/RollupBar";
 
 export const dynamic = "force-dynamic";
 
@@ -44,32 +46,44 @@ export default async function TestQualityPage({
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-8 max-w-6xl mx-auto w-full">
-      <header className="flex flex-col gap-3">
-        <span
-          className="text-[10px] uppercase tracking-[0.18em] font-medium"
-          style={{ color: TOK.textMuted }}
-        >
-          Test quality
-        </span>
-        <h1
-          className="text-2xl sm:text-3xl font-semibold tracking-tight"
-          style={{ color: TOK.textPrimary, letterSpacing: "-0.02em", lineHeight: 1.1 }}
-        >
-          Coverage that means nothing
-        </h1>
-        <p
-          className="text-sm max-w-2xl leading-relaxed inline-flex items-baseline gap-1.5"
-          style={{ color: TOK.textSecondary }}
-        >
-          <span>
+      <OrientationStrip
+        eyebrow="Test quality"
+        title="Coverage that means nothing"
+        line={
+          <>
             Coverage says which lines ran; it doesn&rsquo;t say whether the tests
-            would notice if the result were wrong. This ranks test files by how
-            HOLLOW their assertions are — cases that execute code but verify
-            nothing. Deterministic, with the raw counts on every row.
-          </span>
-          <HelpHint anchor="testquality" label="How assertion quality is measured" />
-        </p>
-      </header>
+            would notice if the result were wrong. Ranks JS/TS test files by how
+            many cases run code but assert nothing meaningful. Start with the
+            hollow ones up top.{" "}
+            <HelpHint
+              anchor="testquality"
+              label="How assertion quality is measured"
+            />
+          </>
+        }
+        rollup={
+          report ? (
+            <RollupBar
+              segments={[
+                {
+                  count: report.counts.hollow,
+                  color: TOK.rose,
+                  label: "hollow",
+                },
+                { count: report.counts.thin, color: TOK.amber, label: "thin" },
+                {
+                  count: report.counts.solid,
+                  color: TOK.accent,
+                  label: "solid",
+                },
+              ]}
+              total={report.totals.testFiles}
+              emptyLabel="No JS/TS test files found"
+              trailing={`${report.totals.testCases.toLocaleString()} cases`}
+            />
+          ) : undefined
+        }
+      />
 
       {report ? (
         <WeakSuitePanel

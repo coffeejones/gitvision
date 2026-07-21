@@ -24,6 +24,8 @@ import { TOK } from "@/lib/sessionTheme";
 import { AiSummaryPanel } from "@/components/AiSummaryPanel";
 import { HealthPanel } from "@/components/HealthPanel";
 import { SignInToUnlock } from "@/components/billing/SignInToUnlock";
+import { OrientationStrip } from "@/components/views/OrientationStrip";
+import { RollupBar } from "@/components/views/RollupBar";
 
 export const dynamic = "force-dynamic";
 
@@ -52,35 +54,54 @@ export default async function InsightsRoute({
       ? await canAccess(authSession.user.id, "aiInsights")
       : false);
 
+  // Phase 2 rollup: the three-column health verdict, folded to a count line.
+  // Only meaningful once the health check has been generated (the columns are
+  // lazy) AND the viewer can see the panels — so the "start with 'Where to dig
+  // deeper'" action never points at a column that isn't on the page.
+  const ha = current.healthAnalysis;
+  const showInsightsRollup = hasAiInsights && !!ha;
+  const insightsHighCount = ha
+    ? ha.signals.needsWork.filter((s) => s.severity === "high").length
+    : 0;
+  const insightsLine = showInsightsRollup
+    ? "AI commentary on the computed signals — a plain-English briefing and a health verdict. Start with “Where to dig deeper.”"
+    : "AI commentary on the computed signals: a plain-English briefing and a health verdict, each anchored to a deterministic signal — never an LLM guess.";
+
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-7xl mx-auto w-full">
-      <header className="flex flex-col gap-4">
-        <span
-          className="text-[10px] uppercase tracking-[0.18em] font-medium"
-          style={{ color: TOK.textMuted }}
-        >
-          Insights
-        </span>
-        <h1
-          className="text-3xl sm:text-4xl font-semibold tracking-tight"
-          style={{
-            color: TOK.textPrimary,
-            letterSpacing: "-0.025em",
-            lineHeight: 1.1,
-          }}
-        >
-          AI commentary on grounded signals.
-        </h1>
-        <p
-          className="text-sm sm:text-base max-w-2xl leading-relaxed"
-          style={{ color: TOK.textSecondary }}
-        >
-          A 150-word repo briefing plus the three-column health
-          read. Every claim is anchored to a deterministic signal
-          from the analysis pipeline — no LLM guesses, no
-          hallucinations.
-        </p>
-      </header>
+      <OrientationStrip
+        eyebrow="Insights"
+        title="AI commentary on grounded signals."
+        line={insightsLine}
+        rollup={
+          showInsightsRollup && ha ? (
+            <RollupBar
+              segments={[
+                {
+                  count: ha.signals.working.length,
+                  color: TOK.accent,
+                  label: "working",
+                },
+                {
+                  count: ha.signals.needsWork.length,
+                  color: TOK.amber,
+                  label: "to dig into",
+                },
+                {
+                  count: ha.signals.questions.length,
+                  color: TOK.textMuted,
+                  label: "open questions",
+                },
+              ]}
+              trailing={
+                insightsHighCount > 0
+                  ? `${insightsHighCount} high-severity`
+                  : undefined
+              }
+            />
+          ) : undefined
+        }
+      />
       <div id="screenshot-target" className="flex flex-col gap-8">
         {hasAiInsights ? (
           <>

@@ -6,8 +6,15 @@
 
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
-import { TOK } from "@/lib/sessionTheme";
 import { CodePanel } from "@/components/views/CodePanel";
+import { OrientationStrip } from "@/components/views/OrientationStrip";
+import { RollupCounts } from "@/components/views/RollupBar";
+import { computeCallResolution } from "@/lib/codeAnalysis/callResolution";
+import {
+  findDuplicateGroups,
+  summarizeDuplicates,
+} from "@/lib/codeAnalysis/duplicates";
+import { computeTestCoverage } from "@/lib/codeAnalysis/testCoverage";
 
 export const dynamic = "force-dynamic";
 
@@ -21,35 +28,42 @@ export default async function CodeRoute({
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 
+  // Phase 2 rollup — a count line reusing the same values CodePanel's stat tiles
+  // already compute (functions, call-resolution rate, duplicate groups, and a
+  // guarded coverage figure). These aren't slices of one whole, so it's a count
+  // line, not a bar. Zero new compute beyond the pure functions below.
+  const cg = current.codeGraph;
+  let codeRollupParts: Array<string | false | null | undefined> = [];
+  if (cg) {
+    const resolvedPct = Math.round(computeCallResolution(cg).rate * 100);
+    const dupGroups = summarizeDuplicates(findDuplicateGroups(cg)).totalGroups;
+    const cov = computeTestCoverage(cg).totals;
+    const covClause =
+      cov.testFiles > 0 && cov.prodFunctions > 0
+        ? `${Math.round(
+            (cov.testedProdFunctions / cov.prodFunctions) * 100,
+          )}% of prod functions have a direct test caller`
+        : cov.testFiles === 0
+          ? "no test files identified"
+          : null;
+    codeRollupParts = [
+      covClause,
+      `${cg.functions.length.toLocaleString()} functions`,
+      `${resolvedPct}% of call sites resolved`,
+      `${dupGroups.toLocaleString()} duplicate group${dupGroups === 1 ? "" : "s"}`,
+    ];
+  }
+
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-7xl mx-auto w-full">
-      <header className="flex flex-col gap-4">
-        <span
-          className="text-[10px] uppercase tracking-[0.18em] font-medium"
-          style={{ color: TOK.textMuted }}
-        >
-          Code
-        </span>
-        <h1
-          className="text-3xl sm:text-4xl font-semibold tracking-tight"
-          style={{
-            color: TOK.textPrimary,
-            letterSpacing: "-0.025em",
-            lineHeight: 1.1,
-          }}
-        >
-          Blast radius, hotspots, duplicates.
-        </h1>
-        <p
-          className="text-sm sm:text-base max-w-2xl leading-relaxed"
-          style={{ color: TOK.textSecondary }}
-        >
-          Pick a file from the heaviest-files or top-complex lists to
-          see what breaks if you change it. Incoming = files that
-          depend on this. Outgoing = what this depends on. Hops capped
-          at 3 so central files don&apos;t show &quot;everything&quot;.
-        </p>
-      </header>
+      <OrientationStrip
+        eyebrow="Code"
+        title="Blast radius, hotspots, duplicates."
+        line="Pick a heavy file or function to see what a change would touch — incoming is what depends on it, outgoing is what it depends on, hops capped at 3 so central files don’t show “everything.” Start with the heaviest file below."
+        rollup={
+          cg ? <RollupCounts parts={codeRollupParts} /> : undefined
+        }
+      />
       <div id="screenshot-target" className="flex flex-col gap-4">
         <CodePanel snapshot={current} />
       </div>

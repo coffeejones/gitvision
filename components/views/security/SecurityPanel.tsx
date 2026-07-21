@@ -16,6 +16,8 @@
 import type { AnalysisSnapshot } from "@/lib/types";
 import { findIncidentMatches } from "@/lib/security/knownIncidents";
 import { KNOWN_INCIDENTS } from "@/lib/security/knownIncidents";
+import { TOK } from "@/lib/sessionTheme";
+import { RollupBar } from "@/components/views/RollupBar";
 import { StatusGrid } from "./StatusGrid";
 import { FindingsList } from "./FindingsList";
 
@@ -52,8 +54,39 @@ export function SecurityPanel({ snapshot, sessionId }: Props) {
     patternFindings.map((f) => f.filePath),
   ).size;
 
+  // Phase 2 rollup — the "am I okay, and by how much?" severity split above the
+  // fold. Reuses the same three arrays this panel already reads (zero new
+  // compute). A tally, not a grade: incidents + critical/high secrets are the
+  // heat; medium secrets are the caution tier; risky patterns are info-only.
+  const rollupHigh =
+    incidentMatches.length +
+    secretFindings.filter(
+      (f) => f.severity === "critical" || f.severity === "high",
+    ).length;
+  const rollupMedium = secretFindings.filter(
+    (f) => f.severity === "medium",
+  ).length;
+  const rollupInfo = patternFindings.length;
+  const notScanned = [
+    secretsState === "not-scanned" ? "secrets" : null,
+    patternsState === "not-scanned" ? "patterns" : null,
+  ].filter(Boolean);
+
   return (
     <div className="flex flex-col gap-8">
+      <RollupBar
+        segments={[
+          { count: rollupHigh, color: TOK.rose, label: "high" },
+          { count: rollupMedium, color: TOK.amber, label: "medium" },
+          { count: rollupInfo, color: TOK.textMuted, label: "informational" },
+        ]}
+        emptyLabel="No findings across any scanner"
+        trailing={
+          notScanned.length > 0
+            ? `${notScanned.join(" + ")} not scanned`
+            : undefined
+        }
+      />
       <StatusGrid
         incidents={{
           title: "Incidents",

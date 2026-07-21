@@ -13,6 +13,7 @@ import { TermInfo } from "@/components/TermInfo";
 import type { GlossaryKey } from "@/lib/glossary";
 import { MUTED, VIZ_NEUTRAL, CYCLE_TIME_RAMP } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
+import { RollupBar } from "@/components/views/RollupBar";
 
 interface Props {
   prs: PullRequestSummary[];
@@ -251,6 +252,32 @@ export function PRFlow({ prs }: Props) {
           }
         />
       </div>
+
+      {/* Phase 2 rollup — the human-PR outcome split as one proportional bar,
+          the at-a-glance the four stats don't sum to. Reuses the summary the
+          sankey is built from; colors match the sankey's outcome nodes. */}
+      <RollupBar
+        segments={[
+          { count: summary.merged, color: NODE_COLOR.Merged, label: "merged" },
+          {
+            count: summary.closedUnmerged,
+            color: NODE_COLOR["Closed (unmerged)"],
+            label: "closed unmerged",
+          },
+          {
+            count: summary.stillOpen,
+            color: NODE_COLOR["Still open"],
+            label: "still open",
+          },
+        ]}
+        total={summary.total}
+        emptyLabel="No human PRs in this snapshot"
+        trailing={
+          summary.medianTimeToMerge > 0
+            ? `median merge ${fmtDuration(summary.medianTimeToMerge)}`
+            : undefined
+        }
+      />
 
       <div
         className="rounded-xl overflow-hidden"
