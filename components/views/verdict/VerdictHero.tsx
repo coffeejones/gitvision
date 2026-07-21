@@ -20,6 +20,7 @@
 import type { Verdict } from "@/lib/intelligence/verdict";
 import { TOK } from "@/lib/sessionTheme";
 import { Gauge } from "lucide-react";
+import { VerdictScoreRing } from "./VerdictScoreRing";
 
 interface Props {
   verdict: Verdict;
@@ -62,16 +63,8 @@ const STYLE_BY_OUTCOME: Record<Verdict["outcome"], OutcomeStyle> = {
   },
 };
 
-// Geometry for the score ring. r = 52 → 2πr ≈ 327 (matches the
-// landing's VerdictDoc so the in-product ring reads as the same
-// artefact). Track + arc share the same circle path; dash math
-// trims the arc to the score percentage.
-const RING_R = 52;
-const RING_CIRC = 2 * Math.PI * RING_R;
-
 export function VerdictHero({ verdict }: Props) {
   const style = STYLE_BY_OUTCOME[verdict.outcome];
-  const arcOffset = RING_CIRC - (RING_CIRC * verdict.score) / 100;
 
   return (
     <section
@@ -81,60 +74,12 @@ export function VerdictHero({ verdict }: Props) {
         border: `1px solid ${style.border}`,
       }}
     >
-      {/* Score ring + grade — mirrors the landing's VerdictDoc score
-          panel. r=52 + strokeWidth=9 matches the marketing artefact
-          exactly so users recognise the metric across surfaces. */}
-      <div className="relative shrink-0">
-        <svg
-          width={138}
-          height={138}
-          viewBox="0 0 138 138"
-          aria-label={`Grade ${verdict.grade}, score ${verdict.score} out of 100`}
-        >
-          {/* Background track — neutral, lets the colored arc do the work. */}
-          <circle
-            cx={69}
-            cy={69}
-            r={RING_R}
-            fill="none"
-            stroke={TOK.border}
-            strokeWidth={9}
-          />
-          {/* Score arc — starts at top (rotated -90°) and sweeps
-              clockwise to verdict.score%. */}
-          <circle
-            cx={69}
-            cy={69}
-            r={RING_R}
-            fill="none"
-            stroke={style.fg}
-            strokeWidth={9}
-            strokeLinecap="round"
-            strokeDasharray={RING_CIRC}
-            strokeDashoffset={arcOffset}
-            transform="rotate(-90 69 69)"
-          />
-        </svg>
-        {/* Grade + score number positioned absolute in the ring's
-            center. Two-line stack so the grade reads as the headline
-            and the n/100 reads as the supporting detail. */}
-        <div
-          className="absolute inset-0 flex flex-col items-center justify-center"
-          aria-hidden
-        >
-          <span
-            className="text-4xl font-semibold leading-none"
-            style={{ color: style.fg, letterSpacing: "-0.02em" }}
-          >
-            {verdict.grade}
-          </span>
-          <span
-            className="text-xs font-mono mt-1.5 tabular-nums"
-            style={{ color: TOK.textMuted }}
-          >
-            {verdict.score}/100
-          </span>
-        </div>
+      {/* Four-segment score ring (Phase 3) — one arc per lens, colored by its
+          vote, lens name on its quarter, center grade in the outcome color.
+          Replaces the single-arc ring so the grade's composition ("three
+          cleared, Supply flagged → capped") is visible, not just described. */}
+      <div className="shrink-0 w-full sm:w-auto flex justify-center">
+        <VerdictScoreRing verdict={verdict} />
       </div>
 
       {/* Right column: eyebrow + outcome label + micro + summary. */}
