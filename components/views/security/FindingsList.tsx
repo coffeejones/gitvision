@@ -22,22 +22,10 @@ import { TOK } from "@/lib/sessionTheme";
 import type { IncidentMatch } from "@/lib/security/knownIncidents";
 import type { RiskyPatternFinding } from "@/lib/security/riskyPatterns";
 import type { SecretFinding } from "@/lib/security/types";
-
-type UnifiedFinding =
-  | { kind: "incident"; severity: "high"; data: IncidentMatch }
-  | {
-      kind: "secret";
-      severity: "high" | "medium" | "low";
-      data: SecretFinding;
-    }
-  | { kind: "pattern"; severity: "info"; data: RiskyPatternFinding };
-
-const SEVERITY_RANK: Record<UnifiedFinding["severity"], number> = {
-  high: 3,
-  medium: 2,
-  low: 1,
-  info: 0,
-};
+import {
+  buildUnifiedFindings,
+  type UnifiedFinding,
+} from "@/lib/security/unifiedFindings";
 
 interface Props {
   incidentMatches: IncidentMatch[];
@@ -52,27 +40,11 @@ export function FindingsList({
   patternFindings,
   sessionId,
 }: Props) {
-  const all: UnifiedFinding[] = [
-    ...incidentMatches.map(
-      (m) => ({ kind: "incident", severity: "high", data: m }) as const,
-    ),
-    ...secretFindings.map(
-      (s) =>
-        ({
-          kind: "secret",
-          severity: s.severity,
-          data: s,
-        }) as UnifiedFinding,
-    ),
-    ...patternFindings.map(
-      (p) => ({ kind: "pattern", severity: "info", data: p }) as const,
-    ),
-  ];
-
-  // Stable sort by severity rank (high first). Array.prototype.sort
-  // is stable in modern V8 / SpiderMonkey, so equal-rank items keep
-  // input order (incidents → secrets → patterns).
-  all.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
+  const all = buildUnifiedFindings(
+    incidentMatches,
+    secretFindings,
+    patternFindings,
+  );
 
   if (all.length === 0) {
     return <CleanListState />;
