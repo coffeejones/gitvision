@@ -31,8 +31,9 @@ import {
   Waypoints,
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
-import { complexityTone, type FnMarker } from "@/lib/sourceAnnotations";
-import type { FunctionSignals, FunctionExplanation } from "@/lib/functionExplain";
+import { complexityTone, type FnMarker, type FileChips } from "@/lib/sourceAnnotations";
+import { buildFunctionSignals, type FunctionSignals } from "@/lib/functionSignals";
+import type { FunctionExplanation } from "@/lib/functionExplain";
 
 const CONSENT_KEY_PRIVATE = "ct-explain-consent-private";
 
@@ -52,6 +53,7 @@ export function FunctionInsight({
   sessionId,
   path,
   marker,
+  chips,
   repoPrivate,
   initial,
   onLoaded,
@@ -60,6 +62,10 @@ export function FunctionInsight({
   sessionId: string;
   path: string;
   marker: FnMarker;
+  /** The file's deterministic chips — lets us build the evidence row on the
+   *  client so the facts show before the AI responds. Matches what the server
+   *  hands the model, so nothing shifts when the reading lands. */
+  chips?: FileChips | null;
   repoPrivate: boolean;
   /** A result already fetched this session — render it instantly, no re-fetch. */
   initial?: InsightResult;
@@ -69,6 +75,10 @@ export function FunctionInsight({
 }) {
   const line = marker.startRow + 1;
   const fnName = marker.name || "(anonymous)";
+  // The deterministic evidence, built on the client from the same marker + file
+  // chips the server uses — identical by construction to result.signals, but on
+  // screen the instant the panel opens instead of after the AI round-trip.
+  const localSignals = buildFunctionSignals(path, marker, chips);
 
   const [phase, setPhase] = useState<Phase>(() => {
     if (initial) return { status: "loaded", result: initial };
@@ -172,14 +182,24 @@ export function FunctionInsight({
       </div>
 
       <div className="px-4 py-3 flex flex-col gap-3">
-        {phase.status === "consent" && (
+        {phase.status === "consent" ? (
           <ConsentGate repoPrivate={repoPrivate} onConfirm={grantConsentAndRun} onCancel={onClose} />
+        ) : (
+          <>
+            {/* Evidence leads — the deterministic facts, computed on the client,
+                on screen the instant the panel opens. Past consent it shows in
+                every phase (loading / error / loaded), so the grounded frame is
+                never gated behind the 2-3s AI round-trip. The reading below sits
+                on top of these, never floats free of them. */}
+            <EvidenceRow signals={localSignals} />
+            <AiReadingDivider />
+          </>
         )}
 
         {phase.status === "loading" && (
-          <div className="flex items-center gap-2 text-[12.5px] py-2" style={{ color: TOK.textSecondary }}>
+          <div className="flex items-center gap-2 text-[12.5px] py-1" style={{ color: TOK.textSecondary }}>
             <Loader2 size={14} className="animate-spin" style={{ color: TOK.accent }} />
-            Reading the function and its signals…
+            Reading the function…
           </div>
         )}
 
@@ -284,16 +304,14 @@ function ConsentGate({
   );
 }
 
-// ─── Loaded body: evidence chips (the frame) then the AI reading ────────────
+// ─── Loaded body: the AI reading (the evidence row leads the panel above) ───
 
 function InsightBody({ result }: { result: InsightResult }) {
-  const { signals, explanation } = result;
+  const { explanation } = result;
+  // The evidence row now leads the whole panel (hoisted above the phase switch),
+  // so the AI body is just the three grounded parts.
   return (
     <div className="flex flex-col gap-3">
-      {/* Grounded evidence — shown FIRST: the deterministic facts the AI was
-          handed. The narrative below sits on top of these, never floats free. */}
-      <EvidenceRow signals={signals} />
-
       <Part
         icon={<Info size={13} />}
         label="What it does"
@@ -317,6 +335,13 @@ function InsightBody({ result }: { result: InsightResult }) {
       )}
     </div>
   );
+}
+
+// A quiet hairline marking the seam between the deterministic evidence above
+// and the AI reading below — the separation does the work, no label needed
+// (the header already says "AI reading").
+function AiReadingDivider() {
+  return <div className="h-px w-full" style={{ background: TOK.border }} aria-hidden />;
 }
 
 function EvidenceRow({ signals }: { signals: FunctionSignals }) {

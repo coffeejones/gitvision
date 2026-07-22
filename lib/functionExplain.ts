@@ -18,8 +18,15 @@
 // the feature without special-casing.
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { SafetyTier } from "./refactorSafety";
-import type { FnMarker, FileChips } from "./sourceAnnotations";
+import type { FnMarker } from "./sourceAnnotations";
+
+// FunctionSignals + its pure builder now live in a client-safe module (they carry
+// no SDK dependency), so the Source view's FunctionInsight can build the evidence
+// row on the client. Re-exported here so existing server-side importers (the
+// explain route, the cache) keep importing from functionExplain unchanged.
+export { buildFunctionSignals } from "./functionSignals";
+export type { FunctionSignals } from "./functionSignals";
+import type { FunctionSignals } from "./functionSignals";
 
 // Haiku 4.5 — same call as the Health Check + summary: a constrained "read this
 // + these numbers, write three short grounded sentences" task, not deep
@@ -33,33 +40,6 @@ const MAX_TOKENS = 500;
 // more than enough to characterise it; we truncate and tell it we did.
 const MAX_SOURCE_LINES = 400;
 const MAX_SOURCE_CHARS = 16_000;
-
-/** The deterministic signals we hand the model alongside the source — the
- *  grounding frame. Every field traces back to an existing analysis pass
- *  (the code graph's functions, computeRefactorSafety, the hotspot list). */
-export interface FunctionSignals {
-  path: string;
-  name: string;
-  /** 1-indexed display line of the function's start. */
-  line: number;
-  complexity: number;
-  /** Vs the previous snapshot: new / modified / null (unchanged or no history). */
-  changed: "new" | "modified" | null;
-  /** Structurally identical copies elsewhere (twins). */
-  duplicateCount: number;
-  /** Resolved call sites into this function (function-level fan-in). */
-  callerCount: number;
-  /** File-level refactor-safety tier, or null for a test/unclassified file. */
-  fileTier: SafetyTier | null;
-  /** Does a test file reach this file at all? null when not meaningfully testable. */
-  fileTested: boolean | null;
-  /** Files that import or call into this file. */
-  fileFanIn: number;
-  /** Commits touching this file (git hotspot), or null with no history. */
-  churn: number | null;
-  /** authors === 1 — the bus-factor signal. */
-  soloAuthor: boolean;
-}
 
 export interface FunctionExplanation {
   /** One plain sentence: what the function does. */
@@ -113,29 +93,6 @@ export function sliceFunctionSource(fileContent: string, marker: FnMarker): stri
     truncated = true;
   }
   return truncated ? `${text}\n… (function truncated for length)` : text;
-}
-
-/** Reshape a function's already-computed marker + its file's chips into the flat
- *  signal set we hand the model. Pure — no new signal is invented. */
-export function buildFunctionSignals(
-  path: string,
-  marker: FnMarker,
-  chips?: FileChips | null,
-): FunctionSignals {
-  return {
-    path,
-    name: marker.name || "(anonymous)",
-    line: marker.startRow + 1,
-    complexity: marker.complexity,
-    changed: marker.changed ?? null,
-    duplicateCount: marker.duplicates?.length ?? 0,
-    callerCount: marker.callers?.length ?? 0,
-    fileTier: chips?.tier ?? null,
-    fileTested: chips?.tested ?? null,
-    fileFanIn: chips?.fanIn ?? 0,
-    churn: chips?.churn ?? null,
-    soloAuthor: chips?.authors === 1,
-  };
 }
 
 /** The grounded, source-aware explanation for one function. Returns null when

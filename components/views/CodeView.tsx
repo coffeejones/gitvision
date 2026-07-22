@@ -381,6 +381,7 @@ export function CodeView({
               sessionId={sessionId!}
               path={path}
               marker={openMarker}
+              chips={chips}
               repoPrivate={repoPrivate}
               initial={insights.get(openInsight!)}
               onLoaded={(r) => setInsights((m) => new Map(m).set(openInsight!, r))}
