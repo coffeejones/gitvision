@@ -45,7 +45,9 @@ import {
   EdgeLabelRenderer,
   getSmoothStepPath,
 } from "@xyflow/react";
-import { Boxes, Search, X } from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { ArrowUpRight, Boxes, Search, X } from "lucide-react";
 import type { CodeGraph } from "@/lib/types";
 import type { ParsedField } from "@/lib/codeAnalysis/types";
 import {
@@ -99,6 +101,206 @@ const EDGE_STYLE = {
   association: { stroke: TOK.textSecondary, dashed: false },
 } as const;
 
+type StereotypeKey = keyof typeof STEREOTYPE_STYLE;
+
+function stereotypeOf(d: ClassNodeData): StereotypeKey {
+  if (d.isInterface) return "interface";
+  if (d.isAbstract) return "abstract";
+  if (d.isEnum) return "enum";
+  return "class";
+}
+
+// A relationship of the selected class, derived from the edge set. verb reads
+// from the selected class's point of view ("extends X", "used by Y").
+interface RelInfo {
+  verb: string;
+  targetId: string;
+  targetLabel: string;
+  kind: keyof typeof EDGE_STYLE;
+}
+
+/** On-canvas legend — makes the edge kinds + stereotype colors decodable
+ *  (the diagram otherwise draws a plum line / blue dashed / colored header with
+ *  no key). Reads straight from EDGE_STYLE + STEREOTYPE_STYLE so it can never
+ *  drift from what's actually drawn. */
+function Legend() {
+  const edgeRows: { kind: keyof typeof EDGE_STYLE; label: string }[] = [
+    { kind: "extends", label: "extends" },
+    { kind: "implements", label: "implements" },
+    { kind: "association", label: "uses (field)" },
+  ];
+  const stKeys: StereotypeKey[] = ["class", "interface", "abstract", "enum"];
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 12,
+        right: 12,
+        zIndex: 5,
+        background: TOK.surfaceElevated,
+        border: `1px solid ${TOK.border}`,
+        borderRadius: 8,
+        padding: "9px 11px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 7,
+        pointerEvents: "none",
+      }}
+    >
+      <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.12em", color: TOK.textMuted }}>
+        Relationships
+      </span>
+      {edgeRows.map((r) => {
+        const s = EDGE_STYLE[r.kind];
+        return (
+          <span key={r.kind} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 11, color: TOK.textSecondary }}>
+            <svg width={22} height={8} style={{ flexShrink: 0 }}>
+              <line
+                x1={1}
+                y1={4}
+                x2={21}
+                y2={4}
+                stroke={s.stroke}
+                strokeWidth={1.5}
+                strokeDasharray={s.dashed ? "3 2" : undefined}
+              />
+            </svg>
+            {r.label}
+          </span>
+        );
+      })}
+      <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.12em", color: TOK.textMuted, marginTop: 2 }}>
+        Kinds
+      </span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", maxWidth: 150 }}>
+        {stKeys.map((k) => {
+          const s = STEREOTYPE_STYLE[k];
+          return (
+            <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: TOK.textSecondary }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: s.accent, flexShrink: 0 }} />
+              {s.label}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Selection detail rail — when a class is clicked, its file (→ Source), member
+ *  counts, and relationships (each clickable to jump to that class) so the
+ *  diagram becomes navigable, not just viewable. */
+function DetailRail({
+  data,
+  relationships,
+  sessionId,
+  onSelectClass,
+  onClose,
+}: {
+  data: ClassNodeData;
+  relationships: RelInfo[];
+  sessionId: string;
+  onSelectClass: (id: string) => void;
+  onClose: () => void;
+}) {
+  const st = stereotypeOf(data);
+  const stStyle = STEREOTYPE_STYLE[st];
+  const memberCount = data.fields.length + data.methodNames.length;
+  return (
+    <aside
+      style={{
+        position: "absolute",
+        top: 12,
+        right: 12,
+        width: 288,
+        maxHeight: "calc(100% - 24px)",
+        overflowY: "auto",
+        zIndex: 6,
+        background: TOK.surfaceElevated,
+        border: `1px solid ${TOK.borderStrong}`,
+        borderRadius: 10,
+        boxShadow: "0 12px 30px -12px rgba(0,0,0,0.6)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div style={{ padding: "12px 14px", borderBottom: `1px solid ${TOK.border}` }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+            <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: stStyle.accent, fontWeight: 600 }}>
+              {stStyle.label}
+            </span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: TOK.textPrimary, fontFamily: "var(--font-ct-mono, monospace)", wordBreak: "break-word" }}>
+              {data.label}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close details"
+            style={{ color: TOK.textMuted, flexShrink: 0, lineHeight: 0, padding: 2, cursor: "pointer" }}
+          >
+            <X size={15} />
+          </button>
+        </div>
+        {sessionId && (
+          <Link
+            href={`/session/${sessionId}/source?file=${encodeURIComponent(data.filePath)}&line=1`}
+            className="transition hover:underline"
+            style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontFamily: "var(--font-ct-mono, monospace)", color: TOK.textSecondary, wordBreak: "break-all" }}
+            title={`Open ${data.filePath} in Source`}
+          >
+            {data.filePath}
+            <ArrowUpRight size={11} style={{ flexShrink: 0 }} />
+          </Link>
+        )}
+        <div style={{ marginTop: 8, fontSize: 11, color: TOK.textMuted }}>
+          {data.fields.length} field{data.fields.length === 1 ? "" : "s"} · {data.methodNames.length} method
+          {data.methodNames.length === 1 ? "" : "s"}
+          {data.isEnum && data.enumValues.length > 0 ? ` · ${data.enumValues.length} values` : ""}
+        </div>
+      </div>
+
+      <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.12em", color: TOK.textMuted }}>
+          Relationships
+        </span>
+        {relationships.length === 0 ? (
+          <span style={{ fontSize: 12, color: TOK.textMuted }}>
+            {memberCount === 0 ? "No members or relationships extracted." : "No relationships to other classes in view."}
+          </span>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {relationships.map((r, i) => (
+              <button
+                key={`${r.verb}-${r.targetId}-${i}`}
+                type="button"
+                onClick={() => onSelectClass(r.targetId)}
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 8,
+                  padding: "6px 0",
+                  borderTop: i === 0 ? "none" : `1px solid ${TOK.border}`,
+                  textAlign: "left",
+                  cursor: "pointer",
+                }}
+                title={`Jump to ${r.targetLabel}`}
+              >
+                <span style={{ width: 7, height: 7, borderRadius: 2, background: EDGE_STYLE[r.kind].stroke, flexShrink: 0, transform: "translateY(1px)" }} />
+                <span style={{ fontSize: 11, color: TOK.textMuted, flexShrink: 0, minWidth: 78 }}>{r.verb}</span>
+                <span style={{ fontSize: 12, color: TOK.textPrimary, fontFamily: "var(--font-ct-mono, monospace)", wordBreak: "break-word" }}>
+                  {r.targetLabel}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 export function ClassCanvas({ codeGraph, scope }: Props) {
   return (
     <ReactFlowProvider>
@@ -129,6 +331,8 @@ function ClassCanvasInner({ codeGraph, scope }: Props) {
   const searchQuery = useDeferredValue(searchInput);
 
   const reactFlow = useReactFlow();
+  const params = useParams();
+  const sessionId = String(params?.id ?? "");
 
   // Pre-compute the connected-id set once per edge change. Used by
   // both the unconnected filter and various downstream hints.
@@ -198,6 +402,43 @@ function ClassCanvasInner({ codeGraph, scope }: Props) {
     }
     return ns;
   }, [selected, filteredEdges]);
+
+  // id → display label, for the detail rail's relationship rows.
+  const labelById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const n of rawNodes) m.set(n.id, (n.data as ClassNodeData).label);
+    return m;
+  }, [rawNodes]);
+
+  const selectedData = useMemo<ClassNodeData | null>(() => {
+    if (!selected) return null;
+    const n = rawNodes.find((x) => x.id === selected);
+    return n ? (n.data as ClassNodeData) : null;
+  }, [selected, rawNodes]);
+
+  // Relationships of the selected class, phrased from its point of view. Edge
+  // direction: extends/implements go parent/iface → child; association goes
+  // user → used.
+  const relationships = useMemo<RelInfo[]>(() => {
+    if (!selected) return [];
+    const out: RelInfo[] = [];
+    const label = (id: string) => labelById.get(id) ?? id;
+    for (const e of filteredEdges) {
+      const kind = (e.data as ClassEdgeData | undefined)?.kind;
+      if (!kind) continue;
+      const field = (e.data as ClassEdgeData | undefined)?.fieldName;
+      if (e.target === selected) {
+        if (kind === "extends") out.push({ verb: "extends", targetId: e.source, targetLabel: label(e.source), kind });
+        else if (kind === "implements") out.push({ verb: "implements", targetId: e.source, targetLabel: label(e.source), kind });
+        else out.push({ verb: "used by", targetId: e.source, targetLabel: label(e.source), kind });
+      } else if (e.source === selected) {
+        if (kind === "extends") out.push({ verb: "extended by", targetId: e.target, targetLabel: label(e.target), kind });
+        else if (kind === "implements") out.push({ verb: "implemented by", targetId: e.target, targetLabel: label(e.target), kind });
+        else out.push({ verb: field ? `uses · ${field}` : "uses", targetId: e.target, targetLabel: label(e.target), kind });
+      }
+    }
+    return out;
+  }, [selected, filteredEdges, labelById]);
 
   const nodes: Node<AugmentedClassNodeData>[] = useMemo(() => {
     return rawNodes
@@ -353,6 +594,16 @@ function ClassCanvasInner({ codeGraph, scope }: Props) {
             }}
           />
         </ReactFlow>
+        <Legend />
+        {selectedData && (
+          <DetailRail
+            data={selectedData}
+            relationships={relationships}
+            sessionId={sessionId}
+            onSelectClass={setSelected}
+            onClose={() => setSelected(null)}
+          />
+        )}
       </div>
     </div>
   );
