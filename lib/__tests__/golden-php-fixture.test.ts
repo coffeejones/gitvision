@@ -119,6 +119,12 @@ describe("golden PHP fixture", () => {
     expect(call).toBeDefined();
   });
 
+  it("call from a class method carries the caller's exact fromContainerType", () => {
+    const g = buildGraph();
+    const call = g.calls.find((c) => c.fromFunction === "process" && c.calleeName === "add");
+    expect(call?.fromContainerType).toBe("Calculator");
+  });
+
   it("add() call resolves cross-file to helper.php", () => {
     const g = buildGraph();
     const call = g.calls.find((c) => c.fromFunction === "process" && c.calleeName === "add");

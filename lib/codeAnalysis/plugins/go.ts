@@ -720,6 +720,10 @@ function parseGoDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             calls.push({
               calleeName,
               inFunction: currentMethod()?.name ?? null,
+              // The enclosing method's receiver type — the same value that stamps
+              // FunctionDef.containerType (Go declares methods outside the struct).
+              // `?? undefined`: receiverType is string|null, the field is string|undefined.
+              fromContainerType: currentMethod()?.receiverType ?? undefined,
               calleeType,
               hasReceiver,
             });

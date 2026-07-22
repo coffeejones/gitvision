@@ -833,6 +833,9 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             calls.push({
               calleeName,
               inFunction: currentMethod()?.name ?? null,
+              // Same live scope that stamps FunctionDef.containerType — gives the
+              // caller side an exact container instead of a name-only guess.
+              fromContainerType: currentClass()?.name,
               calleeType,
               hasReceiver,
             });

@@ -129,6 +129,12 @@ describe("golden C# fixture", () => {
     expect(call).toBeDefined();
   });
 
+  it("call from a class method carries the caller's exact fromContainerType", () => {
+    const g = buildGraph();
+    const call = g.calls.find((c) => c.fromFunction === "Process" && c.calleeName === "Add");
+    expect(call?.fromContainerType).toBe("Main");
+  });
+
   it("Helper.Add() resolves cross-class to Helper.cs", () => {
     const g = buildGraph();
     const call = g.calls.find((c) => c.fromFunction === "Process" && c.calleeName === "Add");

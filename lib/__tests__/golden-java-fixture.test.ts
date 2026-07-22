@@ -132,6 +132,12 @@ describe("golden Java fixture", () => {
     expect(call, "Helper.add() not captured — plugin may not handle ClassName.method() syntax").toBeDefined();
   });
 
+  it("call from a class method carries the caller's exact fromContainerType", () => {
+    const g = buildGraph();
+    const call = g.calls.find((c) => c.fromFunction === "process" && c.calleeName === "add");
+    expect(call?.fromContainerType).toBe("Main");
+  });
+
   it("Helper.add() resolves cross-class to Helper.java", () => {
     const g = buildGraph();
     const call = g.calls.find((c) => c.fromFunction === "process" && c.calleeName === "add");

@@ -789,6 +789,7 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
           calls.push({
             calleeName,
             inFunction: currentMethod()?.name ?? null,
+            fromContainerType: currentClass()?.name,
             calleeType: resolveMemberCallType(receiver),
             // Explicit receiver — engage the resolver's strict guard so an
             // untyped $obj->foo() can't false-match a unique unrelated foo().
@@ -807,6 +808,7 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
           calls.push({
             calleeName,
             inFunction: currentMethod()?.name ?? null,
+            fromContainerType: currentClass()?.name,
             calleeType: resolveScopedCallType(scope),
             // Explicit scope (Foo::/self::/static::) — a receiver, so engage
             // the resolver's strict guard against false name-collision matches.
@@ -837,6 +839,7 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
           calls.push({
             calleeName,
             inFunction: currentMethod()?.name ?? null,
+            fromContainerType: currentClass()?.name,
             // No receiver — leave calleeType undefined unless we wanted
             // to pretend it's the current class. PHP allows free
             // functions and inside-class function calls without
@@ -860,6 +863,7 @@ function parsePhpDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
           calls.push({
             calleeName: typeName,
             inFunction: currentMethod()?.name ?? null,
+            fromContainerType: currentClass()?.name,
             calleeType: typeName,
             // Constructor call — resolve strictly by type; never fall back to
             // a top-level function that happens to share the class name.

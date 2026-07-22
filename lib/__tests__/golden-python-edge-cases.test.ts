@@ -139,6 +139,14 @@ describe("golden Python fixture · edge cases", () => {
     ).toBe(EXPECTED.asyncMethodComplexity);
   });
 
+  it("call from a class method carries the caller's exact fromContainerType", () => {
+    // self.fetch(url) inside Service.call — the edge is unresolved (fetch has no
+    // def) but fromContainerType is stamped at parse time regardless.
+    const g = buildGraph();
+    const edge = g.calls.find((c) => c.fromFunction === "call" && c.calleeName === "fetch");
+    expect(edge?.fromContainerType).toBe("Service");
+  });
+
   it("Service.normalize() call from run() resolves cross-file", () => {
     const g = buildGraph();
     const callsFromRun = g.calls.filter(

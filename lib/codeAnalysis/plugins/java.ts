@@ -638,6 +638,7 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
           calls.push({
             calleeName,
             inFunction: currentMethod()?.name ?? null,
+            fromContainerType: currentClass()?.name,
             calleeType: resolveCalleeType(objectNode),
             // An explicit receiver (obj.method()) engages the resolver's
             // strict guard against false name-collision matches on untyped
@@ -659,6 +660,7 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
             calls.push({
               calleeName: typeName,
               inFunction: currentMethod()?.name ?? null,
+              fromContainerType: currentClass()?.name,
               calleeType: typeName,
               // Constructor call — resolve strictly by type; never fall back
               // to a top-level function that happens to share the class name.

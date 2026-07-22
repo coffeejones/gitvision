@@ -495,6 +495,7 @@ function parseRubyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
               calls.push({
                 calleeName: "initialize",
                 inFunction: currentMethod()?.name ?? null,
+                fromContainerType: currentClass()?.name,
                 calleeType: className,
                 hasReceiver: true,
               });
@@ -505,6 +506,7 @@ function parseRubyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             calls.push({
               calleeName: "initialize",
               inFunction: currentMethod()?.name ?? null,
+              fromContainerType: currentClass()?.name,
               calleeType: cls.name,
               hasReceiver: true,
             });
@@ -523,6 +525,7 @@ function parseRubyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           calls.push({
             calleeName: methodName,
             inFunction: currentMethod()?.name ?? null,
+            fromContainerType: currentClass()?.name,
             calleeType: resolveCallType(receiver),
             hasReceiver: receiver !== null,
           });

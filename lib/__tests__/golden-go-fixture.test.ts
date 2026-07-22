@@ -142,6 +142,12 @@ describe("golden Go fixture", () => {
     expect(call?.toFile).toBe("calc/helper.go");
   });
 
+  it("call from a method carries the caller's exact fromContainerType (receiver)", () => {
+    const g = buildGraph();
+    const call = g.calls.find((c) => c.fromFunction === "Process" && c.calleeName === "Add");
+    expect(call?.fromContainerType).toBe("Calculator");
+  });
+
   it("SafeDiv() call inside Process resolves to helper.go", () => {
     const g = buildGraph();
     const call = g.calls.find(
