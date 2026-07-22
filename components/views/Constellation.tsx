@@ -19,7 +19,7 @@ import {
   Position,
 } from "@xyflow/react";
 import * as d3 from "d3";
-import { Activity, Pause, Play, Users } from "lucide-react";
+import { Activity, History, Pause, Play, Users } from "lucide-react";
 import type { AnalysisSnapshot, FileHotspot, CoChangeEdge } from "@/lib/types";
 import { TOK } from "@/lib/sessionTheme";
 import {
@@ -197,10 +197,14 @@ interface FileNodeData extends Record<string, unknown> {
   isDimmed: boolean;
   authorTint?: { bg: string; ring: string; text: string; authorLogin: string };
   onSelect: (path: string) => void;
+  /** When the timeline scrubber is engaged, a file entering the visible set is
+   *  a file being "born" — spring it in so scrubbing reads as the repo growing.
+   *  Off during the static full view so the whole board doesn't pop on load. */
+  animateEntry?: boolean;
 }
 
 const FileNode = memo(function FileNode({ data }: NodeProps) {
-  const { hotspot, isHot, isSelected, isDimmed, authorTint, onSelect } =
+  const { hotspot, isHot, isSelected, isDimmed, authorTint, onSelect, animateEntry } =
     data as FileNodeData;
   const c = authorTint ?? colorFor(hotspot.path);
   const name = fileDisplayName(hotspot.path);
@@ -225,6 +229,11 @@ const FileNode = memo(function FileNode({ data }: NodeProps) {
           : isHot
           ? `0 0 0 1px ${c.ring}55`
           : "none",
+        // Spring-in only while scrubbing — scaling the INNER card, never React
+        // Flow's node wrapper (which owns positioning).
+        ...(animateEntry
+          ? { animation: "constellation-grow 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards" }
+          : null),
       }}
     >
       <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
@@ -789,6 +798,7 @@ function ConstellationInner({ snapshot }: Props) {
           isDimmed,
           authorTint: authorTintFor(h.path),
           onSelect: setSelected,
+          animateEntry: timeIndex != null,
         } as FileNodeData,
         draggable: true,
         selectable: false, // we handle selection ourselves
@@ -806,6 +816,7 @@ function ConstellationInner({ snapshot }: Props) {
     colorBy,
     dominantAuthor,
     authorRank,
+    timeIndex,
   ]);
 
   const rfEdges: Edge[] = useMemo(() => {
@@ -845,6 +856,8 @@ function ConstellationInner({ snapshot }: Props) {
         border: "1px solid rgba(255,255,255,0.04)",
       }}
     >
+      {/* Spring-in for files as they're "born" while scrubbing the timeline. */}
+      <style>{`@keyframes constellation-grow { 0% { opacity: 0; transform: scale(0.35); } 68% { opacity: 1; transform: scale(1.06); } 100% { transform: scale(1); } }`}</style>
       {/* Controls */}
       <div
         className="absolute z-10 top-3 left-3 flex items-center gap-3 backdrop-blur rounded-lg px-3 py-2 text-xs shadow-lg flex-wrap max-w-[calc(100%-24px)]"
@@ -1070,9 +1083,23 @@ function ConstellationInner({ snapshot }: Props) {
             background: "rgba(12, 11, 11, 0.92)",
             color: TOK.textPrimary,
             border: `1px solid ${TOK.border}`,
-            width: "min(560px, calc(100% - 260px))",
+            width: "min(600px, calc(100% - 260px))",
           }}
         >
+          {/* Label — surfaces what the control does. Idle reads as an invitation
+              ("watch it grow"); once engaged it's just "Timeline". */}
+          <span
+            className="inline-flex items-center gap-1.5 shrink-0"
+            title="Replay the repo's history — files spring in as they were first committed"
+          >
+            <History size={13} style={{ color: TOK.textSecondary }} />
+            <span
+              className="text-[10px] uppercase tracking-[0.12em] font-medium"
+              style={{ color: TOK.textSecondary }}
+            >
+              {timeIndex == null && !playing ? "Watch it grow" : "Timeline"}
+            </span>
+          </span>
           <button
             onClick={() => {
               if (timeIndex == null) setTimeIndex(0);
