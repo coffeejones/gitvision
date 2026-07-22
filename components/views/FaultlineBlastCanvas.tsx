@@ -77,7 +77,7 @@ const EpicenterNode = memo(function EpicenterNode({ data }: NodeProps) {
 // it"). Warmth is layered but the orange never becomes a full fill: a faint
 // left gradient + a 4px stripe + a filled rose "no test" chip. Covered + tests
 // stay fully neutral, so the danger reads instantly against them.
-const UNTESTED_BG = `linear-gradient(90deg, ${TOK.roseSoft} 0%, transparent 55%), ${TOK.surface}`;
+const UNTESTED_BG = `linear-gradient(90deg, ${TOK.roseSoft} 0%, transparent 30%), ${TOK.surface}`;
 
 const AffectedNode = memo(function AffectedNode({ data }: NodeProps) {
   const d = data as { base: string; dir: string; untested: boolean; isTest: boolean; href?: string };
@@ -87,7 +87,7 @@ const AffectedNode = memo(function AffectedNode({ data }: NodeProps) {
     <div
       style={{
         background: restBg,
-        border: `1px solid ${d.untested ? `${TOK.rose}44` : TOK.border}`,
+        border: `1px solid ${d.untested ? `${TOK.rose}33` : TOK.border}`,
         borderRadius: 8,
         width: 208,
         minHeight: 56,
@@ -104,7 +104,7 @@ const AffectedNode = memo(function AffectedNode({ data }: NodeProps) {
       onMouseLeave={(e) => {
         if (!clickable) return;
         e.currentTarget.style.filter = "none";
-        e.currentTarget.style.borderColor = d.untested ? `${TOK.rose}44` : TOK.border;
+        e.currentTarget.style.borderColor = d.untested ? `${TOK.rose}33` : TOK.border;
       }}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
