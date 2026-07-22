@@ -203,7 +203,7 @@ export function WhatIfEditor({
           </button>
         </div>
       ) : result ? (
-        <ResultView path={path} result={result} onBack={() => setPhase("edit")} />
+        <ResultView path={path} result={result} onBack={() => setPhase("edit")} sessionId={sessionId} />
       ) : null}
     </div>
   );
@@ -215,10 +215,12 @@ function ResultView({
   path,
   result,
   onBack,
+  sessionId,
 }: {
   path: string;
   result: SimulateResult;
   onBack: () => void;
+  sessionId: string;
 }) {
   const gate = result.gate;
   const affected = result.affectedFiles;
@@ -295,7 +297,7 @@ function ResultView({
           <span className="text-[10px] uppercase tracking-[0.16em]" style={{ color: TOK.textMuted }}>
             Reaches {affected.length} file{affected.length === 1 ? "" : "s"}
           </span>
-          <FaultlineBlastCanvas epicenter={path} affected={affected} verb="Change" />
+          <FaultlineBlastCanvas epicenter={path} affected={affected} verb="Change" sessionId={sessionId} />
         </div>
       )}
 

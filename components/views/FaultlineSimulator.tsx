@@ -420,7 +420,7 @@ function Verdict({
       </div>
 
       {/* The shockwave — the hero */}
-      <FaultlineBlastCanvas epicenter={epicenter} affected={affected} />
+      <FaultlineBlastCanvas epicenter={epicenter} affected={affected} sessionId={sessionId} />
 
       {/* Required actions — the conscience */}
       {actions.length > 0 && (
