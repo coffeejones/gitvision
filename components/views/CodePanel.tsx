@@ -280,6 +280,31 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
     });
   }, [cg, selected, selectedFunction]);
 
+  // Resolve a function → its 1-based start line so a function blast dot / list
+  // row can deep-link to file:line. FunctionBlastEntry drops the line number
+  // (its BFS keys on file+name+container), so we recover it from cg.functions.
+  // Overloads collide on (file,name,container) — take the earliest line:
+  // deterministic, and matches how the function chips label them.
+  const fnStartRow = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of cg.functions) {
+      const key = `${f.filePath}${f.name}${f.containerType ?? ""}`;
+      const prev = m.get(key);
+      if (prev === undefined || f.startRow < prev) m.set(key, f.startRow);
+    }
+    return m;
+  }, [cg.functions]);
+
+  const fnLineFor = (e: {
+    filePath: string;
+    name?: string;
+    containerType?: string;
+  }) => {
+    const key = `${e.filePath}${e.name ?? ""}${e.containerType ?? ""}`;
+    const row = fnStartRow.get(key);
+    return row != null ? row + 1 : 1;
+  };
+
   const selectedComplexity = selected
     ? cg.fileComplexity[selected] ?? 0
     : null;
@@ -359,6 +384,7 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
               if (selected) rememberSelection(selected, null);
             }}
             file={selected!}
+            lineFor={fnLineFor}
           />
         ) : (
           blast && <BlastRadiusView blast={blast} file={selected!} />
@@ -846,6 +872,10 @@ interface BlastListEntry {
   secondary?: string;
   hop: number;
   crossModule?: boolean;
+  /** Function mode: the resolved 1-based source line for the deep-link (the
+   *  link targets `secondary`, the file path). File mode leaves this unset and
+   *  links `primary`, which is itself the file path, at line 1. */
+  line?: number;
 }
 
 function BlastRadiusView({
@@ -930,13 +960,30 @@ function FunctionBlastRadiusView({
   blast,
   onBack,
   file,
+  lineFor,
 }: {
   blast: FunctionBlastRadius;
   onBack: () => void;
   file: string;
+  /** Resolve a caller/callee to its 1-based start line for the deep-link. */
+  lineFor: (e: {
+    filePath: string;
+    name?: string;
+    containerType?: string;
+  }) => number;
 }) {
+  const params = useParams();
+  const sessionId = String(params?.id ?? "");
   const totalCalls = blast.incoming.length + blast.outgoing.length;
   const isEmpty = totalCalls === 0;
+  const fnName = blast.target.containerType
+    ? `${blast.target.containerType}.${blast.target.name}`
+    : blast.target.name;
+  // The list rows link to their FILE (secondary) at the resolved line.
+  const sourceHref = (e: BlastListEntry) =>
+    sessionId && e.secondary
+      ? `/session/${sessionId}/source?file=${encodeURIComponent(e.secondary)}&line=${e.line ?? 1}`
+      : undefined;
 
   return (
     <div className="flex flex-col gap-3">
@@ -1011,6 +1058,22 @@ function FunctionBlastRadiusView({
         </div>
       )}
 
+      {/* Phase 3: the same concentric blast diagram as file mode, now for the
+       *  call graph — center = this function, dots left = callers (what breaks),
+       *  right = callees (what it calls). Every dot deep-links to the callee/
+       *  caller at its own file:line. Hidden when there are no edges (the hint
+       *  above already explains the empty case). */}
+      {!isEmpty && (
+        <BlastRadiusDiagram
+          blast={blast}
+          file={file}
+          centerLabel={fnName}
+          inLabel="CALLERS"
+          outLabel="CALLEES"
+          lineFor={lineFor}
+        />
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <BlastSection
           title="Callers — functions that call this"
@@ -1022,9 +1085,11 @@ function FunctionBlastRadiusView({
             secondary: e.filePath,
             hop: e.hop,
             crossModule: e.crossModule,
+            line: lineFor(e),
           }))}
           byHop={blast.byHop.incoming}
           crossModuleCount={blast.crossModuleCounts.incoming}
+          sourceHref={sourceHref}
         />
         <BlastSection
           title="Callees — functions this calls"
@@ -1036,9 +1101,11 @@ function FunctionBlastRadiusView({
             secondary: e.filePath,
             hop: e.hop,
             crossModule: e.crossModule,
+            line: lineFor(e),
           }))}
           byHop={blast.byHop.outgoing}
           crossModuleCount={blast.crossModuleCounts.outgoing}
+          sourceHref={sourceHref}
         />
         {blast.truncated && (
           <div
