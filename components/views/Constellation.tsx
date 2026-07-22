@@ -20,6 +20,7 @@ import {
 } from "@xyflow/react";
 import * as d3 from "d3";
 import { Activity, History, Pause, Play, Users } from "lucide-react";
+import { TermInfo } from "@/components/TermInfo";
 import type { AnalysisSnapshot, FileHotspot, CoChangeEdge } from "@/lib/types";
 import { TOK } from "@/lib/sessionTheme";
 import {
@@ -960,9 +961,12 @@ function ConstellationInner({ snapshot }: Props) {
       >
         {colorBy === "type" ? (
           <div className="inline-flex items-center gap-1 flex-wrap">
-            Color = file type · Bar = churn · Green dot = recent ·
+            Color = file type · Bar = churn
+            <TermInfo term="churn" size={10} />
+            · Green dot = recent ·
             <Users size={10} />
             = multi-author
+            <TermInfo term="author-diversity" size={10} />
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">

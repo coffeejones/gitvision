@@ -59,6 +59,8 @@ import {
 import { TOK } from "@/lib/sessionTheme";
 import { MUTED } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
+import { TermInfo } from "@/components/TermInfo";
+import type { GlossaryKey } from "@/lib/glossary";
 
 interface Props {
   codeGraph: CodeGraph;
@@ -124,10 +126,14 @@ interface RelInfo {
  *  no key). Reads straight from EDGE_STYLE + STEREOTYPE_STYLE so it can never
  *  drift from what's actually drawn. */
 function Legend() {
-  const edgeRows: { kind: keyof typeof EDGE_STYLE; label: string }[] = [
-    { kind: "extends", label: "extends" },
-    { kind: "implements", label: "implements" },
-    { kind: "association", label: "uses (field)" },
+  const edgeRows: {
+    kind: keyof typeof EDGE_STYLE;
+    label: string;
+    term: GlossaryKey;
+  }[] = [
+    { kind: "extends", label: "extends", term: "inheritance" },
+    { kind: "implements", label: "implements", term: "interface-implements" },
+    { kind: "association", label: "uses (field)", term: "association-uses" },
   ];
   const stKeys: StereotypeKey[] = ["class", "interface", "abstract", "enum"];
   return (
@@ -166,11 +172,30 @@ function Legend() {
               />
             </svg>
             {r.label}
+            {/* Legend is pointerEvents:none for canvas pan-through; re-enable it
+                just on the info trigger so the term stays hoverable. */}
+            <span style={{ pointerEvents: "auto", display: "inline-flex" }}>
+              <TermInfo term={r.term} size={10} />
+            </span>
           </span>
         );
       })}
-      <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.12em", color: TOK.textMuted, marginTop: 2 }}>
+      <span
+        style={{
+          fontSize: 9,
+          textTransform: "uppercase",
+          letterSpacing: "0.12em",
+          color: TOK.textMuted,
+          marginTop: 2,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
         Kinds
+        <span style={{ pointerEvents: "auto", display: "inline-flex" }}>
+          <TermInfo term="class-stereotype" size={10} />
+        </span>
       </span>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", maxWidth: 150 }}>
         {stKeys.map((k) => {

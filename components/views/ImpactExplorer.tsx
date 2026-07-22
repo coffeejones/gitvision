@@ -42,6 +42,8 @@ import {
 } from "@/lib/impact";
 import type { CodeGraph } from "@/lib/codeAnalysis/types";
 import { TOK } from "@/lib/sessionTheme";
+import { TermInfo } from "@/components/TermInfo";
+import type { GlossaryKey } from "@/lib/glossary";
 import { CH_FOCUS } from "@/components/chambers/theme";
 
 const MONO = { fontFamily: "var(--font-mono)" } as const;
@@ -152,6 +154,7 @@ function Column({
   showUntested,
   riskTiered = false,
   headerless = false,
+  term,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -164,6 +167,8 @@ function Column({
   riskTiered?: boolean;
   /** Skip the built-in header — the caller renders its own (a disclosure). */
   headerless?: boolean;
+  /** Optional glossary term explained by a TermInfo next to the header. */
+  term?: GlossaryKey;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -202,6 +207,7 @@ function Column({
           <span>
             {title} · {entries.length}
           </span>
+          {term && <TermInfo term={term} size={10} />}
         </div>
       )}
       {sorted.length === 0 ? (
@@ -459,10 +465,11 @@ export function ImpactExplorer({
           topFiles.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               <span
-                className="text-[10px] uppercase tracking-[0.1em] self-center mr-1"
+                className="text-[10px] uppercase tracking-[0.1em] self-center mr-1 inline-flex items-center gap-1"
                 style={{ color: TOK.textMuted }}
               >
                 Most depended-on:
+                <TermInfo term="load-bearing" size={10} />
               </span>
               {topFiles.map((t) => (
                 <button
@@ -573,6 +580,7 @@ export function ImpactExplorer({
                       {impactedFileCount === 1 ? "" : "s"} · </>
                     )}
                     {crossModuleCount} cross-module
+                    <TermInfo term="cross-module" size={11} />
                     {untestedCount > 0 && (
                       <>
                         {" · "}
@@ -650,6 +658,7 @@ export function ImpactExplorer({
             {/* Primary question: what breaks, ranked by risk */}
             <Column
               title="What breaks if this changes"
+              term="blast-radius"
               icon={<ArrowDownToLine size={12} />}
               entries={incoming}
               emptyLabel={

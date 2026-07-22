@@ -46,6 +46,7 @@ import {
   X,
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
+import { TermInfo } from "@/components/TermInfo";
 import { CH_FOCUS } from "@/components/chambers/theme";
 import { MUTED, VIZ_NEUTRAL, VIZ_SURFACE } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
@@ -751,8 +752,12 @@ function DependencyCanvasInner({ graph, impactHighlight }: Props) {
                       checked={hideIsolated}
                       onChange={(e) => setHideIsolated(e.target.checked)}
                     />
-                    <span style={{ color: TOK.textSecondary }}>
+                    <span
+                      className="inline-flex items-center gap-1"
+                      style={{ color: TOK.textSecondary }}
+                    >
                       Hide isolated ({isolatedCount})
+                      <TermInfo term="isolated-file" size={10} />
                     </span>
                   </label>
                 )}

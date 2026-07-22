@@ -3,6 +3,8 @@
 import { X } from "lucide-react";
 import type { FileHotspot, CoChangeEdge, CommitSummary, RepoMeta } from "@/lib/types";
 import { TOK } from "@/lib/sessionTheme";
+import { TermInfo } from "@/components/TermInfo";
+import type { GlossaryKey } from "@/lib/glossary";
 
 interface Props {
   hotspot: FileHotspot;
@@ -93,6 +95,7 @@ export function FileDetailsPanel({
             label="Score"
             value={hotspot.score.toFixed(1)}
             sub="risk"
+            term="hotspot"
           />
         </div>
 
@@ -128,7 +131,9 @@ export function FileDetailsPanel({
 
         {partners.length > 0 && (
           <section>
-            <SectionTitle>Co-changes with</SectionTitle>
+            <SectionTitle>
+              Co-changes with <TermInfo term="co-change" size={11} />
+            </SectionTitle>
             <ul className="space-y-1">
               {partners.map((p) => (
                 <li
@@ -206,7 +211,17 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({
+  label,
+  value,
+  sub,
+  term,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  term?: GlossaryKey;
+}) {
   return (
     <div
       className="rounded-lg p-2"
@@ -216,10 +231,11 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
       }}
     >
       <div
-        className="text-[10px] uppercase tracking-wider"
+        className="text-[10px] uppercase tracking-wider inline-flex items-center gap-1"
         style={{ color: TOK.textMuted }}
       >
         {label}
+        {term && <TermInfo term={term} size={10} />}
       </div>
       <div
         className="text-lg font-semibold tabular-nums mt-0.5"

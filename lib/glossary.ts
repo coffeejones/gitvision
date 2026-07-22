@@ -152,6 +152,52 @@ export const GLOSSARY = {
     why: "You still get the dependency graph, but not functions, calls, or complexity for those files.",
     anchor: "code-panel",
   },
+  hotspot: {
+    term: "Hotspot",
+    what: "A file's risk score — how often it changes (churn) weighted by how many people touch it.",
+    why: "High-churn, many-hands files are where bugs cluster; it's the first place to look when you inherit a repo.",
+  },
+  "author-diversity": {
+    term: "Author diversity",
+    what: "How many distinct people have committed to this file over its history.",
+    why: "Many hands means the knowledge is spread; a single author is a bus-factor risk if they move on.",
+  },
+  inheritance: {
+    term: "Inheritance (extends)",
+    what: "One class extends another and inherits its fields and methods, then adds or overrides its own.",
+    why: "Change the parent and every subclass inherits that change — including behaviour they quietly rely on.",
+    anchor: "architecture",
+  },
+  "interface-implements": {
+    term: "Implements (interface)",
+    what: "A class promises to provide every method an interface declares — the interface is the contract, the class fulfils it.",
+    why: "Code written against the interface works with any class that implements it, so implementations swap without touching callers.",
+    anchor: "architecture",
+  },
+  "association-uses": {
+    term: "Uses (association)",
+    what: "One class holds another as a field, so it depends on that type to do its work.",
+    why: "A direct dependency — move or change the used class and every class holding it has to keep up.",
+    anchor: "architecture",
+  },
+  "class-stereotype": {
+    term: "Class kind (stereotype)",
+    what: "The kind of type each box is — plain class, interface, abstract class, or enum — shown by its header colour.",
+    why: "It signals how you use it: instantiate a class, implement an interface, extend an abstract one, pick a value from an enum.",
+    anchor: "architecture",
+  },
+  "cross-module": {
+    term: "Cross-module ripple",
+    what: "A dependent that lives in a different folder or module than the file you're changing.",
+    why: "A break that jumps modules is the easiest to miss — it surfaces somewhere you weren't looking.",
+    anchor: "blast-radius",
+  },
+  "isolated-file": {
+    term: "Isolated file",
+    what: "A file nothing imports and that imports nothing — no edges into or out of it in the graph.",
+    why: "Often just dead code you can skip — but a live entry point here means its real wiring sits outside the import graph, out of this view's reach.",
+    anchor: "imports",
+  },
 } satisfies Record<string, GlossaryEntry>;
 
 export type GlossaryKey = keyof typeof GLOSSARY;

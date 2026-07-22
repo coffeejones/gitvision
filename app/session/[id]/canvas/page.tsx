@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/storage";
 import { TOK } from "@/lib/sessionTheme";
 import { Constellation } from "@/components/views/Constellation";
+import { TermInfo } from "@/components/TermInfo";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function CanvasPage({
           Canvas
         </span>
         <h1
-          className="text-2xl sm:text-3xl font-semibold tracking-tight"
+          className="text-2xl sm:text-3xl font-semibold tracking-tight inline-flex items-center gap-2"
           style={{
             color: TOK.textPrimary,
             letterSpacing: "-0.02em",
@@ -39,6 +40,7 @@ export default async function CanvasPage({
           }}
         >
           Hotspot map.
+          <TermInfo term="hotspot" size={15} />
         </h1>
         <p
           className="text-sm max-w-2xl leading-relaxed"
