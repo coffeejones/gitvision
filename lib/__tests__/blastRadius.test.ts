@@ -531,6 +531,73 @@ describe("computeFunctionBlastRadius", () => {
     ]);
   });
 
+  it("uses CallEdge.fromContainerType for the exact caller container, not the name-only lookup", () => {
+    // handlers.ts has AlphaHandler.handle AND BetaHandler.handle; only
+    // AlphaHandler.handle calls target.run. The legacy name-only lookup is
+    // last-write-wins on `handlers.ts::handle` → BetaHandler (listed last),
+    // which would MISLABEL the caller. The edge's exact fromContainerType wins.
+    const cg = emptyCodeGraph();
+    cg.functions = [
+      {
+        filePath: "handlers.ts",
+        name: "handle",
+        startRow: 10,
+        endRow: 20,
+        complexity: 2,
+        containerType: "AlphaHandler",
+      },
+      {
+        filePath: "handlers.ts",
+        name: "handle",
+        startRow: 40,
+        endRow: 50,
+        complexity: 2,
+        containerType: "BetaHandler", // listed last → would win the name-only map
+      },
+    ];
+    cg.calls = [
+      {
+        fromFile: "handlers.ts",
+        fromFunction: "handle",
+        fromContainerType: "AlphaHandler",
+        calleeName: "run",
+        toFile: "target.ts",
+        toFunction: "run",
+      },
+    ];
+    const b = computeFunctionBlastRadius(cg, "target.ts", "run");
+    expect(b.incoming).toEqual([
+      {
+        filePath: "handlers.ts",
+        name: "handle",
+        containerType: "AlphaHandler",
+        hop: 1,
+        crossModule: false,
+      },
+    ]);
+  });
+
+  it("keeps same-named callers in one file distinct via fromContainerType (no collapse)", () => {
+    // Both AlphaHandler.handle and BetaHandler.handle call target.run. Without an
+    // exact caller container they'd encode to one BFS node and collapse to a
+    // single incoming entry; fromContainerType keeps them separate.
+    const cg = emptyCodeGraph();
+    cg.functions = [
+      { filePath: "handlers.ts", name: "handle", startRow: 10, endRow: 20, complexity: 2, containerType: "AlphaHandler" },
+      { filePath: "handlers.ts", name: "handle", startRow: 40, endRow: 50, complexity: 2, containerType: "BetaHandler" },
+    ];
+    cg.calls = [
+      { fromFile: "handlers.ts", fromFunction: "handle", fromContainerType: "AlphaHandler", calleeName: "run", toFile: "target.ts", toFunction: "run" },
+      { fromFile: "handlers.ts", fromFunction: "handle", fromContainerType: "BetaHandler", calleeName: "run", toFile: "target.ts", toFunction: "run" },
+    ];
+    const b = computeFunctionBlastRadius(cg, "target.ts", "run");
+    expect(b.incoming).toHaveLength(2);
+    expect(b.incoming.map((e) => e.containerType).sort()).toEqual([
+      "AlphaHandler",
+      "BetaHandler",
+    ]);
+  });
+
   it("preserves containerType on outgoing entries (callees) too", () => {
     const cg = emptyCodeGraph();
     cg.functions = [

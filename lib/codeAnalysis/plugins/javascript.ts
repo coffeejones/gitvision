@@ -1078,6 +1078,9 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             calls.push({
               calleeName,
               inFunction: currentMethod()?.name ?? null,
+              // Same live scope that stamps FunctionDef.containerType — gives the
+              // caller side an exact container, not a name-only guess downstream.
+              fromContainerType: currentClass()?.name,
               calleeType,
               hasReceiver,
             });
@@ -1101,6 +1104,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             calls.push({
               calleeName: className,
               inFunction: currentMethod()?.name ?? null,
+              fromContainerType: currentClass()?.name,
               calleeType: className,
             });
           }

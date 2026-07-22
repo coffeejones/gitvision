@@ -162,10 +162,11 @@ export function rankFunctionsByBlast(
     if (classify(c.fromFile)) continue;
     if (classify(c.toFile)) continue;
 
-    // We don't have fromContainerType on the edge — but for ranking we
-    // only need the toId to count callers. Source-side identity doesn't
-    // matter for BFS reachability.
-    const fromId = encodeFn(c.fromFile, c.fromFunction, undefined);
+    // Use the exact caller container when the edge carries it, so two
+    // same-named callers in one file stay distinct source nodes instead of
+    // collapsing and under-counting distinct callers. Undefined for old
+    // snapshots / regex-fallback edges → unchanged from before.
+    const fromId = encodeFn(c.fromFile, c.fromFunction, c.fromContainerType);
     const toId = encodeFn(c.toFile, c.toFunction, c.toContainerType);
     if (fromId === toId) continue; // self-edge
 

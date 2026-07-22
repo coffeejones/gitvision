@@ -88,6 +88,10 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
       calls.push({
         fromFile: f.rel,
         fromFunction: c.inFunction,
+        // Exact caller container from the plugin's class scope — carried
+        // opaquely, never derived here (a name-only lookup would reproduce the
+        // ambiguity we're removing). Undefined for plugins that don't emit it.
+        fromContainerType: c.fromContainerType,
         calleeName: c.calleeName,
         toFile: target?.filePath ?? null,
         toFunction: target?.name ?? null,

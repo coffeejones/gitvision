@@ -126,7 +126,10 @@ export function rankFunctionsInFile(
       set = new Set<string>();
       callers.set(key, set);
     }
-    set.add(`${c.fromFile}\x1E${c.fromFunction}`);
+    // Include the caller's container so two same-named methods in one file
+    // count as distinct callers instead of collapsing (undefined → "" for old
+    // snapshots / regex-fallback edges, i.e. unchanged there).
+    set.add(`${c.fromFile}\x1E${c.fromFunction}\x1E${c.fromContainerType ?? ""}`);
   }
 
   const seen = new Set<string>();

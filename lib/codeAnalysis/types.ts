@@ -89,6 +89,13 @@ export interface ParsedCall {
   calleeName: string;
   /** Name of the enclosing function/method. null for module-scope calls. */
   inFunction: string | null;
+  /** Container (class/struct/etc.) of the enclosing function, when the plugin
+   *  can identify it — mirrors FunctionDef.containerType, stamped from the same
+   *  live class scope. Lets the graph builder give CallEdge an EXACT caller
+   *  container (CallEdge.fromContainerType), so the caller side of the function
+   *  blast radius is as precise as the callee side. Optional: module-scope /
+   *  top-level callers and plugins that don't track class scope leave it unset. */
+  fromContainerType?: string;
   /** When the plugin can statically infer the type of the call's receiver.
    *  E.g. for `validatePassword.validate(...)`, this is "ValidatePassword"
    *  if `validatePassword` was declared as that type in scope. Drives
@@ -327,6 +334,15 @@ export interface CallEdge {
    *  produce identical results — the v0.20 chip-dedup workaround.
    *  Top-level / module-scope target functions leave this undefined. */
   toContainerType?: string;
+  /** Container (class/struct/etc.) of the CALLER's enclosing function
+   *  (fromFunction), when the plugin can identify it (v0.44+). The source-side
+   *  mirror of toContainerType: lets the function blast radius pick the EXACT
+   *  caller among same-named methods across sibling classes in one file,
+   *  instead of the name-only last-wins guess it fell back to before. Supplied
+   *  by the plugin from live class scope (JS/TS first); absent for plugins that
+   *  don't yet emit it and for the regex-fallback languages (no call edges at
+   *  all). Optional so old snapshots on disk keep deserializing. */
+  fromContainerType?: string;
 }
 
 /** A module-level edge between files. */

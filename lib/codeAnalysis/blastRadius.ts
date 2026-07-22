@@ -175,9 +175,9 @@ export function computeBlastRadius(
  *  undefined to match any function with the given name in the file
  *  (legacy behavior, useful for snapshots without container data).
  *
- *  fromFunction's container is NOT tracked in CallEdge — we infer
- *  source-side from cg.functions when needed for display. For BFS
- *  matching we rely on toContainerType only. */
+ *  fromFunction's container comes from CallEdge.fromContainerType (the exact
+ *  caller container the plugin emitted); for old snapshots / regex-fallback
+ *  edges that lack it we fall back to a name-only cg.functions lookup. */
 export function computeFunctionBlastRadius(
   codeGraph: CodeGraph,
   targetFile: string,
@@ -188,9 +188,12 @@ export function computeFunctionBlastRadius(
   const maxNodes = opts.maxNodes ?? DEFAULT_MAX_NODES;
   const targetContainerType = opts.targetContainerType;
 
-  // Build a (file, name) -> container lookup for the source side. CallEdge
-  // doesn't carry fromContainerType; we look it up from cg.functions to
-  // populate FunctionBlastEntry.containerType for callers in the result.
+  // Fallback (file, name) -> container lookup for the source side. CallEdge now
+  // carries fromContainerType (the exact caller container from the plugin), but
+  // old snapshots + regex-fallback edges don't — for those we still infer the
+  // container from cg.functions. This is name-only + last-write-wins, so it
+  // collapses same-named methods across sibling classes in one file; the
+  // per-edge fromContainerType is what fixes that, this is just the legacy path.
   const fromContainerLookup = new Map<string, string | undefined>();
   for (const fn of codeGraph.functions) {
     fromContainerLookup.set(`${fn.filePath}::${fn.name}`, fn.containerType);
@@ -202,8 +205,13 @@ export function computeFunctionBlastRadius(
   for (const c of codeGraph.calls) {
     if (c.fromFunction === null) continue; // module-scope; no source-side fn id
     if (c.toFile === null || c.toFunction === null) continue; // unresolved
+    // Prefer the exact container the plugin pinned for THIS caller edge; fall
+    // back to the name-only cg.functions lookup only for old snapshots and
+    // regex-fallback edges that never carried it (byte-exact with old behavior).
     const fromContainer =
-      fromContainerLookup.get(`${c.fromFile}::${c.fromFunction}`) ?? undefined;
+      c.fromContainerType ??
+      fromContainerLookup.get(`${c.fromFile}::${c.fromFunction}`) ??
+      undefined;
     const fromId = encodeFn(c.fromFile, c.fromFunction, fromContainer);
     const toId = encodeFn(c.toFile, c.toFunction, c.toContainerType);
     addEdge(outgoingAdj, incomingAdj, fromId, toId);

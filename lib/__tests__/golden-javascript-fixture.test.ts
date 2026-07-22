@@ -132,4 +132,13 @@ describe("golden JavaScript fixture", () => {
     );
     expect(call?.toFile).toBe("src/helper.js");
   });
+
+  it("call from a class method carries the caller's exact fromContainerType", () => {
+    // End-to-end: the real plugin stamps the enclosing class onto the call
+    // edge (process lives in Calculator), so the caller side of the function
+    // blast radius is as exact as the callee side — no name-only guessing.
+    const g = buildGraph();
+    const call = g.calls.find((c) => c.fromFunction === "process" && c.calleeName === "add");
+    expect(call?.fromContainerType).toBe("Calculator");
+  });
 });
