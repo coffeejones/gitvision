@@ -104,6 +104,19 @@ async function main() {
     for (const r of m.topRepos) console.log(`   ${pad(r.count)}  ${r.repo}`);
     console.log("");
   }
+
+  // The reason this tap exists right now: read the live Faultline compute
+  // timing so the worker_thread offload is a computed call, not a guess.
+  if (m.faultline) {
+    const f = m.faultline;
+    console.log("  FAULTLINE ENGINE  (compute timing — the worker-offload decision)");
+    console.log(`   ${pad(f.count)}  simulates  ${f.shed} shed · ${f.inFlight} in-flight now`);
+    console.log(
+      `          p50 ${f.p50Ms}ms · p95 ${f.p95Ms}ms · max ${f.maxMs}ms  (window ${f.windowSize})`
+    );
+    const warn = f.p95Ms > 1000 ? "   ⚠ p95 > 1s — worker offload warranted" : "";
+    console.log(`          up since ${new Date(f.startedAt).toLocaleString()}${warn}\n`);
+  }
 }
 
 main();

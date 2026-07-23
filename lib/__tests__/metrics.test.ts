@@ -92,3 +92,26 @@ describe("aggregateMetrics — detail mode", () => {
     expect(JSON.stringify(base)).not.toMatch(/@/);
   });
 });
+
+describe("aggregateMetrics — faultline (injected engine timing)", () => {
+  const faultline = {
+    count: 42,
+    shed: 3,
+    p50Ms: 120,
+    p95Ms: 340,
+    maxMs: 900,
+    windowSize: 42,
+    inFlight: 1,
+    startedAt: "2026-06-17T00:00:00.000Z",
+  };
+
+  it("passes the injected faultline timing through unchanged", () => {
+    const m = aggregateMetrics(users, sessions, NOW, {}, faultline);
+    expect(m.faultline).toEqual(faultline);
+  });
+
+  it("omits faultline for pure callers that don't inject it", () => {
+    const m = aggregateMetrics(users, sessions, NOW);
+    expect(m.faultline).toBeUndefined();
+  });
+});

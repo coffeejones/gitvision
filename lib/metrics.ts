@@ -17,6 +17,8 @@ import { db } from "./db";
 import * as schema from "./db/schema";
 import { listSessions } from "./storage";
 import { cmpStr } from "./deterministicSort";
+import { simulateStats, type SimulateStats } from "./shadowGraph/simulateTelemetry";
+import { gateInFlight } from "./shadowGraph/computeGate";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -52,6 +54,18 @@ export interface MetricsDetail {
   repos: { repo: string; count: number; lastAnalyzed: string }[];
 }
 
+/** Live Faultline / Shadow-Graph compute-engine timing — the data the deferred
+ *  worker_thread offload decision rests on ("build it only if p95 drifts past
+ *  ~1s under load", runPatch.ts). Process-live counters, not derived from the
+ *  DB, so they reset on deploy — `startedAt` says how fresh the window is. */
+export interface FaultlineMetrics extends SimulateStats {
+  /** Simulates in flight through the compute gate right now. */
+  inFlight: number;
+  /** Process start (ISO). If it's minutes ago, the window is post-deploy fresh;
+   *  if hours/days, the p95 reflects real accumulated traffic. */
+  startedAt: string;
+}
+
 export interface Metrics {
   generatedAt: string;
   accounts: MetricPair & {
@@ -74,6 +88,10 @@ export interface Metrics {
    *  none. Not PII — just a timestamp. */
   lastSignupAt: string | null;
   lastAnalysisAt: string | null;
+  /** Live compute-engine timing. Present whenever computeMetrics() ran (it
+   *  reads process state); omitted by pure aggregateMetrics() callers that
+   *  don't inject it. */
+  faultline?: FaultlineMetrics;
   /** Present only when detail was requested (carries emails — PII). */
   detail?: MetricsDetail;
 }
@@ -123,7 +141,8 @@ export function aggregateMetrics(
   users: UserRow[],
   sessions: SessionRow[],
   nowMs: number,
-  opts: { detail?: boolean } = {}
+  opts: { detail?: boolean } = {},
+  faultline?: FaultlineMetrics
 ): Metrics {
   const byTier: Record<string, number> = { Free: 0, Plus: 0, Pro: 0 };
   let paid = 0;
@@ -166,6 +185,10 @@ export function aggregateMetrics(
     lastSignupAt: iso(lastSignupMs),
     lastAnalysisAt: iso(lastAnalysisMs),
   };
+
+  // Live engine timing is injected (not derived from users/sessions), so the
+  // pure aggregator just passes it through — keeps it testable with a fixture.
+  if (faultline) metrics.faultline = faultline;
 
   if (opts.detail) {
     metrics.detail = {
@@ -216,5 +239,14 @@ export async function computeMetrics(
     snapshotCount: s.snapshotCount,
   }));
 
-  return aggregateMetrics(users, sessions, Date.now(), opts);
+  // Live compute-engine timing from the same process (single Railway instance,
+  // so the metrics route and the simulate route share this module state). The
+  // rolling window is in-memory, so this is only meaningful on the prod box.
+  const faultline: FaultlineMetrics = {
+    ...simulateStats(),
+    inFlight: gateInFlight(),
+    startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+  };
+
+  return aggregateMetrics(users, sessions, Date.now(), opts, faultline);
 }
