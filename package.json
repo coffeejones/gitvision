@@ -18,6 +18,7 @@
     "analyze": "tsx lib/codeAnalysis/cli.ts",
     "metrics": "node scripts/metrics-app.mjs",
     "metrics:cli": "node scripts/metrics.mjs",
+    "faultline-probe": "node scripts/faultline-probe.mjs",
     "digest": "tsx scripts/send-digest.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

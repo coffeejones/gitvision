@@ -259,7 +259,21 @@ contents-free, `rawSpec`-re-resolvable). All other plugins: `false`.
 
 ## 7. Surfaces (thin in v1 — the engine is the deliverable)
 
-**7.1 Compute runs in a worker thread (both surfaces).** The whole patch/parse/rebuild is
+**7.1 Compute runs in a worker thread (both surfaces).**
+
+> **STATUS 2026-07-23 — worker DEFERRED, confirmed unwarranted by measurement.** The
+> `worker_threads` offload was never built (it's Next-fragile). v1 ships the bounded-synchronous
+> path (`runPatch.ts` per-file + cumulative byte caps) + a compute gate (`computeGate.ts`, 2
+> slots + bounded queue → 503 "busy") + timing telemetry (`simulateTelemetry.ts`), under the rule
+> "measure first; build the worker only if p95 drifts past ~1s under load." The prod contention
+> re-measure is now done: `npm run faultline-probe` fired 45 delete-sims at the zod demo
+> (concurrency 1→2→4) and read the SERVER-side compute timing back from the founder-metrics tap —
+> **p50 42ms · p95 87ms · max 102ms, 0 gate sheds.** (Client round-trip was 0.4–1.0s and rose
+> with concurrency, but that's network + queueing to Railway, not the compute the worker would
+> offload.) ~10× under budget → the offload below stays deferred. Re-run the probe as real
+> traffic grows to re-confirm before ever reopening this.
+
+The whole patch/parse/rebuild is
 CPU-bound and synchronous, and the web process also runs analysis jobs — so `patch()` runs
 in a `worker_threads` Worker with (a) a **wall-clock timeout** that terminates the worker on
 breach → `{mode:"timeout"}`, and (b) a **cumulative-parse-cost budget** checked before each
