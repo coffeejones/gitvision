@@ -86,6 +86,7 @@ a{color:var(--text);text-decoration:none}a:hover{color:var(--orange)}
   <div class="chart"><div class="t">signups / day · 30d</div><div id="ch-signups"></div></div>
   <div class="chart"><div class="t">analyses / day · 30d</div><div id="ch-analyses"></div></div>
 </div></div>
+<div class="sec" id="fl-sec" style="display:none"><h2><span>Faultline engine</span><span class="tiny" style="text-transform:none;letter-spacing:0;color:var(--muted)">the worker-offload decision</span></h2><div class="cards" id="fl-cards"></div></div>
 <div class="sec"><h2><span>Recent signups</span><button id="reveal" style="padding:4px 10px;font-size:12px">Show emails</button></h2><div class="panel"><table><thead><tr><th>Account</th><th style="text-align:right">Signed up</th></tr></thead><tbody id="accounts"></tbody></table></div></div>
 <div class="sec"><h2>Repos analyzed</h2><div class="panel"><table><thead><tr><th>Repo</th><th style="text-align:right">Runs</th><th style="text-align:right">Last analyzed</th></tr></thead><tbody id="repos"></tbody></table></div></div>
 <div class="tiny" style="margin-top:24px">Read-only · computed from your own product's data · emails shown only on request</div>
@@ -111,6 +112,16 @@ function render(){const m=DATA;if(!m)return;
  ].join('');
  $('ch-signups').innerHTML=spark(m.signupsByDay.map(d=>d.count));
  $('ch-analyses').innerHTML=spark(m.analysesByDay.map(d=>d.count));
+ const f=m.faultline;
+ if(f){$('fl-sec').style.display='';
+   const verdict=f.count===0?'<span class="dim">no simulates yet — run the probe</span>'
+     :(f.p95Ms>1000?'<span class="down">⚠ p95 &gt; 1s — worker offload warranted</span>':'<span class="up">within budget (p95 ≤ 1s)</span>');
+   $('fl-cards').innerHTML=[
+     card('Simulates',f.count,f.shed+' shed · '+f.inFlight+' in-flight now'),
+     card('p95',f.p95Ms+'ms',verdict),
+     card('window '+f.windowSize,'p50 '+f.p50Ms+' · max '+f.maxMs+'ms','engine up '+rel(f.startedAt))
+   ].join('');
+ }
  const accts=(m.detail&&m.detail.accounts)||[];
  $('accounts').innerHTML=accts.length?accts.map(x=>'<tr><td class="k mono">'+(reveal?x.email:mask(x.email))+'</td><td style="text-align:right" title="'+x.createdAt+'">'+rel(x.createdAt)+'</td></tr>').join(''):'<tr><td>No accounts yet</td><td></td></tr>';
  const repos=(m.detail&&m.detail.repos)||[];
