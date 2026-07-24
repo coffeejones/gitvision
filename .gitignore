@@ -60,3 +60,6 @@ next-env.d.ts
 /AGENTS.md
 /doc/launch/
 /doc/future/
+
+# codetrawl-mcp package build artifact
+mcp/pkg/

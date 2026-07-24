@@ -36,26 +36,35 @@ runs in milliseconds against a cached snapshot.
 
 ## Install
 
-> **Status:** pre-npm-publish — install from source. A standalone npm
-> package (`codetrawl-mcp`) and a hosted remote-MCP endpoint will
-> follow once a few external integrations validate the surface.
+Once `codetrawl-mcp` is published to npm, wiring it is one line:
 
-Clone the CodeTrawl repo and build locally:
+```sh
+claude mcp add codetrawl npx codetrawl-mcp
+```
+
+### Publishing the package (maintainer)
+
+The standalone package is a build artifact — `npm run mcp:pack` esbuild-bundles
+the stdio server (externalizing only the tree-sitter WASM deps) into
+`mcp/pkg/`, with a `package.json` whose deps are pinned from the root so it can
+never drift from what the app analyzes with. Verify it actually runs when
+installed, then publish:
+
+```sh
+npm run mcp:pack:test    # pack → install the tarball in a temp dir → boot it
+                         # as an MCP server → analyze a repo (proves WASM resolves)
+cd mcp/pkg && npm publish
+```
+
+### From source (development)
 
 ```sh
 git clone https://github.com/coffeejones/gitvision.git
-cd gitvision
-npm install
-npm run mcp:build
+cd gitvision && npm install && npm run mcp:build
+npm run mcp:validate     # typecheck + the MCP-layer test suite
 ```
 
 The built entry lives at `mcp/dist/mcp/server.js`.
-
-To validate the build before wiring it to a client (recommended):
-
-```sh
-npm run mcp:validate     # build + run the MCP-layer test suite
-```
 
 ## Wire it to your MCP client
 

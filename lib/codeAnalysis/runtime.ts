@@ -18,14 +18,32 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Parser, Language } from "web-tree-sitter";
 
-const NODE_MODULES = path.join(process.cwd(), "node_modules");
-const WTS_DIR = path.join(NODE_MODULES, "web-tree-sitter");
-const VSCODE_GRAMMAR_DIR = path.join(
-  NODE_MODULES,
-  "@vscode",
-  "tree-sitter-wasm",
-  "wasm"
-);
+// WASM host dirs. Default: the project-root node_modules via cwd — the
+// bundler-agnostic policy above, correct for the Next.js app. A STANDALONE build
+// (the codetrawl-mcp npm package) can't use cwd (there cwd is the agent's repo,
+// not the package), so its entry calls setWasmDirs() with paths resolved from
+// its own installed deps. The app never calls it → cwd default → unchanged.
+let wtsDirOverride: string | null = null;
+let grammarDirOverride: string | null = null;
+
+/** Standalone-entry hook: point WASM resolution at explicit install dirs,
+ *  overriding the cwd default. Must be called before the first parse. */
+export function setWasmDirs(dirs: { wtsDir: string; grammarDir: string }): void {
+  wtsDirOverride = dirs.wtsDir;
+  grammarDirOverride = dirs.grammarDir;
+}
+
+function wtsDir(): string {
+  return (
+    wtsDirOverride ?? path.join(process.cwd(), "node_modules", "web-tree-sitter")
+  );
+}
+function grammarDir(): string {
+  return (
+    grammarDirOverride ??
+    path.join(process.cwd(), "node_modules", "@vscode", "tree-sitter-wasm", "wasm")
+  );
+}
 
 let initPromise: Promise<void> | null = null;
 
@@ -40,7 +58,7 @@ let initPromise: Promise<void> | null = null;
 export function ensureRuntime(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
-      const corePath = path.join(WTS_DIR, "web-tree-sitter.wasm");
+      const corePath = path.join(wtsDir(), "web-tree-sitter.wasm");
       const buf = await fs.readFile(corePath);
       await Parser.init({ wasmBinary: new Uint8Array(buf) });
     })().catch((err) => {
@@ -64,7 +82,7 @@ export function _resetRuntimeForTests(): void {
 /** Absolute path to a grammar WASM in @vscode/tree-sitter-wasm.
  *  @param name File name without the .wasm suffix, e.g. "tree-sitter-javascript". */
 export function grammarPath(name: string): string {
-  return path.join(VSCODE_GRAMMAR_DIR, `${name}.wasm`);
+  return path.join(grammarDir(), `${name}.wasm`);
 }
 
 const langCache = new Map<string, Language>();
