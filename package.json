@@ -29,7 +29,9 @@
     "mcp:validate": "npm run mcp:build && npm run mcp:test",
     "mcp": "npm run mcp:build && node mcp/dist/mcp/server.js",
     "mcp:pack": "node scripts/build-mcp-package.mjs",
-    "mcp:pack:test": "node scripts/test-mcp-package.mjs"
+    "mcp:pack:test": "node scripts/test-mcp-package.mjs",
+    "benchmark": "node scripts/benchmark/run.mjs",
+    "benchmark:verify": "node scripts/benchmark/verify.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.0",
