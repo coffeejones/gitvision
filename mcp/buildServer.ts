@@ -45,13 +45,17 @@ import {
   handleSimulateChange,
 } from "./tools/simulateChange.js";
 import {
+  locateSymbolInputSchema,
+  handleLocateSymbol,
+} from "./tools/locateSymbol.js";
+import {
   CONSCIENCE_PROMPT_NAME,
   conscienceArgsSchema,
   conscienceHandler,
 } from "./prompts/conscience.js";
 
 export const SERVER_NAME = "codetrawl";
-export const SERVER_VERSION = "0.67.0";
+export const SERVER_VERSION = "0.68.0";
 
 /** Build a fully-configured CodeTrawl MCP server with all tools
  *  registered. The caller decides which transport to attach (stdio
@@ -100,6 +104,16 @@ export function buildServer(): McpServer {
       inputSchema: untestedHotspotsInputSchema,
     },
     handleUntestedHotspots
+  );
+
+  server.registerTool(
+    "locate_symbol",
+    {
+      description:
+        "Locate where a symbol is defined — pass a function, method, or class/type name and get every matching definition's file and 1-indexed line, with its kind, container class, and complexity. Answers 'where is X defined?' from a BARE name (blast_radius needs the file already). Use the dotted 'Container.method' form or the container arg to disambiguate same-named methods. Exact matches win; falls back to case-insensitive then substring (fuzzy).",
+      inputSchema: locateSymbolInputSchema,
+    },
+    handleLocateSymbol
   );
 
   server.registerTool(

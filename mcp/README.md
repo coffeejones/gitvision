@@ -20,19 +20,21 @@ codebase?", today it grep-greps and guesses. With this server
 connected, it gets actual answers from a tree-sitter AST + call
 graph — no LLM in the analysis path.
 
-Eight tools are exposed. Each takes JSON in, returns JSON out, and
+Ten tools are exposed. Each takes JSON in, returns JSON out, and
 runs in milliseconds against a cached snapshot.
 
 | Tool | Purpose |
 |---|---|
 | `analyze_repo` | Download + parse a GitHub repo, return a stable session id and a compact summary. Always call this first. |
 | `blast_radius` | What breaks if you change a file or function. Cross-file reach via imports + call graph, capped at 3 hops. |
+| `locate_symbol` | Where is symbol X defined? Maps a bare function/method/class name to its file + 1-indexed line, kind, container, and complexity. Answers the "where is X?" question `blast_radius` can't (it needs the file already). |
 | `untested_hotspots` | Production functions with no direct test caller, ranked by complexity. |
 | `find_duplicates` | Functions with identical structural shape (FNV-1a AST hash) across the codebase. Refactor candidates. |
 | `signals` | Deterministic health verdict — what works, what needs work, what needs human judgment. Plus a dimension rollup. |
 | `compare_sessions` | High-level diff of two analyses of the same repo (top-N lists, dup + coverage deltas). Verify a refactor moved the needle. |
 | `analyze_diff` | Function-level diff between two snapshots — every changed function classified add/remove/modify, with complexity delta + a bodyChanged flag. PR-comment-grade detail. |
 | `review_changes` | Prioritized verification suggestions on top of a diff ("addPet complexity rose +7 without tests"), each with severity + evidence. PR-bot / reviewer hints. |
+| `simulate_change` | The Conscience: simulate a proposed diff before committing it — deterministic verdict on what it breaks (load-bearing walls, dependents, guarding tests to run, required actions). |
 
 ## Install
 

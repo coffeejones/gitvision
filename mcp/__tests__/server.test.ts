@@ -67,7 +67,7 @@ describe("MCP server · initialization", () => {
 });
 
 describe("MCP server · tools/list", () => {
-  it("exposes all nine CodeTrawl tools", async () => {
+  it("exposes all ten CodeTrawl tools", async () => {
     const { client, cleanup } = await connectInMemory();
     try {
       const result = await client.listTools();
@@ -78,6 +78,7 @@ describe("MCP server · tools/list", () => {
         "blast_radius",
         "compare_sessions",
         "find_duplicates",
+        "locate_symbol",
         "review_changes",
         "signals",
         "simulate_change",
@@ -107,7 +108,7 @@ describe("MCP server · tools/list", () => {
     const { client, cleanup } = await connectInMemory();
     try {
       const result = await client.listTools();
-      const downstream = ["blast_radius", "find_duplicates", "signals", "untested_hotspots", "simulate_change"];
+      const downstream = ["blast_radius", "find_duplicates", "signals", "untested_hotspots", "simulate_change", "locate_symbol"];
       for (const name of downstream) {
         const tool = result.tools.find((t) => t.name === name);
         expect(tool, `tool ${name} should be registered`).toBeDefined();
