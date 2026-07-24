@@ -44,6 +44,7 @@ import {
   Search,
   Shield,
   ShieldAlert,
+  Route,
   X,
   Sparkles,
   Stethoscope,
@@ -277,6 +278,17 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
       title: "Forensics",
       icon: <Microscope size={12} />,
       items: [
+        {
+          // "How does this work?" — pick an entry point (route, handler, main)
+          // and see what it reaches. Leads Forensics because it's the gentlest
+          // instrument: you read the flow before you take anything apart, and
+          // it's the one surface that assumes no prior knowledge of the repo.
+          label: "Flows",
+          href: `${base}/flows`,
+          icon: <Route size={14} />,
+          hasNewFeatureBadge: true,
+          hint: hasCodeGraph ? undefined : "refresh",
+        },
         {
           // Arc 1 "Can I touch this?" — the action surface: files ranked by how
           // safely you can change them. Leads Forensics because it's the
