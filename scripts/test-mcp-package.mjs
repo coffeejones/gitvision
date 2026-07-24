@@ -65,7 +65,7 @@ try {
 
   const { tools } = await client.listTools();
   log(`  tools/list → ${tools.length}: ${tools.map((t) => t.name).join(", ")}`);
-  if (tools.length < 9) fail(`expected >= 9 tools, got ${tools.length}`);
+  if (tools.length < 10) fail(`expected >= 10 tools, got ${tools.length}`);
 
   log(`  analyze_repo ${REPO}  (fetch + tree-sitter parse in the installed context)…`);
   const res = await client.callTool({ name: "analyze_repo", arguments: { repoUrl: REPO } });
@@ -74,9 +74,20 @@ try {
   if (!/session/i.test(text)) fail(`analyze_repo returned no session:\n    ${text.slice(0, 500)}`);
   log("  ✓ analyze_repo parsed standalone — WASM resolves from the package, not cwd");
 
+  // Prove locate_symbol executes in the BUNDLED artifact (unit + e2e cover the
+  // source; this covers the shipped esbuild bundle). A valid matchType shape is
+  // enough — correctness of a specific repo's parse is tested elsewhere.
+  const sessionId = JSON.parse(text).sessionId;
+  const locRes = await client.callTool({ name: "locate_symbol", arguments: { sessionId, symbol: "isNumber" } });
+  const locText = (locRes.content ?? []).map((c) => c.text ?? "").join("\n");
+  if (locRes.isError) fail(`locate_symbol errored:\n    ${locText.slice(0, 400)}`);
+  const loc = JSON.parse(locText);
+  if (!("matchType" in loc)) fail(`locate_symbol returned no matchType:\n    ${locText.slice(0, 400)}`);
+  log(`  ✓ locate_symbol ran in the bundle — matchType=${loc.matchType}, ${loc.totalMatched} match(es)`);
+
   await client.close();
   fs.rmSync(tarball, { force: true });
-  log("\n  ✓ codetrawl-mcp packs, installs, boots, lists 9 tools, and PARSES standalone.\n");
+  log("\n  ✓ codetrawl-mcp packs, installs, boots, lists 10 tools, PARSES + locates standalone.\n");
 } finally {
   if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
 }

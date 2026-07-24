@@ -19,7 +19,7 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 const OUT = path.join(ROOT, "mcp", "pkg");
-const PKG_VERSION = "0.1.0"; // the npm package version — bump on each publish
+const PKG_VERSION = "0.2.0"; // the npm package version — bump on each publish
 
 const rootPkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 function pin(name) {
