@@ -30,6 +30,7 @@
     "mcp": "npm run mcp:build && node mcp/dist/mcp/server.js",
     "mcp:pack": "node scripts/build-mcp-package.mjs",
     "mcp:pack:test": "node scripts/test-mcp-package.mjs",
+    "flow-probe": "node scripts/flow-probe.mjs",
     "benchmark": "node scripts/benchmark/run.mjs",
     "benchmark:verify": "node scripts/benchmark/verify.mjs"
   },
