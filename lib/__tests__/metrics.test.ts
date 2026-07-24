@@ -115,3 +115,23 @@ describe("aggregateMetrics — faultline (injected engine timing)", () => {
     expect(m.faultline).toBeUndefined();
   });
 });
+
+describe("aggregateMetrics — activation (injected wiring status)", () => {
+  const activation = {
+    receiptSecret: true,
+    cronSecret: false,
+    githubApp: true,
+    aiExplainer: false,
+    watchLastRun: "2026-07-23T08:00:00.000Z",
+  };
+
+  it("passes the injected activation status through unchanged", () => {
+    const m = aggregateMetrics(users, sessions, NOW, {}, undefined, activation);
+    expect(m.activation).toEqual(activation);
+  });
+
+  it("omits activation for pure callers that don't inject it", () => {
+    const m = aggregateMetrics(users, sessions, NOW);
+    expect(m.activation).toBeUndefined();
+  });
+});

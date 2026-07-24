@@ -19,6 +19,7 @@ import { listSessions } from "./storage";
 import { cmpStr } from "./deterministicSort";
 import { simulateStats, type SimulateStats } from "./shadowGraph/simulateTelemetry";
 import { gateInFlight } from "./shadowGraph/computeGate";
+import { readActivation, type ActivationStatus } from "./opsStatus";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -92,6 +93,10 @@ export interface Metrics {
    *  reads process state); omitted by pure aggregateMetrics() callers that
    *  don't inject it. */
   faultline?: FaultlineMetrics;
+  /** Which env-gated features (Gate/Receipt, Watch cron, AI explainer) are
+   *  wired on this box. Presence-only — never a secret value. Injected by
+   *  computeMetrics(); omitted by pure callers. */
+  activation?: ActivationStatus;
   /** Present only when detail was requested (carries emails — PII). */
   detail?: MetricsDetail;
 }
@@ -142,7 +147,8 @@ export function aggregateMetrics(
   sessions: SessionRow[],
   nowMs: number,
   opts: { detail?: boolean } = {},
-  faultline?: FaultlineMetrics
+  faultline?: FaultlineMetrics,
+  activation?: ActivationStatus
 ): Metrics {
   const byTier: Record<string, number> = { Free: 0, Plus: 0, Pro: 0 };
   let paid = 0;
@@ -186,9 +192,11 @@ export function aggregateMetrics(
     lastAnalysisAt: iso(lastAnalysisMs),
   };
 
-  // Live engine timing is injected (not derived from users/sessions), so the
-  // pure aggregator just passes it through — keeps it testable with a fixture.
+  // Live engine timing + activation status are injected (not derived from
+  // users/sessions), so the pure aggregator just passes them through — keeps it
+  // testable with fixtures.
   if (faultline) metrics.faultline = faultline;
+  if (activation) metrics.activation = activation;
 
   if (opts.detail) {
     metrics.detail = {
@@ -248,5 +256,5 @@ export async function computeMetrics(
     startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
   };
 
-  return aggregateMetrics(users, sessions, Date.now(), opts, faultline);
+  return aggregateMetrics(users, sessions, Date.now(), opts, faultline, readActivation());
 }

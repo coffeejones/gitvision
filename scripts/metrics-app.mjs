@@ -87,6 +87,7 @@ a{color:var(--text);text-decoration:none}a:hover{color:var(--orange)}
   <div class="chart"><div class="t">analyses / day · 30d</div><div id="ch-analyses"></div></div>
 </div></div>
 <div class="sec" id="fl-sec" style="display:none"><h2><span>Faultline engine</span><span class="tiny" style="text-transform:none;letter-spacing:0;color:var(--muted)">the worker-offload decision</span></h2><div class="cards" id="fl-cards"></div></div>
+<div class="sec" id="act-sec" style="display:none"><h2><span>Activation</span><span class="tiny" style="text-transform:none;letter-spacing:0;color:var(--muted)">env-gated features on prod</span></h2><div class="cards" id="act-cards"></div><div class="tiny" id="act-meta" style="margin-top:6px"></div></div>
 <div class="sec"><h2><span>Recent signups</span><button id="reveal" style="padding:4px 10px;font-size:12px">Show emails</button></h2><div class="panel"><table><thead><tr><th>Account</th><th style="text-align:right">Signed up</th></tr></thead><tbody id="accounts"></tbody></table></div></div>
 <div class="sec"><h2>Repos analyzed</h2><div class="panel"><table><thead><tr><th>Repo</th><th style="text-align:right">Runs</th><th style="text-align:right">Last analyzed</th></tr></thead><tbody id="repos"></tbody></table></div></div>
 <div class="tiny" style="margin-top:24px">Read-only · computed from your own product's data · emails shown only on request</div>
@@ -121,6 +122,17 @@ function render(){const m=DATA;if(!m)return;
      card('p95',f.p95Ms+'ms',verdict),
      card('window '+f.windowSize,'p50 '+f.p50Ms+' · max '+f.maxMs+'ms','engine up '+rel(f.startedAt))
    ].join('');
+ }
+ const A=m.activation;
+ if(A){$('act-sec').style.display='';
+   const chip=(ok,label)=>card(label,ok?'✓':'✗',ok?'<span class="up">wired</span>':'<span class="dim">not set</span>');
+   $('act-cards').innerHTML=[
+     chip(A.receiptSecret,'Receipt signing'),
+     chip(A.cronSecret,'Watch cron auth'),
+     chip(A.githubApp,'GitHub App'),
+     chip(A.aiExplainer,'AI explainer'),
+   ].join('');
+   $('act-meta').innerHTML='Watch last ran: '+(A.watchLastRun?rel(A.watchLastRun):'not since deploy')+' · checks:write can only be confirmed by opening a PR';
  }
  const accts=(m.detail&&m.detail.accounts)||[];
  $('accounts').innerHTML=accts.length?accts.map(x=>'<tr><td class="k mono">'+(reveal?x.email:mask(x.email))+'</td><td style="text-align:right" title="'+x.createdAt+'">'+rel(x.createdAt)+'</td></tr>').join(''):'<tr><td>No accounts yet</td><td></td></tr>';

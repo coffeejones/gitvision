@@ -17,6 +17,7 @@
 
 import { after } from "next/server";
 import { createHash, timingSafeEqual } from "node:crypto";
+import { recordWatchRun } from "@/lib/opsStatus";
 import { deliverWatchAlerts, runWatchMonitor } from "@/lib/watchMonitor";
 
 export const runtime = "nodejs";
@@ -40,6 +41,9 @@ const notFound = () => new Response("Not found", { status: 404 });
 
 async function runAndLog(dryRun: boolean) {
   const res = await runWatchMonitor({ dryRun });
+  // Record real (non-dry) sweeps so the metrics tap can confirm the cron is
+  // actually firing — a config check for CRON_SECRET + the Actions workflow.
+  if (!dryRun) recordWatchRun(Date.now());
   console.log(
     `[watch-monitor] checked ${res.checked} · swept ${res.swept} · unchanged ${res.skippedUnchanged} · alerts ${res.alerts.length} · errors ${res.errors.length}`,
   );

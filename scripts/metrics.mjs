@@ -117,6 +117,17 @@ async function main() {
     const warn = f.p95Ms > 1000 ? "   ⚠ p95 > 1s — worker offload warranted" : "";
     console.log(`          up since ${new Date(f.startedAt).toLocaleString()}${warn}\n`);
   }
+
+  // Path B activation — which env-gated features are wired on prod. Flip a
+  // secret on Railway, re-run this, watch it go ✓ (see ACTIVATION.md).
+  if (m.activation) {
+    const a = m.activation;
+    const yn = (b) => (b ? "✓" : "✗");
+    console.log("  ACTIVATION  (env-gated features on prod)");
+    console.log(`   ${yn(a.receiptSecret)} Merge Receipt signing    ${yn(a.cronSecret)} Watch cron auth`);
+    console.log(`   ${yn(a.githubApp)} GitHub App (PR Gate)      ${yn(a.aiExplainer)} AI explainer`);
+    console.log(`   Watch last ran: ${a.watchLastRun ? new Date(a.watchLastRun).toLocaleString() : "not since deploy"}\n`);
+  }
 }
 
 main();
