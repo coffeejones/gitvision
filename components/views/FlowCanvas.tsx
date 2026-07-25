@@ -50,6 +50,11 @@ interface FlowNodeData extends Record<string, unknown> {
   elided: number;
   isRoot: boolean;
   selected: boolean;
+  /** Plain-English "what it does", once the AI reading has been fetched for this
+   *  node. Undefined until the user clicks it — source is only ever sent on an
+   *  explicit action, one function at a time (same contract as the Source view). */
+  caption?: string;
+  captionLoading?: boolean;
 }
 
 const StepNode = memo(function StepNode({ data }: NodeProps) {
@@ -104,6 +109,27 @@ const StepNode = memo(function StepNode({ data }: NodeProps) {
         {basename(d.filePath)}
         {dirname(d.filePath) ? ` · ${dirname(d.filePath)}` : ""}
       </div>
+      {d.captionLoading && (
+        <div style={{ fontSize: 10, color: TOK.textMuted, fontStyle: "italic" }}>reading…</div>
+      )}
+      {d.caption && (
+        <div
+          style={{
+            fontSize: 10,
+            lineHeight: 1.35,
+            color: TOK.textSecondary,
+            borderTop: `1px solid ${TOK.border}`,
+            paddingTop: 4,
+            marginTop: 2,
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {d.caption}
+        </div>
+      )}
       {d.elided > 0 && (
         <div style={{ fontSize: 10, color: TOK.textMuted }}>+{d.elided} more not shown</div>
       )}
@@ -148,10 +174,15 @@ export function FlowCanvas({
   trace,
   selectedId,
   onSelect,
+  captions,
 }: {
   trace: FlowTrace;
   selectedId?: string | null;
   onSelect?: (node: FlowTraceNode) => void;
+  /** nodeId → the AI reading, or "loading". Cards grow a caption as the user
+   *  clicks through, so the diagram fills with plain English incrementally
+   *  rather than spending 14 explanations up front. */
+  captions?: Map<string, { does?: string; loading?: boolean }>;
 }) {
   const { nodes, edges } = useMemo(() => {
     const rows = layoutRows(trace);
@@ -166,6 +197,8 @@ export function FlowCanvas({
         elided: n.elidedChildren,
         isRoot: n.parentId === null,
         selected: n.id === selectedId,
+        caption: captions?.get(n.id)?.does,
+        captionLoading: captions?.get(n.id)?.loading,
       } satisfies FlowNodeData,
       draggable: false,
     }));
@@ -179,7 +212,7 @@ export function FlowCanvas({
         style: { stroke: TOK.border, strokeWidth: 1 },
       }));
     return { nodes: ns, edges: es };
-  }, [trace, selectedId]);
+  }, [trace, selectedId, captions]);
 
   const byId = useMemo(
     () => new Map(trace.nodes.map((n) => [n.id, n])),

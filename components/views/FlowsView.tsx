@@ -12,9 +12,9 @@
 //     tree can only be drawn from calls that resolved.
 //   - Truncation is stated when a cap bit.
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
-import { Route, CornerDownRight, FileCode2 } from "lucide-react";
+import { Route, CornerDownRight, FileCode2, Sparkles } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import { FlowCanvas } from "@/components/views/FlowCanvas";
 import type {
@@ -37,6 +37,20 @@ const KIND_LABEL: Record<FlowEntryPoint["kind"], string> = {
 
 const basename = (p: string) => p.split("/").pop() ?? p;
 
+/** One node's AI reading. `does` is the plain-English "what this does" that ends
+ *  up on the card; `risk` and `suggestion` fill the detail bar. */
+interface Caption {
+  loading?: boolean;
+  does?: string;
+  risk?: string;
+  suggestion?: string | null;
+  error?: string;
+  /** The free-phase gate answered "sign in" rather than failing — that's a
+   *  prompt, not an error, and gets a CTA instead of red text (same treatment
+   *  the Source view's FunctionInsight gives it). */
+  signIn?: boolean;
+}
+
 export function FlowsView({
   sessionId,
   flows,
@@ -48,8 +62,64 @@ export function FlowsView({
 }) {
   const [activeId, setActiveId] = useState(flows[0]?.entry.id ?? "");
   const [selected, setSelected] = useState<FlowTraceNode | null>(null);
+  const [captions, setCaptions] = useState<Map<string, Caption>>(new Map());
+
+  const setCaption = useCallback((id: string, patch: Caption) => {
+    setCaptions((prev) => new Map(prev).set(id, patch));
+  }, []);
+
+  /** Fetch one node's reading. Reuses the Source view's endpoint, so the whole
+   *  gate stack (read access, entitlement, AI budget, per-IP rate limit, cache,
+   *  source pinned to the analyzed commit) applies unchanged — and the
+   *  explanation stays grounded in that function's computed signals. Lazy on
+   *  purpose: 14 nodes explained up front would spend the daily budget on
+   *  functions nobody asked about. */
+  const explain = useCallback(
+    async (node: FlowTraceNode) => {
+      if (!node.line) return; // no known definition line → nothing to ground on
+      setCaption(node.id, { loading: true });
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/source/explain`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: node.filePath, fn: node.name, line: node.line }),
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          explanation?: { does?: string; risk?: string; suggestion?: string | null };
+          error?: string;
+          signIn?: boolean;
+        };
+        if (!res.ok || !body.explanation?.does) {
+          setCaption(node.id, {
+            error: body.error ?? "Couldn't read this one.",
+            signIn: body.signIn,
+          });
+          return;
+        }
+        setCaption(node.id, {
+          does: body.explanation.does,
+          risk: body.explanation.risk,
+          suggestion: body.explanation.suggestion ?? null,
+        });
+      } catch {
+        setCaption(node.id, { error: "Network error — try again." });
+      }
+    },
+    [sessionId, setCaption]
+  );
+
+  const onSelectNode = useCallback(
+    (node: FlowTraceNode) => {
+      setSelected(node);
+      // Read it once; a second click just re-selects.
+      if (!captions.has(node.id)) void explain(node);
+    },
+    [captions, explain]
+  );
+
   const active = flows.find((f) => f.entry.id === activeId) ?? flows[0];
   if (!active) return null;
+  const selectedCaption = selected ? captions.get(selected.id) : undefined;
 
   return (
     <div className="flex flex-col gap-4">
@@ -128,7 +198,8 @@ export function FlowsView({
           <FlowCanvas
             trace={active.trace}
             selectedId={selected?.id}
-            onSelect={(n) => setSelected(n)}
+            onSelect={onSelectNode}
+            captions={captions}
           />
         </div>
       </div>
@@ -136,37 +207,105 @@ export function FlowsView({
       {/* ---- selected node detail ---- */}
       {selected && (
         <div
-          className="rounded-lg px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2"
+          className="rounded-lg px-4 py-3 flex flex-col gap-2"
           style={{ border: `1px solid ${TOK.border}`, background: TOK.surface }}
         >
-          <CornerDownRight size={14} style={{ color: TOK.accent }} />
-          <span
-            className="text-[13px] font-medium"
-            style={{ color: TOK.textPrimary, fontFamily: "var(--font-ct-mono, monospace)" }}
-          >
-            {selected.name}
-          </span>
-          <span className="text-[11px]" style={{ color: TOK.textMuted }}>
-            {selected.depth === 0
-              ? "the entry point"
-              : `${selected.depth} hop${selected.depth === 1 ? "" : "s"} from ${active.entry.name}`}
-            {selected.complexity > 1 ? ` · complexity ${selected.complexity}` : ""}
-            {selected.elidedChildren > 0
-              ? ` · calls ${selected.elidedChildren} more not drawn here`
-              : ""}
-          </span>
-          <Link
-            href={`/session/${sessionId}/source?file=${encodeURIComponent(selected.filePath)}`}
-            className="text-[11px] inline-flex items-center gap-1 ml-auto hover:underline"
-            style={{ color: TOK.accent }}
-          >
-            <FileCode2 size={12} />
-            Open {basename(selected.filePath)}
-          </Link>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <CornerDownRight size={14} style={{ color: TOK.accent }} />
+            <span
+              className="text-[13px] font-medium"
+              style={{ color: TOK.textPrimary, fontFamily: "var(--font-ct-mono, monospace)" }}
+            >
+              {selected.name}
+            </span>
+            <span className="text-[11px]" style={{ color: TOK.textMuted }}>
+              {selected.depth === 0
+                ? "the entry point"
+                : `${selected.depth} hop${selected.depth === 1 ? "" : "s"} from ${active.entry.name}`}
+              {selected.complexity > 1 ? ` · complexity ${selected.complexity}` : ""}
+              {selected.elidedChildren > 0
+                ? ` · calls ${selected.elidedChildren} more not drawn here`
+                : ""}
+            </span>
+            <Link
+              href={`/session/${sessionId}/source?file=${encodeURIComponent(selected.filePath)}&line=${selected.line}`}
+              className="text-[11px] inline-flex items-center gap-1 ml-auto hover:underline"
+              style={{ color: TOK.accent }}
+            >
+              <FileCode2 size={12} />
+              Open {basename(selected.filePath)}
+            </Link>
+          </div>
+
+          {/* The AI reading — grounded in this function's computed signals by the
+              same endpoint the Source view uses. */}
+          {selectedCaption?.loading && (
+            <p className="text-[12px] italic" style={{ color: TOK.textMuted }}>
+              Reading {selected.name}…
+            </p>
+          )}
+          {selectedCaption?.error && (
+            <p className="text-[12px]" style={{ color: TOK.textMuted }}>
+              {selectedCaption.error}{" "}
+              {selectedCaption.signIn ? (
+                <Link
+                  href={`/login?next=${encodeURIComponent(`/session/${sessionId}/flows`)}`}
+                  className="inline-flex items-center gap-1 underline"
+                  style={{ color: TOK.accent }}
+                >
+                  <Sparkles size={11} /> Sign in — it&rsquo;s free
+                </Link>
+              ) : (
+                <button
+                  onClick={() => void explain(selected)}
+                  className="underline"
+                  style={{ color: TOK.accent }}
+                >
+                  Try again
+                </button>
+              )}
+            </p>
+          )}
+          {selectedCaption?.does && (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[12px] leading-relaxed" style={{ color: TOK.textSecondary }}>
+                <Sparkles size={11} className="inline mr-1" style={{ color: TOK.accent }} />
+                {selectedCaption.does}
+              </p>
+              {selectedCaption.risk && (
+                <p className="text-[12px] leading-relaxed" style={{ color: TOK.textMuted }}>
+                  {selectedCaption.risk}
+                </p>
+              )}
+              {selectedCaption.suggestion && (
+                <p className="text-[12px] leading-relaxed" style={{ color: TOK.textMuted }}>
+                  {selectedCaption.suggestion}
+                </p>
+              )}
+            </div>
+          )}
+          {!selected.line && (
+            <p className="text-[12px]" style={{ color: TOK.textMuted }}>
+              We don&rsquo;t have a definition line for this one, so there&rsquo;s nothing to read
+              from — it was reached by a call that resolved to a file we didn&rsquo;t index a
+              function for.
+            </p>
+          )}
         </div>
       )}
 
       {/* ---- honesty footer ---- */}
+      {!selected && (
+        <p className="text-[11px]" style={{ color: TOK.textMuted }}>
+          <Sparkles size={11} className="inline mr-1" style={{ color: TOK.accent }} />
+          Click any box to have it read in plain English — the reading stays on the card, so the
+          diagram fills in as you explore.
+        </p>
+      )}
+      <p className="text-[11px] leading-relaxed" style={{ color: TOK.textMuted }}>
+        Reading a box sends that one function&rsquo;s source to Anthropic, on your click and one
+        function at a time. It is never stored — only the explanation is kept, in memory.
+      </p>
       <p className="text-[11px] leading-relaxed" style={{ color: TOK.textMuted }}>
         Each arrow means <strong style={{ color: TOK.textSecondary }}>calls</strong> — not
         &ldquo;and then&rdquo;. Columns are how many calls away something is, not the order things

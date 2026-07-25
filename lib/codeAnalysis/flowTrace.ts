@@ -63,6 +63,10 @@ export interface FlowTraceNode {
    *  is a tree and not the full sub-graph. */
   parentId: string | null;
   complexity: number;
+  /** 1-indexed line the function is defined on — the shape the explain endpoint
+   *  matches against (marker.startRow + 1). 0 when the definition is unknown
+   *  (a call resolved to a file whose function list did not include it). */
+  line: number;
   /** Own-repo functions this node calls that are NOT in the tree (already
    *  reached by a shorter path, or cut by the caps). Surfaces "there is more
    *  here" without redrawing the whole graph. */
@@ -98,6 +102,8 @@ export interface FlowGraphIndex {
   /** calleeId → number of distinct own-repo callers. */
   inDegree: Map<string, number>;
   complexity: Map<string, number>;
+  /** nodeId → 1-indexed definition line, for the explain endpoint. */
+  line: Map<string, number>;
   resolution: FlowResolution;
 }
 
@@ -119,10 +125,14 @@ export function buildFlowIndex(
   const adjacency = new Map<string, Set<string>>();
   const inDegree = new Map<string, number>();
   const complexity = new Map<string, number>();
+  const line = new Map<string, number>();
 
   for (const fn of cg.functions) {
     if (excludeTests && isTestFile(fn.filePath)) continue;
-    complexity.set(flowNodeId(fn.filePath, fn.name), fn.complexity);
+    const id = flowNodeId(fn.filePath, fn.name);
+    complexity.set(id, fn.complexity);
+    // 1-indexed: the explain endpoint matches on marker.startRow + 1.
+    line.set(id, fn.startRow + 1);
   }
 
   let resolvedEdges = 0;
@@ -147,6 +157,7 @@ export function buildFlowIndex(
     adjacency,
     inDegree,
     complexity,
+    line,
     resolution: {
       resolvedEdges,
       totalEdges,
@@ -266,6 +277,7 @@ export function computeFlowTrace(
       depth,
       parentId,
       complexity: idx.complexity.get(id) ?? 0,
+      line: idx.line.get(id) ?? 0,
       elidedChildren: 0,
     });
   };
