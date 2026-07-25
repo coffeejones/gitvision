@@ -21,17 +21,11 @@ import {
   Loader2,
   TriangleAlert,
   ShieldAlert,
-  Lightbulb,
   Info,
-  Flame,
-  FlaskConical,
-  Copy,
-  ArrowLeftToLine,
-  History,
-  Waypoints,
 } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
-import { complexityTone, type FnMarker, type FileChips } from "@/lib/sourceAnnotations";
+import { AiReadingBody, AiReadingDivider, EvidenceRow } from "@/components/views/AiReading";
+import { type FnMarker, type FileChips } from "@/lib/sourceAnnotations";
 import { buildFunctionSignals, type FunctionSignals } from "@/lib/functionSignals";
 import type { FunctionExplanation } from "@/lib/functionExplain";
 
@@ -307,125 +301,15 @@ function ConsentGate({
 // ─── Loaded body: the AI reading (the evidence row leads the panel above) ───
 
 function InsightBody({ result }: { result: InsightResult }) {
-  const { explanation } = result;
-  // The evidence row now leads the whole panel (hoisted above the phase switch),
-  // so the AI body is just the three grounded parts.
-  return (
-    <div className="flex flex-col gap-3">
-      <Part
-        icon={<Info size={13} />}
-        label="What it does"
-        text={explanation.does}
-        color={TOK.textSecondary}
-      />
-      <Part
-        icon={<ShieldAlert size={13} />}
-        label="Where the risk is"
-        text={explanation.risk}
-        color={TOK.textPrimary}
-      />
-      {explanation.suggestion && (
-        <Part
-          icon={<Lightbulb size={13} />}
-          label="Worth considering"
-          text={explanation.suggestion}
-          color={TOK.textSecondary}
-          accent
-        />
-      )}
-    </div>
-  );
+  // The evidence row leads the whole panel (hoisted above the phase switch), so
+  // the AI body is just the three grounded parts — shared with the Flows
+  // surface so the two can't drift (components/views/AiReading.tsx).
+  return <AiReadingBody explanation={result.explanation} />;
 }
 
-// A quiet hairline marking the seam between the deterministic evidence above
-// and the AI reading below — the separation does the work, no label needed
-// (the header already says "AI reading").
-function AiReadingDivider() {
-  return <div className="h-px w-full" style={{ background: TOK.border }} aria-hidden />;
-}
 
-function EvidenceRow({ signals }: { signals: FunctionSignals }) {
-  const chips: React.ReactNode[] = [];
-  const tone = complexityTone(signals.complexity);
-  chips.push(
-    <EvChip
-      key="cx"
-      icon={<Waypoints size={11} />}
-      label={`Complexity ${signals.complexity}`}
-      color={tone === "high" ? TOK.rose : tone === "medium" ? TOK.amber : TOK.textMuted}
-    />,
-  );
-  if (signals.changed) {
-    chips.push(
-      <EvChip key="chg" icon={<History size={11} />} label={signals.changed === "new" ? "New" : "Modified"} color={TOK.accent} />,
-    );
-  }
-  if (signals.callerCount > 0) {
-    chips.push(
-      <EvChip key="cal" icon={<Waypoints size={11} />} label={`Called from ${signals.callerCount}`} color={TOK.textMuted} />,
-    );
-  }
-  if (signals.duplicateCount > 0) {
-    chips.push(
-      <EvChip key="dup" icon={<Copy size={11} />} label={`${signals.duplicateCount} twin${signals.duplicateCount === 1 ? "" : "s"}`} color={TOK.amber} />,
-    );
-  }
-  if (signals.fileTested === false) {
-    chips.push(<EvChip key="test" icon={<FlaskConical size={11} />} label="No test guards it" color={TOK.amber} />);
-  }
-  if (signals.fileFanIn > 0) {
-    chips.push(
-      <EvChip key="fin" icon={<ArrowLeftToLine size={11} />} label={`${signals.fileFanIn} dependent${signals.fileFanIn === 1 ? "" : "s"}`} color={TOK.textMuted} />,
-    );
-  }
-  if (signals.soloAuthor) {
-    chips.push(<EvChip key="bus" icon={<Flame size={11} />} label="Bus factor 1" color={TOK.rose} />);
-  }
-  return <div className="flex items-center gap-1.5 flex-wrap">{chips}</div>;
-}
 
-function EvChip({ icon, label, color }: { icon: React.ReactNode; label: string; color: string }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 text-[10.5px] font-medium px-1.5 py-0.5 rounded"
-      style={{ color, background: "rgba(255,255,255,0.03)", border: `1px solid ${TOK.border}` }}
-    >
-      <span className="flex-shrink-0" style={{ color }}>
-        {icon}
-      </span>
-      {label}
-    </span>
-  );
-}
 
-function Part({
-  icon,
-  label,
-  text,
-  color,
-  accent,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  text: string;
-  color: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className="flex flex-col gap-1"
-      style={accent ? { borderLeft: `2px solid ${TOK.accent}`, paddingLeft: 10 } : undefined}
-    >
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em]" style={{ color: TOK.textMuted }}>
-        <span className="flex-shrink-0">{icon}</span>
-        {label}
-      </div>
-      <p className="text-[12.5px] leading-relaxed" style={{ color }}>
-        {text}
-      </p>
-    </div>
-  );
-}
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 

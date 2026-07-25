@@ -17,6 +17,8 @@ import Link from "next/link";
 import { Route, CornerDownRight, FileCode2, Sparkles } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import { FlowCanvas } from "@/components/views/FlowCanvas";
+import { AiReadingBody, AiReadingDivider, EvidenceRow } from "@/components/views/AiReading";
+import type { FunctionSignals } from "@/lib/functionSignals";
 import type {
   FlowEntryPoint,
   FlowResolution,
@@ -44,6 +46,9 @@ interface Caption {
   does?: string;
   risk?: string;
   suggestion?: string | null;
+  /** The deterministic signals the same response carries. Shown as chips ABOVE
+   *  the prose so a reader can always tell computed fact from AI reading. */
+  signals?: FunctionSignals;
   error?: string;
   /** The free-phase gate answered "sign in" rather than failing — that's a
    *  prompt, not an error, and gets a CTA instead of red text (same treatment
@@ -86,6 +91,7 @@ export function FlowsView({
         });
         const body = (await res.json().catch(() => ({}))) as {
           explanation?: { does?: string; risk?: string; suggestion?: string | null };
+          signals?: FunctionSignals;
           error?: string;
           signIn?: boolean;
         };
@@ -100,6 +106,7 @@ export function FlowsView({
           does: body.explanation.does,
           risk: body.explanation.risk,
           suggestion: body.explanation.suggestion ?? null,
+          signals: body.signals,
         });
       } catch {
         setCaption(node.id, { error: "Network error — try again." });
@@ -267,21 +274,18 @@ export function FlowsView({
             </p>
           )}
           {selectedCaption?.does && (
-            <div className="flex flex-col gap-1.5">
-              <p className="text-[12px] leading-relaxed" style={{ color: TOK.textSecondary }}>
-                <Sparkles size={11} className="inline mr-1" style={{ color: TOK.accent }} />
-                {selectedCaption.does}
-              </p>
-              {selectedCaption.risk && (
-                <p className="text-[12px] leading-relaxed" style={{ color: TOK.textMuted }}>
-                  {selectedCaption.risk}
-                </p>
-              )}
-              {selectedCaption.suggestion && (
-                <p className="text-[12px] leading-relaxed" style={{ color: TOK.textMuted }}>
-                  {selectedCaption.suggestion}
-                </p>
-              )}
+            <div className="flex flex-col gap-2.5">
+              {/* Computed fact first, then the seam, then the model's reading —
+                  so a reader can always tell which half a claim came from. */}
+              {selectedCaption.signals && <EvidenceRow signals={selectedCaption.signals} />}
+              <AiReadingDivider />
+              <AiReadingBody
+                explanation={{
+                  does: selectedCaption.does,
+                  risk: selectedCaption.risk ?? "",
+                  suggestion: selectedCaption.suggestion,
+                }}
+              />
             </div>
           )}
           {!selected.line && (
