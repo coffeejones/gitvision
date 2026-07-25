@@ -87,13 +87,38 @@ export interface FlowTrace {
   reachedTotal: number;
 }
 
-/** Share of call edges that resolve to a known function. The flow tree can only
- *  be built from resolved edges, so this is the honest ceiling on completeness
- *  and belongs on screen, not in a comment. */
+/** How complete the drawn graph is. Two different numbers, and the distinction
+ *  matters enough to be the reason this comment is long.
+ *
+ *  `pct` (resolved / total) reads like an accuracy score and is NOT one. Most
+ *  call edges in any real file point at libraries and language builtins —
+ *  measured on this repo, 72% of all edges are names like `expect`, `it`, `map`,
+ *  `push`, `Map`. Those SHOULD stay unresolved; there is no own-repo function to
+ *  point them at. Leading with `pct` therefore undersells the analysis by
+ *  roughly ten times.
+ *
+ *  `ownPct` is the number worth showing: of the calls that name a function this
+ *  repo actually defines, how many did we resolve? Measured across the stored
+ *  snapshots that runs 92-98% on application-style JS/TS/Java and 51-73% on
+ *  dynamic and library-style code, where same-name methods across many classes
+ *  make the resolver refuse rather than guess.
+ *
+ *  `ownPct` is a LOWER bound on true accuracy: a call to a library's `find` gets
+ *  counted as a miss whenever this repo happens to define its own `find`. Better
+ *  to understate than to claim precision we haven't measured. */
 export interface FlowResolution {
   resolvedEdges: number;
   totalEdges: number;
   pct: number;
+  /** Own-code calls that resolved. Counted on the SAME population as ownMissed
+   *  (production callers only) — an asymmetric count inflates the score. */
+  ownResolved: number;
+  /** Calls naming an own-repo function that failed to resolve. */
+  ownMissed: number;
+  /** ownResolved + ownMissed — every production call that pointed at our code. */
+  ownTotal: number;
+  /** Share of own-code calls that resolved. At least this good, never worse. */
+  ownPct: number;
 }
 
 export interface FlowGraphIndex {
@@ -135,10 +160,30 @@ export function buildFlowIndex(
     line.set(id, fn.startRow + 1);
   }
 
+  // Every function name this repo defines — lets us tell "we failed to resolve
+  // this" from "there was nothing here to resolve" (see FlowResolution).
+  const ownNames = new Set(cg.functions.map((f) => f.name));
+
   let resolvedEdges = 0;
+  let ownResolved = 0;
+  let ownMissed = 0;
   for (const c of cg.calls) {
-    if (!c.fromFunction || !c.toFile || !c.toFunction) continue;
+    if (!c.toFile || !c.toFunction) {
+      // Unresolved. Only counts against us if it names our own code — and only
+      // from production, since a test calling a plugin-interface method that
+      // exists once per plugin is ambiguous by construction, not a defect.
+      if (
+        c.fromFunction &&
+        ownNames.has(c.calleeName) &&
+        !(excludeTests && isTestFile(c.fromFile))
+      ) {
+        ownMissed++;
+      }
+      continue;
+    }
+    if (!c.fromFunction) continue;
     resolvedEdges++;
+    if (!(excludeTests && isTestFile(c.fromFile))) ownResolved++;
     if (excludeTests && (isTestFile(c.fromFile) || isTestFile(c.toFile))) continue;
     const from = flowNodeId(c.fromFile, c.fromFunction);
     const to = flowNodeId(c.toFile, c.toFunction);
@@ -162,6 +207,13 @@ export function buildFlowIndex(
       resolvedEdges,
       totalEdges,
       pct: totalEdges > 0 ? Math.round((resolvedEdges / totalEdges) * 100) : 0,
+      ownResolved,
+      ownMissed,
+      ownTotal: ownResolved + ownMissed,
+      ownPct:
+        ownResolved + ownMissed > 0
+          ? Math.round((ownResolved / (ownResolved + ownMissed)) * 100)
+          : 0,
     },
   };
 }

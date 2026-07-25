@@ -315,11 +315,13 @@ export function FlowsView({
         &ldquo;and then&rdquo;. Columns are how many calls away something is, not the order things
         happen: the analysis reads structure, not execution, so branches and early returns
         aren&rsquo;t visible here.{" "}
-        {resolution.pct < 100 && (
+        {resolution.ownTotal > 0 && (
           <>
-            {resolution.pct}% of this repo&rsquo;s {resolution.totalEdges.toLocaleString()} calls
-            could be traced to a known function ({resolution.resolvedEdges.toLocaleString()}); calls
-            into libraries, dynamic dispatch, and unparsed languages aren&rsquo;t drawn.
+            Of the {resolution.ownTotal.toLocaleString()} calls that point at this repo&rsquo;s own
+            functions, {resolution.ownPct}% were traced to their definition. Calls into libraries
+            and the language itself aren&rsquo;t drawn — there&rsquo;s nothing in this repo to point
+            them at — and where several functions share a name, we leave the arrow out rather than
+            guess which one.
           </>
         )}
       </p>

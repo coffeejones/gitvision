@@ -38,6 +38,53 @@ describe("buildFlowIndex", () => {
     expect(idx.resolution).toMatchObject({ resolvedEdges: 1, totalEdges: 3, pct: 33 });
   });
 
+  it("scores own-code resolution, not library calls — the headline pct undersells by ~10x", () => {
+    const cg = graph(
+      [fn("lib/a.ts", "helper"), fn("lib/b.ts", "caller")],
+      [
+        call("lib/b.ts", "caller", "lib/a.ts", "helper"), // own call, resolved
+        call("lib/b.ts", "caller", null, null), // console.log — nothing to point at
+        call("lib/b.ts", "caller", null, null), // Array.map — likewise
+        call("lib/b.ts", "caller", null, null), // expect() — likewise
+      ]
+    );
+    const r = buildFlowIndex(cg).resolution;
+    expect(r.pct).toBe(25); // 1 of 4 edges — reads like a failing grade
+    expect(r.ownPct).toBe(100); // but every call at our own code resolved
+    expect(r.ownTotal).toBe(1);
+  });
+
+  it("counts an unresolved call as a miss only when it names a function we define", () => {
+    const cg = graph(
+      [fn("lib/a.ts", "helper")],
+      [
+        call("lib/b.ts", "caller", null, null), // names "helper" → a real miss
+        call("lib/b.ts", "caller", null, null),
+      ]
+    );
+    cg.calls[0].calleeName = "helper";
+    cg.calls[1].calleeName = "someLibraryThing";
+    const r = buildFlowIndex(cg).resolution;
+    expect(r.ownMissed).toBe(1);
+    expect(r.ownPct).toBe(0);
+  });
+
+  it("counts resolved and missed on the SAME population — an asymmetric count inflates the score", () => {
+    const cg = graph(
+      [fn("lib/a.ts", "helper")],
+      [
+        call("lib/a.test.ts", "spec", "lib/a.ts", "helper"), // resolved, but from a test
+        call("lib/b.ts", "caller", null, null), // missed, from prod
+      ]
+    );
+    cg.calls[1].calleeName = "helper";
+    const r = buildFlowIndex(cg).resolution;
+    // The test-file hit must NOT pad the numerator while test misses are excluded.
+    expect(r.ownResolved).toBe(0);
+    expect(r.ownMissed).toBe(1);
+    expect(r.ownPct).toBe(0);
+  });
+
   it("drops self-recursion (it adds no story) but still counts it as resolved", () => {
     const cg = graph([fn("a.ts", "a")], [call("a.ts", "a", "a.ts", "a")]);
     const idx = buildFlowIndex(cg);
