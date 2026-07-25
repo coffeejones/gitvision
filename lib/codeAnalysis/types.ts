@@ -113,6 +113,15 @@ export interface ParsedCall {
    *  the single-candidate fallback because the alternative (always
    *  unresolved bare calls) loses too much real signal. */
   hasReceiver?: boolean;
+  /** True when the call site is a constructor invocation (`new Foo()`), with
+   *  `calleeName` = the class name. Lets the graph builder look the target up
+   *  the way classes are actually indexed — a constructor is a FunctionDef
+   *  named "constructor" whose containerType is the class — instead of hunting
+   *  for a function literally named `Foo`, which almost never exists and, when
+   *  it does, is usually an unrelated same-named helper. Optional and
+   *  language-neutral: any plugin with a distinct construction syntax can set
+   *  it, and the fallback still handles ES5-style constructor functions. */
+  isConstructor?: boolean;
 }
 
 /** One test case (an `it`/`test` block) with its assertion-quality tally.

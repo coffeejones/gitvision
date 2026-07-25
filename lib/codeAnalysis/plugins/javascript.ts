@@ -904,9 +904,25 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
       case "identifier": {
         const t = lookupVariableType(receiver.text);
         if (t) return t;
-        // Bare identifier could be a class name (Foo.staticMethod()) — return
-        // it so the type-table lookup gets a shot.
-        return receiver.text;
+        // A bare identifier could be a class name (Foo.staticMethod()), and
+        // returning it gives the type-table lookup a shot. But returning it
+        // UNCONDITIONALLY stamps a variable name as a type: `console.log()`
+        // arrived at the resolver as type "console", `lines.join()` as "lines".
+        // That is not harmless — pickCallTarget treats any calleeType as a
+        // typed receiver and takes the strict branch, which returns null on no
+        // match instead of falling through to the proximity heuristics that
+        // exist precisely for untyped receivers. Measured: 1,597 of 1,621 such
+        // refusals carried a fabricated type; only 24 involved a real one.
+        //
+        // Uppercase-initial is the JS/TS convention for classes and
+        // constructors, so it is the cheapest signal that separates a plausible
+        // type from a variable. A miss now returns undefined, which routes the
+        // call to proximity — the tier it belonged in all along.
+        const first = receiver.text[0];
+        if (first && first === first.toUpperCase() && first !== first.toLowerCase()) {
+          return receiver.text;
+        }
+        return undefined;
       }
       case "member_expression": {
         // obj.field → look up field's type in obj's struct/class
@@ -1106,6 +1122,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
               inFunction: currentMethod()?.name ?? null,
               fromContainerType: currentClass()?.name,
               calleeType: className,
+              isConstructor: true,
             });
           }
         }

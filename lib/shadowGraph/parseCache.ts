@@ -31,7 +31,7 @@ const SCHEMA_VERSION = 1;
  *  or the resolver logic changes in a way that alters the produced graph — a
  *  stale cache from an older analyzer must NOT be spliced against a newer engine.
  *  Mismatched entries are treated as absent (recompute path). */
-export const ANALYZER_VERSION = "3"; // 3: resolver drops prod→test edges (2: CallEdge.fromContainerType)
+export const ANALYZER_VERSION = "4"; // 4: no fabricated receiver types + constructor resolution (3: prod→test guard)
 
 const GC_MAX_BYTES = 500 * 1024 * 1024; // 500 MB default namespace budget
 

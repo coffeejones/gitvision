@@ -875,3 +875,89 @@ describe("buildCodeGraph — production code never resolves into a test", () => 
     expect(edge?.toFile).toBe("lib/real.ts");
   });
 });
+
+describe("buildCodeGraph — constructor calls", () => {
+  const ctorOf = (cls: string) => ({
+    name: "constructor",
+    startRow: 2,
+    endRow: 6,
+    complexity: 1,
+    containerType: cls,
+  });
+
+  it("resolves `new Foo()` to Foo's constructor, not to a function named Foo", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "src/widget.ts", functions: [ctorOf("Widget")] }),
+        pf({
+          rel: "src/make.ts",
+          imports: [{ rawSpec: "./widget", resolvedPath: "src/widget.ts" }],
+          calls: [
+            { calleeName: "Widget", inFunction: "make", calleeType: "Widget", isConstructor: true },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    const edge = g.calls.find((c) => c.fromFile === "src/make.ts");
+    expect(edge?.toFile).toBe("src/widget.ts");
+    expect(edge?.toFunction).toBe("constructor");
+    expect(edge?.toContainerType).toBe("Widget");
+  });
+
+  it("refuses a same-named class the caller doesn't import — class names repeat", () => {
+    // zod defines the same class in its v3 and v4 packages; matching on
+    // containerType alone added 84 unjustified edges there.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "v3/error.ts", functions: [ctorOf("ZodError")] }),
+        pf({ rel: "v4/error.ts", functions: [ctorOf("ZodError")] }),
+        pf({
+          rel: "v4/parse.ts",
+          imports: [{ rawSpec: "./error", resolvedPath: "v4/error.ts" }],
+          calls: [
+            { calleeName: "ZodError", inFunction: "fail", calleeType: "ZodError", isConstructor: true },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    const edge = g.calls.find((c) => c.fromFile === "v4/parse.ts");
+    expect(edge?.toFile).toBe("v4/error.ts");
+  });
+
+  it("leaves it unresolved when no candidate class is in scope", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "a/error.ts", functions: [ctorOf("Thing")] }),
+        pf({ rel: "b/error.ts", functions: [ctorOf("Thing")] }),
+        pf({
+          rel: "c/use.ts", // imports neither
+          calls: [
+            { calleeName: "Thing", inFunction: "go", calleeType: "Thing", isConstructor: true },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls.find((c) => c.fromFile === "c/use.ts")?.toFile).toBeNull();
+  });
+
+  it("still handles ES5 constructor functions — `new Foo()` where Foo IS a function", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "src/legacy.js",
+          functions: [{ name: "Widget", startRow: 1, endRow: 5, complexity: 1 }],
+          calls: [
+            { calleeName: "Widget", inFunction: "make", calleeType: "Widget", isConstructor: true },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    const edge = g.calls.find((c) => c.calleeName === "Widget");
+    expect(edge?.toFile).toBe("src/legacy.js");
+    expect(edge?.toFunction).toBe("Widget");
+  });
+});

@@ -902,3 +902,53 @@ describe("javascriptPlugin — type-aware tracking (v0.17)", () => {
     expect(names).toEqual(["makeWidget", "noop"]);
   });
 });
+
+describe("javascriptPlugin — receiver types are inferred, not fabricated", () => {
+  beforeAll(async () => {
+    await ensureRuntime();
+    await javascriptPlugin.load();
+  });
+
+  /** Parse one snippet and return its calls. */
+  async function callsIn(src: string) {
+    const file: SourceFile = { rel: "src/a.ts", ext: "ts", content: src };
+    const parsed = parseFile(javascriptPlugin, file, makeIndex([file]));
+    return parsed.calls;
+  }
+
+  it("does not stamp a lowercase variable name as the receiver's type", async () => {
+    // `lines.join()` used to arrive at the resolver as calleeType "lines",
+    // which sent it down the strict typed branch — the one that returns null
+    // rather than trying proximity. 1,597 of 1,621 such refusals carried a
+    // fabricated type like this.
+    const calls = await callsIn(`
+      export function render(lines: string[]) {
+        return lines.join("\\n");
+      }
+    `);
+    const join = calls.find((c) => c.calleeName === "join");
+    expect(join, "the join() call should be captured").toBeDefined();
+    expect(join!.calleeType).toBeUndefined();
+    expect(join!.hasReceiver).toBe(true);
+  });
+
+  it("still offers an uppercase receiver as a possible class (Foo.staticMethod())", async () => {
+    const calls = await callsIn(`
+      export function go() {
+        return Registry.lookup("x");
+      }
+    `);
+    const lookup = calls.find((c) => c.calleeName === "lookup");
+    expect(lookup?.calleeType).toBe("Registry");
+  });
+
+  it("marks `new Foo()` as a constructor call", async () => {
+    const calls = await callsIn(`
+      export function make() {
+        return new Widget(1);
+      }
+    `);
+    const ctor = calls.find((c) => c.calleeName === "Widget");
+    expect(ctor?.isConstructor).toBe(true);
+  });
+});

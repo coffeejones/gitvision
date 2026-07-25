@@ -78,7 +78,33 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
   const calls: CallEdge[] = [];
   for (const f of parsedFiles) {
     for (const c of f.calls) {
-      const candidates = funcsByName.get(c.calleeName) ?? [];
+      // A constructor call names a CLASS, but a constructor is indexed as a
+      // function named "constructor" whose containerType is that class — so a
+      // by-name lookup for `Foo` finds nothing (and, when some unrelated
+      // top-level `Foo` exists, finds the wrong thing). Look it up the way it
+      // is actually stored, and fall back to the plain by-name candidates for
+      // ES5-style constructor functions, where `new Foo()` really does target
+      // `function Foo()`.
+      let candidates = funcsByName.get(c.calleeName) ?? [];
+      if (c.isConstructor) {
+        let ctors = (funcsByName.get("constructor") ?? []).filter(
+          (f) => f.containerType === c.calleeName
+        );
+        // Class names repeat across a codebase far more than function names do
+        // — zod defines the same class in its v3 and v4 packages — and matching
+        // on containerType alone is a global name match with no evidence behind
+        // it. Measured: resolving constructors by name alone added 104 edges to
+        // zod of which 84 were ones the import graph could not justify. So
+        // require the same proof the rest of the resolver requires: the class
+        // must be defined in this file or in a file this one imports.
+        if (ctors.length > 1 || (ctors.length === 1 && ctors[0].filePath !== f.rel)) {
+          const imported = importsByFile.get(f.rel);
+          ctors = ctors.filter(
+            (t) => t.filePath === f.rel || imported?.has(t.filePath)
+          );
+        }
+        if (ctors.length === 1) candidates = ctors;
+      }
       const target = pickCallTarget(
         f.rel,
         c.calleeType,
