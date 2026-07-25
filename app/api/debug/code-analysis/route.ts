@@ -15,6 +15,7 @@
 // snapshot pipeline and this route can be removed.
 
 import { NextResponse } from "next/server";
+import { ALL_PLUGINS } from "@/lib/codeAnalysis/plugins/all";
 import { Octokit } from "octokit";
 import { z } from "zod";
 import { parseRepoUrl, fetchRepoMeta } from "@/lib/github";
@@ -24,14 +25,6 @@ import {
   validateExcludeFolders,
 } from "@/lib/graph";
 import { analyzeDirectory } from "@/lib/codeAnalysis/analyze";
-import { csharpPlugin } from "@/lib/codeAnalysis/plugins/csharp";
-import { goPlugin } from "@/lib/codeAnalysis/plugins/go";
-import { javaPlugin } from "@/lib/codeAnalysis/plugins/java";
-import { javascriptPlugin } from "@/lib/codeAnalysis/plugins/javascript";
-import { phpPlugin } from "@/lib/codeAnalysis/plugins/php";
-import { pythonPlugin } from "@/lib/codeAnalysis/plugins/python";
-import { rubyPlugin } from "@/lib/codeAnalysis/plugins/ruby";
-import { regexFallbackPlugin } from "@/lib/codeAnalysis/plugins/regexFallback";
 import type { CodeGraph, ParsedFile } from "@/lib/codeAnalysis/types";
 
 const PostBody = z.object({
@@ -149,16 +142,7 @@ async function runAnalysis(
     cleanup = extracted.cleanup;
     const tarballMs = Date.now() - tarballStart;
 
-    const result = await analyzeDirectory(extracted.extractDir, [
-      javascriptPlugin,
-      pythonPlugin,
-      goPlugin,
-      javaPlugin,
-      csharpPlugin,
-      phpPlugin,
-      rubyPlugin,
-      regexFallbackPlugin,
-    ]);
+    const result = await analyzeDirectory(extracted.extractDir, ALL_PLUGINS);
     const summary = buildSummary(result.files, result.codeGraph);
 
     return NextResponse.json({

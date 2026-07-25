@@ -7,15 +7,8 @@
 // plus the CodeGraph.byPlugin breakdown showing which plugin handled what.
 
 import path from "node:path";
+import { ALL_PLUGINS } from "./plugins/all";
 import { analyzeDirectory } from "./analyze";
-import { csharpPlugin } from "./plugins/csharp";
-import { goPlugin } from "./plugins/go";
-import { javaPlugin } from "./plugins/java";
-import { javascriptPlugin } from "./plugins/javascript";
-import { phpPlugin } from "./plugins/php";
-import { pythonPlugin } from "./plugins/python";
-import { rubyPlugin } from "./plugins/ruby";
-import { regexFallbackPlugin } from "./plugins/regexFallback";
 
 async function main() {
   const target = process.argv[2];
@@ -25,16 +18,7 @@ async function main() {
   }
   const abs = path.resolve(target);
 
-  const result = await analyzeDirectory(abs, [
-    javascriptPlugin,
-    pythonPlugin,
-    goPlugin,
-    javaPlugin,
-    csharpPlugin,
-    phpPlugin,
-    rubyPlugin,
-    regexFallbackPlugin,
-  ]);
+  const result = await analyzeDirectory(abs, ALL_PLUGINS);
   const { totals, elapsedMs, files, truncated, codeGraph } = result;
 
   // Top 10 most complex functions
