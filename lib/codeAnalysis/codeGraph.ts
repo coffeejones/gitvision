@@ -20,6 +20,7 @@ import type {
   PluginStats,
   TestFileGraphEntry,
 } from "./types";
+import { isTestFile } from "./testCoverage";
 
 export interface BuildCodeGraphInput {
   parsedFiles: ParsedFile[];
@@ -294,6 +295,28 @@ function pickCallTarget(
   importsByFile: Map<string, Set<string>>
 ): FunctionDef | null {
   if (candidates.length === 0) return null;
+
+  // 0. Production code never calls into a test.
+  //
+  // A test-local helper with a common name becomes a magnet for every builtin
+  // call of that name in the whole codebase: `duplicates.test.ts` defines a
+  // nested `find()`, so every `Array.prototype.find` in production resolved to
+  // it; `workspaces.test.ts` defines `writeFile`, so `lib/atomicWrite.ts`
+  // calling Node's `fs.writeFile` was shown as depending on a test. Found
+  // mechanically by scripts/graph-precision.mjs — 34 such edges on zod, 8 here,
+  // 4 on rspec-core. Every one of them is wrong, and one of them is exactly the
+  // kind of thing that makes a user stop trusting the whole diagram.
+  //
+  // Direction matters and is asymmetric ON PURPOSE. Only prod→test is dropped:
+  // test→prod is how computeTestCoverage derives coverage at all, and test→test
+  // is ordinary helper reuse. Filtering candidates (rather than rejecting after
+  // a pick) applies the rule uniformly to every strategy below, and dropping to
+  // zero candidates correctly leaves the call unresolved.
+  if (!isTestFile(fromFile)) {
+    const prodOnly = candidates.filter((c) => !isTestFile(c.filePath));
+    if (prodOnly.length === 0) return null;
+    candidates = prodOnly;
+  }
 
   // 1. Strict type-aware match.
   if (calleeType) {

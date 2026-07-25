@@ -800,3 +800,78 @@ describe("buildCodeGraph", () => {
     expect(g.classes).toBeUndefined();
   });
 });
+
+describe("buildCodeGraph — production code never resolves into a test", () => {
+  // A test-local helper with a common name used to become a magnet for every
+  // builtin call of that name: `duplicates.test.ts` defines a nested `find()`,
+  // so `Array.prototype.find` in production resolved to it. Found mechanically
+  // by scripts/graph-precision.mjs. The rule is asymmetric on purpose — see the
+  // guard in pickCallTarget.
+  const helper = { name: "writeFile", startRow: 1, endRow: 5, complexity: 1 };
+
+  it("leaves the call unresolved rather than pointing production at a test helper", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "lib/__tests__/workspaces.test.ts", functions: [helper] }),
+        pf({
+          rel: "lib/atomicWrite.ts",
+          // This is Node's fs.writeFile, not any function in this repo.
+          calls: [{ calleeName: "writeFile", inFunction: "atomicWriteJson" }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    const edge = g.calls.find((c) => c.fromFile === "lib/atomicWrite.ts");
+    expect(edge?.toFile).toBeNull();
+    expect(edge?.toFunction).toBeNull();
+  });
+
+  it("STILL resolves test → production — computeTestCoverage depends on it", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "lib/atomicWrite.ts",
+          functions: [{ name: "atomicWriteJson", startRow: 1, endRow: 9, complexity: 2 }],
+        }),
+        pf({
+          rel: "lib/__tests__/atomicWrite.test.ts",
+          calls: [{ calleeName: "atomicWriteJson", inFunction: "spec" }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    const edge = g.calls.find((c) => c.fromFile.includes(".test."));
+    expect(edge?.toFile).toBe("lib/atomicWrite.ts");
+  });
+
+  it("still resolves test → test (ordinary helper reuse inside a suite)", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "lib/__tests__/helpers.test.ts", functions: [helper] }),
+        pf({
+          rel: "lib/__tests__/other.test.ts",
+          calls: [{ calleeName: "writeFile", inFunction: "spec" }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    const edge = g.calls.find((c) => c.fromFile === "lib/__tests__/other.test.ts");
+    expect(edge?.toFile).toBe("lib/__tests__/helpers.test.ts");
+  });
+
+  it("prefers the production definition when a test defines the same name", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "lib/__tests__/dup.test.ts", functions: [{ ...helper, name: "load" }] }),
+        pf({
+          rel: "lib/real.ts",
+          functions: [{ name: "load", startRow: 1, endRow: 4, complexity: 1 }],
+        }),
+        pf({ rel: "lib/caller.ts", calls: [{ calleeName: "load", inFunction: "go" }] }),
+      ],
+      pluginByFile: new Map(),
+    });
+    const edge = g.calls.find((c) => c.fromFile === "lib/caller.ts");
+    expect(edge?.toFile).toBe("lib/real.ts");
+  });
+});
