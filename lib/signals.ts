@@ -79,8 +79,11 @@ const DUPLICATE_MIN_GROUPS = 2;
 /** Small repos concentrate complexity by arithmetic, not by design. */
 const COMPLEXITY_MIN_FUNCTIONS = 40;
 /** Share of total branching in the top 5% of functions before it's worth
- *  pointing at. Measured across the stored snapshots, ordinary codebases sit
- *  well under this. */
+ *  pointing at. Measured across ten stored snapshots the distribution is
+ *  17, 17, 18, 18, 22, 23, 24, 25, 29, 30, 45 — a tight band up to ~30 and one
+ *  clear outlier (zod, whose top 73 of 1,463 functions hold 45%). 35 sits above
+ *  the band on purpose: this signal should fire on the outlier, not on the
+ *  ordinary shape of a codebase. Revisit if the band moves. */
 const COMPLEXITY_CONCENTRATION_PCT = 35;
 /** Don't judge unit coverage on a handful of functions. */
 const UNIT_COVERAGE_MIN_FUNCTIONS = 25;
