@@ -780,19 +780,79 @@ function detectMissingHygiene(snap: AnalysisSnapshot): HealthSignal[] {
 
 // 10. Commit cadence — steady rhythm across weeks is a positive signal even
 // for solo projects. Looks for activity spread, not just volume.
+/** Weeks in the cadence window. A year reads as "lately" without being so short
+ *  that one holiday sinks it. */
+const CADENCE_WINDOW_WEEKS = 52;
+/** Share of weeks in the window that need a commit to call the rhythm steady.
+ *  Three weeks in five. */
+const CADENCE_MIN_RATIO = 0.6;
+/** Below this much recorded history the ratio is noise. */
+const CADENCE_MIN_WEEKS = 6;
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** "Is development steady lately?"
+ *
+ *  This detector used to be vacuous AND untrue. `commitActivity` contains only
+ *  weeks that HAD commits — never a zero bucket — so `activeWeeks /
+ *  weeks.length` was always exactly 1.0 and the signal fired for every repo
+ *  with six recorded weeks, including one that committed six times in a decade.
+ *  Worse, it said so out loud: flask's evidence read "677 of the last 677
+ *  sampled weeks had activity", which is simply false.
+ *
+ *  Two fixes, because there were two bugs. The denominator is now the calendar
+ *  window, so absent weeks count as silence. And the window is anchored to the
+ *  snapshot date rather than to the last commit — otherwise a repo abandoned in
+ *  2019 would be praised for its rhythm in 2019. Measured across the stored
+ *  snapshots, this turns three of seven false greens off and drops flask from a
+ *  claimed 100% to a real 48%. */
 function detectCommitCadence(snap: AnalysisSnapshot): HealthSignal[] {
   const weeks = snap.commitActivity ?? [];
-  if (weeks.length < 6) return [];
-  const activeWeeks = weeks.filter((w) => w.count > 0).length;
-  const activeRatio = activeWeeks / weeks.length;
-  if (activeRatio < 0.6) return [];
+  if (weeks.length < CADENCE_MIN_WEEKS) return [];
+
+  const anchor = Date.parse(snap.fetchedAt);
+  if (Number.isNaN(anchor)) return [];
+  const cutoff = anchor - (CADENCE_WINDOW_WEEKS - 1) * WEEK_MS;
+
+  // How much window we actually have: a repo three months old is judged on
+  // three months, not credited with silence it never had the chance to fill.
+  const earliest = weeks.reduce(
+    (min, w) => Math.min(min, Date.parse(w.week) || Infinity),
+    Infinity
+  );
+  if (!Number.isFinite(earliest)) return [];
+  const windowWeeks = Math.min(
+    CADENCE_WINDOW_WEEKS,
+    Math.round((anchor - earliest) / WEEK_MS) + 1
+  );
+  if (windowWeeks < CADENCE_MIN_WEEKS) return [];
+
+  // Count DISTINCT weeks: a duplicated bucket would otherwise let activeWeeks
+  // exceed the window and report a ratio above 100%.
+  const activeInWindow = new Set<string>();
+  for (const w of weeks) {
+    const t = Date.parse(w.week);
+    if (w.count > 0 && !Number.isNaN(t) && t >= cutoff && t <= anchor) {
+      activeInWindow.add(w.week);
+    }
+  }
+  const activeWeeks = Math.min(activeInWindow.size, windowWeeks);
+
+  const activeRatio = activeWeeks / windowWeeks;
+  if (activeRatio < CADENCE_MIN_RATIO) return [];
+
   return [
     {
       id: "consistent-cadence",
       title: "Consistent commit cadence",
-      detail: `${activeWeeks} of the last ${weeks.length} sampled weeks had activity — steady development rhythm.`,
+      detail:
+        `${activeWeeks} of the last ${windowWeeks} weeks had a commit ` +
+        `(${Math.round(activeRatio * 100)}%) — development has a steady rhythm, not just a busy past.`,
       evidence: {
-        numbers: { activeWeeks, totalWeeks: weeks.length },
+        numbers: {
+          activeWeeks,
+          windowWeeks,
+          activePct: Math.round(activeRatio * 100),
+        },
       },
     },
   ];

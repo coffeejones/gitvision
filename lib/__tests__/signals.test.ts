@@ -1082,3 +1082,74 @@ describe("codeGraph signals", () => {
     });
   });
 });
+
+describe("consistent-cadence", () => {
+  const WEEK = 7 * 24 * 60 * 60 * 1000;
+  const ANCHOR = "2026-05-19T00:00:00Z";
+  /** `n` CONSECUTIVE weeks with commits, ending at the anchor. */
+  const consecutive = (n: number, offsetWeeks = 0) =>
+    Array.from({ length: n }, (_, i) => ({
+      week: new Date(Date.parse(ANCHOR) - (i + offsetWeeks) * WEEK)
+        .toISOString()
+        .slice(0, 10),
+      count: 3,
+    }));
+  /** `count` commit weeks scattered across `spread` weeks — the real shape of a
+   *  repo that has been alive a long time but works in bursts. */
+  const sparse = (count: number, spread: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      week: new Date(Date.parse(ANCHOR) - Math.floor((i * spread) / count) * WEEK)
+        .toISOString()
+        .slice(0, 10),
+      count: 3,
+    }));
+
+  const cadence = (commitActivity: { week: string; count: number }[]) =>
+    extractHealthSignals(
+      mockSnapshot({ fetchedAt: ANCHOR, commitActivity })
+    ).working.find((s) => s.id === "consistent-cadence");
+
+  it("does not fire on sparse commits spread over years — the vacuous-denominator bug", () => {
+    // commitActivity holds no zero buckets, so activeWeeks/weeks.length was
+    // always 1.0 and this fired for every repo, claiming "677 of 677 weeks".
+    expect(cadence(sparse(20, 500))).toBeUndefined();
+  });
+
+  it("fires when most weeks in the past year actually had a commit", () => {
+    // 40 recent weeks of commits, on a repo that is demonstrably older than a
+    // year — so the window is the full 52, not the repo's age.
+    const c = cadence([...consecutive(40), ...consecutive(1, 120)]);
+    expect(c).toBeDefined();
+    expect(c!.evidence.numbers?.windowWeeks).toBe(52);
+    expect(c!.evidence.numbers!.activePct).toBeGreaterThanOrEqual(60);
+  });
+
+  it("does not praise a dead repo for its old rhythm — the window is anchored to NOW", () => {
+    // Dense weekly commits, but all of them five years before the snapshot.
+    const old = Array.from({ length: 60 }, (_, i) => ({
+      week: new Date(Date.parse(ANCHOR) - (260 + i) * WEEK).toISOString().slice(0, 10),
+      count: 5,
+    }));
+    expect(cadence(old)).toBeUndefined();
+  });
+
+  it("judges a young repo on the history it has, not on silence it couldn't fill", () => {
+    // 8 weeks old, committed in 7 of them: steady, and shouldn't be divided by 52.
+    const c = cadence(consecutive(7));
+    expect(c).toBeDefined();
+    expect(c!.evidence.numbers?.windowWeeks).toBeLessThan(12);
+  });
+
+  it("stays quiet below the minimum history", () => {
+    expect(cadence(consecutive(3))).toBeUndefined();
+  });
+
+  it("never reports a ratio above 100%, even on duplicated buckets", () => {
+    const c = cadence(sparse(45, 40));
+    if (c) {
+      expect(c.evidence.numbers!.activeWeeks).toBeLessThanOrEqual(
+        c.evidence.numbers!.windowWeeks
+      );
+    }
+  });
+});
