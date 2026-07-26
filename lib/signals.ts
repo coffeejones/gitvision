@@ -9,6 +9,8 @@
 // see both the AI prose AND the raw signals in the UI via an evidence toggle.
 
 import { isBotAuthor } from "./botDetection";
+import { findDuplicateGroups } from "./codeAnalysis/duplicates";
+import { computeTestCoverage } from "./codeAnalysis/testCoverage";
 import { detectKnownIncidents } from "./security/knownIncidents";
 import type {
   AnalysisSnapshot,
@@ -68,6 +70,24 @@ function summarizeByEcosystem<T>(tagged: TaggedDep<T>[]): string {
 // the eval/strategy/github-app-skeleton doc for the rationale.
 
 // ------------------- File-classification helpers -------------------
+
+
+// ── codeGraph detector thresholds ───────────────────────────────────────────
+// Chosen to fire on real duplication and real concentration, not on noise.
+/** Below this many duplicate GROUPS, a repo is just reusing a shape or two. */
+const DUPLICATE_MIN_GROUPS = 2;
+/** Small repos concentrate complexity by arithmetic, not by design. */
+const COMPLEXITY_MIN_FUNCTIONS = 40;
+/** Share of total branching in the top 5% of functions before it's worth
+ *  pointing at. Measured across the stored snapshots, ordinary codebases sit
+ *  well under this. */
+const COMPLEXITY_CONCENTRATION_PCT = 35;
+/** Don't judge unit coverage on a handful of functions. */
+const UNIT_COVERAGE_MIN_FUNCTIONS = 25;
+/** At or above this, direct-call coverage is a genuine strength. */
+const UNIT_COVERAGE_GOOD_PCT = 30;
+/** At or below this, the suite is end-to-end shaped — a fact, not a fault. */
+const UNIT_COVERAGE_INTEGRATION_PCT = 3;
 
 const METADATA_BASENAMES = new Set<string>([
   "readme.md",
@@ -1065,6 +1085,178 @@ function detectWeakSuite(snap: AnalysisSnapshot): {
 
 // ------------------- Aggregator -------------------
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// codeGraph detectors.
+//
+// Until now not one Code-dimension signal read snap.codeGraph: they ran on the
+// import graph, git churn, and co-change. So the whole function-level AST layer
+// — every function, its complexity, the resolved call edges, the structural
+// hashes — powered panels but never reached a dimension tile, the verdict, or
+// the AI narrative. These read it.
+//
+// All three are computed, never estimated, and all degrade to silence rather
+// than to a guess: no codeGraph (legacy snapshot, unparsed language) emits
+// nothing at all, which the honest empty state already covers.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Functions with byte-identical structure in more than one place. Not a
+ *  string match: FNV-1a over the AST shape, so renamed identifiers still
+ *  collide and reformatting doesn't. minComplexity 5 keeps one-line accessors
+ *  and getters — duplicates by accident, not design — out of it. */
+function detectDuplicateImplementations(snap: AnalysisSnapshot): HealthSignal[] {
+  const cg = snap.codeGraph;
+  if (!cg) return [];
+  const groups = findDuplicateGroups(cg, { minComplexity: 5, limit: 50 });
+  if (groups.length < DUPLICATE_MIN_GROUPS) return [];
+
+  const copies = groups.reduce((n, g) => n + g.members.length, 0);
+  const worst = groups[0];
+  const paths = worst.members.slice(0, 4).map((m) => m.filePath);
+  // Severity tracks how much duplicated logic there is, not just how many
+  // groups: two copies of a complexity-30 function is worse than six copies
+  // of a complexity-6 one.
+  const severity: HealthSignal["severity"] =
+    groups.length >= 10 || worst.maxComplexity >= 20
+      ? "high"
+      : groups.length >= 5
+        ? "medium"
+        : "low";
+
+  return [
+    {
+      id: "duplicate-implementations",
+      title: "The same logic, written more than once",
+      detail:
+        `${groups.length} group${groups.length === 1 ? "" : "s"} of functions share an identical ` +
+        `structure across ${copies} copies — the largest is \`${worst.members[0].name}\` ` +
+        `(complexity ${worst.maxComplexity}), duplicated ${worst.members.length} times. ` +
+        `A fix applied to one copy has to be remembered for the others.`,
+      evidence: {
+        paths,
+        numbers: {
+          groups: groups.length,
+          copies,
+          worstComplexity: worst.maxComplexity,
+          worstCopies: worst.members.length,
+        },
+      },
+      severity,
+    },
+  ];
+}
+
+/** How much of the codebase's total decision-making lives in its handful of
+ *  worst functions. A question, never a failure: concentration is normal in a
+ *  parser or a router, and only the reader knows whether it's the right shape
+ *  here. What it buys is knowing WHERE the thinking happens. */
+function detectComplexityConcentration(snap: AnalysisSnapshot): HealthSignal[] {
+  const cg = snap.codeGraph;
+  if (!cg || cg.functions.length < COMPLEXITY_MIN_FUNCTIONS) return [];
+
+  const sorted = [...cg.functions].sort((a, b) => b.complexity - a.complexity);
+  const total = sorted.reduce((n, f) => n + f.complexity, 0);
+  if (total <= 0) return [];
+
+  // Top 5% of functions, at least 3 of them.
+  const topN = Math.max(3, Math.round(sorted.length * 0.05));
+  const top = sorted.slice(0, topN);
+  const topTotal = top.reduce((n, f) => n + f.complexity, 0);
+  const share = Math.round((topTotal / total) * 100);
+  if (share < COMPLEXITY_CONCENTRATION_PCT) return [];
+
+  return [
+    {
+      id: "complexity-concentration",
+      title: "Most of the decisions live in a few functions",
+      detail:
+        `${share}% of this codebase's branching sits in its ${topN} most complex function` +
+        `${topN === 1 ? "" : "s"} out of ${sorted.length.toLocaleString()} — starting with ` +
+        `\`${top[0].name}\` (complexity ${top[0].complexity}). That can be exactly right for a ` +
+        `parser or a dispatcher, and a warning sign anywhere else.`,
+      evidence: {
+        paths: top.slice(0, 4).map((f) => f.filePath),
+        numbers: {
+          sharePct: share,
+          topFunctions: topN,
+          totalFunctions: sorted.length,
+          worstComplexity: top[0].complexity,
+        },
+      },
+    },
+  ];
+}
+
+/** Direct unit-level coverage, from the call graph: does a test file call this
+ *  function itself?
+ *
+ *  DELIBERATELY NEVER "needsWork". Measured on real repos, a healthy
+ *  integration-tested project reads 0% here — express drives everything through
+ *  supertest over HTTP, so no test calls res.send() directly, and reporting
+ *  that as a failure would be a confidently wrong claim about a well-tested
+ *  codebase. So: a genuine positive when direct coverage is real, and a
+ *  QUESTION (not a verdict) when a suite exists but works end-to-end. */
+function detectUnitLevelCoverage(snap: AnalysisSnapshot): {
+  working: HealthSignal[];
+  questions: HealthSignal[];
+} {
+  const cg = snap.codeGraph;
+  const out: { working: HealthSignal[]; questions: HealthSignal[] } = {
+    working: [],
+    questions: [],
+  };
+  if (!cg) return out;
+
+  const cov = computeTestCoverage(cg);
+  const { prodFunctions, testedProdFunctions, testFiles } = cov.totals;
+  if (testFiles === 0 || prodFunctions < UNIT_COVERAGE_MIN_FUNCTIONS) return out;
+
+  const pct = Math.round((testedProdFunctions / prodFunctions) * 100);
+
+  if (pct >= UNIT_COVERAGE_GOOD_PCT) {
+    out.working.push({
+      id: "unit-tested-core",
+      title: "Tests call the code directly",
+      detail:
+        `${pct}% of production functions (${testedProdFunctions.toLocaleString()} of ` +
+        `${prodFunctions.toLocaleString()}) are called straight from a test, not just exercised ` +
+        `through the app. Direct calls pin behaviour at the unit a change touches.`,
+      evidence: {
+        numbers: { coveragePct: pct, testedFunctions: testedProdFunctions, prodFunctions, testFiles },
+      },
+    });
+    return out;
+  }
+
+  // Everything below the "genuine strength" line is one question, not silence.
+  // An earlier cut only spoke at 0-3% and above 30%, which left six of ten real
+  // repos — 7%, 12%, 15%, 28% — with nothing said at all, even though the
+  // number is both real and useful. The detail adapts; the verdict doesn't,
+  // because structure cannot distinguish "covered end-to-end" from "untested".
+  const endToEndShaped = pct <= UNIT_COVERAGE_INTEGRATION_PCT;
+  out.questions.push({
+    id: "limited-direct-coverage",
+    title: endToEndShaped
+      ? "The tests drive the app, not its functions"
+      : "Most functions have no test calling them directly",
+    detail: endToEndShaped
+      ? `${testFiles.toLocaleString()} test file${testFiles === 1 ? "" : "s"} exist, but almost no ` +
+        `production function is called directly from one (${pct}%). That is the normal shape of an ` +
+        `end-to-end suite: it does not mean the code is untested, and it does mean function-level ` +
+        `coverage won't tell you much here.`
+      : `${pct}% of production functions (${testedProdFunctions.toLocaleString()} of ` +
+        `${prodFunctions.toLocaleString()}) are called directly from a test. The other ` +
+        `${(100 - pct)}% are either covered end-to-end or not covered at all — reading structure ` +
+        `alone cannot tell those two apart, which is why this is a question and not a grade.`,
+    evidence: {
+      numbers: { coveragePct: pct, testedFunctions: testedProdFunctions, prodFunctions, testFiles },
+      note: "Coverage here counts direct call edges from a test file into a production function.",
+    },
+  });
+
+  return out;
+}
+
 export function extractHealthSignals(snap: AnalysisSnapshot): HealthSignals {
   const working: HealthSignal[] = [];
   const needsWork: HealthSignal[] = [];
@@ -1089,6 +1281,11 @@ export function extractHealthSignals(snap: AnalysisSnapshot): HealthSignals {
   needsWork.push(...knowledge.needsWork);
 
   needsWork.push(...detectUntestedHotspots(snap));
+  needsWork.push(...detectDuplicateImplementations(snap));
+  questions.push(...detectComplexityConcentration(snap));
+  const unitCoverage = detectUnitLevelCoverage(snap);
+  working.push(...unitCoverage.working);
+  questions.push(...unitCoverage.questions);
   needsWork.push(...detectCrossBoundaryCoupling(snap));
   questions.push(...detectMetadataDominance(snap));
 

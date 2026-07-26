@@ -3,6 +3,7 @@
 
 import { describe, it, expect } from "vitest";
 import { extractHealthSignals } from "../signals";
+import type { CodeGraph } from "../codeAnalysis/types";
 import type {
   AnalysisSnapshot,
   FileGraph,
@@ -909,5 +910,175 @@ describe("detectWeakSuite (Arc 1)", () => {
     const r = extractHealthSignals(mockSnapshot({ weakSuite: ws(0.15, 1.2) }));
     expect(hasSignal(r.needsWork, "weak-suite")).toBe(false);
     expect(hasSignal(r.working, "assertion-dense-tests")).toBe(false);
+  });
+});
+
+// ─── codeGraph detectors ────────────────────────────────────────────────────
+// The first Code-dimension signals that read snap.codeGraph. Before these, the
+// whole function-level AST layer powered panels but never reached a tile.
+
+describe("codeGraph signals", () => {
+  const fn = (
+    filePath: string,
+    name: string,
+    complexity: number,
+    bodyHash?: string
+  ) => ({ filePath, name, startRow: 1, endRow: 9, complexity, bodyHash });
+
+  const graph = (over: Partial<CodeGraph> = {}): CodeGraph => ({
+    functions: [],
+    calls: [],
+    imports: [],
+    fileComplexity: {},
+    filesByExt: {},
+    byPlugin: {},
+    ...over,
+  });
+
+  const idsOf = (snap: AnalysisSnapshot) => {
+    const s = extractHealthSignals(snap);
+    return {
+      working: s.working.map((x) => x.id),
+      needsWork: s.needsWork.map((x) => x.id),
+      questions: s.questions.map((x) => x.id),
+    };
+  };
+
+  it("emits nothing at all without a code graph — silence, never a guess", () => {
+    const ids = idsOf(mockSnapshot({ codeGraph: undefined }));
+    const all = [...ids.working, ...ids.needsWork, ...ids.questions];
+    expect(all).not.toContain("duplicate-implementations");
+    expect(all).not.toContain("complexity-concentration");
+    expect(all).not.toContain("limited-direct-coverage");
+    expect(all).not.toContain("unit-tested-core");
+  });
+
+  describe("duplicate-implementations", () => {
+    it("fires on structurally identical functions and scales severity with the worst group", () => {
+      const codeGraph = graph({
+        functions: [
+          fn("a.ts", "parse", 24, "hash-big"),
+          fn("b.ts", "parseAgain", 24, "hash-big"),
+          fn("c.ts", "fmt", 7, "hash-small"),
+          fn("d.ts", "format", 7, "hash-small"),
+        ],
+      });
+      const s = extractHealthSignals(mockSnapshot({ codeGraph }));
+      const dup = s.needsWork.find((x) => x.id === "duplicate-implementations");
+      expect(dup).toBeDefined();
+      // complexity 24 clears the high bar even with only two groups.
+      expect(dup!.severity).toBe("high");
+      expect(dup!.evidence.numbers?.groups).toBe(2);
+      expect(dup!.evidence.numbers?.copies).toBe(4);
+    });
+
+    it("ignores trivial duplicates — one-line accessors repeat by accident, not design", () => {
+      const codeGraph = graph({
+        functions: [
+          fn("a.ts", "getId", 1, "trivial"),
+          fn("b.ts", "getName", 1, "trivial"),
+        ],
+      });
+      const s = extractHealthSignals(mockSnapshot({ codeGraph }));
+      expect(s.needsWork.map((x) => x.id)).not.toContain("duplicate-implementations");
+    });
+
+    it("stays quiet on a single duplicated shape — that's reuse, not a pattern", () => {
+      const codeGraph = graph({
+        functions: [fn("a.ts", "x", 9, "h"), fn("b.ts", "y", 9, "h")],
+      });
+      const dup = extractHealthSignals(mockSnapshot({ codeGraph })).needsWork.find(
+        (x) => x.id === "duplicate-implementations"
+      );
+      expect(dup).toBeUndefined();
+    });
+  });
+
+  describe("complexity-concentration", () => {
+    it("reports when a handful of functions hold most of the branching", () => {
+      // 60 trivial functions + 3 monsters: the top 5% carry the majority.
+      const functions = [
+        ...Array.from({ length: 60 }, (_, i) => fn(`s/f${i}.ts`, `f${i}`, 1)),
+        fn("s/big1.ts", "big1", 90),
+        fn("s/big2.ts", "big2", 80),
+        fn("s/big3.ts", "big3", 70),
+      ];
+      const c = extractHealthSignals(mockSnapshot({ codeGraph: graph({ functions }) })).questions.find(
+        (x) => x.id === "complexity-concentration"
+      );
+      expect(c).toBeDefined();
+      expect(c!.evidence.numbers?.worstComplexity).toBe(90);
+      expect(c!.evidence.numbers!.sharePct).toBeGreaterThan(35);
+    });
+
+    it("stays quiet when complexity is spread evenly", () => {
+      const functions = Array.from({ length: 60 }, (_, i) => fn(`s/f${i}.ts`, `f${i}`, 5));
+      const c = extractHealthSignals(mockSnapshot({ codeGraph: graph({ functions }) })).questions.find(
+        (x) => x.id === "complexity-concentration"
+      );
+      expect(c).toBeUndefined();
+    });
+
+    it("stays quiet on a small codebase — few functions concentrate by arithmetic", () => {
+      const functions = [fn("a.ts", "a", 50), fn("b.ts", "b", 1), fn("c.ts", "c", 1)];
+      const c = extractHealthSignals(mockSnapshot({ codeGraph: graph({ functions }) })).questions.find(
+        (x) => x.id === "complexity-concentration"
+      );
+      expect(c).toBeUndefined();
+    });
+  });
+
+  describe("direct test coverage", () => {
+    /** N production functions, `tested` of them called from a test file. */
+    const covGraph = (prod: number, tested: number) => {
+      const functions = [
+        ...Array.from({ length: prod }, (_, i) => fn(`src/p${i}.ts`, `p${i}`, 2)),
+        fn("src/__tests__/x.test.ts", "spec", 1),
+      ];
+      const calls = Array.from({ length: tested }, (_, i) => ({
+        fromFile: "src/__tests__/x.test.ts",
+        fromFunction: "spec",
+        calleeName: `p${i}`,
+        toFile: `src/p${i}.ts`,
+        toFunction: `p${i}`,
+      }));
+      return graph({ functions, calls });
+    };
+
+    it("credits a suite that calls production functions directly", () => {
+      const s = extractHealthSignals(mockSnapshot({ codeGraph: covGraph(40, 20) }));
+      expect(s.working.map((x) => x.id)).toContain("unit-tested-core");
+      expect(s.questions.map((x) => x.id)).not.toContain("limited-direct-coverage");
+    });
+
+    it("calls a 0% suite end-to-end shaped — a question, NEVER a failure", () => {
+      // express reads 0% here with an excellent supertest suite. Reporting that
+      // as needsWork would be a confidently wrong claim about tested code.
+      const s = extractHealthSignals(mockSnapshot({ codeGraph: covGraph(40, 0) }));
+      const q = s.questions.find((x) => x.id === "limited-direct-coverage");
+      expect(q).toBeDefined();
+      expect(q!.detail).toContain("does not mean the code is untested");
+      expect(s.needsWork.map((x) => x.id)).not.toContain("limited-direct-coverage");
+    });
+
+    it("still speaks in the middle of the range instead of going silent", () => {
+      // An earlier cut only spoke at 0-3% and 30%+, which left six of ten real
+      // repos (7%, 12%, 15%, 28%) with nothing said.
+      const q = extractHealthSignals(mockSnapshot({ codeGraph: covGraph(40, 5) })).questions.find(
+        (x) => x.id === "limited-direct-coverage"
+      );
+      expect(q).toBeDefined();
+      expect(q!.evidence.numbers?.coveragePct).toBe(13);
+    });
+
+    it("says nothing when there are no test files to reason about", () => {
+      const noTests = graph({
+        functions: Array.from({ length: 40 }, (_, i) => fn(`src/p${i}.ts`, `p${i}`, 2)),
+      });
+      const s = extractHealthSignals(mockSnapshot({ codeGraph: noTests }));
+      const all = [...s.working, ...s.questions].map((x) => x.id);
+      expect(all).not.toContain("limited-direct-coverage");
+      expect(all).not.toContain("unit-tested-core");
+    });
   });
 });

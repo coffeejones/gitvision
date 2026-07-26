@@ -82,6 +82,17 @@ const DIMENSION_SIGNAL_IDS: Record<DimensionId, readonly string[]> = {
     // drives the Code tile to NEEDS WORK alone — but it does show
     // in the tile's contributing-signal count and on /signals.
     "risky-eval-patterns",
+    // 2026-07: the first signals that actually read snap.codeGraph. Until these
+    // landed, the whole function-level AST layer — complexity, call edges,
+    // structural hashes — powered panels but never reached a dimension tile.
+    "duplicate-implementations",
+    "complexity-concentration",
+    "unit-tested-core",
+    "limited-direct-coverage",
+    // Arc 1 shipped these detectors and then never mapped them, so assertion
+    // quality moved no tile. It does now.
+    "weak-suite",
+    "assertion-dense-tests",
   ],
   "pr-flow": [
     "healthy-pr-throughput",

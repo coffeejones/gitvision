@@ -140,6 +140,17 @@ const DEPARTMENT_SIGNAL_IDS: Record<DepartmentId, readonly string[]> = {
     "untested-hotspots",
     "cross-boundary-coupling",
     "deep-dependency-chains",
+    // 2026-07: the codeGraph signals. All structural by construction — they
+    // read the function index and the resolved call graph — so they belong in
+    // forensics rather than health, which is where test PRESENCE lives.
+    "duplicate-implementations",
+    "complexity-concentration",
+    "unit-tested-core",
+    "limited-direct-coverage",
+    // Arc 1 shipped these and never mapped them anywhere, so assertion quality
+    // never reached a grade.
+    "weak-suite",
+    "assertion-dense-tests",
   ],
   supply: [
     "outdated-deps",
