@@ -69,6 +69,7 @@ const DIMENSION_SIGNAL_IDS: Record<DimensionId, readonly string[]> = {
     "bus-factor-risk",
     "broad-ownership",
     "many-contributors",
+    "concentrated-ownership",
   ],
   code: [
     "untested-hotspots",

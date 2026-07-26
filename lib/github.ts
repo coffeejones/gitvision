@@ -415,8 +415,8 @@ export async function fetchCommitFileChanges(
   repo: string,
   commitShas: string[],
   client: Octokit = octokit,
-): Promise<Map<string, { files: string[]; authorLogin: string | null; date: string }>> {
-  const result = new Map<string, { files: string[]; authorLogin: string | null; date: string }>();
+): Promise<Map<string, { files: string[]; authorLogin: string | null; authorName?: string; date: string }>> {
+  const result = new Map<string, { files: string[]; authorLogin: string | null; authorName?: string; date: string }>();
   // Sequential to respect rate-limit; could parallelize with a concurrency cap later.
   for (const sha of commitShas) {
     try {
@@ -438,11 +438,17 @@ export async function fetchCommitFileChanges(
  * Score = churn * log(authors+1) — favors files touched often by multiple people.
  */
 export function computeHotspots(
-  perCommitFiles: Map<string, { files: string[]; authorLogin: string | null; date: string }>
+  perCommitFiles: Map<string, { files: string[]; authorLogin: string | null; authorName?: string; date: string }>
 ): FileHotspot[] {
   const byFile = new Map<
     string,
-    { churn: number; authors: Set<string>; lastModified: string; commits: string[] }
+    {
+      churn: number;
+      authors: Set<string>;
+      logins: Set<string>;
+      lastModified: string;
+      commits: string[];
+    }
   >();
 
   for (const [sha, info] of perCommitFiles) {
@@ -450,11 +456,20 @@ export function computeHotspots(
       const entry = byFile.get(file) ?? {
         churn: 0,
         authors: new Set<string>(),
+        logins: new Set<string>(),
         lastModified: "",
         commits: [] as string[],
       };
       entry.churn += 1;
-      if (info.authorLogin) entry.authors.add(info.authorLogin);
+      // Identity, not login. Using authorLogin alone dropped every commit not
+      // authored from a users.noreply.github.com address — which zeroed both
+      // `authors` AND, through it, `score = churn * log(authors+1)`. On four of
+      // eleven stored snapshots EVERY hotspot scored 0, so the sort below was a
+      // no-op and the "hotspot" list was really insertion order. The name is
+      // always present on the git-log path; the REST path still has only a login.
+      const identity = info.authorLogin ?? info.authorName;
+      if (identity) entry.authors.add(identity);
+      if (info.authorLogin) entry.logins.add(info.authorLogin);
       if (info.date && info.date > entry.lastModified) entry.lastModified = info.date;
       entry.commits.push(sha);
       byFile.set(file, entry);
@@ -463,12 +478,16 @@ export function computeHotspots(
 
   const hotspots: FileHotspot[] = [];
   for (const [path, data] of byFile) {
-    const authorLogins = [...data.authors];
-    const score = data.churn * Math.log(authorLogins.length + 1);
+    // `authors` counts PEOPLE (login or name); `authorLogins` stays logins only,
+    // because FileDetailsPanel turns each entry into a https://github.com/<x>
+    // link and a display name there produces a broken URL.
+    const identities = [...data.authors];
+    const authorLogins = identities.filter((a) => data.logins.has(a));
+    const score = data.churn * Math.log(identities.length + 1);
     hotspots.push({
       path,
       churn: data.churn,
-      authors: authorLogins.length,
+      authors: identities.length,
       authorLogins,
       lastModified: data.lastModified,
       score,
@@ -484,7 +503,7 @@ export function computeHotspots(
  * Skips mega-commits (>15 files) which are usually renames/refactors and would dominate.
  */
 export function computeCoChange(
-  perCommitFiles: Map<string, { files: string[]; authorLogin: string | null; date: string }>,
+  perCommitFiles: Map<string, { files: string[]; authorLogin: string | null; authorName?: string; date: string }>,
   allowedFiles: Set<string>,
   opts: { maxEdges?: number; minCount?: number } = {}
 ): CoChangeEdge[] {
@@ -598,15 +617,16 @@ export function computeCommitActivity(commits: CommitSummary[]): { week: string;
  */
 function gitLogCommitsToPerCommitFiles(
   commits: GitLogCommit[]
-): Map<string, { files: string[]; authorLogin: string | null; date: string }> {
+): Map<string, { files: string[]; authorLogin: string | null; authorName?: string; date: string }> {
   const m = new Map<
     string,
-    { files: string[]; authorLogin: string | null; date: string }
+    { files: string[]; authorLogin: string | null; authorName?: string; date: string }
   >();
   for (const c of commits) {
     m.set(c.sha, {
       files: c.files,
       authorLogin: c.authorLogin,
+      authorName: c.authorName,
       date: c.date,
     });
   }
@@ -731,7 +751,7 @@ export async function analyzeRepo(
   // + requires extra calls for file data (capped at 80).
   let perCommitFiles: Map<
     string,
-    { files: string[]; authorLogin: string | null; date: string }
+    { files: string[]; authorLogin: string | null; authorName?: string; date: string }
   >;
   let recentCommits: CommitSummary[];
   let historySource: AnalysisSnapshot["historySource"];

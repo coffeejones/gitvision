@@ -9,6 +9,11 @@
 // see both the AI prose AND the raw signals in the UI via an evidence toggle.
 
 import { isBotAuthor } from "./botDetection";
+import {
+  authorCommitShares,
+  buildAuthorIndex,
+  resolveHotspotAuthors,
+} from "./authorIdentity";
 import { findDuplicateGroups } from "./codeAnalysis/duplicates";
 import { computeTestCoverage } from "./codeAnalysis/testCoverage";
 import { detectKnownIncidents } from "./security/knownIncidents";
@@ -71,6 +76,16 @@ function summarizeByEcosystem<T>(tagged: TaggedDep<T>[]): string {
 
 // ------------------- File-classification helpers -------------------
 
+
+// ── Team detector thresholds ────────────────────────────────────────────────
+/** One person writing this share of commits IS a solo project, whatever the
+ *  distinct-name count says. Measured: this repo 98%, simutil 96%, then a long
+ *  gap to zod at 66%. */
+const SOLO_DOMINANCE_PCT = 90;
+/** Below this, "a few people carry it" is just restating the contributor count. */
+const CONCENTRATION_MIN_AUTHORS = 3;
+/** Share of commits held by the top three before concentration is worth saying. */
+const CONCENTRATION_TOP3_PCT = 70;
 
 // ── codeGraph detector thresholds ───────────────────────────────────────────
 // Chosen to fire on real duplication and real concentration, not on noise.
@@ -391,12 +406,17 @@ function detectKnowledgeDistribution(
 
   const byFolder = new Map<string, Set<string>>();
   const churnByFolder = new Map<string, number>();
+  // Resolve identity through the commit index rather than reading authorLogins
+  // directly: those are GitHub logins, absent on any commit not authored from a
+  // noreply address, which zeroed this detector out on four of eleven stored
+  // snapshots. See lib/authorIdentity.ts.
+  const authorIndex = buildAuthorIndex(snap);
   for (const h of snap.hotspots) {
     const folder = folderOf(h.path);
     const authors = byFolder.get(folder) ?? new Set<string>();
     // Exclude bots (dependabot, pre-commit-ci, …) — they shouldn't inflate a
     // folder's owner count (masking bus-factor) or fake "broad ownership".
-    (h.authorLogins ?? []).forEach((a) => {
+    resolveHotspotAuthors(h, authorIndex).forEach((a) => {
       if (!isBotAuthor(a)) authors.add(a);
     });
     byFolder.set(folder, authors);
@@ -738,31 +758,88 @@ function detectActivityRecency(
 
 // 8. Solo contributor check (question — not intrinsically bad)
 function detectSoloProject(snap: AnalysisSnapshot): HealthSignal[] {
-  const authors = new Set<string>();
-  snap.hotspots.forEach((h) =>
-    (h.authorLogins ?? []).forEach((a) => {
-      if (!isBotAuthor(a)) authors.add(a);
-    })
-  );
-  if (authors.size !== 1) return [];
+  // Was: exactly one distinct GitHub login across all hotspots. That failed
+  // twice over — it went silent on every repo whose commits don't carry a
+  // noreply address (four of eleven stored snapshots, this one included), and
+  // it broke whenever one person committed under two git configs. Dominance
+  // answers the question that was actually being asked, and survives both.
   if (snap.recentCommits.length < 5) return [];
-  const [onlyAuthor] = [...authors];
+  const shares = authorCommitShares(snap, { exclude: isBotAuthor });
+
+  // No commit index (the REST-sampled path records no author names) — fall back
+  // to the original distinct-login test rather than going silent. Trading one
+  // blind spot for another would not be an improvement.
+  if (shares.length === 0) {
+    const logins = new Set<string>();
+    for (const h of snap.hotspots) {
+      for (const a of h.authorLogins ?? []) if (!isBotAuthor(a)) logins.add(a);
+    }
+    if (logins.size !== 1) return [];
+    const [only] = [...logins];
+    return [
+      {
+        id: "solo-project",
+        title: "Solo project",
+        detail: `All visible activity is by @${only}. If this is an intentional personal project, great — otherwise the bus factor is one.`,
+        evidence: { note: only },
+      },
+    ];
+  }
+
+  const top = shares[0];
+  if (top.sharePct < SOLO_DOMINANCE_PCT) return [];
+
+  const index = buildAuthorIndex(snap);
+  const who = index.logins.has(top.identity) ? `@${top.identity}` : top.identity;
+  const others = shares.length - 1;
   return [
     {
       id: "solo-project",
       title: "Solo project",
-      detail: `All visible activity is by @${onlyAuthor}. If this is an intentional personal project, great — otherwise the bus factor is one.`,
-      evidence: { note: onlyAuthor },
+      detail:
+        `${who} wrote ${top.sharePct}% of the commits` +
+        (others > 0 ? ` — the other ${others} contributor${others === 1 ? "" : "s"} together account for ${100 - top.sharePct}%` : "") +
+        `. If this is an intentional personal project, great — otherwise the bus factor is one.`,
+      evidence: {
+        note: top.identity,
+        numbers: { topSharePct: top.sharePct, commits: top.commits, otherContributors: others },
+      },
     },
   ];
 }
 
-// 9. Missing open-source hygiene (license/README) — question.
-// README check uses the snapshot's `hasReadme` flag, populated from GitHub's
-// dedicated /readme endpoint during analysis. Path-scanning was unreliable
-// because README files often don't appear in hotspots or the file-graph.
-// On pre-v0.6 snapshots without the flag, skip the README check entirely
-// rather than falsely accuse mature repos.
+/** The gap between "solo" and "20+ contributors" — where most real teams live.
+ *  A few people carrying nearly everything is a bus-factor fact worth stating
+ *  even when the contributor list is long: rspec has 379 identities and three
+ *  of them do 70% of the work. */
+function detectOwnershipConcentration(
+  snap: AnalysisSnapshot,
+  isSoloProject: boolean
+): HealthSignal[] {
+  if (isSoloProject) return [];
+  const shares = authorCommitShares(snap, { exclude: isBotAuthor });
+  if (shares.length < CONCENTRATION_MIN_AUTHORS) return [];
+
+  const topN = shares.slice(0, 3);
+  const topShare = topN.reduce((n, a) => n + a.sharePct, 0);
+  if (topShare < CONCENTRATION_TOP3_PCT) return [];
+
+  return [
+    {
+      id: "concentrated-ownership",
+      title: "A few people carry most of it",
+      detail:
+        `${topN.length} of ${shares.length} contributors account for ${topShare}% of all commits ` +
+        `(${topN.map((a) => `${a.identity} ${a.sharePct}%`).join(", ")}). ` +
+        `That's normal for a project with a core team, and it's also who you'd miss.`,
+      evidence: {
+        numbers: { top3SharePct: topShare, totalContributors: shares.length },
+        note: topN.map((a) => a.identity).join(", "),
+      },
+    },
+  ];
+}
+
 function detectMissingHygiene(snap: AnalysisSnapshot): HealthSignal[] {
   const missing: string[] = [];
   if (!snap.repo.license) missing.push("LICENSE");
@@ -1350,6 +1427,7 @@ export function extractHealthSignals(snap: AnalysisSnapshot): HealthSignals {
   working.push(...unitCoverage.working);
   questions.push(...unitCoverage.questions);
   needsWork.push(...detectCrossBoundaryCoupling(snap));
+  questions.push(...detectOwnershipConcentration(snap, isSoloProject));
   questions.push(...detectMetadataDominance(snap));
 
   // Deep import chains (v0.81+). The detector emits one signal max;

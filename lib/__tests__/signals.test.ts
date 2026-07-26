@@ -1153,3 +1153,126 @@ describe("consistent-cadence", () => {
     }
   });
 });
+
+// ─── Team dimension on resolved identity ────────────────────────────────────
+// All four Team detectors used to read FileHotspot.authorLogins, which holds
+// GitHub logins and only those. A login is recoverable only from a
+// users.noreply.github.com commit address, so on four of eleven stored
+// snapshots — this repo included — it resolved for ZERO hotspots and the whole
+// dimension went dark. See lib/authorIdentity.ts.
+
+describe("Team signals — identity from the commit index", () => {
+  const commits = (spec: Array<[string, string | null, number]>) => {
+    const commitIndex: Record<string, { d: string; a: string | null; n: string }> = {};
+    let i = 0;
+    for (const [name, login, count] of spec) {
+      for (let k = 0; k < count; k++) {
+        commitIndex[`sha${i++}`] = { d: "2026-05-01T00:00:00Z", a: login, n: name };
+      }
+    }
+    return commitIndex;
+  };
+  const recent = Array.from({ length: 10 }, () => ({
+    sha: "x",
+    message: "m",
+    author: "a",
+    date: "2026-05-01T00:00:00Z",
+  })) as never;
+
+  const teamIds = (snap: AnalysisSnapshot) => {
+    const s = extractHealthSignals(snap);
+    return [...s.working, ...s.needsWork, ...s.questions].map((x) => x.id);
+  };
+
+  it("finds a solo project whose commits carry no GitHub login at all", () => {
+    // The exact shape of this repo: 0% login resolution, one human.
+    const snap = mockSnapshot({
+      commitIndex: commits([["Jonas Hansen", null, 99]]),
+      recentCommits: recent,
+    });
+    const solo = extractHealthSignals(snap).questions.find((x) => x.id === "solo-project");
+    expect(solo).toBeDefined();
+    expect(solo!.detail).toContain("100%");
+    // No login → no "@", because the UI links @names to github.com/<name>.
+    expect(solo!.detail).not.toContain("@");
+  });
+
+  it("still calls it solo when one person commits under two git configs", () => {
+    // "Jonas Hansen" and "jonas" are the same human with two user.name values.
+    // Counting distinct strings said 2 and killed the signal; share says 98%.
+    const snap = mockSnapshot({
+      commitIndex: commits([["Jonas Hansen", null, 98], ["jonas", null, 2]]),
+      recentCommits: recent,
+    });
+    expect(teamIds(snap)).toContain("solo-project");
+  });
+
+  it("does not call a two-person project solo", () => {
+    const snap = mockSnapshot({
+      commitIndex: commits([["Ada", null, 60], ["Grace", null, 40]]),
+      recentCommits: recent,
+    });
+    expect(teamIds(snap)).not.toContain("solo-project");
+  });
+
+  it("folds a name into the login the same person also commits under", () => {
+    const snap = mockSnapshot({
+      commitIndex: commits([["Ada Lovelace", "ada", 50], ["Ada Lovelace", null, 45]]),
+      recentCommits: recent,
+    });
+    const solo = extractHealthSignals(snap).questions.find((x) => x.id === "solo-project");
+    expect(solo).toBeDefined();
+    // Folded → one identity at 95%, and it IS a login, so it gets the @.
+    expect(solo!.detail).toContain("@ada");
+  });
+
+  it("names the few who carry a large project — the gap between solo and 20+", () => {
+    const snap = mockSnapshot({
+      commitIndex: commits([
+        ["Core One", null, 30], ["Core Two", null, 25], ["Core Three", null, 16],
+        ["Drive By", null, 3], ["Someone", null, 3], ["Else", null, 3],
+      ]),
+      recentCommits: recent,
+    });
+    const c = extractHealthSignals(snap).questions.find((x) => x.id === "concentrated-ownership");
+    expect(c).toBeDefined();
+    expect(c!.evidence.numbers!.top3SharePct).toBeGreaterThanOrEqual(70);
+  });
+
+  it("stays quiet on concentration when work is genuinely spread", () => {
+    const snap = mockSnapshot({
+      commitIndex: commits(
+        Array.from({ length: 10 }, (_, i) => [`Dev${i}`, null, 10] as [string, null, number])
+      ),
+      recentCommits: recent,
+    });
+    expect(teamIds(snap)).not.toContain("concentrated-ownership");
+  });
+
+  it("ignores bots when deciding who owns the project", () => {
+    const snap = mockSnapshot({
+      commitIndex: commits([["Ada", null, 50], ["dependabot[bot]", "dependabot[bot]", 50]]),
+      recentCommits: recent,
+    });
+    // Ada is the only human, so she holds 100% of human commits.
+    expect(teamIds(snap)).toContain("solo-project");
+  });
+
+  it("falls back to logins when there is no commit index (the REST-sampled path)", () => {
+    const snap = mockSnapshot({
+      hotspots: [
+        {
+          path: "src/a.ts",
+          churn: 10,
+          authors: 1,
+          authorLogins: ["ada"],
+          lastModified: "2026-05-01T00:00:00Z",
+          score: 7,
+          commits: ["s1"],
+        },
+      ],
+      recentCommits: recent,
+    });
+    expect(teamIds(snap)).toContain("solo-project");
+  });
+});
