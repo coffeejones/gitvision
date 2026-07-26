@@ -1276,3 +1276,103 @@ describe("Team signals — identity from the commit index", () => {
     expect(teamIds(snap)).toContain("solo-project");
   });
 });
+
+// ─── Hygiene: CI supply-chain posture ───────────────────────────────────────
+// ciHardening has driven the Packages panel and the evidence pack since it
+// shipped but never reached a signal, so Hygiene had two detectors, both
+// questions, and its tile could only be amber or green-by-silence.
+describe("CI hardening signals", () => {
+  const report = (over: Partial<NonNullable<AnalysisSnapshot["ciHardening"]>> = {}) =>
+    ({
+      workflowCount: 2,
+      actions: [{ raw: "actions/checkout@abc123" }],
+      unpinned: [],
+      permissions: [],
+      findings: [],
+      posture: "hardened",
+      ...over,
+    }) as NonNullable<AnalysisSnapshot["ciHardening"]>;
+
+  const ids = (ciHardening: AnalysisSnapshot["ciHardening"]) => {
+    const s = extractHealthSignals(mockSnapshot({ ciHardening }));
+    return [...s.working, ...s.needsWork, ...s.questions].map((x) => x.id);
+  };
+
+  it("never claims CI is hardened when no workflow was read", () => {
+    // posture is derived from findings alone, so zero readable workflows yields
+    // zero findings and therefore "hardened". Saying so would be a confident
+    // claim about something we never looked at.
+    expect(ids(report({ workflowCount: 0, posture: "hardened" }))).not.toContain("ci-hardened");
+  });
+
+  it("says nothing at all when the repo has no CI report", () => {
+    expect(ids(undefined)).not.toContain("ci-hardened");
+  });
+
+  it("names what it checked when CI is genuinely hardened", () => {
+    const s = extractHealthSignals(mockSnapshot({ ciHardening: report() }));
+    const ok = s.working.find((x) => x.id === "ci-hardened");
+    expect(ok).toBeDefined();
+    // Green must be a statement about evidence, not about silence.
+    expect(ok!.detail).toMatch(/pinned to a commit/);
+    expect(ok!.detail).toMatch(/token scope/);
+  });
+
+  it("raises unpinned actions as high severity and cites the incident", () => {
+    const s = extractHealthSignals(
+      mockSnapshot({
+        ciHardening: report({
+          posture: "exposed",
+          unpinned: [{ raw: "tj-actions/changed-files@v35" }] as never,
+          findings: [
+            {
+              id: "unpinned-actions",
+              severity: "high",
+              title: "unpinned",
+              count: 1,
+              evidence: ["tj-actions/changed-files@v35 in ci.yml"],
+              incident: {
+                name: "tj-actions/changed-files backdoor (CVE-2025-30066)",
+                date: "2025-03-14",
+                url: "https://example.test",
+                summary: "s",
+              },
+            },
+          ] as never,
+        }),
+      })
+    );
+    const bad = s.needsWork.find((x) => x.id === "ci-supply-chain-exposed");
+    expect(bad?.severity).toBe("high");
+    expect(bad!.detail).toContain("CVE-2025-30066");
+    expect(bad!.evidence.paths).toContain("tj-actions/changed-files@v35 in ci.yml");
+  });
+
+  it("reports broad token scope as medium, not as an exposure", () => {
+    const got = ids(
+      report({
+        posture: "attention",
+        findings: [
+          { id: "broad-permissions", severity: "medium", title: "t", count: 1, evidence: [] },
+        ] as never,
+      })
+    );
+    expect(got).toContain("ci-permissions-broad");
+    expect(got).not.toContain("ci-supply-chain-exposed");
+    expect(got).not.toContain("ci-hardened");
+  });
+
+  it("leads with the worst finding when a repo has several", () => {
+    const got = ids(
+      report({
+        posture: "exposed",
+        findings: [
+          { id: "broad-permissions", severity: "medium", title: "t", count: 3, evidence: [] },
+          { id: "unpinned-actions", severity: "high", title: "t", count: 9, evidence: [] },
+        ] as never,
+      })
+    );
+    expect(got).toContain("ci-supply-chain-exposed");
+    expect(got).not.toContain("ci-permissions-broad");
+  });
+});

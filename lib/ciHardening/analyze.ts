@@ -209,11 +209,13 @@ export function analyzeWorkflows(
       title:
         writeAll.length > 0
           ? `${writeAll.length} workflow${
-              writeAll.length === 1 ? "" : "s"
-            } grant the token write-all`
+              writeAll.length === 1 ? " grants" : "s grant"
+            } the token write-all`
           : `${broad.length} workflow${
-              broad.length === 1 ? "" : "s"
-            } leave the token scope unset (inherits the broad repo default)`,
+              broad.length === 1 ? " leaves" : "s leave"
+            } the token scope unset (${
+              broad.length === 1 ? "inherits" : "inherit"
+            } the broad repo default)`,
       count: broad.length,
       evidence: broad.map((p) =>
         p.scope === "write-all"

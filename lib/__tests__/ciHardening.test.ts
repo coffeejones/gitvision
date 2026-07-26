@@ -130,3 +130,25 @@ jobs:
     expect(unpinned.severity).toBe("medium");
   });
 });
+
+describe("analyzeWorkflows — finding prose", () => {
+  const wfBroad = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      path: `.github/workflows/w${i}.yml`,
+      content: "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n",
+    }));
+
+  it("agrees in number when one workflow leaves the token scope unset", () => {
+    const r = analyzeWorkflows(wfBroad(1), "myorg")!;
+    const f = r.findings.find((x) => x.id === "broad-permissions")!;
+    expect(f.title).toContain("1 workflow leaves");
+    expect(f.title).toContain("(inherits");
+  });
+
+  it("agrees in number when several do", () => {
+    const r = analyzeWorkflows(wfBroad(3), "myorg")!;
+    const f = r.findings.find((x) => x.id === "broad-permissions")!;
+    expect(f.title).toContain("3 workflows leave");
+    expect(f.title).toContain("(inherit ");
+  });
+});

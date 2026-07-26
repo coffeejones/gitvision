@@ -840,6 +840,95 @@ function detectOwnershipConcentration(
   ];
 }
 
+
+/** CI supply-chain posture, from the already-computed ciHardening report.
+ *
+ *  That report has driven the Packages panel and the evidence pack since it
+ *  shipped, but never reached a signal — so the Hygiene dimension had two
+ *  detectors, both questions, and its tile could only be amber or green-by-
+ *  silence. A green Hygiene tile meant "nothing fired", not "we looked and it
+ *  is fine". This is the first Hygiene signal that can actually say the latter.
+ *
+ *  The workflowCount gate is deliberate. `posture` is derived from findings
+ *  alone, so a report with no workflows in it would carry zero findings and
+ *  therefore read "hardened" — and claiming a repo's CI is hardened when we
+ *  never read a workflow is the kind of confident wrong answer this codebase
+ *  exists to avoid. analyzeWorkflows already refuses to emit a report in that
+ *  case, so this is defence in depth rather than a fix: the type permits
+ *  workflowCount 0, and a signal that asserts a positive should not depend on a
+ *  guarantee made somewhere else. */
+function detectCiHardening(snap: AnalysisSnapshot): {
+  working: HealthSignal[];
+  needsWork: HealthSignal[];
+} {
+  const ci = snap.ciHardening;
+  if (!ci || ci.workflowCount === 0) return { working: [], needsWork: [] };
+
+  const plural = ci.workflowCount === 1 ? "" : "s";
+  const worst = ci.findings.find((f) => f.severity === "high");
+  const medium = ci.findings.find((f) => f.severity === "medium");
+  // Cite the named incident behind the check — the reason it is a check at all.
+  const incident = (worst ?? medium)?.incident;
+  const because = incident ? ` The check exists because of ${incident.name}.` : "";
+  const evidence = {
+    paths: ci.findings.flatMap((f) => f.evidence).slice(0, 4),
+    numbers: {
+      workflows: ci.workflowCount,
+      unpinnedActions: ci.unpinned.length,
+      findings: ci.findings.length,
+    },
+  };
+
+  if (worst) {
+    return {
+      working: [],
+      needsWork: [
+        {
+          id: "ci-supply-chain-exposed",
+          title: "CI can run code you did not pin",
+          detail:
+            `${ci.unpinned.length} action reference${ci.unpinned.length === 1 ? " is" : "s are"} pinned to a tag or branch across ${ci.workflowCount} workflow${plural}, ` +
+            `so whoever controls that tag controls what runs in your CI — with your repo token.${because}`,
+          evidence,
+          severity: "high",
+        },
+      ],
+    };
+  }
+
+  if (medium) {
+    return {
+      working: [],
+      needsWork: [
+        {
+          id: "ci-permissions-broad",
+          title: "CI token scope is wider than it needs to be",
+          detail:
+            `${medium.count} of ${ci.workflowCount} workflow${plural} ${medium.count === 1 ? "leaves" : "leave"} the token scope unset, ` +
+            `so ${medium.count === 1 ? "it inherits" : "they inherit"} the repository default rather than asking for what ${medium.count === 1 ? "it uses" : "they use"}.${because}`,
+          evidence,
+          severity: "medium",
+        },
+      ],
+    };
+  }
+
+  // The positive names what was actually checked, so "green" is a statement
+  // about evidence rather than about silence.
+  return {
+    working: [
+      {
+        id: "ci-hardened",
+        title: "CI is hardened",
+        detail:
+          `All ${ci.actions.length} action reference${ci.actions.length === 1 ? " is" : "s are"} pinned to a commit and every one of the ${ci.workflowCount} workflow${plural} declares its token scope — the two things a compromised action needs in order to matter.`,
+        evidence,
+      },
+    ],
+    needsWork: [],
+  };
+}
+
 function detectMissingHygiene(snap: AnalysisSnapshot): HealthSignal[] {
   const missing: string[] = [];
   if (!snap.repo.license) missing.push("LICENSE");
@@ -1442,6 +1531,9 @@ export function extractHealthSignals(snap: AnalysisSnapshot): HealthSignals {
   working.push(...activity.working);
   needsWork.push(...activity.needsWork);
 
+  const ciSignals = detectCiHardening(snap);
+  working.push(...ciSignals.working);
+  needsWork.push(...ciSignals.needsWork);
   questions.push(...detectMissingHygiene(snap));
 
   // Dependency-health detectors (from lib/depsHealth.ts data)

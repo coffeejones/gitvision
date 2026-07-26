@@ -111,7 +111,13 @@ const DIMENSION_SIGNAL_IDS: Record<DimensionId, readonly string[]> = {
     // tile to CRITICAL on any match.
     "known-incident-match",
   ],
-  hygiene: ["missing-hygiene", "metadata-dominance"],
+  hygiene: [
+    "missing-hygiene",
+    "metadata-dominance",
+    "ci-supply-chain-exposed",
+    "ci-permissions-broad",
+    "ci-hardened",
+  ],
 };
 
 const DIMENSION_LABELS: Record<DimensionId, string> = {
