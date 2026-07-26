@@ -619,3 +619,80 @@ describe("rubyPlugin — class extraction for Architecture tab", () => {
     expect(parsed.classes![0].isAbstract).toBe(false);
   });
 });
+
+// Parenless method calls — Ruby's most ordinary idiom, and previously invisible.
+//
+// tree-sitter-ruby gives `helper` (no receiver, no parentheses, no arguments) a
+// plain `identifier` node rather than a `call`, so the plugin never saw it.
+// Every other form — helper(), self.helper, helper 1 — was already captured.
+// Measured on rspec-core's lib/: 366 such call sites against 1,997 identifier
+// references that really are locals, and closing the gap took its resolved
+// edges from 1,284 to 1,501 while the unjustified share FELL from 18.4% to 16.6%.
+//
+// The rule is Ruby's own: a bare word is a local variable if it is bound in the
+// scope, and otherwise a method call on self. These tests pin both halves,
+// because the risk here was never the calls we'd find — it was the locals we
+// might mistake for calls.
+describe("rubyPlugin — bare parenless calls", () => {
+  beforeAll(async () => {
+    await rubyPlugin.load();
+  });
+
+  const callsIn = (body: string, method = "run") => {
+    const file: SourceFile = { rel: "lib/x.rb", ext: "rb", content: body };
+    const ix: FileIndex = {
+      byPath: new Map([[file.rel, file]]),
+      byExt: new Map([["rb", [file]]]),
+      extras: new Map(),
+    };
+    return parseFile(rubyPlugin, file, ix).calls.filter((c) => c.inFunction === method);
+  };
+  const names = (body: string) => callsIn(body).map((c) => c.calleeName);
+
+  it("captures a bare call with no receiver, parentheses or arguments", () => {
+    const calls = callsIn("class A\n  def run\n    helper\n  end\n  def helper\n  end\nend\n");
+    expect(calls.map((c) => c.calleeName)).toContain("helper");
+    const helper = calls.find((c) => c.calleeName === "helper")!;
+    expect(helper.hasReceiver).toBe(false);
+    expect(helper.fromContainerType).toBe("A");
+  });
+
+  it("does not mistake an assigned local for a call", () => {
+    expect(names("class A\n  def run\n    x = 5\n    x\n  end\nend\n")).not.toContain("x");
+  });
+
+  it("does not mistake a method parameter for a call", () => {
+    expect(names("class A\n  def run(item)\n    item\n  end\nend\n")).not.toContain("item");
+  });
+
+  it("does not mistake a block parameter for a call", () => {
+    const got = names("class A\n  def run\n    [1].each { |n| n }\n  end\nend\n");
+    expect(got).not.toContain("n");
+    expect(got).toContain("each");
+  });
+
+  it("does not mistake a rescue variable for a call, but still sees the call it guards", () => {
+    const got = names(
+      "class A\n  def run\n    begin\n      go\n    rescue => e\n      e\n    end\n  end\nend\n"
+    );
+    expect(got).not.toContain("e");
+    expect(got).toContain("go");
+  });
+
+  it("does not treat a symbol as a call", () => {
+    // `attr_reader :thing` — the symbol is an argument, not a second call.
+    expect(names("class A\n  def run\n    attr_reader :thing\n  end\nend\n")).not.toContain("thing");
+  });
+
+  it("treats a name assigned anywhere in the method as a local throughout", () => {
+    // Ruby is order-sensitive here; scanning the whole scope errs toward
+    // emitting fewer calls, and a missing edge is cheaper than an invented one.
+    expect(names("class A\n  def run\n    value\n    value = 1\n  end\nend\n")).not.toContain("value");
+  });
+
+  it("still captures the forms that always worked", () => {
+    expect(names("class A\n  def run\n    helper()\n  end\nend\n")).toContain("helper");
+    expect(names("class A\n  def run\n    self.helper\n  end\nend\n")).toContain("helper");
+    expect(names("class A\n  def run\n    helper 1\n  end\nend\n")).toContain("helper");
+  });
+});

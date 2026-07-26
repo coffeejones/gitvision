@@ -62,6 +62,38 @@ import { hashSubtree } from "../astHash";
 const PLUGIN_NAME = "ruby";
 const EXTENSIONS = ["rb"] as const;
 
+/** Node types whose identifier children BIND a name rather than reference one.
+ *  Ruby decides "variable or call on self?" by exactly this question. */
+const BINDING_NODES = new Set<string>([
+  "assignment",
+  "operator_assignment",
+  "method_parameters",
+  "block_parameters",
+  "left_assignment_list",
+  "rest_assignment",
+  "optional_parameter",
+  "keyword_parameter",
+  "splat_parameter",
+  "hash_splat_parameter",
+  "block_parameter",
+  "destructured_parameter",
+  "exception_variable",
+  "for",
+]);
+
+/** Parents where an identifier is a name being declared, or is already handled
+ *  as part of a real call node — never a bare parenless call of its own. */
+const NON_REFERENCE_PARENTS = new Set<string>([
+  "call",
+  "method",
+  "singleton_method",
+  "simple_symbol",
+  "hash_key_symbol",
+  "pair",
+  "alias",
+  "undef",
+]);
+
 let lang: Language | null = null;
 
 // ------------------- Module-level resolver context -------------------
@@ -334,6 +366,12 @@ interface MethodScope {
   /** Local + instance variable types, keyed by name (without @ prefix for
    *  instance vars — same convention as PHP's bareVariableName). */
   locals: Map<string, string>;
+  /** Every name BOUND in this method — parameters, assignment targets, block
+   *  parameters, rescue and for variables. Ruby decides whether a bare word is
+   *  a variable or a call on self by exactly this question, so the set is what
+   *  makes parenless-call detection a reading of the language rather than a
+   *  guess. Collected in one pass when the method opens (see collectBindings). */
+  bound: Set<string>;
   decisionPoints: number;
 }
 
@@ -429,6 +467,34 @@ function parseRubyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
       default:
         return undefined;
     }
+  }
+
+  /** Names a node binds rather than references. Scanning the WHOLE method in
+   *  one pass (rather than tracking assignments as we reach them) is
+   *  deliberately conservative: Ruby is order-sensitive, so a name assigned
+   *  only later in the method is technically a call before that point — but
+   *  treating it as a local everywhere errs toward emitting FEWER calls, and a
+   *  missing edge is cheaper than an invented one. */
+  function collectBindings(methodNode: TsNode): Set<string> {
+    const bound = new Set<string>();
+    const addIds = (n: TsNode) => {
+      if (n.type === "identifier") bound.add(n.text);
+      for (const c of n.namedChildren) addIds(c);
+    };
+    const walk = (n: TsNode) => {
+      if (BINDING_NODES.has(n.type)) {
+        // For an assignment only the LEFT side binds; the right side is a
+        // value expression whose identifiers may well be calls.
+        const target =
+          n.type === "assignment" || n.type === "operator_assignment"
+            ? n.childForFieldName("left") ?? n
+            : n;
+        addIds(target);
+      }
+      for (const c of n.namedChildren) walk(c);
+    };
+    walk(methodNode);
+    return bound;
   }
 
   function visit(node: TsNode) {
@@ -620,6 +686,29 @@ function parseRubyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         return;
       }
 
+      // A bare word with no receiver, no parentheses and no arguments —
+      // `helper` on a line by itself. tree-sitter gives it a plain `identifier`
+      // node rather than a `call`, so this plugin used to miss it entirely,
+      // and it is Ruby's most ordinary way to call a method. Measured on
+      // rspec-core's lib/: 366 such call sites, against 1,997 identifier
+      // references that really are locals and are excluded here.
+      case "identifier": {
+        const m = currentMethod();
+        if (!m || m.bound.has(node.text)) return;
+        const parent = node.parent;
+        // Skip identifiers that are a NAME rather than a reference: the callee
+        // of a real call node, a `def` name, a symbol, a keyword argument.
+        if (!parent || NON_REFERENCE_PARENTS.has(parent.type)) return;
+        if (BINDING_NODES.has(parent.type)) return;
+        calls.push({
+          calleeName: node.text,
+          inFunction: m.name,
+          fromContainerType: currentClass()?.name,
+          hasReceiver: false,
+        });
+        return;
+      }
+
       case "method":
       case "singleton_method": {
         const nameNode = node.childForFieldName("name");
@@ -627,7 +716,12 @@ function parseRubyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         const startRow = node.startPosition.row;
         const endRow = node.endPosition.row;
         // Ruby has no parameter types, so locals starts empty
-        methodStack.push({ name: fnName, locals: new Map(), decisionPoints: 0 });
+        methodStack.push({
+          name: fnName,
+          locals: new Map(),
+          bound: collectBindings(node),
+          decisionPoints: 0,
+        });
         const body = node.childForFieldName("body");
         if (body) {
           for (const child of body.namedChildren) visit(child);

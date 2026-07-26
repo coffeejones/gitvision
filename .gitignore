@@ -66,3 +66,4 @@ mcp/pkg/
 
 # benchmark harness working dir (clones + results)
 scripts/benchmark/.work/
+.scratch/
