@@ -23,6 +23,8 @@ import { CTProof } from "./CTProof";
 import { CTFaq } from "./CTFaq";
 import { CTCodePane } from "./CTCodePane";
 import { CTBlastDiagram } from "./CTBlastDiagram";
+import { CTSecurityPane } from "./CTSecurityPane";
+import { CTOverviewPane } from "./CTOverviewPane";
 import type { DemoHighlight } from "@/lib/demoHighlights";
 import { CTScreenshot } from "./CTScreenshot";
 import { CTLandingIntake } from "./CTLandingIntake";
@@ -66,15 +68,11 @@ export function CodeTrawlLanding({ demos }: { demos: DemoHighlight[] }) {
           </p>
           <CTLandingIntake resume />
           <div className="rk-hero-shot">
-            <CTScreenshot
-              src="/landing/CT_Overview.webp"
-              alt="CodeTrawl reading pallets/flask — overview with lenses and findings"
-              label="codetrawl.com — pallets/flask"
-              wide
-              width={1600}
-              height={824}
-              priority
-            />
+            {/* The product's own HeadlineFinding + HealthSummary on a pinned
+                sweep — not a picture of them. See CTOverviewPane. */}
+            <CTScreenshot label="codetrawl.com — pallets/flask" wide>
+              <CTOverviewPane />
+            </CTScreenshot>
           </div>
         </header>
 
@@ -155,16 +153,11 @@ export function CodeTrawlLanding({ demos }: { demos: DemoHighlight[] }) {
               </p>
             </div>
             <div className="rk-bleed-shot" data-rv="right">
-              <CTScreenshot
-                src="/landing/CT_SecurityReview.webp"
-                alt="Security review of flask: eval and exec patterns found in cli.py and config.py, with file and line"
-                label="codetrawl.com — security"
-                tight
-                bleed="right"
-                fade="left"
-                width={1600}
-                height={824}
-              />
+              {/* Not a rebuild — the product's own SecurityPanel, rendered on a
+                  pinned sweep. See CTSecurityPane. */}
+              <CTScreenshot label="codetrawl.com — security" tight bleed="right" fade="left">
+                <CTSecurityPane />
+              </CTScreenshot>
             </div>
           </div>
         </section>
