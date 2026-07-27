@@ -18,6 +18,8 @@
 
 import { CTSurface } from "./CTSurface";
 import { CTNav } from "./CTNav";
+import { CTDemoProof } from "./CTDemoProof";
+import type { DemoHighlight } from "@/lib/demoHighlights";
 import { CTScreenshot } from "./CTScreenshot";
 import { CTLandingIntake } from "./CTLandingIntake";
 import { CTMotion } from "./CTMotion";
@@ -40,7 +42,7 @@ const STEPS = [
   { k: "Read the manual", v: "A grade to orient you, then the survey: source, Faultline, signals — every claim with its evidence." },
 ];
 
-export function CodeTrawlLanding() {
+export function CodeTrawlLanding({ demos }: { demos: DemoHighlight[] }) {
   return (
     <CTSurface>
       <style>{CSS}</style>
@@ -71,6 +73,9 @@ export function CodeTrawlLanding() {
             />
           </div>
         </header>
+
+        {/* ── PROOF — the three open sweeps, directly after the promise ─── */}
+        <CTDemoProof demos={demos} />
 
         {/* ── HOW IT WORKS — three hairline steps ──────────────────────── */}
         <section className="rk-how" id="how">
@@ -296,10 +301,23 @@ const CSS = `
   min-height: 20px; margin: 10px 0 0;
   font-family: var(--ct-mono); font-size: 12px; color: var(--ct-ember);
 }
-.rk .rk-demos { margin: 8px 0 0; font-family: var(--ct-mono); font-size: 12.5px; color: var(--ct-faint); }
-.rk .rk-demos a { color: var(--ct-dim); text-decoration: underline; text-underline-offset: 3px; }
-.rk .rk-demos a:hover { color: var(--ct-text); }
-.rk .rk-demos-tail { color: var(--ct-ghost); }
+/* The note under the intake. 14px on --ct-dim (6.7:1), not 12.5px on
+   --ct-ghost (3.2:1, below AA) — it is load-bearing information about what the
+   button is about to do, and the old line put exactly that on the token
+   reserved for ink that conveys nothing. */
+.rk .rk-intake-note {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ct-dim);
+}
+.rk .rk-intake-note a {
+  color: var(--ct-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: text-underline-offset 0.15s ease;
+}
+.rk .rk-intake-note a:hover { text-underline-offset: 5px; }
 
 /* the hero shot goes wider than the text column — a big establishing shot,
    centred in the viewport, bleeding a little past the 1180 content edge */
@@ -309,6 +327,68 @@ const CSS = `
   margin-left: 50%;
   transform: translateX(-50%);
 }
+
+/* ── PROOF — the three open sweeps ───────────────────────────────────────
+   Denser than the sections around it on purpose. Everything else on this page
+   is a claim with air around it; this is the one place a visitor can check the
+   claims themselves, so it reads as a set of results rather than a pitch. */
+.rk .rk-proof { max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 128px) var(--edge) 0; }
+.rk .rk-proof-head { max-width: 640px; margin: 0 0 clamp(28px, 3.5vw, 40px); }
+.rk .rk-proof-head .rk-h2 { font-size: clamp(28px, 3.4vw, 42px); }
+.rk .rk-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(14px, 1.6vw, 20px);
+}
+.rk .rk-proof-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 178px;
+  padding: 20px;
+  border: 1px solid var(--ct-line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ct-surface) 60%, transparent);
+  text-decoration: none;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.rk .rk-proof-card--bare { min-height: 0; }
+.rk .rk-proof-card:hover {
+  border-color: color-mix(in srgb, var(--ct-ember) 40%, transparent);
+  background: var(--ct-surface);
+  transform: translateY(-2px);
+}
+.rk .rk-proof-repo {
+  font-family: var(--ct-mono);
+  font-size: 13px;
+  color: var(--ct-text);
+}
+.rk .rk-proof-meta {
+  font-family: var(--ct-mono);
+  font-size: 12px;
+  color: var(--ct-faint);
+}
+/* The computed finding is the reason the card exists, so it is the largest
+   thing on it. */
+.rk .rk-proof-finding {
+  margin-top: 4px;
+  font-size: 15.5px;
+  line-height: 1.42;
+  letter-spacing: -0.005em;
+  color: var(--ct-text);
+  text-wrap: pretty;
+}
+.rk .rk-proof-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ct-ember);
+}
+.rk .rk-proof-card:hover .rk-proof-cta { color: var(--ct-orange); }
 
 /* ── HOW IT WORKS — three hairline steps ─────────────────────────────── */
 .rk .rk-how { max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 132px) var(--edge) 0; }
@@ -380,6 +460,8 @@ const CSS = `
 
 @media (max-width: 900px) {
   .rk .rk-intake form { flex-direction: column; }
+  .rk .rk-proof-grid { grid-template-columns: 1fr; }
+  .rk .rk-proof-card { min-height: 0; }
   .rk .rk-how-grid { grid-template-columns: 1fr; }
   .rk .rk-split-grid { grid-template-columns: 1fr; gap: clamp(20px, 4vw, 36px); }
   .rk .rk-split-copy { max-width: 560px; }
@@ -418,16 +500,20 @@ html.lenis, html.lenis body { height: auto; }
    a delay so the index's two columns cascade together; the 3-step
    how-it-works simply staggers 1-2-3) */
 .rk [data-rv="cascade"] { opacity: 1; transform: none; }
-.rk [data-rv="cascade"] .rk-idx-row {
+.rk [data-rv="cascade"] .rk-idx-row,
+.rk [data-rv="cascade"] .rk-proof-card {
   opacity: 0;
   transform: translateY(14px);
   transition: opacity 0.55s ease, transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.rk [data-rv="cascade"].in .rk-idx-row { opacity: 1; transform: none; }
+.rk [data-rv="cascade"].in .rk-idx-row,
+.rk [data-rv="cascade"].in .rk-proof-card { opacity: 1; transform: none; }
 .rk [data-rv="cascade"].in .rk-idx-row:nth-child(2),
-.rk [data-rv="cascade"].in .rk-idx-row:nth-child(6) { transition-delay: 70ms; }
+.rk [data-rv="cascade"].in .rk-idx-row:nth-child(6),
+.rk [data-rv="cascade"].in .rk-proof-card:nth-child(2) { transition-delay: 70ms; }
 .rk [data-rv="cascade"].in .rk-idx-row:nth-child(3),
-.rk [data-rv="cascade"].in .rk-idx-row:nth-child(7) { transition-delay: 140ms; }
+.rk [data-rv="cascade"].in .rk-idx-row:nth-child(7),
+.rk [data-rv="cascade"].in .rk-proof-card:nth-child(3) { transition-delay: 140ms; }
 .rk [data-rv="cascade"].in .rk-idx-row:nth-child(4),
 .rk [data-rv="cascade"].in .rk-idx-row:nth-child(8) { transition-delay: 210ms; }
 
@@ -468,7 +554,9 @@ html.lenis, html.lenis body { height: auto; }
 
 /* ── reduced motion: render finished, no choreography ────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .rk [data-rv], .rk [data-rv="cascade"] .rk-idx-row { opacity: 1; transform: none; transition: none; }
+  .rk [data-rv],
+  .rk [data-rv="cascade"] .rk-idx-row,
+  .rk [data-rv="cascade"] .rk-proof-card { opacity: 1; transform: none; transition: none; }
   .rk .rk-h1, .rk .rk-lede, .rk .rk-hero .rk-intake, .rk .rk-hero-shot figure { animation: none; }
 }
 `;

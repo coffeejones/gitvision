@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { CodeTrawlLanding } from "@/components/landing/codetrawl/CodeTrawlLanding";
+import { loadDemoHighlights } from "@/lib/demoHighlights";
 
 export const dynamic = "force-dynamic";
 
@@ -53,5 +54,8 @@ export const metadata: Metadata = {
 export default async function Home() {
   const authSession = await auth.api.getSession({ headers: await headers() });
   if (authSession?.user) redirect("/cases");
-  return <CodeTrawlLanding />;
+  // Read the demo sweeps AFTER the redirect — a signed-in visitor never sees
+  // the landing, so there's no reason to touch the session store for them.
+  const demos = await loadDemoHighlights();
+  return <CodeTrawlLanding demos={demos} />;
 }

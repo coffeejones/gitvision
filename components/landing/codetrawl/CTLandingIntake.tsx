@@ -37,6 +37,13 @@ export function CTLandingIntake({ resume = false }: { resume?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Where "read one already swept" goes. Prefer the in-page proof section when
+  // this intake is on the landing; the close instance links there too, since
+  // scrolling back up to the cards beats a cold link into one repo. Falls back
+  // to the first configured demo session if the section is ever removed.
+  const firstDemo = DEMO_SESSIONS.find((d) => d.sessionId);
+  const firstDemoHref = firstDemo ? "#demos" : "/signup?next=/cases";
+
   function runAnalysis(normalized: string) {
     setError(null);
     startTransition(async () => {
@@ -157,31 +164,24 @@ export function CTLandingIntake({ resume = false }: { resume?: boolean }) {
       <div id={errId} className="rk-intake-err" role="status" aria-live="polite">
         {error ?? (pending ? "Analysis running — this can take about a minute." : "")}
       </div>
-      <p className="rk-demos">
-        or open one that&apos;s already done —{" "}
-        {DEMO_SESSIONS.map((d, i) => (
-          <span key={d.label}>
-            {/* If a demo id is ever unset, fall back to the stash→signup
-                analyze flow (same contract as the retired CTIntake) so the
-                visitor's chosen repo isn't dropped at the signup wall. */}
-            <a
-              href={d.sessionId ? `/session/${d.sessionId}` : "/signup?next=/cases"}
-              onClick={
-                d.sessionId
-                  ? undefined
-                  : (e) => {
-                      e.preventDefault();
-                      runSweep(d.repo);
-                    }
-              }
-            >
-              {d.label}
-            </a>
-            {i < DEMO_SESSIONS.length - 1 ? " · " : ""}
-          </span>
-        ))}
-        <span className="rk-demos-tail"> · no sign-up</span>
-      </p>
+      {/* Say what the button does BEFORE it is pressed.
+          Every visitor who sees this page is logged out (app/page.tsx sends
+          signed-in users to /cases), and for them the submit above resolves to
+          stashAndSignup → /signup. The page used to promise "nothing to
+          install" and "no sign-up" around a large orange button that delivered
+          a signup form with no warning, which is a bait-and-switch even though
+          the repo is kept and resumed afterwards. The honest version costs one
+          line and points at the path that genuinely needs no account.
+          Suppressed while a sweep is running — that is the post-signup resume,
+          where the visitor already has an account. */}
+      {!loggedIn && !pending && (
+        <p className="rk-intake-note">
+          Sweeping your own repo takes a free account — we&apos;ll keep the URL
+          and run it the moment you land.{" "}
+          <a href={firstDemoHref}>Or read one already swept</a>, no account at
+          all.
+        </p>
+      )}
     </div>
   );
 }
