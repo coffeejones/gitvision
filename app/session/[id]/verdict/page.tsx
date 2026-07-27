@@ -27,6 +27,7 @@ import { getSession, patchLatestSnapshot } from "@/lib/storage";
 import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
 import { isDemoSession } from "@/lib/demoSessions";
+import { checkSessionOwnership } from "@/lib/ownership";
 import { consumeAiBudget } from "@/lib/aiBudget";
 import { computeVerdict } from "@/lib/intelligence/verdict";
 import { computeAdoptionRead } from "@/lib/intelligence/adoptionRead";
@@ -70,6 +71,22 @@ export default async function VerdictRoute({
     isDemo ||
     (authSession ? await canAccess(authSession.user.id, "aiInsights") : false);
 
+  // Generating these narratives calls patchLatestSnapshot — it is a WRITE to
+  // someone's analysis — so it takes the same ownership rule as any other
+  // mutation, not merely "is this viewer entitled to AI".
+  //
+  // Entitlement alone was not enough: a public analysis is readable by anyone
+  // with the link, so the first signed-in visitor to open a stranger's verdict
+  // page was generating on their behalf — spending the shared daily AI budget
+  // and writing the result into that stranger's session file. The owner had not
+  // asked for it and could not have stopped it.
+  //
+  // Ownerless legacy sessions keep their previous behaviour: checkSessionOwnership
+  // returns "allowed" for them, so nothing that used to generate stops.
+  const isOwner =
+    checkSessionOwnership(session, authSession?.user.id ?? null, null) ===
+    "allowed";
+
   // Read-through cache: the bench statement is a stable function of the
   // snapshot, so persist it on first generation and reuse it — paid users
   // don't re-spend on repeat views. Public demo sessions serve a PRE-BAKED
@@ -86,7 +103,7 @@ export default async function VerdictRoute({
   // global daily AI budget allows — same kill-switch the POST AI routes honor,
   // so the inline path can't outrun the cap. Budget is consumed lazily (short-
   // circuit) so demo/free/cached views never touch it.
-  if (!narrative && hasAi && !isDemo && consumeAiBudget().ok) {
+  if (!narrative && hasAi && isOwner && !isDemo && consumeAiBudget().ok) {
     narrative = await generateVerdictNarrative(verdict, latest.repo.fullName);
     if (narrative) {
       await patchLatestSnapshot(session.id, { verdictNarrative: narrative });
@@ -100,6 +117,7 @@ export default async function VerdictRoute({
   if (
     !recNarrative &&
     hasAi &&
+    isOwner &&
     !isDemo &&
     recommendations.items.length > 0 &&
     consumeAiBudget().ok

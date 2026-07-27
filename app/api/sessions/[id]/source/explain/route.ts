@@ -6,8 +6,14 @@
 // This is the one endpoint that transmits repository source to Anthropic — one
 // function at a time, on the user's explicit click. It is never stored: the
 // explanation is held only in an in-memory read-through cache (keyed by the
-// analyzed commit, so a re-sweep invalidates it). The Source view discloses the
-// transmission at the point of action, and private-repo owners opt in first.
+// analyzed commit, so a re-sweep invalidates it). Both callers — the Source
+// view and the Flows diagram — disclose the transmission at the point of
+// action, and both ask a private-repo reader to opt in first (lib/explainConsent).
+//
+// That opt-in is a CLIENT-SIDE consent prompt, not a gate this route enforces:
+// the checks below establish who is asking, never that they were asked. Said
+// plainly because the previous version of this comment implied the Source view
+// was the only caller, which is how Flows shipped without the prompt at all.
 //
 // Gate stack (in order): AI configured → per-IP AI rate limit → session exists →
 // read access (private-repo owner-only, 404 not 403) → free-phase entitlement

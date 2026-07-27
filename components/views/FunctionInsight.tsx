@@ -28,8 +28,11 @@ import { AiReadingBody, AiReadingDivider, EvidenceRow } from "@/components/views
 import { type FnMarker, type FileChips } from "@/lib/sourceAnnotations";
 import { buildFunctionSignals, type FunctionSignals } from "@/lib/functionSignals";
 import type { FunctionExplanation } from "@/lib/functionExplain";
+import {
+  grantPrivateExplainConsent,
+  needsPrivateExplainConsent,
+} from "@/lib/explainConsent";
 
-const CONSENT_KEY_PRIVATE = "ct-explain-consent-private";
 
 export interface InsightResult {
   signals: FunctionSignals;
@@ -76,7 +79,7 @@ export function FunctionInsight({
 
   const [phase, setPhase] = useState<Phase>(() => {
     if (initial) return { status: "loaded", result: initial };
-    if (repoPrivate && !hasPrivateConsent()) return { status: "consent" };
+    if (needsPrivateExplainConsent(repoPrivate)) return { status: "consent" };
     return { status: "loading" };
   });
 
@@ -138,11 +141,7 @@ export function FunctionInsight({
   }, []);
 
   function grantConsentAndRun() {
-    try {
-      window.localStorage.setItem(CONSENT_KEY_PRIVATE, "1");
-    } catch {
-      /* private mode / storage blocked — proceed for this session anyway */
-    }
+    grantPrivateExplainConsent();
     void run();
   }
 
@@ -312,14 +311,6 @@ function InsightBody({ result }: { result: InsightResult }) {
 
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-
-function hasPrivateConsent(): boolean {
-  try {
-    return window.localStorage.getItem(CONSENT_KEY_PRIVATE) === "1";
-  } catch {
-    return false;
-  }
-}
 
 /** "claude-haiku-4-5" → "Haiku 4.5". Best-effort; falls back to the raw id. */
 function modelLabel(model: string): string {

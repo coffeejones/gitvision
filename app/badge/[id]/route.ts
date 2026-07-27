@@ -1,9 +1,17 @@
 // GET /badge/[id] — the README trend badge (Arc 3 distribution).
 //
 // Returns an SVG of the session's verdict grade + trend arrow, sized for a
-// README. Public-repo sessions only: a private session returns a neutral
-// "private" badge (never its grade), and a missing id 404s. No auth — the
-// badge is meant to live in public READMEs and be fetched by anyone.
+// README. No auth — the badge is meant to live in READMEs and be fetched by
+// anyone (GitHub's image proxy strips cookies, so auth is not an option here).
+//
+// A private analysis and an id that has never existed get the SAME response,
+// byte for byte. That is the whole security property of this route: it used to
+// 404 a missing id while answering 200 "private" for a real one, which made it
+// an existence oracle — anyone holding an id could confirm it was a real
+// private analysis, and every other route in the product deliberately refuses
+// to tell them that (checkSessionReadAccess returns 404). Returning the neutral
+// badge for both keeps the feature the UI advertises (BadgeModal tells users a
+// private repo's badge reads "private") while revealing nothing.
 
 import { getSession } from "@/lib/storage";
 import { isSessionPrivate } from "@/lib/ownership";
@@ -30,12 +38,11 @@ export async function GET(
   const { id } = await params;
   const session = await getSession(id);
 
-  if (!session) {
-    return new Response("Not found", { status: 404 });
-  }
-
-  // Never expose a private repo's grade in a public README.
-  if (isSessionPrivate(session)) {
+  // Missing and private are answered identically — same SVG, same cache
+  // header — so the response carries no signal about whether the id is real.
+  // Do not split these branches back apart to give a nicer 404: the two must
+  // stay indistinguishable to anyone who did not create the analysis.
+  if (!session || isSessionPrivate(session)) {
     return svgResponse(neutralBadgeSvg("private"), 300);
   }
 

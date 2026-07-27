@@ -7,6 +7,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { nanoid } from "nanoid";
 import { atomicWriteJson } from "./atomicWrite";
+import { deleteFreshness } from "./freshness";
 import type { Session, SessionSummary, AnalysisSnapshot } from "./types";
 import { cmpStr } from "./deterministicSort";
 
@@ -174,13 +175,30 @@ export async function patchLatestSnapshot(
   return session;
 }
 
+/** Delete an analysis and the records keyed to it.
+ *
+ *  This used to unlink the session file and stop, which left a freshness
+ *  record — the last commit sha we saw on that repository — sitting under the
+ *  same session id. "Delete this analysis" quietly keeping a note about the
+ *  repo it came from is not what the word means.
+ *
+ *  Two things still outlive a deletion, both stated on /security rather than
+ *  papered over: the content-addressed parse index (paths, symbol names and
+ *  per-file hashes — no file contents), which is keyed by a digest of the
+ *  analyzed file set and shared between any sessions with identical contents,
+ *  so removing it here could pull the layer out from under an unrelated
+ *  analysis; and the session id left as a key in the owner's own seen-map.
+ *  Making the parse index deletable per session needs refcounting, not a
+ *  one-line unlink. */
 export async function deleteSession(id: string): Promise<boolean> {
   try {
     await fs.unlink(sessionPath(id));
-    return true;
   } catch {
     return false;
   }
+  // After the session is gone, so a failure here can't strand the analysis.
+  await deleteFreshness(id);
+  return true;
 }
 
 /**

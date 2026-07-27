@@ -39,11 +39,6 @@ async function fetchBadge(id = "s1") {
 beforeEach(() => mockGetSession.mockReset());
 
 describe("GET /badge/[id]", () => {
-  it("404s a missing session", async () => {
-    mockGetSession.mockResolvedValue(null);
-    expect((await fetchBadge()).status).toBe(404);
-  });
-
   it("NEVER leaks a private repo's grade — returns the neutral badge", async () => {
     mockGetSession.mockResolvedValue(session([snap({ private: true, grade: "A" })]));
     const { status, body } = await fetchBadge();
@@ -51,6 +46,23 @@ describe("GET /badge/[id]", () => {
     expect(body).toContain("private");
     expect(body).not.toContain(">A<"); // the grade must not appear
     expect(body).not.toContain("#2ea043"); // nor its ramp colour
+  });
+
+  // This route has no auth — GitHub's image proxy strips cookies — so the only
+  // way it can avoid confirming that an id is real is to answer a private
+  // analysis and a nonexistent one identically. It used to 404 the miss and
+  // return 200 "private" for the hit, which told anyone holding an id exactly
+  // what they wanted to know, while every other route in the product returns
+  // 404 precisely to avoid saying it.
+  it("answers a missing session identically to a private one", async () => {
+    mockGetSession.mockResolvedValue(session([snap({ private: true, grade: "A" })]));
+    const hit = await fetchBadge();
+
+    mockGetSession.mockResolvedValue(null);
+    const miss = await fetchBadge();
+
+    expect(miss.status).toBe(hit.status);
+    expect(miss.body).toBe(hit.body);
   });
 
   it("shows the grade with no arrow for a single-snapshot session", async () => {

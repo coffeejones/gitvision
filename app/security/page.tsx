@@ -306,6 +306,14 @@ export default function SecurityPage() {
               your analysis; the returned explanation is held in server memory
               and cleared on restart.
             </Fact>
+            <Fact
+              label="private repositories ask first"
+              limit="One prompt per browser, not per repository, and it is a consent prompt rather than a permission boundary — the server checks who is asking, not that they were asked."
+            >
+              The first time you use that explainer on a private repository, in
+              either the Source view or the Flows diagram, it asks before
+              anything is sent.
+            </Fact>
           </Stack>
           <P>
             AI features run on Anthropic&rsquo;s standard commercial API. What
@@ -330,7 +338,11 @@ export default function SecurityPage() {
               limit="Visibility is recorded at sweep time, not checked live: if a repository becomes private after you analyzed it, re-run the sweep so the lock applies."
             >
               Every page, API route and export for that analysis returns
-              &ldquo;not found&rdquo; to anyone else.
+              &ldquo;not found&rdquo; to anyone else. The README badge is the
+              one endpoint that answers at all — it cannot check who is asking,
+              because GitHub&rsquo;s image proxy strips cookies — and it returns
+              the same neutral marker whether the analysis is private or has
+              never existed.
             </Fact>
             <Fact
               label="public repositories — anyone with the link"

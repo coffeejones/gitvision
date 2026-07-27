@@ -106,7 +106,12 @@ export default async function FlowsPage({
           />
         ) : (
           <AnchorGlow>
-            <FlowsView sessionId={session.id} flows={flows} resolution={index!.resolution} />
+            <FlowsView
+              sessionId={session.id}
+              flows={flows}
+              resolution={index!.resolution}
+              repoPrivate={current.repo.private === true}
+            />
           </AnchorGlow>
         )}
       </div>

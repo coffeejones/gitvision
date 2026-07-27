@@ -18,6 +18,10 @@ import { Route, CornerDownRight, FileCode2, Sparkles } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import { FlowCanvas } from "@/components/views/FlowCanvas";
 import { AiReadingBody, AiReadingDivider, EvidenceRow } from "@/components/views/AiReading";
+import {
+  grantPrivateExplainConsent,
+  needsPrivateExplainConsent,
+} from "@/lib/explainConsent";
 import type { FunctionSignals } from "@/lib/functionSignals";
 import type {
   FlowEntryPoint,
@@ -60,14 +64,21 @@ export function FlowsView({
   sessionId,
   flows,
   resolution,
+  repoPrivate,
 }: {
   sessionId: string;
   flows: FlowEntry[];
   resolution: FlowResolution;
+  /** Whether the analyzed repo was private. Drives the same one-time opt-in
+   *  the Source view asks for before the explainer sends source to Anthropic.
+   *  This surface used to send without asking at all. */
+  repoPrivate: boolean;
 }) {
   const [activeId, setActiveId] = useState(flows[0]?.entry.id ?? "");
   const [selected, setSelected] = useState<FlowTraceNode | null>(null);
   const [captions, setCaptions] = useState<Map<string, Caption>>(new Map());
+  /** Node whose reading is waiting on the private-repo opt-in. */
+  const [pendingConsent, setPendingConsent] = useState<FlowTraceNode | null>(null);
 
   const setCaption = useCallback((id: string, patch: Caption) => {
     setCaptions((prev) => new Map(prev).set(id, patch));
@@ -82,6 +93,13 @@ export function FlowsView({
   const explain = useCallback(
     async (node: FlowTraceNode) => {
       if (!node.line) return; // no known definition line → nothing to ground on
+      // Private repo, first use in this browser: ask before any source leaves.
+      // Clicking a node here is a much lighter gesture than opening the Source
+      // view's panel, which is exactly why this surface needed the gate most.
+      if (needsPrivateExplainConsent(repoPrivate)) {
+        setPendingConsent(node);
+        return;
+      }
       setCaption(node.id, { loading: true });
       try {
         const res = await fetch(`/api/sessions/${sessionId}/source/explain`, {
@@ -286,6 +304,41 @@ export function FlowsView({
                   suggestion: selectedCaption.suggestion,
                 }}
               />
+            </div>
+          )}
+          {pendingConsent?.id === selected.id && (
+            <div
+              className="flex flex-col gap-2 rounded-md px-3 py-2.5"
+              style={{ border: `1px solid ${TOK.border}`, background: TOK.surfaceElevated }}
+            >
+              <p className="text-[12.5px] leading-relaxed" style={{ color: TOK.textSecondary }}>
+                This repo is private. Reading a function sends{" "}
+                <strong style={{ color: TOK.textPrimary }}>that function&rsquo;s source</strong> to
+                Anthropic for that one request — nothing else, and it is never stored. Continue?
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="text-[12px] font-medium rounded px-2.5 py-1"
+                  style={{ background: TOK.accent, color: "#0c0b0b" }}
+                  onClick={() => {
+                    grantPrivateExplainConsent();
+                    const node = pendingConsent;
+                    setPendingConsent(null);
+                    void explain(node);
+                  }}
+                >
+                  Read this function
+                </button>
+                <button
+                  type="button"
+                  className="text-[12px] rounded px-2.5 py-1"
+                  style={{ border: `1px solid ${TOK.border}`, color: TOK.textSecondary }}
+                  onClick={() => setPendingConsent(null)}
+                >
+                  Not now
+                </button>
+              </div>
             </div>
           )}
           {!selected.line && (

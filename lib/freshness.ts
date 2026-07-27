@@ -55,6 +55,19 @@ async function writeCache(sessionId: string, c: FreshnessCache): Promise<void> {
   }
 }
 
+/** Drop a session's freshness record. Called by deleteSession: this file is
+ *  keyed by session id and holds the last commit sha we saw on that
+ *  repository, so leaving it behind means "delete this analysis" quietly kept
+ *  a note about the repo it came from. Best-effort and never throws — a
+ *  failure here must not prevent the session itself from being deleted. */
+export async function deleteFreshness(sessionId: string): Promise<void> {
+  try {
+    await fs.unlink(freshPath(sessionId));
+  } catch {
+    // no record, or already gone
+  }
+}
+
 /** Current default-branch HEAD sha for a repo, via a short-TTL cache.
  *  null when it can't be determined (API error, empty repo). Never
  *  throws — freshness is a cosmetic nudge, not a hard dependency. */
