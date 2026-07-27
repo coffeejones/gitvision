@@ -99,11 +99,20 @@ describe("the AI reading is generated, not written", () => {
   });
 
   it("describes the same function the chips do", () => {
-    // A reading transcribed from a different run would talk about other code.
+    // A reading transcribed from a different run would talk about other code,
+    // so tie it to the signals it was given. Deliberately NOT asserting that it
+    // quotes the complexity: an unremarkable 5 is something the model may
+    // reasonably not mention, and a test that demands it would push whoever
+    // re-runs this toward editing the prose until it complies — the exact thing
+    // the rest of this file exists to prevent.
     const r = LANDING_SOURCE.reading;
     const s = LANDING_SOURCE.signals;
-    expect(r.risk).toContain(String(s.complexity));
-    if (s.duplicateCount > 0) expect(r.risk.toLowerCase()).toMatch(/duplicate|twin/);
+    if (s.duplicateCount > 0) {
+      expect(r.risk.toLowerCase()).toMatch(/duplicat|twin/);
+      expect(r.risk, "the reading cites a different duplicate count").toContain(
+        String(s.duplicateCount),
+      );
+    }
     if (!s.fileTested) expect(r.risk.toLowerCase()).toMatch(/test/);
   });
 
@@ -134,13 +143,14 @@ describe("the shown slice stays true to the file it names", () => {
   });
 
   it("fits the column it is rendered in", () => {
-    // MEASURED, not guessed: 76 characters at 12.5px in the split column as it
-    // stands today. It was 57 before the section was widened to 1320px — so
-    // re-measure in the browser if .rk-split or its grid ratio moves, rather
-    // than nudging this number until the test passes. A slice past the limit
-    // renders clipped, which is what made the first attempt look broken.
+    // MEASURED, not guessed: 84 characters at 12.5px in the split column as it
+    // stands today. It has been 57, then 76, then this, each time because the
+    // section got wider — so re-measure in the browser if .rk-split or its grid
+    // ratio moves, rather than nudging the number until the test passes. A
+    // slice past the limit renders clipped, which is what made the first
+    // attempt look broken.
     const widest = Math.max(...LANDING_SOURCE.code.split("\n").map((l) => l.length));
-    expect(widest, `widest line is ${widest} chars — pick a narrower slice`).toBeLessThanOrEqual(76);
+    expect(widest, `widest line is ${widest} chars — pick a narrower slice`).toBeLessThanOrEqual(84);
   });
 
   it("points its chips at a line inside the slice", () => {

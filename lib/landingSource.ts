@@ -10,17 +10,17 @@
 //
 // Choosing is the point — this is the best example out of a hundred, the way a
 // product photographer picks the best one off the line. The repository, the
-// file, the function and the framing are all deliberate. `splitTopLevel` is a
-// sixteen-line parser that splits on top-level commas, so a stranger reads it
-// in one pass, and it fits the column without a horizontal scrollbar: the pane
-// holds about 57 characters at 12.5px, and a wider slice renders clipped, which
-// is exactly the sort of thing that makes a still look broken.
+// file, the function and the framing are all deliberate. `lookupVariableType`
+// is twelve lines, sixty characters at its widest, and a stranger reads it in
+// one pass: walk the scope stack, then the class fields, then give up.
 //
-// It was chosen for what the analyzer says about it, not despite it. The body
-// exists TWICE in our own codebase and no test reaches it, so three chips light
-// up and all three are mild criticism of us. That demonstrates more than a
-// polished green panel would, because a green panel proves nothing and this is
-// precisely the work the product exists to do.
+// It was chosen for what the analyzer says about it, not despite it. That body
+// exists FIVE TIMES in our own codebase — byte-identical in the C#, Java,
+// JavaScript, PHP and Python plugins — seven files call it, and no test reaches
+// any copy. Every chip is mild criticism of us, which demonstrates more than a
+// polished green panel ever could: a green panel proves nothing, and finding a
+// generic scope walk copy-pasted into five language plugins is precisely the
+// work the product exists to do.
 //
 // The NUMBERS are not chosen. Complexity, caller count and duplicate count are
 // what the analyzer computed for this exact function, transcribed from a real
@@ -69,56 +69,53 @@ export interface PinnedSource {
 
 export const LANDING_SOURCE: PinnedSource = {
   repo: "coffeejones/gitvision",
-  path: "lib/intelligence/classCanvas.ts",
-  commit: "eb63f5e",
+  path: "lib/codeAnalysis/plugins/javascript.ts",
+  commit: "3a443c2",
   lang: "ts",
-  fn: { name: "splitTopLevel", line: 385 },
-  firstLine: 385,
-  // Verbatim from the file at that commit. Do not reformat it to fit — if it
-  // stops fitting, choose a different slice rather than editing the code.
-  code: `function splitTopLevel(s: string): string[] {
-  const out: string[] = [];
-  let depth = 0;
-  let start = 0;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (c === "<" || c === "[") depth++;
-    else if (c === ">" || c === "]") depth--;
-    else if (c === "," && depth === 0) {
-      out.push(s.slice(start, i));
-      start = i + 1;
+  fn: { name: "lookupVariableType", line: 696 },
+  firstLine: 696,
+  // Verbatim from the file at that commit, leading indentation included — it is
+  // a nested function, and the slice is compared byte-for-byte in the tests. Do
+  // not reformat it to fit; choose a different slice instead.
+  code: `  function lookupVariableType(name: string): string | null {
+    for (let i = methodStack.length - 1; i >= 0; i--) {
+      const t = methodStack[i].locals.get(name);
+      if (t) return t;
     }
-  }
-  out.push(s.slice(start));
-  return out;
-}`,
+    const cls = currentClass();
+    if (cls) {
+      const t = cls.fields.get(name);
+      if (t) return t;
+    }
+    return null;
+  }`,
   // Verbatim output of lib/functionExplain.explainFunction() run against the
   // slice above with the signals below — not a sentence anyone here composed.
   // Re-run it if the code or the signals change; do not hand-edit it to read
   // better, because then it is marketing copy wearing the product's voice.
   reading: {
     does:
-      "Splits a string on commas that are not nested inside angle brackets or square brackets, tracking depth to identify top-level delimiters.",
+      "Searches a stack of method scopes and the current class for a variable's type, returning the first match or null.",
     risk:
-      "The file is not reached by tests, and the function has a structural duplicate elsewhere (1 duplicate found). Moderate cyclomatic complexity (8) from the nested conditions means changes risk introducing off-by-one errors or depth-tracking bugs that would not be caught by tests.",
+      "The function is structurally duplicated 4 times elsewhere in the codebase, and the file containing it is not reached by tests, making it difficult to verify correctness across all copies if the logic needs to change.",
     suggestion:
-      "Before modifying, consolidate the duplicate copy into a single implementation and add a unit test covering edge cases: empty strings, nested brackets, trailing/leading commas, and mismatched delimiters.",
+      "Extract this lookup logic into a shared utility function to consolidate the 4 duplicates and reduce maintenance burden.",
     model: "claude-haiku-4-5",
-    generatedAt: "2026-07-27T18:49:11.213Z",
+    generatedAt: "2026-07-27T21:13:31.267Z",
     provenance:
-      "explainFunction() on this exact slice + signals, 1,111 input / 158 output tokens. Transcribed verbatim.",
+      "explainFunction() on this exact slice + signals, 1,072 input / 124 output tokens. Transcribed verbatim.",
   },
   signals: {
     // codeGraph.functions[] entry for this function.
-    complexity: 8,
-    // Called from classCanvas.ts and classDiagram.ts — 2 distinct files.
-    callerCount: 2,
-    // One twin: lib/intelligence/classDiagram.ts:555 has a byte-identical body
-    // (bodyHash 5528c74cd3e84178). Two copies exist, so one is a twin.
-    duplicateCount: 1,
-    // Nothing in codeGraph.testFiles calls it.
+    complexity: 5,
+    // Seven distinct files call it.
+    callerCount: 7,
+    // FIVE byte-identical copies share one bodyHash — the C#, Java, JavaScript,
+    // PHP and Python plugins each hold one — so four of them are twins.
+    duplicateCount: 4,
+    // Nothing in codeGraph.testFiles reaches any copy.
     fileTested: false,
   },
   provenance:
-    "Transcribed from the stored analysis of coffeejones/gitvision (session 6xw0IjzqRh: 1,752 functions, 24,907 call edges). Re-derive after any change to lib/intelligence/classCanvas.ts.",
+    "Transcribed from the stored analysis of coffeejones/gitvision (session 6xw0IjzqRh: 1,752 functions, 24,907 call edges). Re-derive after any change to lib/codeAnalysis/plugins/javascript.ts.",
 };
