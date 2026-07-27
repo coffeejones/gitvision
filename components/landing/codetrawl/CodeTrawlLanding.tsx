@@ -544,6 +544,9 @@ const CSS = `
 }
 .rk .rk-bleed-shot { min-width: 0; }
 .rk .rk-bleed-copy { max-width: 380px; }
+/* The blast shot has two shapes: the graph on wide screens, a list on narrow
+   ones. Exactly one is ever displayed — see the 900px query below. */
+.rk .ct-blast-list { display: none; }
 .rk .rk-bleed--right .rk-bleed-grid {
   grid-template-columns: min(380px, 34vw) minmax(0, 1fr);
   padding-right: 0;
@@ -596,6 +599,12 @@ const CSS = `
   .rk .rk-bleed--right .rk-bleed-grid { grid-template-columns: 1fr; gap: clamp(20px, 4vw, 36px); padding-right: 0; padding-left: 0; }
   .rk .rk-bleed-copy { order: 1; max-width: 560px; padding: 0 var(--edge); }
   .rk .rk-bleed-shot { order: 2; }
+  /* Below this width the bleed grid stacks and the shot column collapses to
+     roughly the viewport, which scales the blast graph's 1020-unit viewBox to
+     about a third and its smallest label to 4px. Swap in the list — see
+     CTBlastDiagram. */
+  .rk .ct-blast-graph { display: none; }
+  .rk .ct-blast-list { display: block; }
 }
 @media (max-width: 640px) {
   .rk .rk-index { grid-auto-flow: row; grid-template-rows: none; grid-template-columns: 1fr; }

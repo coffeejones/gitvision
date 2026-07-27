@@ -12,13 +12,11 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
-const TOK = {
-  bg: "#0d0b0a",
-  surface: "#161412",
-  line: "rgba(242, 239, 234, 0.09)",
-  faint: "#8a847c",
-  orange: "#ff4f00",
-};
+// The FRAME is the landing's, not the product's — it is the device around the
+// screenshot, so it wears the page's palette while everything mounted inside it
+// wears the product's (see ./tokens). This used to be a fourth hand-copied
+// palette, with a #0d0b0a that matched no token at all.
+import { CT as TOK } from "./tokens";
 
 // No panel: a transparent wrapper that just gives the glow room to bleed into
 // the page. There is no rectangle, no border — only the frame and the light.

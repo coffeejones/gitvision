@@ -14,8 +14,18 @@
 //
 // The theme is Shiki's github-dark-default, the same one the Source view uses,
 // so the token colours are identical rather than merely similar.
+//
+// COLOUR IS IMPORTED, NOT TRANSCRIBED. TOK is the product's own theme module,
+// because a hand-copied palette drifts silently: this pane had #d29922 where
+// the product uses CH.warning #c99a4e, an amber rule on the suggestion where it
+// uses neutral bone, one flat #cfcac3 across all three reading paragraphs where
+// the product deliberately brightens the RISK one, and a gutter two shades
+// darker than CodeView's. Each drift was small, and together they were why the
+// pane read as an imitation rather than the app.
 
 import { highlightToLines } from "@/lib/highlight";
+import { TOK } from "@/lib/sessionTheme";
+import { complexityTone } from "@/lib/sourceAnnotations";
 import { LANDING_SOURCE } from "@/lib/landingSource";
 
 /** From components/views/CodeView.tsx. */
@@ -24,11 +34,23 @@ const GUTTER_NUM = 52;
 const GUTTER_MARK = 34;
 const CODE_SIZE = 12.5;
 
-const SURFACE = "#171615";
-const BORDER = "rgba(255,255,255,0.08)";
-const MUTED = "#6e6a64";
-const TEXT = "#f2efea";
-const AMBER = "#d29922";
+const SURFACE = TOK.surface;
+const BORDER = TOK.border;
+const MUTED = TOK.textMuted;
+const TEXT = TOK.textPrimary;
+const AMBER = TOK.amber;
+
+/** What the product paints a complexity marker, from the product's own tone
+ *  function rather than a colour picked here. It matters: this function scores
+ *  5, which complexityTone calls "low" — "explainable but not risky", says
+ *  CodeView, which then draws it in quiet grey. The pane used to hardcode amber
+ *  and so told visitors the app raises a warning where the app deliberately
+ *  stays calm. Importing the rule means the colour follows the number even if a
+ *  future slice scores differently. */
+function complexityColor(complexity: number): string {
+  const tone = complexityTone(complexity);
+  return tone === "high" ? TOK.rose : tone === "medium" ? TOK.amber : TOK.textMuted;
+}
 
 function Chip({ label, color }: { label: string; color: string }) {
   return (
@@ -55,6 +77,7 @@ export async function CTCodePane() {
   const src = LANDING_SOURCE;
   const { lines } = await highlightToLines(src.code, src.lang);
   const fnLine = src.fn.line;
+  const cx = complexityColor(src.signals.complexity);
 
   return (
     <div style={{ background: SURFACE, fontFamily: "var(--ct-mono)" }}>
@@ -123,8 +146,8 @@ export async function CTCodePane() {
                       style={{
                         fontSize: 9.5,
                         fontWeight: 600,
-                        color: AMBER,
-                        border: `1px solid ${AMBER}55`,
+                        color: cx,
+                        border: `1px solid ${cx}55`,
                         borderRadius: 3,
                         padding: "0 3px",
                         lineHeight: "13px",
@@ -169,10 +192,12 @@ export async function CTCodePane() {
         <span style={{ fontSize: 11.5, color: TEXT, marginRight: 2 }}>
           {src.fn.name}
         </span>
-        {/* Same chips, same wording, same colours as components/views/AiReading
-            — including the amber ones. A landing that only ever showed the
-            flattering chips would be the fake version of this. */}
-        <Chip label={`Complexity ${src.signals.complexity}`} color={AMBER} />
+        {/* Same chips, same wording and same colour RULES as AiReading — which
+            paints complexity by tone and reserves amber for the genuinely
+            mid-severity signals. A landing that only ever showed the flattering
+            chips would be the fake version of this; one that reddened a calm
+            chip to look busier would be the other fake version. */}
+        <Chip label={`Complexity ${src.signals.complexity}`} color={cx} />
         <Chip label={`Called from ${src.signals.callerCount}`} color={MUTED} />
         {src.signals.duplicateCount > 0 && (
           <Chip
@@ -204,10 +229,18 @@ export async function CTCodePane() {
           fontFamily: "var(--ct-display)",
         }}
       >
-        <Reading label="What it does" body={src.reading.does} />
-        <Reading label="Where the risk is" body={src.reading.risk} />
+        {/* Tone per paragraph is the product's, not a flat grey: AiReadingBody
+            gives the risk textPrimary and the other two textSecondary, so the
+            concern is the brightest thing in the block. */}
+        <Reading label="What it does" body={src.reading.does} tone={TOK.textSecondary} />
+        <Reading label="Where the risk is" body={src.reading.risk} tone={TOK.textPrimary} />
         {src.reading.suggestion && (
-          <Reading label="Worth considering" body={src.reading.suggestion} accent />
+          <Reading
+            label="Worth considering"
+            body={src.reading.suggestion}
+            tone={TOK.textSecondary}
+            accent
+          />
         )}
         {/* The same disclosure the product shows at the point of action. */}
         <div
@@ -234,14 +267,17 @@ export async function CTCodePane() {
 }
 
 /** One labelled paragraph of the reading. `accent` marks the suggestion, which
- *  the product sets off with a rule the same way. */
+ *  the product sets off with a 2px rule in neutral bone — TOK.accent, not the
+ *  warning gold: the suggestion is the helpful line, not a third warning. */
 function Reading({
   label,
   body,
+  tone,
   accent = false,
 }: {
   label: string;
   body: string;
+  tone: string;
   accent?: boolean;
 }) {
   return (
@@ -250,22 +286,20 @@ function Reading({
         display: "flex",
         flexDirection: "column",
         gap: 2,
-        ...(accent ? { borderLeft: `2px solid ${AMBER}55`, paddingLeft: 9 } : {}),
+        ...(accent ? { borderLeft: `2px solid ${TOK.accent}`, paddingLeft: 10 } : {}),
       }}
     >
       <span
         style={{
-          fontSize: 9.5,
-          letterSpacing: "0.1em",
+          fontSize: 10,
+          letterSpacing: "0.12em",
           textTransform: "uppercase",
           color: MUTED,
         }}
       >
         {label}
       </span>
-      <span style={{ fontSize: 11.5, lineHeight: 1.5, color: "#cfcac3" }}>
-        {body}
-      </span>
+      <span style={{ fontSize: 12.5, lineHeight: 1.5, color: tone }}>{body}</span>
     </div>
   );
 }
