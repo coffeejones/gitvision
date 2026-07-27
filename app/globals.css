@@ -43,6 +43,47 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── React Flow chrome, themed ──────────────────────────────────────────────
+   @xyflow/react ships a LIGHT stylesheet and nothing overrode it, so every
+   canvas in the app — Faultline, Flows, Imports, Architecture, Constellation
+   — rendered a white zoom panel on the bitumen. It is the brightest object on
+   any of those screens, and it was baked into the Faultline shot on the
+   landing page, where it was the brightest object on the marketing site too.
+
+   Themed through the library's OWN --xy-* custom properties rather than by
+   out-specifying its selectors. Its rules read
+   `background: var(--xy-controls-button-background-color-props, var(...))`, so
+   an override of the same specificity is a coin-toss decided by source order —
+   and the first attempt here lost it, with `color` applying while `background`
+   did not. Setting the variables is the supported seam and cannot be reordered
+   out of effect.
+
+   Values come from the CHAMBERS palette (components/chambers/theme.ts), not
+   from the --surface-* variables above: every canvas lives inside the session
+   surface, which paints TOK.surface = CH.panel, a warm near-black. The globals
+   above are the older cool palette, and theming the controls from those put a
+   blue-grey chip on a warm canvas — not white any more, but still not part of
+   the interface. Kept in step by lib/__tests__/canvasChrome.test.ts. */
+:root {
+  --xy-controls-button-background-color: #232220;
+  --xy-controls-button-background-color-hover: #2e2c29;
+  --xy-controls-button-color: #f2efea;
+  --xy-controls-button-color-hover: #ffffff;
+  --xy-controls-button-border-color: rgba(255, 255, 255, 0.08);
+  --xy-controls-box-shadow: none;
+  --xy-minimap-background-color: #171615;
+  --xy-attribution-background-color: transparent;
+}
+/* The group reads as one control rather than a stack of separate chips. */
+.react-flow__controls {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.react-flow__attribution a {
+  color: var(--text-muted);
+}
+
 /* Subtle dotted canvas texture */
 .canvas-dots {
   background-image: radial-gradient(

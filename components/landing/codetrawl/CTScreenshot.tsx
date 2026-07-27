@@ -79,7 +79,7 @@ const dot: CSSProperties = {
 
 const url: CSSProperties = {
   fontFamily: "var(--ct-mono)",
-  fontSize: 11.5,
+  fontSize: 12,
   color: TOK.faint,
   margin: "0 auto",
 };

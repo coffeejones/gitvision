@@ -227,14 +227,41 @@ const CSS = `
    the footer, so it defers rather than restating the clamp. */
 .rk { overflow-x: clip; --edge: var(--ct-edge); }
 
+/* ── SECTION CADENCE ──────────────────────────────────────────────────────
+   Section gaps mark where an ARGUMENT ends, not a fixed tick. Four sections in
+   a row used to open with the same 168px and the page read as evenly-spaced
+   slabs; a gap that never varies stops carrying information.
+   Desktop maxima, and the reason for each:
+
+     hero    120   the promise
+     proof    92   its evidence — same beat as the hero, so: tighter
+     stats    64   still that beat, tighter again
+     how     160   NEW ARGUMENT (how it works) — the page's widest break
+     split   144   the feature group opens
+     bleed   112   inside the group
+     bleed   112   inside the group
+     caps    144   the group's summary
+     trust   160   (margin) the turn
+     faq     128   objections
+     close   176   the ask, and it needs the air
+
+   If a section is added, decide which beat it belongs to and match that beat's
+   value — do not average it into the middle. */
+
 /* The nav lives in codetrawl.css as .ct-nav* — it is shared with every other
    public page now (CTNav), so it can't stay in this page's private stylesheet. */
 
 /* ── HERO ────────────────────────────────────────────────────────────── */
 .rk .rk-hero { max-width: 1180px; margin: 0 auto; padding: clamp(56px, 9vw, 120px) var(--edge) 0; text-align: center; }
+/* 92, down from 104. The "huge sentence hero" is deliberate — it is the
+   Raycast grammar this page is built on — so this is a trim, not a retreat to
+   the 56-64px the SaaS default lands at. What 104 cost was the relationship to
+   everything under it: against a 54px h2 it read 1.93:1, close enough to two
+   full steps that the h2 stopped registering as a heading at all. 92:54 is
+   1.7 — still emphatic, and the rest of the page can be heard. */
 .rk .rk-h1 {
   margin: 0 auto 26px; max-width: 14ch;
-  font-size: clamp(46px, 8vw, 104px); font-weight: 600;
+  font-size: clamp(46px, 7.2vw, 92px); font-weight: 600;
   letter-spacing: -0.045em; line-height: 0.98; text-wrap: balance;
 }
 .rk .rk-dot { color: var(--ct-orange); }
@@ -340,9 +367,9 @@ const CSS = `
    Denser than the sections around it on purpose. Everything else on this page
    is a claim with air around it; this is the one place a visitor can check the
    claims themselves, so it reads as a set of results rather than a pitch. */
-.rk .rk-proof { max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 128px) var(--edge) 0; }
+.rk .rk-proof { max-width: 1180px; margin: 0 auto; padding: clamp(52px, 6vw, 92px) var(--edge) 0; }
 .rk .rk-proof-head { max-width: 640px; margin: 0 0 clamp(28px, 3.5vw, 40px); }
-.rk .rk-proof-head .rk-h2 { font-size: clamp(28px, 3.4vw, 42px); }
+.rk .rk-proof-head .rk-h2 { font-size: clamp(27px, 3.3vw, 40px); }
 .rk .rk-proof-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -380,7 +407,7 @@ const CSS = `
    thing on it. */
 .rk .rk-proof-finding {
   margin-top: 4px;
-  font-size: 15.5px;
+  font-size: 16px;
   line-height: 1.42;
   letter-spacing: -0.005em;
   color: var(--ct-text);
@@ -392,7 +419,7 @@ const CSS = `
   gap: 6px;
   margin-top: auto;
   padding-top: 12px;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--ct-ember);
 }
@@ -401,7 +428,7 @@ const CSS = `
 /* ── NUMBERS — four figures, each a door ─────────────────────────────────
    Tighter than the sections around it. A stat that has to be scrolled past
    isn't a stat, it's a paragraph with a big number in it. */
-.rk .rk-stats { max-width: 1180px; margin: 0 auto; padding: clamp(56px, 7vw, 88px) var(--edge) 0; }
+.rk .rk-stats { max-width: 1180px; margin: 0 auto; padding: clamp(40px, 4.5vw, 64px) var(--edge) 0; }
 .rk .rk-stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -444,9 +471,9 @@ const CSS = `
 .rk .rk-stat-detail { font-size: 13px; line-height: 1.5; color: var(--ct-dim); }
 
 /* ── FAQ — native <details>, no accordion machinery ──────────────────── */
-.rk .rk-faq { max-width: 820px; margin: 0 auto; padding: clamp(72px, 10vw, 120px) var(--edge) 0; }
+.rk .rk-faq { max-width: 820px; margin: 0 auto; padding: clamp(72px, 9vw, 128px) var(--edge) 0; }
 .rk .rk-faq-head { margin: 0 0 clamp(20px, 2.5vw, 30px); }
-.rk .rk-faq-head .rk-h2 { font-size: clamp(26px, 3.2vw, 38px); margin: 0; }
+.rk .rk-faq-head .rk-h2 { font-size: clamp(27px, 3.3vw, 40px); margin: 0; }
 .rk .rk-faq-list { border-top: 1px solid var(--ct-line); }
 .rk .rk-faq-item { border-bottom: 1px solid var(--ct-line); }
 .rk .rk-faq-q {
@@ -483,7 +510,7 @@ const CSS = `
 .rk .rk-faq-a a:hover { text-underline-offset: 5px; }
 
 /* ── HOW IT WORKS — three hairline steps ─────────────────────────────── */
-.rk .rk-how { max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 132px) var(--edge) 0; }
+.rk .rk-how { max-width: 1180px; margin: 0 auto; padding: clamp(88px, 11vw, 160px) var(--edge) 0; }
 .rk .rk-how-grid {
   display: grid; grid-template-columns: repeat(3, 1fr);
   column-gap: clamp(36px, 5vw, 80px);
@@ -497,14 +524,14 @@ const CSS = `
 .rk .rk-feat-sub { margin: 0; color: var(--ct-dim); font-size: clamp(16px, 1.6vw, 19px); line-height: 1.55; }
 
 /* ── SPLIT FEATURE — asymmetric 2-col ────────────────────────────────── */
-.rk .rk-split { max-width: 1180px; margin: 0 auto; padding: clamp(88px, 12vw, 168px) var(--edge) 0; }
+.rk .rk-split { max-width: 1180px; margin: 0 auto; padding: clamp(80px, 10vw, 144px) var(--edge) 0; }
 .rk .rk-split-grid { display: grid; grid-template-columns: 0.92fr 1.28fr; gap: clamp(32px, 5vw, 80px); align-items: center; }
 .rk .rk-split-copy { max-width: 440px; }
 .rk .rk-split-sub { margin: 0; color: var(--ct-dim); font-size: clamp(16px, 1.6vw, 18px); line-height: 1.55; }
 .rk .rk-split-shot { min-width: 0; }
 
 /* ── BLEED FEATURE — shot runs flush off a viewport edge ─────────────── */
-.rk .rk-bleed { padding: clamp(88px, 12vw, 168px) 0 0; }
+.rk .rk-bleed { padding: clamp(64px, 8vw, 112px) 0 0; }
 .rk .rk-bleed-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) min(380px, 34vw);
@@ -521,7 +548,7 @@ const CSS = `
 }
 
 /* ── INDEX — hairline rows, mono numbers, no cards ───────────────────── */
-.rk .rk-caps { max-width: 1180px; margin: 0 auto; padding: clamp(88px, 12vw, 168px) var(--edge) 0; }
+.rk .rk-caps { max-width: 1180px; margin: 0 auto; padding: clamp(80px, 10vw, 144px) var(--edge) 0; }
 .rk .rk-index {
   display: grid;
   grid-auto-flow: column;
@@ -536,7 +563,7 @@ const CSS = `
 }
 .rk .rk-idx-n { flex: none; min-width: 22px; font-family: var(--ct-mono); font-size: 12px; color: var(--ct-ghost); }
 .rk .rk-idx-body { display: flex; flex-direction: column; gap: 5px; }
-.rk .rk-idx-k { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.rk .rk-idx-k { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 .rk .rk-idx-v { color: var(--ct-dim); font-size: 14px; line-height: 1.5; }
 
 /* ── TRUST STRIP ─────────────────────────────────────────────────────── */
@@ -545,9 +572,12 @@ const CSS = `
 .rk .rk-trust-line b { color: var(--ct-text); }
 
 /* ── CLOSE ───────────────────────────────────────────────────────────── */
-.rk .rk-close { max-width: 720px; margin: 0 auto; padding: clamp(96px, 13vw, 180px) var(--edge) clamp(56px, 8vw, 96px); text-align: center; }
+.rk .rk-close { max-width: 720px; margin: 0 auto; padding: clamp(96px, 12vw, 176px) var(--edge) clamp(56px, 8vw, 96px); text-align: center; }
 .rk .rk-close-h { margin: 0 0 16px; }
-.rk .rk-close-sub { margin: 0 0 34px; color: var(--ct-dim); font-size: 18px; }
+/* The same clamp as .rk-lede: both are the sentence under a big heading,
+   so they are one role and should be one size. A flat 18 sat half a step
+   from the lede's 17-20 range and read as a third body size for no reason. */
+.rk .rk-close-sub { margin: 0 0 34px; color: var(--ct-dim); font-size: clamp(17px, 1.7vw, 20px); }
 .rk .rk-close .rk-demos { text-align: center; }
 
 @media (max-width: 900px) {
@@ -567,7 +597,7 @@ const CSS = `
 @media (max-width: 640px) {
   .rk .rk-index { grid-auto-flow: row; grid-template-rows: none; grid-template-columns: 1fr; }
   .rk .rk-stats-grid { grid-template-columns: 1fr; }
-  .rk .rk-faq-q { font-size: 15.5px; padding: 18px 2px; }
+  .rk .rk-faq-q { font-size: 15px; padding: 18px 2px; }
 }
 
 /* ═══ MOTION LAYER ═══════════════════════════════════════════════════════
