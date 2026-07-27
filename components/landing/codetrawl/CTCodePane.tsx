@@ -192,8 +192,10 @@ export async function CTCodePane() {
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 10,
-          padding: "12px 14px 14px",
+          // Tight on purpose: the pane is wide and the code block is a fixed
+          // 320px, so the reading is the only place height can come out of.
+          gap: 8,
+          padding: "10px 14px 11px",
           borderTop: `1px solid ${BORDER}`,
           background: "rgba(255,255,255,0.015)",
           // The pane sets mono for the code; the product renders the reading in
@@ -213,7 +215,7 @@ export async function CTCodePane() {
             display: "flex",
             alignItems: "center",
             gap: 8,
-            paddingTop: 4,
+            paddingTop: 2,
             fontSize: 10,
             color: MUTED,
           }}
@@ -247,7 +249,7 @@ function Reading({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 3,
+        gap: 2,
         ...(accent ? { borderLeft: `2px solid ${AMBER}55`, paddingLeft: 9 } : {}),
       }}
     >
@@ -261,7 +263,7 @@ function Reading({
       >
         {label}
       </span>
-      <span style={{ fontSize: 11.5, lineHeight: 1.55, color: "#cfcac3" }}>
+      <span style={{ fontSize: 11.5, lineHeight: 1.5, color: "#cfcac3" }}>
         {body}
       </span>
     </div>

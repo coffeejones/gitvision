@@ -134,10 +134,13 @@ describe("the shown slice stays true to the file it names", () => {
   });
 
   it("fits the column it is rendered in", () => {
-    // ~57 characters at 12.5px in the split column. A wider line renders
-    // clipped, which is what made the first attempt look broken.
+    // MEASURED, not guessed: 76 characters at 12.5px in the split column as it
+    // stands today. It was 57 before the section was widened to 1320px — so
+    // re-measure in the browser if .rk-split or its grid ratio moves, rather
+    // than nudging this number until the test passes. A slice past the limit
+    // renders clipped, which is what made the first attempt look broken.
     const widest = Math.max(...LANDING_SOURCE.code.split("\n").map((l) => l.length));
-    expect(widest, `widest line is ${widest} chars — pick a narrower slice`).toBeLessThanOrEqual(57);
+    expect(widest, `widest line is ${widest} chars — pick a narrower slice`).toBeLessThanOrEqual(76);
   });
 
   it("points its chips at a line inside the slice", () => {

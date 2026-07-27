@@ -522,8 +522,16 @@ const CSS = `
 .rk .rk-feat-sub { margin: 0; color: var(--ct-dim); font-size: clamp(16px, 1.6vw, 19px); line-height: 1.55; }
 
 /* ── SPLIT FEATURE — asymmetric 2-col ────────────────────────────────── */
-.rk .rk-split { max-width: 1180px; margin: 0 auto; padding: clamp(80px, 10vw, 144px) var(--edge) 0; }
-.rk .rk-split-grid { display: grid; grid-template-columns: 0.92fr 1.28fr; gap: clamp(32px, 5vw, 80px); align-items: center; }
+/* Wider than the 1180 the text sections use — the same move the hero shot
+   makes. Taking the width out of the copy column instead starved it to 38
+   characters a line, which reads as fragments rather than prose. */
+.rk .rk-split { max-width: 1320px; margin: 0 auto; padding: clamp(80px, 10vw, 144px) var(--edge) 0; }
+/* The shot column is deliberately dominant. It holds a rendered code pane, and
+   a wider pane is also a SHORTER one — the reading's prose wraps into fewer
+   lines — so widening fixes the proportion from both directions at once. The
+   copy beside it stays above 44 characters a line, which is the floor before a
+   narrow column starts reading as a list of fragments. */
+.rk .rk-split-grid { display: grid; grid-template-columns: 0.86fr 1.44fr; gap: clamp(28px, 4vw, 64px); align-items: center; }
 .rk .rk-split-copy { max-width: 440px; }
 .rk .rk-split-sub { margin: 0; color: var(--ct-dim); font-size: clamp(16px, 1.6vw, 18px); line-height: 1.55; }
 .rk .rk-split-shot { min-width: 0; }
