@@ -22,6 +22,7 @@ import { CTDemoProof } from "./CTDemoProof";
 import { CTProof } from "./CTProof";
 import { CTFaq } from "./CTFaq";
 import { CTCodePane } from "./CTCodePane";
+import { CTBlastDiagram } from "./CTBlastDiagram";
 import type { DemoHighlight } from "@/lib/demoHighlights";
 import { CTScreenshot } from "./CTScreenshot";
 import { CTLandingIntake } from "./CTLandingIntake";
@@ -123,16 +124,12 @@ export function CodeTrawlLanding({ demos }: { demos: DemoHighlight[] }) {
         <section className="rk-bleed" id="faultline">
           <div className="rk-bleed-grid">
             <div className="rk-bleed-shot" data-rv="left">
-              <CTScreenshot
-                src="/landing/CT_Faultline.webp"
-                alt="Faultline: deleting index.ts breaks 15 files, 11 with no test"
-                label="codetrawl.com — faultline"
-                tight
-                bleed="left"
-                fade="right"
-                width={1600}
-                height={1111}
-              />
+              {/* Rendered, not photographed. This is the shot that carried the
+                  unstyled React Flow panel for weeks and had to be patched by
+                  hand — there is nothing left to photograph or patch. */}
+              <CTScreenshot label="codetrawl.com — faultline" tight bleed="left" fade="right">
+                <CTBlastDiagram />
+              </CTScreenshot>
             </div>
             <div className="rk-bleed-copy" data-rv>
               <h2 className="rk-h2 rk-h2--left">Know what a change breaks — before you make it.</h2>
