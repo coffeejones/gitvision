@@ -19,6 +19,8 @@
 import { CTSurface } from "./CTSurface";
 import { CTNav } from "./CTNav";
 import { CTDemoProof } from "./CTDemoProof";
+import { CTProof } from "./CTProof";
+import { CTFaq } from "./CTFaq";
 import type { DemoHighlight } from "@/lib/demoHighlights";
 import { CTScreenshot } from "./CTScreenshot";
 import { CTLandingIntake } from "./CTLandingIntake";
@@ -76,6 +78,9 @@ export function CodeTrawlLanding({ demos }: { demos: DemoHighlight[] }) {
 
         {/* ── PROOF — the three open sweeps, directly after the promise ─── */}
         <CTDemoProof demos={demos} />
+
+        {/* ── NUMBERS — and the way into the pages that prove them ──────── */}
+        <CTProof />
 
         {/* ── HOW IT WORKS — three hairline steps ──────────────────────── */}
         <section className="rk-how" id="how">
@@ -199,6 +204,9 @@ export function CodeTrawlLanding({ demos }: { demos: DemoHighlight[] }) {
             graphs. The AI narrates what was found; it never invents it.
           </p>
         </section>
+
+        {/* ── FAQ — the objections, answered before the last ask ───────── */}
+        <CTFaq />
 
         {/* ── CLOSE ────────────────────────────────────────────────────── */}
         <section className="rk-close" data-rv>
@@ -390,6 +398,90 @@ const CSS = `
 }
 .rk .rk-proof-card:hover .rk-proof-cta { color: var(--ct-orange); }
 
+/* ── NUMBERS — four figures, each a door ─────────────────────────────────
+   Tighter than the sections around it. A stat that has to be scrolled past
+   isn't a stat, it's a paragraph with a big number in it. */
+.rk .rk-stats { max-width: 1180px; margin: 0 auto; padding: clamp(56px, 7vw, 88px) var(--edge) 0; }
+.rk .rk-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--ct-line);
+  border: 1px solid var(--ct-line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+/* The 1px grid gap IS the rule between cells — cheaper than per-cell borders
+   and it never doubles up at the seams. */
+.rk .rk-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 22px 20px 20px;
+  background: var(--ct-bg);
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+.rk .rk-stat:hover { background: var(--ct-surface); }
+.rk .rk-stat-figure {
+  font-size: 38px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ct-text);
+}
+.rk .rk-stat-label {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ct-text);
+}
+.rk .rk-stat-arrow { flex: none; color: var(--ct-ghost); transition: color 0.2s ease, transform 0.2s ease; }
+.rk .rk-stat:hover .rk-stat-arrow { color: var(--ct-ember); transform: translate(1px, -1px); }
+.rk .rk-stat-detail { font-size: 13px; line-height: 1.5; color: var(--ct-dim); }
+
+/* ── FAQ — native <details>, no accordion machinery ──────────────────── */
+.rk .rk-faq { max-width: 820px; margin: 0 auto; padding: clamp(72px, 10vw, 120px) var(--edge) 0; }
+.rk .rk-faq-head { margin: 0 0 clamp(20px, 2.5vw, 30px); }
+.rk .rk-faq-head .rk-h2 { font-size: clamp(26px, 3.2vw, 38px); margin: 0; }
+.rk .rk-faq-list { border-top: 1px solid var(--ct-line); }
+.rk .rk-faq-item { border-bottom: 1px solid var(--ct-line); }
+.rk .rk-faq-q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 2px;
+  font-size: 16.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ct-text);
+  cursor: pointer;
+  list-style: none;
+  transition: color 0.15s ease;
+}
+.rk .rk-faq-q::-webkit-details-marker { display: none; }
+.rk .rk-faq-q:hover { color: var(--ct-ember); }
+.rk .rk-faq-icon { flex: none; color: var(--ct-ghost); transition: transform 0.2s ease, color 0.2s ease; }
+.rk .rk-faq-item[open] .rk-faq-icon { transform: rotate(45deg); color: var(--ct-ember); }
+.rk .rk-faq-a {
+  padding: 0 2px 22px;
+  max-width: 68ch;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--ct-dim);
+}
+.rk .rk-faq-a a {
+  color: var(--ct-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: text-underline-offset 0.15s ease;
+}
+.rk .rk-faq-a a:hover { text-underline-offset: 5px; }
+
 /* ── HOW IT WORKS — three hairline steps ─────────────────────────────── */
 .rk .rk-how { max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 132px) var(--edge) 0; }
 .rk .rk-how-grid {
@@ -462,6 +554,7 @@ const CSS = `
   .rk .rk-intake form { flex-direction: column; }
   .rk .rk-proof-grid { grid-template-columns: 1fr; }
   .rk .rk-proof-card { min-height: 0; }
+  .rk .rk-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rk .rk-how-grid { grid-template-columns: 1fr; }
   .rk .rk-split-grid { grid-template-columns: 1fr; gap: clamp(20px, 4vw, 36px); }
   .rk .rk-split-copy { max-width: 560px; }
@@ -473,6 +566,8 @@ const CSS = `
 }
 @media (max-width: 640px) {
   .rk .rk-index { grid-auto-flow: row; grid-template-rows: none; grid-template-columns: 1fr; }
+  .rk .rk-stats-grid { grid-template-columns: 1fr; }
+  .rk .rk-faq-q { font-size: 15.5px; padding: 18px 2px; }
 }
 
 /* ═══ MOTION LAYER ═══════════════════════════════════════════════════════
