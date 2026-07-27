@@ -4,7 +4,7 @@
 // tarball, run the full analyze pipeline, cache the resulting
 // AnalysisSnapshot under a stable sessionId, and return a JSON summary
 // with the bits an agent typically wants for its first read: repo
-// metadata, language mix, top hotspots, and the same 17-signal health
+// metadata, language mix, top hotspots, and the same rule-based health
 // summary that powers the workspace UI.
 //
 // Subsequent tool calls (blast_radius, find_duplicates, etc.) reuse
@@ -128,7 +128,7 @@ export async function handleAnalyzeRepo(input: Input) {
       `Call blast_radius with sessionId='${sessionId}' to see what depends on a given file or function.`,
       `Call find_duplicates with sessionId='${sessionId}' to surface structurally identical functions.`,
       `Call untested_hotspots with sessionId='${sessionId}' for production code without test coverage.`,
-      `Call signals with sessionId='${sessionId}' for the full 17-signal health verdict.`,
+      `Call signals with sessionId='${sessionId}' for the full rule-based health verdict.`,
       `Call simulate_change with sessionId='${sessionId}' and a proposed diff to see what it breaks BEFORE committing (deterministic blast + required actions).`,
     ],
   };

@@ -172,10 +172,25 @@ export default function PrivacyPage() {
               <td>OAuth identity, repositories you analyze</td>
               <td>Sign-in + repo access</td>
             </tr>
+            {/* This row used to read "Repository snapshot (package names,
+                paths, contributor logins)", which understated it in two ways
+                that matter. lib/aiSummary.ts:111 sends up to 18 of your commit
+                messages verbatim, and lib/functionExplain.ts:131 sends the
+                actual source of one function whenever you click Explain in the
+                Source view. The code has always been candid about the second
+                (functionExplain.ts:13, and the UI says it at the point of the
+                click) — the policy was not. Keep this row in step with those
+                two call sites. */}
             <tr>
               <td>Anthropic</td>
-              <td>Repository snapshot (package names, paths, contributor logins)</td>
-              <td>AI briefing + grade narrative</td>
+              <td>
+                Analysis results (paths, package names, contributor logins,
+                computed signals), your repository description and topics, and
+                up to 18 recent commit messages. Separately, when you click
+                &ldquo;Explain&rdquo; on a function in the Source view, that one
+                function&rsquo;s source code.
+              </td>
+              <td>AI briefing, grade narrative + per-function explanations</td>
             </tr>
             <tr>
               <td>Polar</td>

@@ -120,7 +120,10 @@ export function buildServer(): McpServer {
     "signals",
     {
       description:
-        "Full 17-signal health verdict — what works, what needs work, what's worth a human eye. Returns both raw signals (with severity, evidence, IDs) and a 6-dimension rollup (Activity, Team, Code, PR flow, Dependencies, Hygiene) so agents can quote specific findings or summarize at a high level. Pure rule-based, no AI involved.",
+        // No signal count in the text. It said "17" while lib/signals.ts emitted
+        // 33 distinct ids, because a number in a tool description has to be
+        // hand-updated every time a detector lands and never is.
+        "Full rule-based health verdict — what works, what needs work, what's worth a human eye. Returns both raw signals (with severity, evidence, IDs) and a 6-dimension rollup (Activity, Team, Code, PR flow, Dependencies, Hygiene) so agents can quote specific findings or summarize at a high level. Pure rule-based, no AI involved.",
       inputSchema: signalsInputSchema,
     },
     handleSignals

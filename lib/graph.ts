@@ -307,20 +307,40 @@ export async function downloadAndExtract(
   const tmpRoot = path.join(os.tmpdir(), `codetrawl-${nanoid(8)}`);
   await fs.mkdir(tmpRoot, { recursive: true });
 
-  // Octokit returns a Response-like object for binary endpoints
-  const res = await octokit.rest.repos.downloadTarballArchive({
-    owner,
-    repo,
-    ref,
-  });
-  // `data` is an ArrayBuffer
-  const buf = Buffer.from(res.data as ArrayBuffer);
+  // Everything from here on is inside the try. It used to start below, at the
+  // tar.x call, which left a window that leaked the caller's source: the
+  // download and the writeFile happened first, so a throw between them and the
+  // extract left tmpRoot on disk — and after the writeFile that directory
+  // holds a COMPLETE archive of the repository. The caller cannot compensate,
+  // because lib/github.ts:849 only assigns `cleanup` once this function has
+  // returned; if it throws, there is nothing to call. Nothing sweeps
+  // os.tmpdir() afterwards either — there is no SIGTERM handler and no
+  // reaper — so a leaked archive stays until the host clears its temp dir.
+  //
+  // Realistic triggers: downloadTarballArchive throwing on a 403/404, a rate
+  // limit or a network error (leaks an empty dir), and writeFile throwing on a
+  // full disk (leaks the archive itself).
+  let tarballPath: string;
+  let extractDir: string;
+  try {
+    // Octokit returns a Response-like object for binary endpoints
+    const res = await octokit.rest.repos.downloadTarballArchive({
+      owner,
+      repo,
+      ref,
+    });
+    // `data` is an ArrayBuffer
+    const buf = Buffer.from(res.data as ArrayBuffer);
 
-  const tarballPath = path.join(tmpRoot, "archive.tar.gz");
-  await fs.writeFile(tarballPath, buf);
+    tarballPath = path.join(tmpRoot, "archive.tar.gz");
+    await fs.writeFile(tarballPath, buf);
 
-  const extractDir = path.join(tmpRoot, "src");
-  await fs.mkdir(extractDir, { recursive: true });
+    extractDir = path.join(tmpRoot, "src");
+    await fs.mkdir(extractDir, { recursive: true });
+  } catch (err) {
+    await fs.rm(tmpRoot, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
 
   // GitHub tarballs have one top-level dir like `owner-repo-<sha>/`. Strip
   // it. When a subdir and/or exclude-folders are set, we additionally filter

@@ -14,9 +14,11 @@
 // the function chips simply won't have call edges — the function view will
 // show empty lists, which is the honest outcome.
 //
-// Coverage chip at top makes our limits explicit: JS/TS gets full call-graph
-// + complexity, the other 7 languages contribute imports only via the
-// regex-fallback plugin. Honest accounting beats over-promised UI.
+// Coverage chip at top makes our limits explicit. Seven plugins now give a
+// full call graph + complexity (JS/TS, Python, Go, Java, C#, PHP, Ruby); the
+// regex-fallback plugin is down to Kotlin and contributes imports only, and
+// its tile only appears when files actually went through it. Honest
+// accounting beats over-promised UI.
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";

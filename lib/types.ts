@@ -294,9 +294,13 @@ export interface AnalysisSnapshot {
   // DEPRECATED: pre-v0.9 snapshots stored a single npm-only DependencyHealth
   // here. Read-side helpers (getDependencyHealths) normalize both shapes.
   dependencyHealth?: DependencyHealth;
-  // AST-based code analysis (v0.10). JS/TS via tree-sitter, other 7 languages
-  // via the regex-fallback wrapper. Functions, calls, complexity are JS/TS-
-  // only as of v0.10; imports cover all 8 languages. Optional — pre-v0.10
+  // AST-based code analysis (v0.10). SEVEN plugins now parse to a real call
+  // graph via tree-sitter — JS/TS, Python, Go, Java, C#, PHP, Ruby — each
+  // producing functions, calls and complexity. The regex-fallback wrapper is
+  // down to Kotlin (plus HTML/CSS as passive render targets) and yields
+  // imports only. This comment described the v0.10 world, where JS/TS was the
+  // only tree-sitter plugin; six migrations landed between v0.12 and v0.23 and
+  // it was never updated. Optional — pre-v0.10
   // snapshots simply omit this field. The Imports tab continues to read
   // `fileGraph` as before, so old sessions render unchanged.
   codeGraph?: CodeGraph;
