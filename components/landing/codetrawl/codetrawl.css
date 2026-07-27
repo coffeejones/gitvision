@@ -2226,17 +2226,23 @@ body:has(.ct) {
   flex-direction: column;
   gap: 13px;
 }
+/* Positioned dash, same reasoning as .legal-section li above. These bullets are
+   plain strings today, so flex happened to render them correctly — but it would
+   split into columns the instant one of them bolded a word, and that is a
+   silent trap to leave lying in a shared stylesheet. */
 .ct .auth-points li {
-  display: flex;
-  gap: 11px;
+  position: relative;
+  padding-left: 20px;
   font-size: 14.5px;
   line-height: 1.45;
   color: var(--ct-dim);
 }
 .ct .auth-points li::before {
   content: "—";
+  position: absolute;
+  left: 0;
+  top: 0;
   color: var(--ct-faint);
-  flex: none;
 }
 .ct .auth-foot {
   margin: 0;
@@ -2671,22 +2677,33 @@ body:has(.ct) {
   flex-direction: column;
   gap: 9px;
 }
+/* The bullet is positioned, NOT a flex item.
+   This was `display: flex` with the dot as the first flex child, which works
+   only while the item is one unbroken string. A legal bullet is not: it reads
+   "<strong>To provide the service</strong> (accounts, …) — legal basis:
+   <em>performance of a contract</em>." — and flex makes every one of those a
+   separate COLUMN, so the sentence rendered as four ragged blocks with the
+   final full stop stranded at the far right. Only the items containing inline
+   markup broke, which is why the damage looked arbitrary.
+   Keep this positioned: the same trap returns the moment anyone re-adds flex. */
 .ct .legal-section li {
-  display: flex;
-  gap: 11px;
-  align-items: flex-start;
+  position: relative;
+  /* 5px dot + the 11px gap the flex version used */
+  padding-left: 16px;
   font-size: 14.5px;
   line-height: 1.6;
   color: var(--ct-dim);
 }
 .ct .legal-section li::before {
   content: "";
-  flex: none;
+  position: absolute;
+  left: 0;
+  /* aligns the dot to the middle of the first line at 14.5px/1.6 */
+  top: 9px;
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: var(--ct-faint);
-  margin-top: 9px;
 }
 .ct .legal-section li strong {
   color: var(--ct-text);
