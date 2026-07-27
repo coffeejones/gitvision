@@ -1,7 +1,7 @@
 // POST /api/sessions  — enqueue a new session-create job. Returns
 //                       { jobId } immediately; the client polls
 //                       /api/jobs/<id> until done. (v0.25+)
-// GET  /api/sessions  — list all sessions
+// GET  /api/sessions  — list the CALLER'S OWN sessions. Sign-in required.
 
 import { NextResponse } from "next/server";
 import { after } from "next/server";
@@ -14,7 +14,6 @@ import { isSafeGitRef } from "@/lib/githubUrl";
 import { validateSubdir } from "@/lib/graph";
 import { createJob, processJob } from "@/lib/jobs";
 import { filterSessionsByUser, OWNER_ID_HEADER } from "@/lib/ownerId";
-import { checkSessionOwnership } from "@/lib/ownership";
 import {
   RATE_LIMITS,
   checkRateLimit,
@@ -35,25 +34,60 @@ const CreateSchema = z.object({
   ref: z.string().optional(),
 });
 
+/** The listing shape. Deliberately NOT SessionSummary: that carries `userId`
+ *  and `ownerId`, which are internal identifiers the caller has no use for and
+ *  which linked an analysis to the account that ran it. */
+function toListing(s: {
+  id: string;
+  name: string;
+  repoUrl: string;
+  repoFullName: string;
+  createdAt: string;
+  updatedAt: string;
+  snapshotCount: number;
+  private?: boolean;
+}) {
+  return {
+    id: s.id,
+    name: s.name,
+    repoUrl: s.repoUrl,
+    repoFullName: s.repoFullName,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+    snapshotCount: s.snapshotCount,
+    private: s.private,
+  };
+}
+
+/** List the caller's own analyses.
+ *
+ *  This used to return every non-private session on the instance to anyone,
+ *  unauthenticated, with `userId` attached — so a stranger could enumerate
+ *  which repositories every account had analyzed and when. The intent behind
+ *  it was the "anyone with the URL can view a public analysis" rule, but a
+ *  shareable link and a full directory are different promises, and only the
+ *  first was ever made. Nothing in the app consumed this: `/cases` calls
+ *  `listSessions()` server-side and filters with `filterSessionsByUser`, and
+ *  the three client fetches of /api/sessions are all POST.
+ *
+ *  Sharing is untouched — a public analysis is still readable by anyone
+ *  holding its id (app/api/sessions/[id]). What is gone is the way to obtain
+ *  ids you were never given. */
 export async function GET(req: Request) {
-  const sessions = await listSessions();
-  // v0.81: filter private-repo sessions to ones the caller can read.
-  // Public-repo sessions stay visible to everyone (matches the
-  // "anyone with the URL can view" rule for public analyses); private
-  // ones are owner-only, so non-owners shouldn't even see them listed.
   const authSession = await auth.api.getSession({ headers: req.headers });
-  const callerUserId = authSession?.user.id ?? null;
-  const callerOwnerId = req.headers.get(OWNER_ID_HEADER);
-  const visible = sessions.filter((s) => {
-    if (!s.private) return true;
-    const decision = checkSessionOwnership(
-      { userId: s.userId, ownerId: s.ownerId },
-      callerUserId,
-      callerOwnerId,
+  const userId = authSession?.user.id ?? null;
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Sign in to list your analyses." },
+      { status: 401 },
     );
-    return decision === "allowed";
-  });
-  return NextResponse.json({ sessions: visible });
+  }
+
+  const sessions = await listSessions();
+  // Same helper /cases uses, so the two listings cannot drift apart: it drops
+  // demo-owned sessions and returns [] for a null user.
+  const owned = filterSessionsByUser(sessions, userId);
+  return NextResponse.json({ sessions: owned.map(toListing) });
 }
 
 export async function POST(req: Request) {
