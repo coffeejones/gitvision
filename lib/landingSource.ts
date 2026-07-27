@@ -44,6 +44,17 @@ export interface PinnedSource {
   /** True line number of the slice's first line, so the gutter is honest. */
   firstLine: number;
   code: string;
+  /** The model's reading of this exact function, GENERATED not written — see
+   *  `reading.provenance`. Kept alongside the signals it was given so the two
+   *  can never describe different functions. */
+  reading: {
+    does: string;
+    risk: string;
+    suggestion: string | null;
+    model: string;
+    generatedAt: string;
+    provenance: string;
+  };
   /** Computed by the analyzer, not by us. See `provenance`. */
   signals: {
     complexity: number;
@@ -81,6 +92,22 @@ export const LANDING_SOURCE: PinnedSource = {
   out.push(s.slice(start));
   return out;
 }`,
+  // Verbatim output of lib/functionExplain.explainFunction() run against the
+  // slice above with the signals below — not a sentence anyone here composed.
+  // Re-run it if the code or the signals change; do not hand-edit it to read
+  // better, because then it is marketing copy wearing the product's voice.
+  reading: {
+    does:
+      "Splits a string on commas that are not nested inside angle brackets or square brackets, tracking depth to identify top-level delimiters.",
+    risk:
+      "The file is not reached by tests, and the function has a structural duplicate elsewhere (1 duplicate found). Moderate cyclomatic complexity (8) from the nested conditions means changes risk introducing off-by-one errors or depth-tracking bugs that would not be caught by tests.",
+    suggestion:
+      "Before modifying, consolidate the duplicate copy into a single implementation and add a unit test covering edge cases: empty strings, nested brackets, trailing/leading commas, and mismatched delimiters.",
+    model: "claude-haiku-4-5",
+    generatedAt: "2026-07-27T18:49:11.213Z",
+    provenance:
+      "explainFunction() on this exact slice + signals, 1,111 input / 158 output tokens. Transcribed verbatim.",
+  },
   signals: {
     // codeGraph.functions[] entry for this function.
     complexity: 8,

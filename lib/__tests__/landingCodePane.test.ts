@@ -87,6 +87,40 @@ describe("the landing pane shows the product's findings, not flattering ones", (
   });
 });
 
+describe("the AI reading is generated, not written", () => {
+  // The reading is the most tempting thing on the page to improve by hand: it
+  // is prose, it sells, and nobody would notice. These are the cheap checks
+  // that make hand-editing it a deliberate act rather than a drift.
+  it("carries the model and timestamp that produced it", () => {
+    const r = LANDING_SOURCE.reading;
+    expect(r.model, "no model id — did someone write this?").toMatch(/^claude-/);
+    expect(Number.isNaN(Date.parse(r.generatedAt))).toBe(false);
+    expect(r.provenance).toMatch(/explainFunction/);
+  });
+
+  it("describes the same function the chips do", () => {
+    // A reading transcribed from a different run would talk about other code.
+    const r = LANDING_SOURCE.reading;
+    const s = LANDING_SOURCE.signals;
+    expect(r.risk).toContain(String(s.complexity));
+    if (s.duplicateCount > 0) expect(r.risk.toLowerCase()).toMatch(/duplicate|twin/);
+    if (!s.fileTested) expect(r.risk.toLowerCase()).toMatch(/test/);
+  });
+
+  it("uses the product's own section labels", () => {
+    const aiReading = read("components", "views", "AiReading.tsx");
+    for (const label of ["What it does", "Where the risk is", "Worth considering"]) {
+      expect(aiReading, `the product renamed "${label}"`).toContain(label);
+      expect(pane, `the pane renamed "${label}"`).toContain(label);
+    }
+  });
+
+  it("keeps the disclosure the product shows at the point of action", () => {
+    expect(pane).toContain("sent to Anthropic on");
+    expect(pane).toContain("never stored");
+  });
+});
+
 describe("the shown slice stays true to the file it names", () => {
   it("still exists, verbatim, at the line it claims", () => {
     // The fixture is a transcription. If lib/intelligence/classCanvas.ts moves

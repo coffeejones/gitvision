@@ -182,6 +182,95 @@ export async function CTCodePane() {
         )}
         {!src.signals.fileTested && <Chip label="No test guards it" color={AMBER} />}
       </div>
+
+      {/* The reading. Section labels are the product's own (AiReadingBody:
+          "What it does" / "Where the risk is" / "Worth considering"), and the
+          prose is verbatim model output — see LANDING_SOURCE.reading. This is
+          the half that shows a visitor the thing the chips cannot: that the
+          function becomes UNDERSTANDABLE, not just measured. */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          padding: "12px 14px 14px",
+          borderTop: `1px solid ${BORDER}`,
+          background: "rgba(255,255,255,0.015)",
+          // The pane sets mono for the code; the product renders the reading in
+          // the body face, so step back out of it here rather than letting the
+          // prose inherit a terminal look the real panel does not have.
+          fontFamily: "var(--ct-display)",
+        }}
+      >
+        <Reading label="What it does" body={src.reading.does} />
+        <Reading label="Where the risk is" body={src.reading.risk} />
+        {src.reading.suggestion && (
+          <Reading label="Worth considering" body={src.reading.suggestion} accent />
+        )}
+        {/* The same disclosure the product shows at the point of action. */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            paddingTop: 4,
+            fontSize: 10,
+            color: MUTED,
+          }}
+        >
+          <span>
+            Reads this function&rsquo;s source with AI — sent to Anthropic on
+            your click, never stored.
+          </span>
+          <span style={{ marginLeft: "auto", whiteSpace: "nowrap" }}>
+            {modelLabel(src.reading.model)}
+          </span>
+        </div>
+      </div>
     </div>
   );
+}
+
+/** One labelled paragraph of the reading. `accent` marks the suggestion, which
+ *  the product sets off with a rule the same way. */
+function Reading({
+  label,
+  body,
+  accent = false,
+}: {
+  label: string;
+  body: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        ...(accent ? { borderLeft: `2px solid ${AMBER}55`, paddingLeft: 9 } : {}),
+      }}
+    >
+      <span
+        style={{
+          fontSize: 9.5,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: MUTED,
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ fontSize: 11.5, lineHeight: 1.55, color: "#cfcac3" }}>
+        {body}
+      </span>
+    </div>
+  );
+}
+
+/** "claude-haiku-4-5" -> "Haiku 4.5", matching FunctionInsight's own label. */
+function modelLabel(model: string): string {
+  const m = model.match(/claude-(\w+)-(\d+)-(\d+)/);
+  if (!m) return model;
+  return `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}.${m[3]}`;
 }
