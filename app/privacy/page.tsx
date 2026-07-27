@@ -112,7 +112,11 @@ export default function PrivacyPage() {
         <H3>Analysis data</H3>
         <UL>
           <LI>
-            <strong>Repository analysis results</strong> — the snapshots you
+            {/* Explicit {" "}: this one bullet rendered as "results— the" while
+                every other bullet on the page kept its space, with byte-identical
+                source around the tag. Rather than leave it to whatever collapsed
+                it, the space is spelled out. */}
+            <strong>Repository analysis results</strong>{" "}— the snapshots you
             create (metadata, file structure, git history summaries, dependency
             data). These describe code, not you, but a private repo&rsquo;s
             contents may be personal or confidential, so we treat them with the

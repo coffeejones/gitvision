@@ -2573,6 +2573,11 @@ body:has(.ct) {
   line-height: 1.7;
   color: var(--ct-dim);
   margin-bottom: 36px;
+  /* Same measure as the body below it — it sits outside .legal-section, so it
+     is not covered by that rule and stayed full width, which made the first
+     thing on the page the widest line on it. Slightly fewer ch because this is
+     16px against the body's 14.5px. */
+  max-width: 47ch;
 }
 .ct .legal-note {
   font-size: 13.5px;
@@ -2626,7 +2631,10 @@ body:has(.ct) {
   color: var(--ct-text);
 }
 .ct .legal-section {
-  margin-bottom: 38px;
+  /* Sections have to out-space their own contents or they don't read as
+     separate. Internal rhythm is 14px between bullets and 30px above a group
+     label, so 38px was not enough of a break. */
+  margin-bottom: 60px;
   scroll-margin-top: 96px;
 }
 .ct .legal-section h2 {
@@ -2645,12 +2653,39 @@ body:has(.ct) {
   font-weight: 400;
   color: var(--ct-ember);
 }
+/* Group labels are an EYEBROW, not a slightly larger bold line.
+   Measured, the old rule was 15.5px/600 in --ct-text while the bold lead-in
+   inside a bullet beneath it was 14.5px/700 in the same colour — the label was
+   lighter than the items it governed, so the hierarchy read inverted and a
+   section of grouped bullets collapsed into one undifferentiated block.
+   Uppercase mono at a smaller size cannot be confused with body text at any
+   weight, and it is the grammar the rest of the site already uses for section
+   labels (/agents, /exposure, /security, the footer columns). */
 .ct .legal-section h3 {
-  font-family: var(--ct-display);
-  font-weight: 600;
-  font-size: 15.5px;
-  color: var(--ct-text);
-  margin: 22px 0 8px;
+  font-family: var(--ct-mono);
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ct-faint);
+  margin: 30px 0 12px;
+}
+/* The MEASURE is set on the prose, not on .legal-main.
+   Two reasons. The column ran to 95 characters a line, well past the 60-75
+   band prose stays readable in, and that is most of why a page of short
+   bullets still read as a wall. And the cap has to sit here because `ch`
+   resolves against the element's OWN font: on .legal-main (17px display) 68ch
+   came out at 707px, which is 93 characters of 14.5px body text. On the
+   paragraph itself the unit means what it says, and it stays true if the type
+   scale moves. Section 4's provider table is deliberately left at full width —
+   dense tabular data wants the room that prose does not. */
+.ct .legal-section p,
+.ct .legal-section ul {
+  /* Reads as ~70 characters a line, measured, which is the target. The number
+     looks small because `ch` is the advance of "0" — noticeably wider than an
+     average lowercase letter in Schibsted Grotesk — so 64ch measured out at 87
+     actual characters. Calibrated against the real glyph widths, not assumed. */
+  max-width: 52ch;
 }
 .ct .legal-section p {
   font-size: 14.5px;
@@ -2671,11 +2706,14 @@ body:has(.ct) {
 }
 .ct .legal-section ul {
   list-style: none;
-  margin: 0 0 16px;
+  margin: 0 0 20px;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  /* 14, not 9: most of these items wrap to two or three lines, so a 9px gap
+     was smaller than the leading inside an item and adjacent bullets read as
+     one paragraph. */
+  gap: 14px;
 }
 /* The bullet is positioned, NOT a flex item.
    This was `display: flex` with the dot as the first flex child, which works
