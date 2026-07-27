@@ -21,6 +21,7 @@ import { CTNav } from "./CTNav";
 import { CTDemoProof } from "./CTDemoProof";
 import { CTProof } from "./CTProof";
 import { CTFaq } from "./CTFaq";
+import { CTCodePane } from "./CTCodePane";
 import type { DemoHighlight } from "@/lib/demoHighlights";
 import { CTScreenshot } from "./CTScreenshot";
 import { CTLandingIntake } from "./CTLandingIntake";
@@ -109,14 +110,11 @@ export function CodeTrawlLanding({ demos }: { demos: DemoHighlight[] }) {
               </p>
             </div>
             <div className="rk-split-shot" data-rv="right">
-              <CTScreenshot
-                src="/landing/CT_SourceExplainer.webp"
-                alt="Source view: a function explained, anchored to computed complexity and callers"
-                label="codetrawl.com — source"
-                tight
-                width={1600}
-                height={1010}
-              />
+              {/* Rendered, not photographed — same frame as the screenshots
+                  around it, so the chrome gives nothing away. See CTCodePane. */}
+              <CTScreenshot label="codetrawl.com — source" tight>
+                <CTCodePane />
+              </CTScreenshot>
             </div>
           </div>
         </section>

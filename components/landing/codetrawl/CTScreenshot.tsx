@@ -97,6 +97,7 @@ const caption: CSSProperties = {
 export function CTScreenshot({
   src,
   alt,
+  children,
   label,
   caption: cap,
   flat = false,
@@ -108,8 +109,13 @@ export function CTScreenshot({
   height,
   priority = false,
 }: {
-  src: string;
-  alt: string;
+  /** Omit when passing `children` — the frame then wraps live content. */
+  src?: string;
+  alt?: string;
+  /** Render real markup inside the window instead of an image. Used by the
+   *  code pane, so a rendered view and a screenshot sit in the SAME frame and
+   *  the page cannot tell you which is which by its chrome. */
+  children?: ReactNode;
   /** the window-bar URL, e.g. "codetrawl.com — faultline". Omit to leave it blank. */
   label?: string;
   /** optional mono line under the frame */
@@ -178,17 +184,19 @@ export function CTScreenshot({
         {label ? <span style={url}>{label}</span> : <span style={{ margin: "0 auto" }} />}
         <span style={{ width: 47 }} />
       </div>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={alt}
-        width={width}
-        height={height}
-        loading={priority ? undefined : "lazy"}
-        fetchPriority={priority ? "high" : undefined}
-        decoding="async"
-        style={{ display: "block", width: "100%", height: "auto" }}
-      />
+      {children ?? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={alt}
+          width={width}
+          height={height}
+          loading={priority ? undefined : "lazy"}
+          fetchPriority={priority ? "high" : undefined}
+          decoding="async"
+          style={{ display: "block", width: "100%", height: "auto" }}
+        />
+      )}
     </div>
   );
 
