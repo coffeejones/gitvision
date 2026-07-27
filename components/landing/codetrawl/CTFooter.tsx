@@ -39,6 +39,9 @@ const GROUPS: Array<{
   {
     heading: "Legal",
     links: [
+      // Security sits with the legal group rather than Developers: the reader
+      // who wants it is doing an evaluation, and this is the column they scan.
+      { href: "/security", label: "Security" },
       { href: "/privacy", label: "Privacy" },
       { href: "/terms", label: "Terms" },
       { href: "/cookies", label: "Cookies" },

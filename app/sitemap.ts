@@ -23,6 +23,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/pricing": 0.8,
     "/agents": 0.7,
     "/exposure": 0.7,
+    "/security": 0.7,
     "/help": 0.6,
     "/preview": 0.6,
   };
@@ -31,6 +32,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/pricing",
     "/agents",
     "/exposure",
+    "/security",
     "/help",
     "/preview",
     "/privacy",

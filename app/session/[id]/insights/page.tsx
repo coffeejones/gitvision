@@ -65,7 +65,13 @@ export default async function InsightsRoute({
     : 0;
   const insightsLine = showInsightsRollup
     ? "AI commentary on the computed signals — a plain-English briefing and a health verdict. Start with “Where to dig deeper.”"
-    : "AI commentary on the computed signals: a plain-English briefing and a health verdict, each anchored to a deterministic signal — never an LLM guess.";
+    // Not "each anchored to a deterministic signal — never an LLM guess". That
+    // is true of the health verdict, whose prompt receives the signal JSON and
+    // nothing else, but not of the briefing: lib/aiSummary.ts:39 asks for "who
+    // uses it, what makes it interesting" — which no field in the payload can
+    // answer — and its few-shot asserts world knowledge about tailwindcss. The
+    // two are different products and saying otherwise oversells the weaker one.
+    : "AI commentary on the computed signals: a plain-English briefing and a health verdict. The verdict is written from the computed signals alone; the briefing also draws on what the model already knows about well-known projects.";
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-7xl mx-auto w-full">
