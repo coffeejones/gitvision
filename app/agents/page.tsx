@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ctMono } from "@/components/landing/codetrawl/ctFonts";
 import { CTSurface } from "@/components/landing/codetrawl/CTSurface";
+import { CTNav } from "@/components/landing/codetrawl/CTNav";
 import { CTFooter } from "@/components/landing/codetrawl/CTFooter";
 
 export const metadata: Metadata = {
@@ -25,6 +26,7 @@ const BORDER = "rgba(255,255,255,0.10)";
 
 const TOOLS: Array<[string, string]> = [
   ["analyze_repo", "Download + parse a GitHub repo → a session id and a compact summary. Always first."],
+  ["locate_symbol", "Where is a symbol defined? A bare function, method, or class name → every definition's file and line. The lookup blast_radius needs first."],
   ["blast_radius", "What breaks if you change a file or function — cross-file reach via imports + calls, 3 hops."],
   ["simulate_change", "Simulate a proposed diff BEFORE you commit → a deterministic blast + a pass/block conscience gate. The pre-commit check."],
   ["untested_hotspots", "Production functions with no test caller, ranked by complexity — test the risky paths first."],
@@ -123,27 +125,7 @@ function Section({
 export default function AgentsPage() {
   return (
     <CTSurface>
-      <nav className="scrolled">
-        <div className="nav-inner">
-          <Link href="/" className="nav-brand">
-            CodeTrawl
-          </Link>
-          <div className="nav-links">
-            <Link href="/#how">How it works</Link>
-            <Link href="/#features">Features</Link>
-            <Link href="/agents">For agents</Link>
-            <Link href="/pricing">Pricing</Link>
-          </div>
-          <div className="nav-right">
-            <Link href="/login" className="nav-signin">
-              Sign in
-            </Link>
-            <Link href="/#analyze" className="nav-cta">
-              Analyze a repo
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <CTNav />
 
       <main className="wrap" style={{ paddingBottom: 96 }}>
         <header
@@ -175,7 +157,7 @@ export default function AgentsPage() {
           </p>
         </Section>
 
-        <Section eyebrow="Nine tools" title="What your agent can call">
+        <Section eyebrow="Ten tools" title="What your agent can call">
           <div style={{ display: "flex", flexDirection: "column", borderRadius: 12, overflow: "hidden", border: `1px solid ${BORDER}` }}>
             {TOOLS.map(([name, desc], i) => (
               <div
@@ -199,25 +181,23 @@ export default function AgentsPage() {
 
         <Section eyebrow="Install" title="Wire it to your client">
           <p style={{ fontSize: 15, color: MUTED, margin: 0 }}>
-            Pre-npm-publish — build from source today (a hosted remote endpoint
-            and an <code style={{ fontFamily: MONO, color: EMBER }}>npx codetrawl-mcp</code>{" "}
-            install are coming). Analysis runs on your machine; no
-            CodeTrawl-controlled server sees your repos.
+            One command. Published on npm as{" "}
+            <code style={{ fontFamily: MONO, color: EMBER }}>codetrawl-mcp</code>
+            {" "}— nothing to clone and nothing to build. The analysis runs on
+            your machine; no CodeTrawl-controlled server sees your repos.
           </p>
-          <Code>{`git clone https://github.com/coffeejones/gitvision.git
-cd gitvision && npm install && npm run mcp:build`}</Code>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
             <div>
               <div style={{ fontSize: 13, color: MUTED, marginBottom: 6 }}>Claude Code</div>
-              <Code>{`claude mcp add codetrawl node /abs/path/gitvision/mcp/dist/mcp/server.js`}</Code>
+              <Code>{`claude mcp add codetrawl npx codetrawl-mcp`}</Code>
             </div>
             <div>
               <div style={{ fontSize: 13, color: MUTED, marginBottom: 6 }}>Cursor / Cline / others (JSON config)</div>
               <Code>{`{
   "mcpServers": {
     "codetrawl": {
-      "command": "node",
-      "args": ["/abs/path/gitvision/mcp/dist/mcp/server.js"]
+      "command": "npx",
+      "args": ["-y", "codetrawl-mcp"]
     }
   }
 }`}</Code>
@@ -260,7 +240,7 @@ cd gitvision && npm install && npm run mcp:build`}</Code>
             </div>
           </div>
           <Link
-            href="/#analyze"
+            href="/#top"
             style={{
               fontFamily: "inherit",
               fontSize: 15,

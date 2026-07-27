@@ -7,11 +7,11 @@
 // page stays in sync with auth-gating + the Polar webhook handler.
 
 import type { Metadata } from "next";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { Check } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { CTSurface } from "@/components/landing/codetrawl/CTSurface";
+import { CTNav } from "@/components/landing/codetrawl/CTNav";
 import { CTFooter } from "@/components/landing/codetrawl/CTFooter";
 import {
   TIER_CONFIG,
@@ -47,7 +47,7 @@ export default async function PricingPage({
 
   return (
     <CTSurface>
-      <PricingNav loggedIn={loggedIn} />
+      <CTNav />
       <main className="wrap price-page">
         <header className="price-hero">
           <span className="eyebrow">Pricing · the whole tool is free on one repo</span>
@@ -67,36 +67,6 @@ export default async function PricingPage({
       </main>
       <CTFooter />
     </CTSurface>
-  );
-}
-
-// ─── Nav — reuses the landing's .nav-* classes, absolute anchors back home ─
-
-function PricingNav({ loggedIn }: { loggedIn: boolean }) {
-  return (
-    <nav className="scrolled">
-      <div className="nav-inner">
-        <Link href="/" className="nav-brand">
-          CodeTrawl
-        </Link>
-        <div className="nav-links">
-          <Link href="/#how">How it works</Link>
-          <Link href="/#features">Features</Link>
-          <Link href="/#compare">Compare</Link>
-          <Link href="/pricing">Pricing</Link>
-        </div>
-        <div className="nav-right">
-          {!loggedIn && (
-            <Link href="/login" className="nav-signin">
-              Sign in
-            </Link>
-          )}
-          <Link href="/#analyze" className="nav-cta">
-            Analyze a repo
-          </Link>
-        </div>
-      </div>
-    </nav>
   );
 }
 
@@ -188,7 +158,12 @@ function FeatureComparison() {
     { label: "Unlimited refreshes", values: [false, true, true] },
     { label: "Grade watch on PRs", values: [false, true, true] },
     { label: "Unlimited PR repos", values: [false, false, true] },
-    { label: "Team workspaces", values: [false, false, true] },
+    // "Team workspaces" used to sit here with a ✓ on Pro. There is no team,
+    // org or membership model in the product, so the row was a promise nothing
+    // could keep. Replaced with SBOM export, which is real (lib/sbom builds
+    // CycloneDX + SPDX), is genuinely Pro-only, and was missing from this table
+    // even though it shipped.
+    { label: "SBOM export (CycloneDX / SPDX)", values: [false, false, true] },
     { label: "Priority support", values: [false, false, true] },
     { label: "Early access features", values: [false, false, true] },
   ];

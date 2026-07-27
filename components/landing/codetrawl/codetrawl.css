@@ -66,7 +66,14 @@ body:has(.ct) {
   --ct-ember: #ff8a50;
   --ct-display: var(--font-ct-display), "Helvetica Neue", Arial, sans-serif;
   --ct-mono: var(--font-ct-mono), ui-monospace, monospace;
-  --ct-maxw: 1120px;
+  /* One column edge for the whole public surface. Was 1120px while the 2026-07
+     landing laid its own sections out at 1180px, so the nav, the landing's
+     content and /pricing's content each started at a different x — the grid
+     read as accidental because it was. --ct-edge matches the landing's gutter
+     for the same reason: equal max-width with unequal padding still misaligns
+     the text. Change these two together or not at all. */
+  --ct-maxw: 1180px;
+  --ct-edge: clamp(20px, 5vw, 40px);
 
   background: var(--ct-bg);
   color: var(--ct-text);
@@ -95,7 +102,7 @@ body:has(.ct) {
 .ct .wrap {
   max-width: var(--ct-maxw);
   margin: 0 auto;
-  padding: 0 28px;
+  padding: 0 var(--ct-edge);
 }
 
 .ct a {
@@ -200,81 +207,163 @@ body:has(.ct) {
   border: 0;
 }
 
-/* ── NAV ──────────────────────────────────────────────────────────────── */
-.ct nav {
+/* ── NAV ──────────────────────────────────────────────────────────────────
+   One nav for every public page, rendered by CTNav. This replaces two parallel
+   systems: the 64px full-width bar that used to live here (.ct nav / .nav-inner
+   / .nav-cta, an outlined CTA) and the 56px pill the 2026-07 landing kept in
+   its own inline <style>. Both shipped at once, so moving between the landing
+   and /pricing changed the nav's height, shape, container width and CTA colour.
+   The pill won because it is the current design language; the bar's classes are
+   gone rather than aliased, so a page cannot silently keep the old shape. */
+.ct .ct-navwrap {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: color-mix(in srgb, var(--ct-bg) 86%, transparent);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.25s;
+  padding: 14px var(--ct-edge) 0;
 }
-.ct nav.scrolled {
-  border-bottom-color: var(--ct-line);
-}
-.ct .nav-inner {
+.ct .ct-nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
   max-width: var(--ct-maxw);
   margin: 0 auto;
-  padding: 0 28px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  gap: 36px;
-}
-.ct .nav-brand {
-  font-weight: 600;
-  font-size: 18px;
-  letter-spacing: -0.02em;
-}
-.ct .nav-links {
-  display: flex;
-  gap: 26px;
-  margin-left: 8px;
-}
-.ct .nav-links a {
-  font-size: 14.5px;
-  color: var(--ct-dim);
-  transition: color 0.2s;
-}
-.ct .nav-links a:hover {
-  color: var(--ct-text);
-}
-.ct .nav-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-.ct .nav-signin {
-  font-size: 14.5px;
-  color: var(--ct-dim);
-  transition: color 0.2s;
-}
-.ct .nav-signin:hover {
-  color: var(--ct-text);
-}
-.ct .nav-cta {
-  /* it's a <button> performing an in-page action — reset chrome to match
-     the anchor styling the class was drawn for */
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  font-size: 14.5px;
-  font-weight: 500;
-  padding: 8px 16px;
+  height: 56px;
+  padding: 0 10px 0 22px;
   border: 1px solid var(--ct-line);
-  border-radius: 8px;
-  transition: border-color 0.2s;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--ct-bg) 72%, transparent);
+  backdrop-filter: blur(16px);
+  transition: background 0.25s ease, border-color 0.25s ease;
 }
-.ct .nav-cta:hover {
-  border-color: var(--ct-faint);
+/* On the landing CTMotion adds .scrolled once the page moves; every other page
+   renders with it already on, since there is no hero for the nav to float over
+   and a translucent bar over ordinary content just looks unfinished. */
+.ct .ct-navwrap.scrolled .ct-nav {
+  background: color-mix(in srgb, var(--ct-bg) 88%, transparent);
+  border-color: color-mix(in srgb, var(--ct-line) 100%, rgba(242, 239, 234, 0.06));
 }
-@media (max-width: 720px) {
-  .ct .nav-links {
+.ct .ct-nav-logo {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-size: 16px;
+  color: var(--ct-text);
+  text-decoration: none;
+}
+.ct .ct-nav-links {
+  display: flex;
+  gap: 24px;
+  margin: 0 auto 0 18px;
+}
+.ct .ct-nav-links a {
+  color: var(--ct-dim);
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.ct .ct-nav-links a:hover {
+  color: var(--ct-text);
+}
+.ct .ct-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.ct .ct-nav-login {
+  color: var(--ct-dim);
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.ct .ct-nav-login:hover {
+  color: var(--ct-text);
+}
+.ct .ct-nav-cta {
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  color: #140a02;
+  background: var(--ct-orange);
+  border-radius: 11px;
+  padding: 10px 16px;
+  white-space: nowrap;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+.ct .ct-nav-cta:hover {
+  background: var(--ct-ember);
+  transform: translateY(-1px);
+}
+.ct .ct-nav-cta:active {
+  transform: translateY(0) scale(0.985);
+}
+/* Below 900px the section links would leave the page they point into, so they
+   go first — but the page links stay. The old nav dropped every link at once
+   and left an empty pill with a logo in it, which is where a phone visitor got
+   stuck with no way to reach pricing or docs. */
+@media (max-width: 900px) {
+  .ct .ct-nav-anchor {
     display: none;
   }
+  .ct .ct-nav-links {
+    gap: 18px;
+    margin-left: 14px;
+  }
+}
+@media (max-width: 620px) {
+  .ct .ct-nav-links {
+    display: none;
+  }
+}
+/* Log in survives as far down as it fits — a returning user on a phone still
+   needs a way in, and dropping it left the pill holding nothing but a signup
+   CTA. Measured: logo + Log in + CTA fit inside 375px with room to spare, so
+   the threshold is set below the narrowest phone in common use. */
+@media (max-width: 360px) {
+  .ct .ct-nav-login {
+    display: none;
+  }
+}
+@media (max-width: 620px) {
+  .ct .ct-nav {
+    gap: 12px;
+    padding: 0 8px 0 16px;
+  }
+  .ct .ct-nav-right {
+    margin-left: auto;
+    gap: 12px;
+  }
+}
+
+/* ── PRIMARY BUTTON ───────────────────────────────────────────────────────
+   The nav CTA used to be the only filled button in the system, so two pages
+   borrowed `.nav-cta` for a form submit and a body CTA. Both then depended on a
+   nav class for their appearance. This is that shape as its own thing —
+   anchor or <button>, same rendering. */
+.ct .ct-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  color: #140a02;
+  background: var(--ct-orange);
+  border: 0;
+  border-radius: 11px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+.ct .ct-btn:hover:not(:disabled) {
+  background: var(--ct-ember);
+  transform: translateY(-1px);
+}
+.ct .ct-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+.ct .ct-btn:disabled {
+  cursor: default;
 }
 
 /* ── HERO ─────────────────────────────────────────────────────────────── */
@@ -1851,35 +1940,75 @@ body:has(.ct) {
   background-size: 100% 6px;
   background-repeat: no-repeat;
 }
-.ct .foot-row {
+/* Identity block on the left, then one column per link group. The identity
+   column is wider so the mono tagline doesn't wrap; the groups size to their
+   content and collapse to two columns, then one, on narrow screens. */
+.ct .foot-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(130px, 1fr));
+  gap: 32px;
+  padding-top: 30px;
+}
+.ct .foot-id {
   display: flex;
-  align-items: center;
-  gap: 28px;
-  padding-top: 22px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
 }
 .ct .foot-brand {
   font-weight: 600;
   font-size: 15px;
 }
-.ct .foot-links {
-  display: flex;
-  gap: 20px;
-}
-.ct .foot-links a {
+.ct .foot-line {
   font-family: var(--ct-mono);
   font-size: 12.5px;
   color: var(--ct-faint);
+}
+.ct .foot-contact {
+  font-family: var(--ct-mono);
+  font-size: 12.5px;
+  color: var(--ct-faint);
+  text-decoration: none;
   transition: color 0.2s;
 }
-.ct .foot-links a:hover {
+.ct .foot-contact:hover {
   color: var(--ct-text);
 }
-.ct .foot-line {
-  margin-left: auto;
+.ct .foot-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.ct .foot-head {
   font-family: var(--ct-mono);
-  font-size: 12.5px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  /* --ct-ghost is reserved for ink that conveys nothing; a column heading is
+     structure, so it sits on --ct-faint, which clears AA on the bitumen. */
   color: var(--ct-faint);
+  margin-bottom: 2px;
+}
+.ct .foot-col a {
+  font-size: 13.5px;
+  color: var(--ct-dim);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.ct .foot-col a:hover {
+  color: var(--ct-text);
+}
+@media (max-width: 860px) {
+  .ct .foot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px;
+  }
+}
+@media (max-width: 460px) {
+  .ct .foot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ── HERO ENTRANCE — one orchestrated load, staggered ─────────────────── */

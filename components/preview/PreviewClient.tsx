@@ -148,7 +148,7 @@ export function PreviewClient() {
         <button
           type="submit"
           disabled={phase === "running" || !prUrl.trim()}
-          className="nav-cta"
+          className="ct-btn"
           style={{ height: 44, opacity: phase === "running" || !prUrl.trim() ? 0.5 : 1 }}
         >
           {phase === "running" ? "Analyzing…" : "Preview the blast"}

@@ -53,7 +53,12 @@ export interface TierLimits {
   /** SBOM export — download a timestamped CycloneDX / SPDX bill of materials
    *  for a snapshot (Arc 4, Pro-only evidence feature). */
   sbomExport: boolean;
-  /** Team workspaces (multi-user) */
+  /** Team workspaces (multi-user). NOT IMPLEMENTED — there is no team, org or
+   *  membership model anywhere in the product (lib/db/schema.ts defines only
+   *  user, session, account, verification and watch). The flag is kept so the
+   *  gate exists the day it ships, but it must stay false on every tier until
+   *  then: it was advertised on Pro without an implementation behind it, and a
+   *  buyer discovering that costs more than the feature would have earned. */
   teamWorkspaces: boolean;
   /** Priority support channel */
   prioritySupport: boolean;
@@ -174,7 +179,10 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
   "full-bench": {
     id: "full-bench",
     name: "Pro",
-    tagline: "For the whole org.",
+    // Not "For the whole org." — that promised multi-user, which the product
+    // does not have. Pro's real axis is breadth: unlimited PR-bot and Watch
+    // repos where Plus caps both at 5, plus the SBOM/evidence export.
+    tagline: "For every repo you own.",
     monthlyPriceUsd: 39,
     annualPriceUsd: 390,
     polarProductIdMonthly: "8e8cbfe1-9e40-4b8c-a328-0fc8625a6353",
@@ -192,7 +200,7 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       testQuality: true,
       simulate: true,
       sbomExport: true,
-      teamWorkspaces: true,
+      teamWorkspaces: false, // unimplemented — see TierLimits.teamWorkspaces
       prioritySupport: true,
       earlyAccess: true,
       apiAccess: true,
@@ -201,7 +209,6 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
       "Everything in Plus",
       "Grade + watch on unlimited repos",
       "SBOM export (CycloneDX / SPDX)",
-      "Team workspaces (multi-user)",
       "Priority support",
       "Early access + API (coming)",
     ],

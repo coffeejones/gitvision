@@ -4,8 +4,8 @@
 // public repo's PR, no CI install. Same CTSurface marketing shell as /agents.
 
 import type { Metadata } from "next";
-import Link from "next/link";
 import { CTSurface } from "@/components/landing/codetrawl/CTSurface";
+import { CTNav } from "@/components/landing/codetrawl/CTNav";
 import { CTFooter } from "@/components/landing/codetrawl/CTFooter";
 import { PreviewClient } from "@/components/preview/PreviewClient";
 
@@ -18,27 +18,7 @@ export const metadata: Metadata = {
 export default function PreviewPage() {
   return (
     <CTSurface>
-      <nav className="scrolled">
-        <div className="nav-inner">
-          <Link href="/" className="nav-brand">
-            CodeTrawl
-          </Link>
-          <div className="nav-links">
-            <Link href="/#how">How it works</Link>
-            <Link href="/#features">Features</Link>
-            <Link href="/agents">For agents</Link>
-            <Link href="/pricing">Pricing</Link>
-          </div>
-          <div className="nav-right">
-            <Link href="/login" className="nav-signin">
-              Sign in
-            </Link>
-            <Link href="/#analyze" className="nav-cta">
-              Analyze a repo
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <CTNav />
 
       <main className="wrap" style={{ paddingBottom: 96 }}>
         <header

@@ -21,17 +21,25 @@ const geistMono = Geist_Mono({
 // blank preview. The `metadataBase` makes relative og:image URLs
 // resolve against the current host — important for Railway preview
 // deploys where the URL changes per branch.
+//
+// This is NOT just the fallback for a few stray routes: no page under
+// app/session/[id]/ declares metadata of its own, so EVERY analysis URL —
+// including the three public demos the landing offers as its only proof —
+// shares with whatever is written here. It carried the retired "map any GitHub
+// repo" pitch for months after the product stopped being described that way,
+// which meant the most-shared surface pitched the old product. Keep this in
+// step with app/page.tsx's TITLE/DESCRIPTION when the positioning moves.
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://codetrawl.com"
   ),
-  title: "CodeTrawl — map any GitHub repo",
+  title: "CodeTrawl — get to know any codebase",
   description:
-    "Find what's risky, duplicated, or untested in any GitHub repo. Blast radius, structural duplicates, untested hotspots, and an AI health grade — across 7 languages.",
+    "Paste a GitHub repo and read it like a manual — what every part does, how it all connects, and what breaks if you touch it. One sweep, about a minute, nothing to install.",
   openGraph: {
-    title: "CodeTrawl — map any GitHub repo",
+    title: "CodeTrawl — get to know any codebase",
     description:
-      "Blast radius, structural duplicates, untested hotspots, and an AI health grade — across 7 languages. Paste a public GitHub URL to see your repo at a glance.",
+      "Paste a GitHub repo and read it like a manual — what every part does, how it all connects, and what breaks if you touch it. One sweep, about a minute, nothing to install.",
     type: "website",
     siteName: "CodeTrawl",
     // Auto-discovered by Next.js: app/opengraph-image.tsx generates
@@ -39,9 +47,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "CodeTrawl — map any GitHub repo",
+    title: "CodeTrawl — get to know any codebase",
     description:
-      "Blast radius, structural duplicates, untested hotspots, and an AI health grade — across 7 languages.",
+      "Paste a GitHub repo and read it like a manual — what every part does, how it all connects, and what breaks if you touch it.",
     // No app/twitter-image.tsx: when an OG image exists and twitter.images
     // is unset, Next.js reuses app/opengraph-image.tsx for twitter:image, so
     // the summary_large_image card still renders the CodeTrawl share image.

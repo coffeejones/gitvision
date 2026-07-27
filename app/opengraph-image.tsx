@@ -17,7 +17,7 @@ import { OG_ICON_DATA_URI } from "@/lib/ogIcon";
 
 export const runtime = "edge";
 
-export const alt = "CodeTrawl — map any GitHub repo";
+export const alt = "CodeTrawl — get to know any codebase";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -69,8 +69,14 @@ export default function OpenGraphImage() {
 
         {/* Bottom: headline + strapline */}
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* Carries the landing's H1 verbatim, orange period included — this
+              card is the first impression for every shared session URL, so it
+              should be the same sentence a visitor lands on. Satori needs an
+              explicit display:flex on any element with more than one child,
+              hence the row rather than a nested <span>. */}
           <div
             style={{
+              display: "flex",
               fontSize: 78,
               fontWeight: 600,
               lineHeight: 1.05,
@@ -79,7 +85,8 @@ export default function OpenGraphImage() {
               maxWidth: 1000,
             }}
           >
-            Map any GitHub repo.
+            <div>Get to know any codebase</div>
+            <div style={{ color: "#ff4f00" }}>.</div>
           </div>
           <div
             style={{
@@ -88,11 +95,14 @@ export default function OpenGraphImage() {
               // v0.80: pulled emerald accent in favour of off-white-on-
               // muted as the brand pulls away from green.
               color: "#9c968e",
-              maxWidth: 950,
+              // 700, not 950: the "computed, never generated" mark sits in the
+              // bottom-right corner, and a wider measure runs the strapline's
+              // first line underneath it.
+              maxWidth: 700,
             }}
           >
-            Blast radius, structural duplicates, untested hotspots —
-            across 7 languages.
+            What every part does, how it all connects, and what breaks if you
+            touch it.
           </div>
         </div>
 

@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ctMono } from "@/components/landing/codetrawl/ctFonts";
 import { CTSurface } from "@/components/landing/codetrawl/CTSurface";
+import { CTNav } from "@/components/landing/codetrawl/CTNav";
 import { CTFooter } from "@/components/landing/codetrawl/CTFooter";
 import { KNOWN_INCIDENTS } from "@/lib/security/knownIncidents";
 import { ECOSYSTEM_LABEL, formatIncidentDate } from "../format";
@@ -55,27 +56,7 @@ export default async function ExposureDetailPage({
 
   return (
     <CTSurface>
-      <nav className="scrolled">
-        <div className="nav-inner">
-          <Link href="/" className="nav-brand">
-            CodeTrawl
-          </Link>
-          <div className="nav-links">
-            <Link href="/#how">How it works</Link>
-            <Link href="/#features">Features</Link>
-            <Link href="/exposure">Incidents</Link>
-            <Link href="/pricing">Pricing</Link>
-          </div>
-          <div className="nav-right">
-            <Link href="/login" className="nav-signin">
-              Sign in
-            </Link>
-            <Link href="/#analyze" className="nav-cta">
-              Analyze a repo
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <CTNav />
 
       <main className="wrap" style={{ paddingBottom: 96 }}>
         <header
@@ -164,8 +145,8 @@ export default async function ExposureDetailPage({
               declare.
             </p>
             <Link
-              href="/#analyze"
-              className="nav-cta"
+              href="/#top"
+              className="ct-btn"
               style={{ alignSelf: "flex-start" }}
             >
               Analyze a repo

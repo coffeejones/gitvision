@@ -16,8 +16,8 @@
 // spring reveals, hero parallax, index cascade, one deliberate loop (the
 // intake's orbiting border light). prefers-reduced-motion renders finished.
 
-import Link from "next/link";
 import { CTSurface } from "./CTSurface";
+import { CTNav } from "./CTNav";
 import { CTScreenshot } from "./CTScreenshot";
 import { CTLandingIntake } from "./CTLandingIntake";
 import { CTMotion } from "./CTMotion";
@@ -47,22 +47,8 @@ export function CodeTrawlLanding() {
       <CTMotion />
 
       <div className="rk">
-        {/* ── NAV — pill ───────────────────────────────────────────────── */}
-        <div className="rk-navwrap">
-          <nav className="rk-nav">
-            <span className="rk-logo">CodeTrawl</span>
-            <span className="rk-nav-links">
-              <a href="#read">Source</a>
-              <a href="#faultline">Faultline</a>
-              <a href="#caps">Everything else</a>
-              <Link href="/pricing">Pricing</Link>
-            </span>
-            <span className="rk-nav-right">
-              <Link href="/login" className="rk-nav-login">Log in</Link>
-              <a href="#top" className="rk-nav-cta">Analyze a repo</a>
-            </span>
-          </nav>
-        </div>
+        {/* ── NAV — shared across every public page (CTNav) ─────────────── */}
+        <CTNav onLanding />
 
         {/* ── HERO ─────────────────────────────────────────────────────── */}
         <header className="rk-hero" id="top">
@@ -223,30 +209,13 @@ export function CodeTrawlLanding() {
 }
 
 const CSS = `
-.rk { overflow-x: clip; --edge: clamp(20px, 5vw, 40px); }
+/* --edge is the landing's local alias for the shared gutter. It must stay
+   equal to --ct-edge or the landing's sections stop lining up with the nav and
+   the footer, so it defers rather than restating the clamp. */
+.rk { overflow-x: clip; --edge: var(--ct-edge); }
 
-/* ── NAV — floating pill ─────────────────────────────────────────────── */
-.rk .rk-navwrap { position: sticky; top: 0; z-index: 50; padding: 14px var(--edge) 0; }
-.rk .rk-nav {
-  display: flex; align-items: center; gap: 24px;
-  max-width: 1180px; margin: 0 auto; height: 56px; padding: 0 10px 0 22px;
-  border: 1px solid var(--ct-line); border-radius: 16px;
-  background: color-mix(in srgb, var(--ct-bg) 72%, transparent);
-  backdrop-filter: blur(16px);
-}
-.rk .rk-logo { font-weight: 600; letter-spacing: -0.02em; font-size: 16px; }
-.rk .rk-nav-links { display: flex; gap: 24px; margin: 0 auto 0 18px; }
-.rk .rk-nav-links a { color: var(--ct-dim); font-size: 14px; text-decoration: none; }
-.rk .rk-nav-links a:hover { color: var(--ct-text); }
-.rk .rk-nav-right { display: flex; align-items: center; gap: 16px; }
-.rk .rk-nav-login { color: var(--ct-dim); font-size: 14px; text-decoration: none; }
-.rk .rk-nav-login:hover { color: var(--ct-text); }
-.rk .rk-nav-cta {
-  font-size: 14px; font-weight: 600; text-decoration: none;
-  color: #140a02; background: var(--ct-orange);
-  border-radius: 11px; padding: 10px 16px;
-}
-.rk .rk-nav-cta:hover { background: var(--ct-ember); }
+/* The nav lives in codetrawl.css as .ct-nav* — it is shared with every other
+   public page now (CTNav), so it can't stay in this page's private stylesheet. */
 
 /* ── HERO ────────────────────────────────────────────────────────────── */
 .rk .rk-hero { max-width: 1180px; margin: 0 auto; padding: clamp(56px, 9vw, 120px) var(--edge) 0; text-align: center; }
@@ -410,7 +379,6 @@ const CSS = `
 .rk .rk-close .rk-demos { text-align: center; }
 
 @media (max-width: 900px) {
-  .rk .rk-nav-links { display: none; }
   .rk .rk-intake form { flex-direction: column; }
   .rk .rk-how-grid { grid-template-columns: 1fr; }
   .rk .rk-split-grid { grid-template-columns: 1fr; gap: clamp(20px, 4vw, 36px); }
@@ -480,20 +448,16 @@ html.lenis, html.lenis body { height: auto; }
 /* parallax transform lives inline on .rk-hero-shot (JS); keep it smooth */
 .rk .rk-hero-shot { will-change: transform; }
 
-/* ── nav scrolled state ──────────────────────────────────────────────── */
-.rk .rk-nav { transition: background 0.25s ease, border-color 0.25s ease; }
-.rk .rk-navwrap.scrolled .rk-nav {
-  background: color-mix(in srgb, var(--ct-bg) 88%, transparent);
-  border-color: color-mix(in srgb, var(--ct-line) 100%, rgba(242, 239, 234, 0.06));
-}
+/* the nav's scrolled state and its hover transitions moved to codetrawl.css
+   with the rest of .ct-nav* — CTMotion still toggles .scrolled on .ct-navwrap */
 
 /* ── hover micro-interactions ────────────────────────────────────────── */
-.rk .rk-intake button, .rk .rk-nav-cta {
+.rk .rk-intake button {
   transition: background 0.16s ease, transform 0.16s ease;
 }
-.rk .rk-intake button:hover, .rk .rk-nav-cta:hover { transform: translateY(-1px); }
-.rk .rk-intake button:active, .rk .rk-nav-cta:active { transform: translateY(0) scale(0.985); }
-.rk .rk-demos a, .rk .rk-nav-links a, .rk .rk-nav-login {
+.rk .rk-intake button:hover { transform: translateY(-1px); }
+.rk .rk-intake button:active { transform: translateY(0) scale(0.985); }
+.rk .rk-demos a {
   transition: color 0.15s ease, text-underline-offset 0.15s ease;
 }
 .rk .rk-demos a:hover { text-underline-offset: 5px; }

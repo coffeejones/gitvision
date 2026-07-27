@@ -473,7 +473,7 @@ export function BillingPanel({
       {!isPaid && (
         <SectionCard
           title="Unlock more"
-          description="Upgrade to Plus to keep unlimited repos, put a grade on every pull request, and watch for regressions. Or jump straight to Pro for team workspaces and priority support."
+          description="Upgrade to Plus to keep unlimited repos, put a grade on every pull request, and watch for regressions. Or jump straight to Pro for unlimited PR and Watch repos, SBOM export, and priority support."
         >
           <div className="pt-2">
             <Link

@@ -42,7 +42,9 @@ export function CTMotion() {
 
     // 3 + 4 · parallax + nav state, one rAF-throttled scroll handler
     const shot = document.querySelector<HTMLElement>(".rk-hero-shot");
-    const nav = document.querySelector<HTMLElement>(".rk-navwrap");
+    // CTNav renders .ct-navwrap — shared with every other public page, which
+    // is why the selector is no longer the landing's own .rk-* namespace.
+    const nav = document.querySelector<HTMLElement>(".ct-navwrap");
     let ticking = false;
     const onScroll = () => {
       if (ticking) return;
