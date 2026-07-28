@@ -3,18 +3,26 @@
 // Message (the founder's framing): a manual for any repo — what every part
 // does, how it all connects, what works, and what breaks if you touch it.
 // Structure adapted from Raycast's layout grammar (pill nav · huge sentence
-// hero + one big product shot · alternating feature sections with edge
-// bleeds · a hairline index · thin trust strip · close), applied to the .ct
-// design system: bitumen, Schibsted Grotesk, International Orange rationed.
+// hero · alternating feature sections with edge bleeds · a hairline index ·
+// thin trust strip · close), applied to the .ct design system: bitumen,
+// Schibsted Grotesk, International Orange rationed.
 //
-// Product imagery is real FULL screenshots (no crops, no hand-built mocks),
-// mounted by CTScreenshot: window chrome + light radiating from behind the
-// frame into the page. Faultline/Source shots are our own repo (dogfood);
-// Overview/Security are the public flask demo — every visible number is real.
+// THE HERO CARRIES NO SHOT. It held a full Overview screen and the promise had
+// to share the first screen with it; without it the sentence and the intake own
+// the fold, and the first thing below is CTDemoProof — three repos already
+// swept, which a visitor can open. A live report is better proof than a picture
+// of one, and it was the picture that was competing.
+//
+// Product imagery is RENDERED, not photographed — there are no screenshots left
+// in public/landing. CTCodePane and CTBlastDiagram redraw surfaces whose product
+// components are client-side; CTSecurityPane mounts the product's own
+// SecurityPanel outright. Source/Faultline are our own repo (dogfood), Security
+// is the public flask demo, and every visible number came off a real sweep.
 //
 // Motion (CTMotion + the MOTION LAYER css): Lenis smooth scroll, directional
-// spring reveals, hero parallax, index cascade, one deliberate loop (the
-// intake's orbiting border light). prefers-reduced-motion renders finished.
+// spring reveals, index cascade, one deliberate loop (the intake's orbiting
+// border light). prefers-reduced-motion renders finished. The hero parallax
+// went with the hero shot.
 
 import { CTSurface } from "./CTSurface";
 import { CTNav } from "./CTNav";
@@ -24,7 +32,6 @@ import { CTFaq } from "./CTFaq";
 import { CTCodePane } from "./CTCodePane";
 import { CTBlastDiagram } from "./CTBlastDiagram";
 import { CTSecurityPane } from "./CTSecurityPane";
-import { CTOverviewPane } from "./CTOverviewPane";
 import type { DemoHighlight } from "@/lib/demoHighlights";
 import { CTScreenshot } from "./CTScreenshot";
 import { CTLandingIntake } from "./CTLandingIntake";
@@ -67,13 +74,6 @@ export function CodeTrawlLanding({ demos }: { demos: DemoHighlight[] }) {
             a minute, nothing to install.
           </p>
           <CTLandingIntake resume />
-          <div className="rk-hero-shot">
-            {/* The product's own HeadlineFinding + HealthSummary on a pinned
-                sweep — not a picture of them. See CTOverviewPane. */}
-            <CTScreenshot label="codetrawl.com — pallets/flask" wide>
-              <CTOverviewPane />
-            </CTScreenshot>
-          </div>
         </header>
 
         {/* ── PROOF — the three open sweeps, directly after the promise ─── */}
@@ -240,7 +240,7 @@ const CSS = `
    public page now (CTNav), so it can't stay in this page's private stylesheet. */
 
 /* ── HERO ────────────────────────────────────────────────────────────── */
-.rk .rk-hero { max-width: 1180px; margin: 0 auto; padding: clamp(56px, 9vw, 120px) var(--edge) 0; text-align: center; }
+.rk .rk-hero { max-width: 1180px; margin: 0 auto; padding: clamp(56px, 9vw, 120px) var(--edge) clamp(28px, 5vw, 64px); text-align: center; }
 /* 92, down from 104. The "huge sentence hero" is deliberate — it is the
    Raycast grammar this page is built on — so this is a trim, not a retreat to
    the 56-64px the SaaS default lands at. What 104 cost was the relationship to
@@ -341,15 +341,6 @@ const CSS = `
   transition: text-underline-offset 0.15s ease;
 }
 .rk .rk-intake-note a:hover { text-underline-offset: 5px; }
-
-/* the hero shot goes wider than the text column — a big establishing shot,
-   centred in the viewport, bleeding a little past the 1180 content edge */
-.rk .rk-hero-shot {
-  margin-top: clamp(52px, 7vw, 92px);
-  width: min(1320px, calc(100vw - 2 * var(--edge)));
-  margin-left: 50%;
-  transform: translateX(-50%);
-}
 
 /* ── PROOF — the three open sweeps ───────────────────────────────────────
    Denser than the sections around it on purpose. Everything else on this page
@@ -659,10 +650,7 @@ html.lenis, html.lenis body { height: auto; }
 .rk .rk-h1 { animation: rk-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.05s backwards; }
 .rk .rk-lede { animation: rk-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.14s backwards; }
 .rk .rk-hero .rk-intake { animation: rk-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.23s backwards; }
-.rk .rk-hero-shot figure { animation: rk-surface 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.34s backwards; }
 
-/* parallax transform lives inline on .rk-hero-shot (JS); keep it smooth */
-.rk .rk-hero-shot { will-change: transform; }
 
 /* the nav's scrolled state and its hover transitions moved to codetrawl.css
    with the rest of .ct-nav* — CTMotion still toggles .scrolled on .ct-navwrap */
@@ -687,6 +675,6 @@ html.lenis, html.lenis body { height: auto; }
   .rk [data-rv],
   .rk [data-rv="cascade"] .rk-idx-row,
   .rk [data-rv="cascade"] .rk-proof-card { opacity: 1; transform: none; transition: none; }
-  .rk .rk-h1, .rk .rk-lede, .rk .rk-hero .rk-intake, .rk .rk-hero-shot figure { animation: none; }
+  .rk .rk-h1, .rk .rk-lede, .rk .rk-hero .rk-intake { animation: none; }
 }
 `;

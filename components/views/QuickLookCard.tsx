@@ -1,12 +1,12 @@
 // QuickLookCard — one Workspace tile on the Overview: an icon, a label, the
 // headline stat for that tab, and a one-line description of what is behind it.
 //
-// Moved out of app/session/[id]/page.tsx unchanged. It was a local, unexported
-// function in a route file, which meant the only way to show a Workspace card
-// anywhere else was to copy sixty lines of it — and a copied product surface is
-// exactly what components/landing/codetrawl/tokens.ts exists to document the
-// cost of. The landing's hero shot mounts this; the Overview still renders it
-// the same way it always did.
+// Moved out of app/session/[id]/page.tsx unchanged, and it stays out. The
+// extraction was made so the landing's hero shot could mount a real Workspace
+// tile instead of copying sixty lines of one; that shot has since been dropped
+// from the landing, but a self-contained presentational card belongs beside its
+// thirty siblings in components/views/ rather than buried in a 600-line route
+// either way. The Overview renders it exactly as it always did.
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";

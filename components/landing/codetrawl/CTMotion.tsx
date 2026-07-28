@@ -40,8 +40,10 @@ export function CTMotion() {
     );
     rvs.forEach((el) => io.observe(el));
 
-    // 3 + 4 · parallax + nav state, one rAF-throttled scroll handler
-    const shot = document.querySelector<HTMLElement>(".rk-hero-shot");
+    // 4 · nav state, one rAF-throttled scroll handler. This also drove the
+    // hero shot's parallax drift until the shot was dropped from the hero —
+    // the query stayed harmless behind its null check, which is exactly how
+    // dead code survives, so it went with it.
     // CTNav renders .ct-navwrap — shared with every other public page, which
     // is why the selector is no longer the landing's own .rk-* namespace.
     const nav = document.querySelector<HTMLElement>(".ct-navwrap");
@@ -51,13 +53,7 @@ export function CTMotion() {
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
-        const y = window.scrollY;
-        if (shot) {
-          // drift slower than the page while the hero is on screen; capped
-          const drift = Math.min(y * 0.08, 64);
-          shot.style.transform = `translateX(-50%) translateY(${drift}px)`;
-        }
-        if (nav) nav.classList.toggle("scrolled", y > 8);
+        if (nav) nav.classList.toggle("scrolled", window.scrollY > 8);
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
