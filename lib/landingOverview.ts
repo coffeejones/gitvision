@@ -51,6 +51,73 @@ export const LANDING_HEADLINE: Headline = {
   ctaLabel: "View untested hotspots",
 };
 
+/** The route's own no-diff orientation line, verbatim from
+ *  app/session/[id]/page.tsx. It has two branches — one for a repeat visit with
+ *  a diff, one for a first sweep — and the shot is a first sweep. */
+export const LANDING_ORIENTATION_LINE =
+  "The top finding, then six rule-based health tiles. Start with the finding, then open any card.";
+
+/** The Workspace grid. Each `stat` is the string the route builds for that tab
+ *  from this sweep — 120 hotspots, 105 files and 211 edges, 1,460 functions at
+ *  7% covered, and so on. They are transcribed rather than recomputed because
+ *  the route derives them inline rather than through a named function; the
+ *  numbers are the sweep's, not chosen, and re-derive after any analyzer change.
+ *
+ *  `accent` and `warn` are the route's own flags: accent when a tab has
+ *  something worth opening, warn when it has a problem. Flask's packages are
+ *  clean at runtime scope, so nothing here is warned. */
+export const LANDING_WORKSPACE: {
+  tab: string;
+  label: string;
+  stat: string;
+  description: string;
+  accent?: boolean;
+}[] = [
+  {
+    tab: "canvas",
+    label: "Canvas",
+    stat: "120 hotspots · Python",
+    description: "Folder map · color by author or type · time-scrub history",
+  },
+  {
+    tab: "imports",
+    label: "Imports",
+    stat: "105 files · 211 edges",
+    description: "Import graph · cycles · orphaned modules",
+  },
+  {
+    tab: "code",
+    label: "Code",
+    stat: "1,460 fns · 7% covered",
+    description: "Blast radius · untested hotspots · structural duplicates",
+    accent: true,
+  },
+  {
+    tab: "architecture",
+    label: "Architecture",
+    stat: "160 classes extracted",
+    description: "Class diagrams · Mermaid export · architectural intelligence",
+  },
+  {
+    tab: "packages",
+    label: "Packages",
+    stat: "30 packages",
+    description: "CVE-aware health for npm / Cargo / PyPI",
+  },
+  {
+    tab: "prs",
+    label: "PRs",
+    stat: "200 pull requests",
+    description: "Sankey of cycle-time flow · median time-to-merge",
+  },
+  {
+    tab: "insights",
+    label: "Insights",
+    stat: "AI summary + health grade",
+    description: "Grounded in 20 deterministic signals · zero hallucination",
+  },
+];
+
 /** All six dimensions, in the product's order, with the product's own evidence
  *  sentences. Five healthy and one critical is what the analyzer returned — a
  *  strip edited to look either greener or redder would be the fake version of

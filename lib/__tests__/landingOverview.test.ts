@@ -15,7 +15,9 @@ import path from "node:path";
 import {
   LANDING_HEADLINE,
   LANDING_HEALTH,
+  LANDING_ORIENTATION_LINE,
   LANDING_OVERVIEW_PROVENANCE,
+  LANDING_WORKSPACE,
 } from "../landingOverview";
 import { LANDING_SECURITY_SNAPSHOT } from "../landingSecurity";
 
@@ -89,6 +91,59 @@ describe("the pinned strip is a real sweep, in the shape the strip needs", () =>
     expect(LANDING_HEADLINE.severity).not.toBe("good");
     expect(LANDING_HEADLINE.primary).toMatch(/untested/i);
     expect(LANDING_HEADLINE.detail).toMatch(/blueprints\.py/);
+  });
+
+  it("quotes the route's own orientation line", () => {
+    // The route has two branches — with a diff and without — and the shot is a
+    // first sweep, so it must be the no-diff one.
+    const route = read("app", "session", "[id]", "page.tsx");
+    expect(route).toContain(LANDING_ORIENTATION_LINE);
+  });
+
+  it("mounts the Workspace card rather than copying it", () => {
+    // QuickLookCard used to be a local, unexported function inside the route,
+    // so showing a Workspace tile anywhere else meant copying sixty lines. It
+    // was moved to components/views/ instead; both the route and the landing
+    // import it, and the extraction is only worth anything if it stays that way.
+    expect(pane).toMatch(
+      /import \{ QuickLookCard \} from "@\/components\/views\/QuickLookCard"/,
+    );
+    const route = read("app", "session", "[id]", "page.tsx");
+    expect(route).toMatch(
+      /import \{ QuickLookCard \} from "@\/components\/views\/QuickLookCard"/,
+    );
+    expect(route).not.toMatch(/^function QuickLookCard\(/m);
+  });
+
+  it("carries every Workspace tab, each with a real stat", () => {
+    expect(LANDING_WORKSPACE.map((c) => c.tab)).toEqual([
+      "canvas",
+      "imports",
+      "code",
+      "architecture",
+      "packages",
+      "prs",
+      "insights",
+    ]);
+    for (const c of LANDING_WORKSPACE) {
+      expect(c.stat, `${c.tab} has no stat`).toBeTruthy();
+      // "Refresh to populate" / "No PR data" are the route's EMPTY states. A
+      // shot showing them would be advertising a sweep that found nothing.
+      expect(c.stat).not.toMatch(/refresh to populate|no .* data|not detected/i);
+    }
+  });
+
+  it("keeps the rollup bar in step with the tiles it sits above", () => {
+    // The bar's segments are counted per status over the same six summaries, so
+    // the two can only disagree if a new status appears — which shows up here
+    // as segments that no longer sum to the number of tiles.
+    const tiers = ["critical", "warning", "healthy", "solo", "unknown"];
+    const counted = tiers.reduce(
+      (n, t) => n + LANDING_HEALTH.filter((s) => s.status === t).length,
+      0,
+    );
+    expect(counted).toBe(LANDING_HEALTH.length);
+    expect(pane).toContain("ROLLUP_TIERS");
   });
 
   it("comes from the same sweep as the security shot", () => {
