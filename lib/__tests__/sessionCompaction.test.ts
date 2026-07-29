@@ -70,6 +70,48 @@ describe("session writes take the compact path", () => {
   });
 });
 
+describe("every write path leaves the file compact", () => {
+  // Greping storage.ts proves the call sites pass the flag; this proves the
+  // BEHAVIOUR, which is what actually matters. A single writer left on the
+  // indented default would silently re-inflate a session the first time anyone
+  // renamed it or the AI wrote a narrative back — undoing the migration one
+  // file at a time, invisibly.
+  it("survives create, rename and patch", async () => {
+    const { createSession, renameSession, patchLatestSnapshot, deleteSession } =
+      await import("../storage");
+    const dir = path.join(process.cwd(), ".gitvision", "sessions");
+    const headOf = (id: string) =>
+      readFileSync(path.join(dir, `${id}.json`), "utf-8").slice(0, 2);
+
+    const session = await createSession({
+      repoUrl: "https://github.com/compaction/probe",
+      name: "compaction/probe",
+      initialSnapshot: {
+        fetchedAt: new Date(0).toISOString(),
+        repo: {
+          owner: "compaction", name: "probe", fullName: "compaction/probe",
+          description: null, stars: 0, forks: 0, watchers: 0, openIssues: 0,
+          defaultBranch: "main", createdAt: "2020-01-01T00:00:00Z",
+          updatedAt: "2020-01-01T00:00:00Z", pushedAt: "2020-01-01T00:00:00Z",
+          language: null, license: null, homepage: null, topics: [], private: false,
+        },
+        contributors: [], languages: {}, recentCommits: [],
+        hotspots: [], coChange: [], commitActivity: [],
+      },
+    });
+
+    try {
+      expect(headOf(session.id), "createSession").toBe('{"');
+      await renameSession(session.id, "renamed");
+      expect(headOf(session.id), "renameSession").toBe('{"');
+      await patchLatestSnapshot(session.id, { hasReadme: true });
+      expect(headOf(session.id), "patchLatestSnapshot").toBe('{"');
+    } finally {
+      await deleteSession(session.id);
+    }
+  });
+});
+
 describe("the migration pass that rewrites old files", () => {
   const migrate = readFileSync(
     path.join(process.cwd(), "scripts", "migrate.mjs"),
