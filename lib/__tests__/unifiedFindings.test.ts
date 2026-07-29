@@ -5,6 +5,7 @@ import {
 } from "../security/unifiedFindings";
 import type { SecretFinding, SecretSeverity } from "../security/types";
 import type { RiskyPatternFinding } from "../security/riskyPatterns";
+import type { ClassifiedSink } from "../security/reachability";
 
 function secret(severity: SecretSeverity, filePath: string): SecretFinding {
   return {
@@ -25,6 +26,22 @@ function pattern(filePath: string): RiskyPatternFinding {
     filePath,
     line: 1,
     snippet: "eval(x)",
+  };
+}
+
+function sink(
+  severity: ClassifiedSink["severity"],
+  reachability: ClassifiedSink["reachability"],
+  filePath = "views.py",
+): ClassifiedSink {
+  return {
+    filePath,
+    ruleId: "py-sql-assembled",
+    severity,
+    line: 42,
+    inFunction: "search",
+    snippet: "cursor.execute(q)",
+    reachability,
   };
 }
 
@@ -63,5 +80,39 @@ describe("buildUnifiedFindings", () => {
     for (const f of out) {
       expect(Number.isNaN(SEVERITY_RANK[f.severity])).toBe(false);
     }
+  });
+});
+
+describe("buildUnifiedFindings — sinks", () => {
+  it("merges sinks into the same severity ordering as every other scanner", () => {
+    const out = buildUnifiedFindings(
+      [],
+      [secret("medium", "cfg.ts")],
+      [pattern("a.ts")],
+      [sink("high", "reachable")],
+    );
+    expect(out.map((f) => f.kind)).toEqual(["sink", "secret", "pattern"]);
+  });
+
+  it("keeps reachability out of severity — the two axes stay separate", () => {
+    // A reachable finding and an unknown one of the same class share a
+    // severity. Promoting the reachable one would fold confidence into
+    // urgency, which is the conflation the whole filter exists to avoid.
+    const out = buildUnifiedFindings(
+      [],
+      [],
+      [],
+      [sink("high", "reachable", "a.py"), sink("high", "unknown", "b.py")],
+    );
+    expect(out.every((f) => f.severity === "high")).toBe(true);
+    // classifySinks already ordered them; the stable sort must not reshuffle.
+    expect(out.map((f) => (f.kind === "sink" ? f.data.filePath : ""))).toEqual([
+      "a.py",
+      "b.py",
+    ]);
+  });
+
+  it("defaults to no sinks so pre-v0.82 callers are unaffected", () => {
+    expect(buildUnifiedFindings([], [], [pattern("a.ts")])).toHaveLength(1);
   });
 });

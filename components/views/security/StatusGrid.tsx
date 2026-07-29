@@ -24,13 +24,19 @@ interface Props {
   incidents: StatusCardProps;
   secrets: StatusCardProps;
   patterns: StatusCardProps;
+  /** Optional so a pre-v0.82 snapshot renders the original three-up grid
+   *  rather than an empty slot. */
+  sinks?: StatusCardProps;
 }
 
-export function StatusGrid({ incidents, secrets, patterns }: Props) {
+export function StatusGrid({ incidents, secrets, patterns, sinks }: Props) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div
+      className={`grid grid-cols-1 gap-3 ${sinks ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}
+    >
       <StatusCard {...incidents} />
       <StatusCard {...secrets} />
+      {sinks && <StatusCard {...sinks} />}
       <StatusCard {...patterns} />
     </div>
   );

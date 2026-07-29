@@ -17,6 +17,7 @@ import type { Language, Node as TsNode } from "web-tree-sitter";
 import type {
   ClassMemberVisibility,
   CodeAnalysisPlugin,
+  EntryPointInfo,
   FileIndex,
   ParsedCall,
   ParsedClass,
@@ -25,6 +26,9 @@ import type {
   ParsedFunction,
   ParsedImport,
   PluginQueries,
+  RouteDeclaration,
+  SinkFinding,
+  SinkSeverity,
   SourceFile,
 } from "../types";
 import { loadBuiltinGrammar } from "../runtime";
@@ -265,6 +269,457 @@ function extractPyTypeName(node: TsNode): string | null {
   }
 }
 
+// ------------------- Route decorators (entry-point reader) -------------------
+//
+// Flask and FastAPI declare HTTP routes as decorators:
+//
+//   @app.route("/serialize", methods=["POST"])   @router.get("/items/{id}")
+//
+// Routing is not a call edge, so the graph cannot see these — the decorated
+// function typically has zero inbound callers and looks like dead code. Marking
+// them is what lets reachability analysis start somewhere real.
+//
+// DISCRIMINATOR: the first positional argument must be a static string starting
+// with "/". That single rule is what separates `@app.get("/items")` from
+// `@cache.get("session-key")` — both are `@<ident>.get(...)`, and there is no
+// other local evidence to tell them apart. It costs us routes whose path is a
+// variable (`@app.route(PATH)`), which is rare and a miss, never a false claim.
+//
+// Deliberately NOT gated on a flask/fastapi import in the same file: blueprint
+// and router modules routinely import only their own `bp` object, so an
+// import gate would silently drop exactly the files that hold the routes.
+
+/** Decorator attributes that name an HTTP method directly. */
+const HTTP_VERB_DECORATORS = new Set([
+  "get",
+  "post",
+  "put",
+  "delete",
+  "patch",
+  "head",
+  "options",
+]);
+
+/** Decorator attributes that declare a route without naming one method.
+ *  `route` carries methods in a `methods=` kwarg; `websocket` has no method. */
+const ROUTE_DECORATORS = new Set(["route", "api_route", "websocket"]);
+
+/** Literal value of a Python string node, or null when it isn't a plain static
+ *  string. f-strings are rejected: their value depends on runtime state, so any
+ *  path we printed would be a guess. */
+function pyStringLiteral(node: TsNode | null): string | null {
+  if (!node || node.type !== "string") return null;
+  const raw = node.text;
+  const m = /^([A-Za-z]*)("""|'''|"|')([\s\S]*)\2$/.exec(raw);
+  if (!m) return null;
+  if (/[fF]/.test(m[1])) return null;
+  return m[3];
+}
+
+/** Read `methods=["GET", "POST"]` off a decorator's argument list. */
+function readMethodsKwarg(argList: TsNode): string[] | undefined {
+  for (const arg of argList.namedChildren) {
+    if (!arg || arg.type !== "keyword_argument") continue;
+    if (arg.childForFieldName("name")?.text !== "methods") continue;
+    const value = arg.childForFieldName("value");
+    if (!value) continue;
+    const out: string[] = [];
+    for (const item of value.namedChildren) {
+      const s = pyStringLiteral(item);
+      if (s) out.push(s.toUpperCase());
+    }
+    return out.length ? out : undefined;
+  }
+  return undefined;
+}
+
+/** Recognise one `(decorator ...)` node as an HTTP route declaration.
+ *  Returns null for every decorator that isn't one — @property, @csrf_exempt,
+ *  @dataclass and the long tail all fall through here. */
+function readRouteDecorator(decorator: TsNode): EntryPointInfo | null {
+  // `@x.y(...)` — the decorator's expression must be a call.
+  const call = decorator.namedChildren.find((c) => c?.type === "call");
+  if (!call) return null;
+  const fn = call.childForFieldName("function");
+  if (!fn || fn.type !== "attribute") return null;
+
+  const attr = fn.childForFieldName("attribute")?.text;
+  if (!attr) return null;
+  const isVerb = HTTP_VERB_DECORATORS.has(attr);
+  if (!isVerb && !ROUTE_DECORATORS.has(attr)) return null;
+
+  const argList = call.childForFieldName("arguments");
+  if (!argList) return null;
+
+  // First POSITIONAL argument, and it has to look like a route path.
+  const firstPositional = argList.namedChildren.find(
+    (c) => c && c.type !== "keyword_argument"
+  );
+  const route = pyStringLiteral(firstPositional ?? null);
+  if (!route || !route.startsWith("/")) return null;
+
+  const via = `@${fn.text}`;
+  if (isVerb) {
+    return { kind: "http-route", methods: [attr.toUpperCase()], route, via };
+  }
+  const methods = readMethodsKwarg(argList);
+  return methods
+    ? { kind: "http-route", methods, route, via }
+    : { kind: "http-route", route, via };
+}
+
+// ------------------- Django URLconf (entry-point reader #2) -------------------
+//
+// Django keeps routing in a table, not on the handler:
+//
+//   from django.urls import path
+//   from . import views
+//   urlpatterns = [ path('xss', views.xss, name="xss") ]
+//
+// So `xss` has no decorator, and `urls.py` REFERENCES it rather than calling
+// it — there is no call edge either. To the graph the view is dead code. This
+// reader records what the table says; buildCodeGraph resolves the name once
+// every file is parsed.
+//
+// GATE: the file must import django.urls / django.conf.urls. A bare `path(...)`
+// or `url(...)` call is far too common a spelling to claim on sight, and the
+// import is the one piece of local evidence that says "this is a URLconf".
+
+const DJANGO_URLCONF_IMPORT =
+  /^[ \t]*(?:from|import)[ \t]+django\.(?:urls|conf\.urls)\b/m;
+
+/** Django's route-table functions. `url()` is the pre-2.0 spelling, still
+ *  everywhere in real repos; `re_path()` is its replacement. */
+const URLCONF_FUNCTIONS = new Set(["path", "re_path", "url"]);
+
+/** Read one `path("route", views.handler, ...)` row.
+ *
+ *  Returns null for the rows that don't name a handler we could ever resolve —
+ *  `include("other.urls")` delegates to another table, and
+ *  `MyView.as_view()` is a class-based view whose handler is a method we have
+ *  no mapping for yet. Both are misses, neither is a wrong answer. */
+function readUrlconfRow(call: TsNode, calleeName: string): RouteDeclaration | null {
+  if (!URLCONF_FUNCTIONS.has(calleeName)) return null;
+  const argList = call.childForFieldName("arguments");
+  if (!argList) return null;
+
+  const positional = argList.namedChildren.filter(
+    (c): c is TsNode => !!c && c.type !== "keyword_argument"
+  );
+  const route = pyStringLiteral(positional[0] ?? null);
+  if (route === null) return null;
+
+  const target = positional[1];
+  if (!target) return null;
+  if (target.type === "attribute") {
+    // views.home → module "views", name "home"
+    const object = target.childForFieldName("object");
+    const attribute = target.childForFieldName("attribute");
+    if (object?.type !== "identifier" || attribute?.type !== "identifier") return null;
+    return {
+      route,
+      targetModule: object.text,
+      targetName: attribute.text,
+      via: `${calleeName}()`,
+    };
+  }
+  if (target.type === "identifier") {
+    // path("x", home) — imported directly into the urls module.
+    return { route, targetModule: null, targetName: target.text, via: `${calleeName}()` };
+  }
+  if (target.type === "call") {
+    // path("x", views.MyView.as_view()) — a class-based view. Large Django
+    // codebases are overwhelmingly CBV; measured on NetBox, 84 of its URLconf
+    // rows take this form and every one of them was previously skipped.
+    return readAsViewTarget(target, `${calleeName}()`, route);
+  }
+  return null;
+}
+
+/** Pull the view class out of `views.MyView.as_view()` or `MyView.as_view()`. */
+function readAsViewTarget(
+  call: TsNode,
+  via: string,
+  route: string
+): RouteDeclaration | null {
+  const fn = call.childForFieldName("function");
+  if (fn?.type !== "attribute") return null;
+  if (fn.childForFieldName("attribute")?.text !== "as_view") return null;
+  const holder = fn.childForFieldName("object");
+  if (holder?.type === "attribute") {
+    const mod = holder.childForFieldName("object");
+    const cls = holder.childForFieldName("attribute");
+    if (mod?.type !== "identifier" || cls?.type !== "identifier") return null;
+    return {
+      route,
+      targetModule: mod.text,
+      targetName: cls.text,
+      targetIsClass: true,
+      via,
+    };
+  }
+  if (holder?.type === "identifier") {
+    return { route, targetModule: null, targetName: holder.text, targetIsClass: true, via };
+  }
+  return null;
+}
+
+/** DRF viewset registration: `router.register('sites', views.SiteViewSet)`.
+ *
+ *  A routing table like any other, just spelled as a method call. NetBox has
+ *  139 of these against 84 `as_view()` rows, so on a modern Django API this is
+ *  the LARGER mechanism.
+ *
+ *  DISCRIMINATOR: the class name must end in `ViewSet`. `register` is far too
+ *  common a method name to claim on sight — signal handlers, plugin registries
+ *  and admin sites all use it — and DRF's own naming convention is the one
+ *  piece of local evidence that says which `register` this is. Costs us
+ *  viewsets named against convention; that is a miss, not a wrong answer. */
+function readRouterRegistration(
+  call: TsNode,
+  fnNode: TsNode,
+  calleeName: string
+): RouteDeclaration | null {
+  if (calleeName !== "register" || fnNode.type !== "attribute") return null;
+  const argList = call.childForFieldName("arguments");
+  if (!argList) return null;
+  const positional = argList.namedChildren.filter(
+    (c): c is TsNode => !!c && c.type !== "keyword_argument"
+  );
+  const route = pyStringLiteral(positional[0] ?? null);
+  if (route === null) return null;
+
+  const target = positional[1];
+  if (!target) return null;
+  if (target.type === "attribute") {
+    const mod = target.childForFieldName("object");
+    const cls = target.childForFieldName("attribute");
+    if (mod?.type !== "identifier" || cls?.type !== "identifier") return null;
+    if (!cls.text.endsWith("ViewSet")) return null;
+    return {
+      route,
+      targetModule: mod.text,
+      targetName: cls.text,
+      targetIsClass: true,
+      via: "router.register()",
+    };
+  }
+  if (target.type === "identifier" && target.text.endsWith("ViewSet")) {
+    return {
+      route,
+      targetModule: null,
+      targetName: target.text,
+      targetIsClass: true,
+      via: "router.register()",
+    };
+  }
+  return null;
+}
+
+// ------------------- Security sinks -------------------
+//
+// Dangerous operations, recognised syntactically. A sink is recorded for what
+// the code SAYS, never for what it might receive at runtime — whether anything
+// can actually reach it is the reachability pass's job, and these two axes are
+// kept apart on purpose (see SinkSeverity).
+//
+// Every rule carries a discriminator tight enough to stand on its own. The
+// reachability pass RANKS findings; it does not rescue bad ones. A rule that
+// needs "well, it might be reachable" to justify itself does not belong here.
+//
+// Known misses, all deliberate:
+//   - `from os import system` then a bare `system(...)`. Import aliasing needs
+//     symbol tracking we don't have; the receiver check is what keeps
+//     `self.system()` and `parser.system()` from matching.
+//   - `cursor.execute(query)` where `query` was built on an earlier line. That
+//     is precisely what intraprocedural taint is for (slice 5). Flagging bare
+//     variables today would be a guess dressed as a finding.
+
+/** Extract the value node of a keyword argument, e.g. `shell=True`. */
+function kwarg(argList: TsNode, name: string): TsNode | null {
+  for (const arg of argList.namedChildren) {
+    if (!arg || arg.type !== "keyword_argument") continue;
+    if (arg.childForFieldName("name")?.text === name) {
+      return arg.childForFieldName("value") ?? null;
+    }
+  }
+  return null;
+}
+
+/** First positional (non-keyword) argument. */
+function firstPositional(argList: TsNode): TsNode | null {
+  return argList.namedChildren.find((c) => c && c.type !== "keyword_argument") ?? null;
+}
+
+/** Receiver of an `obj.method()` call, when it is a plain identifier. Returns
+ *  null for `self.x.method()` and other compound receivers — a module-level
+ *  rule like `os.system` should not match `shim.os.system`. */
+function plainReceiver(fnNode: TsNode): string | null {
+  const obj = fnNode.childForFieldName("object");
+  return obj?.type === "identifier" ? obj.text : null;
+}
+
+/** Is this expression a string ASSEMBLED at runtime?
+ *
+ *  The discriminator for SQL injection. `execute("SELECT 1")` is a constant and
+ *  says nothing; `execute(f"... {x}")` is a query built from parts, which is
+ *  the shape every SQL-injection finding has. Parameterised queries —
+ *  `execute("... %s", (x,))` — are a literal plus a params tuple and correctly
+ *  do not match. */
+function isAssembledString(node: TsNode | null): boolean {
+  if (!node) return false;
+  switch (node.type) {
+    case "string":
+      // An f-string carries `interpolation` children; a plain literal doesn't.
+      return node.namedChildren.some((c) => c?.type === "interpolation");
+    case "binary_operator": {
+      const op = node.childForFieldName("operator")?.text;
+      if (op !== "+" && op !== "%") return false;
+      // Require a string on one side so arithmetic doesn't match.
+      const left = node.childForFieldName("left");
+      const right = node.childForFieldName("right");
+      return left?.type === "string" || right?.type === "string";
+    }
+    case "call": {
+      // "...".format(x)
+      const fn = node.childForFieldName("function");
+      return (
+        fn?.type === "attribute" &&
+        fn.childForFieldName("attribute")?.text === "format" &&
+        fn.childForFieldName("object")?.type === "string"
+      );
+    }
+    default:
+      return false;
+  }
+}
+
+/** Methods that hand a string to a database engine. Matched on the method name
+ *  plus an assembled-string argument, not on the receiver — real code calls
+ *  these on `cursor`, `conn`, `db`, `session` and half a dozen ORM objects, so
+ *  the argument shape carries the precision instead. */
+const SQL_EXEC_METHODS = new Set([
+  "execute",
+  "executemany",
+  "executescript",
+  "raw",
+]);
+
+/** Functions that wrap a query string on its way to the engine. SQLAlchemy's
+ *  `text()` is how raw SQL is written in every SQLAlchemy codebase —
+ *  `execute(text(q))` — so a rule that only looks at the outer argument sees a
+ *  function call and gives up. Unwrapped, then judged on the same terms as any
+ *  other query. */
+const SQL_WRAPPERS = new Set(["text"]);
+
+/** Look through `text(...)` to the query it carries. */
+function unwrapSqlArg(arg: TsNode | null): TsNode | null {
+  if (arg?.type !== "call") return arg;
+  const wrapper = arg.childForFieldName("function");
+  if (wrapper?.type !== "identifier" || !SQL_WRAPPERS.has(wrapper.text)) return arg;
+  const inner = arg.childForFieldName("arguments");
+  return inner ? firstPositional(inner) : arg;
+}
+
+/** subprocess entry points that accept `shell=`. */
+const SUBPROCESS_FUNCTIONS = new Set([
+  "run",
+  "call",
+  "check_call",
+  "check_output",
+  "Popen",
+]);
+
+interface SinkRuleHit {
+  ruleId: string;
+  severity: SinkSeverity;
+}
+
+/** Match one call node against the sink rules. Returns null for the
+ *  overwhelming majority of calls. */
+function matchSinkRule(
+  call: TsNode,
+  fnNode: TsNode,
+  calleeName: string,
+  /** Was this local name assigned a string built from parts, earlier in the
+   *  same function? See the bounded-lookback note on the SQL rule. */
+  isAssembledVar: (name: string) => boolean
+): SinkRuleHit | null {
+  const argList = call.childForFieldName("arguments");
+  const bare = fnNode.type === "identifier";
+  const recv = bare ? null : plainReceiver(fnNode);
+
+  // Code execution: bare eval()/exec() only. `obj.eval()` is somebody's own
+  // method and matching it is how a scanner earns its reputation for noise.
+  if (bare && (calleeName === "eval" || calleeName === "exec")) {
+    return { ruleId: `py-${calleeName}`, severity: "high" };
+  }
+
+  if (!argList) return null;
+
+  // Command execution.
+  if (recv === "os" && (calleeName === "system" || calleeName === "popen")) {
+    return { ruleId: "py-os-command", severity: "high" };
+  }
+  if (recv === "subprocess" && SUBPROCESS_FUNCTIONS.has(calleeName)) {
+    // Without shell=True the argv form is safe by construction — no shell to
+    // inject into — so the kwarg IS the finding.
+    const shell = kwarg(argList, "shell");
+    if (shell?.text === "True") {
+      return { ruleId: "py-subprocess-shell", severity: "high" };
+    }
+    return null;
+  }
+
+  // Deserialisation.
+  if (
+    (recv === "pickle" || recv === "cPickle" || recv === "dill") &&
+    (calleeName === "load" || calleeName === "loads")
+  ) {
+    return { ruleId: "py-pickle-load", severity: "high" };
+  }
+  if (recv === "yaml" && (calleeName === "load" || calleeName === "load_all")) {
+    // yaml.load with a Safe loader is the documented safe form.
+    const loader = kwarg(argList, "Loader");
+    if (loader && /Safe/.test(loader.text)) return null;
+    return { ruleId: "py-yaml-unsafe-load", severity: "high" };
+  }
+
+  // SQL built by string assembly.
+  //
+  // BOUNDED LOOKBACK, not taint. Real code almost never assembles the query
+  // inside the call — pygoat's SQL-injection lab is the normal shape:
+  //
+  //   sql_query = "SELECT * FROM login WHERE user='" + name + "'"
+  //   val = login.objects.raw(sql_query)
+  //
+  // so a call-site-only rule fires on almost no real SQL injection. We
+  // therefore accept a bare local that was assigned an assembled string
+  // earlier in the SAME function. That is a syntactic local-variable lookup,
+  // and it is worth being precise about what it does NOT do: it says nothing
+  // about whether the assembled parts are untrusted. "Assembled" is not
+  // "tainted" — establishing that is slice 5's job, and until then this rule
+  // claims exactly what it can see, which is that the query was built rather
+  // than written.
+  if (!bare && SQL_EXEC_METHODS.has(calleeName)) {
+    const arg = unwrapSqlArg(firstPositional(argList));
+    const assembled =
+      isAssembledString(arg) ||
+      (arg?.type === "identifier" && isAssembledVar(arg.text));
+    return assembled ? { ruleId: "py-sql-assembled", severity: "high" } : null;
+  }
+
+  // Transport security switched off.
+  if (kwarg(argList, "verify")?.text === "False" && recv !== null) {
+    return { ruleId: "py-tls-verify-disabled", severity: "medium" };
+  }
+
+  return null;
+}
+
+/** Cap per file so a generated or pathological file can't flood the panel. */
+const MAX_SINKS_PER_FILE = 100;
+
 // ------------------- parseDirect: AST walk with type tracking -------------------
 
 interface PyClassScope {
@@ -282,6 +737,9 @@ interface PyMethodScope {
   decisionPoints: number;
   /** True for class methods — drives self.method() / cls.method() resolution. */
   isInClassMethod: boolean;
+  /** Local names assigned a string built from parts, for the SQL rule. See
+   *  isAssembledString and the note on bounded lookback in matchSinkRule. */
+  assembled: Set<string>;
 }
 
 function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
@@ -309,6 +767,46 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   const seenImportSpecs = new Set<string>();
   const classStack: PyClassScope[] = [];
   const methodStack: PyMethodScope[] = [];
+  /** Route decorator seen on the definition we are about to descend into.
+   *  Consumed by the `function_definition` case on ENTRY (not on push) so a
+   *  decorated inner function can't steal its enclosing function's marker. */
+  let pendingEntryPoint: EntryPointInfo | null = null;
+  /** Rows read out of a Django URLconf table, if this file is one. */
+  const routes: RouteDeclaration[] = [];
+  const isUrlconf = DJANGO_URLCONF_IMPORT.test(file.content);
+  const sinks: SinkFinding[] = [];
+  /** Module-scope counterpart of PyMethodScope.assembled. */
+  const moduleAssembled = new Set<string>();
+  /** Sticky by design: if ANY assignment in the function builds the string from
+   *  parts, the query can be assembled, so a later `q = "SELECT 1"` does not
+   *  clear it. Sticky over last-write-wins because branches
+   *  (`if c: q = f"..." else: q = "..."`) would otherwise resolve on walk order,
+   *  which is arbitrary. Costs the odd extra finding a human glances at; the
+   *  alternative silently drops real ones. */
+  const markAssembled = (name: string) => {
+    (currentMethod()?.assembled ?? moduleAssembled).add(name);
+  };
+  const isAssembledVar = (name: string): boolean => {
+    for (let i = methodStack.length - 1; i >= 0; i--) {
+      if (methodStack[i].assembled.has(name)) return true;
+    }
+    return moduleAssembled.has(name);
+  };
+  /** Line starts, computed once, so a snippet lookup isn't an O(n) rescan. */
+  let lineStarts: number[] | null = null;
+  const snippetAt = (row: number): string => {
+    if (!lineStarts) {
+      lineStarts = [0];
+      for (let i = 0; i < file.content.length; i++) {
+        if (file.content[i] === "\n") lineStarts.push(i + 1);
+      }
+    }
+    const start = lineStarts[row] ?? 0;
+    let end = file.content.indexOf("\n", start);
+    if (end < 0) end = file.content.length;
+    const text = file.content.slice(start, end).trim();
+    return text.length > 200 ? `${text.slice(0, 200)}…` : text;
+  };
 
   function currentClass(): PyClassScope | null {
     return classStack[classStack.length - 1] ?? null;
@@ -413,11 +911,11 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
    *  through isAbstract instead. */
   function extractPythonParents(
     classNode: TsNode
-  ): { parentClass?: string; isAbstract: boolean } {
+  ): { parentClass?: string; baseClasses: string[]; isAbstract: boolean } {
     const args = classNode.namedChildren.find(
       (c) => c.type === "argument_list"
     );
-    if (!args) return { isAbstract: false };
+    if (!args) return { baseClasses: [], isAbstract: false };
     const names: string[] = [];
     for (const arg of args.namedChildren) {
       if (arg.type === "identifier") names.push(arg.text);
@@ -434,7 +932,11 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
       (n) => n !== "ABC" && n !== "ABCMeta" && n !== "Protocol"
     );
     return {
+      // First base stays the "primary" one so class diagrams are unchanged.
       parentClass: realParents[0],
+      // ...and the full list, because Python mixins routinely come first and
+      // anything following only the head walks straight past the real base.
+      baseClasses: realParents,
       isAbstract,
     };
   }
@@ -745,7 +1247,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         // stays false; isAbstract reflects ABC / ABCMeta / Protocol
         // parents.
         if (className !== "<anon>" && bodyNode) {
-          const { parentClass, isAbstract } = extractPythonParents(node);
+          const { parentClass, baseClasses, isAbstract } = extractPythonParents(node);
           parsedClasses.push({
             name: className,
             startRow: node.startPosition.row,
@@ -753,6 +1255,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             fields: collectFullPythonFields(bodyNode),
             methodNames,
             parentClass,
+            ...(baseClasses.length > 1 ? { baseClasses } : {}),
             implements: [],
             isInterface: false,
             isAbstract,
@@ -768,12 +1271,17 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         const endRow = node.endPosition.row;
         const isInClass = classStack.length > 0;
         const locals = collectMethodParams(node, isInClass);
+        // Claim the marker NOW: the body is walked before we push, and a
+        // decorated function nested in this one would otherwise overwrite it.
+        const entryPoint = pendingEntryPoint ?? undefined;
+        pendingEntryPoint = null;
 
         methodStack.push({
           name: fnName,
           locals,
           decisionPoints: 0,
           isInClassMethod: isInClass,
+          assembled: new Set(),
         });
         const body = node.childForFieldName("body");
         if (body) for (const child of body.namedChildren) visit(child);
@@ -785,7 +1293,24 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           complexity: 1 + ms.decisionPoints,
           containerType: isInClass ? currentClass()?.name : undefined,
           bodyHash: body ? hashSubtree(body) : undefined,
+          entryPoint,
         });
+        return;
+      }
+
+      case "decorated_definition": {
+        // Children are visited exactly as the default case would, so decorator
+        // call edges keep being recorded — only the marker is new.
+        for (const child of node.namedChildren) {
+          if (!child || child.type !== "decorator") continue;
+          const route = readRouteDecorator(child);
+          if (route) {
+            pendingEntryPoint = route;
+            break;
+          }
+        }
+        for (const child of node.namedChildren) visit(child);
+        pendingEntryPoint = null;
         return;
       }
 
@@ -805,6 +1330,39 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             if (fn?.type === "identifier") typeName = fn.text;
           }
           if (typeName) m.locals.set(left.text, typeName);
+        }
+        // Independent of the type pass above, and not gated on being inside a
+        // function — module-level query building is just as real.
+        if (left?.type === "identifier" && isAssembledString(valueNode)) {
+          markAssembled(left.text);
+        }
+        for (const child of node.namedChildren) visit(child);
+        return;
+      }
+
+      case "augmented_assignment": {
+        // `sql += ...` only assembles a query when TEXT is being appended.
+        //
+        // Measured on Zulip: marking every `+=` target flagged
+        // `query += sql.SQL(...).format(field=sql.Identifier(f))` — psycopg2's
+        // composition API, which exists precisely to build dynamic SQL safely
+        // and escapes on the caller's behalf. That was the single reachable
+        // high-severity finding on a real production codebase, and it was
+        // wrong.
+        //
+        // So: an assembled expression or a bare name counts (we cannot see
+        // what a variable holds, and that is the risky case). A call does not
+        // — a function returned a value, which is not us watching text being
+        // glued together. Nor does a plain literal: `q += " AND active"` is
+        // still a constant query. Costs us `q += get_filter()`; that is a
+        // declared miss, not a wrong answer.
+        const left = node.childForFieldName("left");
+        const op = node.childForFieldName("operator")?.text;
+        const right = node.childForFieldName("right");
+        const appendsText =
+          isAssembledString(right) || right?.type === "identifier";
+        if (left?.type === "identifier" && op === "+=" && appendsText) {
+          markAssembled(left.text);
         }
         for (const child of node.namedChildren) visit(child);
         return;
@@ -828,6 +1386,30 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             const objNode = fnNode.childForFieldName("object");
             if (attrNode?.type === "identifier") calleeName = attrNode.text;
             if (objNode) calleeType = resolveReceiverType(objNode);
+          }
+          if (calleeName && isUrlconf) {
+            const row = readUrlconfRow(node, calleeName);
+            if (row) routes.push(row);
+          }
+          if (calleeName) {
+            // Not gated on isUrlconf: DRF routers are routinely registered in
+            // files that never import django.urls. The ViewSet suffix carries
+            // the precision instead.
+            const reg = readRouterRegistration(node, fnNode, calleeName);
+            if (reg) routes.push(reg);
+          }
+          if (calleeName && sinks.length < MAX_SINKS_PER_FILE) {
+            const hit = matchSinkRule(node, fnNode, calleeName, isAssembledVar);
+            if (hit) {
+              sinks.push({
+                ruleId: hit.ruleId,
+                severity: hit.severity,
+                line: node.startPosition.row + 1,
+                inFunction: currentMethod()?.name ?? null,
+                inContainerType: currentClass()?.name,
+                snippet: snippetAt(node.startPosition.row),
+              });
+            }
           }
           if (calleeName) {
             calls.push({
@@ -875,6 +1457,8 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     fileComplexity: 1 + totalDecisionPoints,
     parseError: false,
     classes: parsedClasses,
+    ...(routes.length ? { routes } : {}),
+    ...(sinks.length ? { sinks } : {}),
   };
 }
 

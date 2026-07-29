@@ -35,7 +35,7 @@ export default async function SecurityRoute({
       <OrientationStrip
         eyebrow="Security · code + dependencies"
         title="What deserves a security review."
-        line="Three deterministic scanners — incidents, secrets, risky eval/exec. Every finding maps to an advisory, a known incident, or a literal match; the list sorts worst-severity first, so start at the top."
+        line="Four deterministic scanners — incidents, secrets, code paths, risky eval/exec. Every finding maps to an advisory, a known incident, or a literal match. Code-path findings also say whether anything can actually reach them: a traced path means reachable from an entry point, not that the call happens on every request."
       />
 
       <SecurityPanel snapshot={current} sessionId={id} />

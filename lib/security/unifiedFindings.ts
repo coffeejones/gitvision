@@ -12,12 +12,14 @@
 // as the least.
 
 import type { IncidentMatch } from "./knownIncidents";
+import type { ClassifiedSink } from "./reachability";
 import type { RiskyPatternFinding } from "./riskyPatterns";
 import type { SecretFinding } from "./types";
 
 export type UnifiedFinding =
   | { kind: "incident"; severity: "high"; data: IncidentMatch }
   | { kind: "secret"; severity: "high" | "medium" | "low"; data: SecretFinding }
+  | { kind: "sink"; severity: "high" | "medium" | "low"; data: ClassifiedSink }
   | { kind: "pattern"; severity: "info"; data: RiskyPatternFinding };
 
 export const SEVERITY_RANK: Record<UnifiedFinding["severity"], number> = {
@@ -27,17 +29,28 @@ export const SEVERITY_RANK: Record<UnifiedFinding["severity"], number> = {
   info: 0,
 };
 
-/** Merge the three scanners into one list, sorted most-severe first. Stable:
+/** Merge the scanners into one list, sorted most-severe first. Stable:
  *  Array.prototype.sort is stable in modern engines, so equal-rank items keep
- *  input order (incidents → secrets → patterns). */
+ *  input order (incidents → secrets → sinks → patterns).
+ *
+ *  Sinks arrive already ordered by reachability-then-severity (classifySinks),
+ *  and that order is preserved WITHIN a severity band by the stable sort. A
+ *  reachable finding and an unknown one of the same class share a severity —
+ *  the difference between them is confidence, which the row renders as its own
+ *  axis rather than by inflating the severity. Only sinks we can say something
+ *  about are passed in: see reachableFirst below. */
 export function buildUnifiedFindings(
   incidentMatches: IncidentMatch[],
   secretFindings: SecretFinding[],
   patternFindings: RiskyPatternFinding[],
+  sinkFindings: ClassifiedSink[] = [],
 ): UnifiedFinding[] {
   const all: UnifiedFinding[] = [
     ...incidentMatches.map(
       (m) => ({ kind: "incident", severity: "high", data: m }) as const,
+    ),
+    ...sinkFindings.map(
+      (s) => ({ kind: "sink", severity: s.severity, data: s }) as const,
     ),
     ...secretFindings.map(
       (s) =>

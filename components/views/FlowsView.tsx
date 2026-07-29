@@ -370,11 +370,12 @@ export function FlowsView({
         aren&rsquo;t visible here.{" "}
         {resolution.ownTotal > 0 && (
           <>
-            Of the {resolution.ownTotal.toLocaleString()} calls that point at this repo&rsquo;s own
-            functions, {resolution.ownPct}% were traced to their definition. Calls into libraries
-            and the language itself aren&rsquo;t drawn — there&rsquo;s nothing in this repo to point
-            them at — and where several functions share a name, we leave the arrow out rather than
-            guess which one.
+            Of the {resolution.ownTotal.toLocaleString()} calls we can tell point at this
+            repo&rsquo;s own functions, {resolution.ownPct}% were traced to their definition. Calls
+            into libraries and the language itself aren&rsquo;t drawn — there&rsquo;s nothing in
+            this repo to point them at — and where several functions share a name, or a method is
+            called on something we couldn&rsquo;t identify, we leave the arrow out rather than
+            guess.
           </>
         )}
       </p>

@@ -23,7 +23,7 @@
 // ever lands, this is the file that gets to change its mind.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { CodeGraph } from "./types";
+import type { CodeGraph, EntryPointInfo } from "./types";
 import { isTestFile } from "./testCoverage";
 import { cmpStr } from "../deterministicSort";
 
@@ -50,6 +50,13 @@ export interface FlowEntryPoint {
   kind: FlowEntryKind;
   /** Ranking score — higher is a better starting point. Ordering only. */
   score: number;
+  /** Set when a language plugin DECLARED this an entry point (a route
+   *  decorator, a URLconf row) rather than the name/path heuristic guessing it.
+   *  The `kind` stays "route-like" either way so existing consumers are
+   *  unaffected — this field is the difference between evidence and a guess,
+   *  and it carries the method and path for anything that wants to say
+   *  "reachable from POST /login". */
+  declared?: EntryPointInfo;
 }
 
 export interface FlowTraceNode {
@@ -113,7 +120,24 @@ export interface FlowResolution {
   /** Own-code calls that resolved. Counted on the SAME population as ownMissed
    *  (production callers only) — an asymmetric count inflates the score. */
   ownResolved: number;
-  /** Calls naming an own-repo function that failed to resolve. */
+  /** Unresolved calls we have EVIDENCE were aimed at our own code.
+   *
+   *  A name match alone is not evidence. `request.POST.get()` names `get`, and
+   *  any Django repo defines a `get` somewhere, so counting name collisions
+   *  scored pygoat at 25% when 74 of its 103 "misses" were dict and ORM calls
+   *  the resolver was right to refuse. Python is worst hit — `get`, `save`,
+   *  `error`, `filter`, `update` are simultaneously ubiquitous library methods
+   *  and perfectly ordinary function names — but nothing here is Python-specific.
+   *
+   *  Evidence means one of:
+   *    - a bare call (no receiver) naming a function we define
+   *    - a receiver typed as a class we define — that one should have resolved
+   *
+   *  Known trade: when a plugin fails to type a receiver that really was ours,
+   *  the miss now goes uncounted, so this errs slightly optimistic. That is the
+   *  right direction for a number shown to users as a confidence signal, and
+   *  the honest alternative — counting things we cannot show are ours — was
+   *  wrong by a factor of four. */
   ownMissed: number;
   /** ownResolved + ownMissed — every production call that pointed at our code. */
   ownTotal: number;
@@ -129,6 +153,10 @@ export interface FlowGraphIndex {
   complexity: Map<string, number>;
   /** nodeId → 1-indexed definition line, for the explain endpoint. */
   line: Map<string, number>;
+  /** nodeId → the plugin's entry-point declaration, for the functions a
+   *  language plugin identified as externally triggered. Unlike every other map
+   *  here this one is EVIDENCE, not inference. */
+  declaredEntries: Map<string, EntryPointInfo>;
   resolution: FlowResolution;
 }
 
@@ -151,6 +179,7 @@ export function buildFlowIndex(
   const inDegree = new Map<string, number>();
   const complexity = new Map<string, number>();
   const line = new Map<string, number>();
+  const declaredEntries = new Map<string, EntryPointInfo>();
 
   for (const fn of cg.functions) {
     if (excludeTests && isTestFile(fn.filePath)) continue;
@@ -158,11 +187,18 @@ export function buildFlowIndex(
     complexity.set(id, fn.complexity);
     // 1-indexed: the explain endpoint matches on marker.startRow + 1.
     line.set(id, fn.startRow + 1);
+    if (fn.entryPoint) declaredEntries.set(id, fn.entryPoint);
   }
 
   // Every function name this repo defines — lets us tell "we failed to resolve
   // this" from "there was nothing here to resolve" (see FlowResolution).
   const ownNames = new Set(cg.functions.map((f) => f.name));
+  // Classes/structs this repo defines. A receiver typed as one of these is a
+  // call at our own code; a receiver typed as anything else is a library.
+  const ownContainers = new Set<string>();
+  for (const fn of cg.functions) {
+    if (fn.containerType) ownContainers.add(fn.containerType);
+  }
 
   let resolvedEdges = 0;
   let ownResolved = 0;
@@ -175,7 +211,12 @@ export function buildFlowIndex(
       if (
         c.fromFunction &&
         ownNames.has(c.calleeName) &&
-        !(excludeTests && isTestFile(c.fromFile))
+        !(excludeTests && isTestFile(c.fromFile)) &&
+        // Evidence check — see FlowResolution.ownMissed. A bare call naming our
+        // function is ours; a receiver we typed to one of our classes is ours;
+        // an untyped receiver tells us nothing and must not be counted.
+        (!c.hasReceiver ||
+          (c.calleeType !== undefined && ownContainers.has(c.calleeType)))
       ) {
         ownMissed++;
       }
@@ -203,6 +244,7 @@ export function buildFlowIndex(
     inDegree,
     complexity,
     line,
+    declaredEntries,
     resolution: {
       resolvedEdges,
       totalEdges,
@@ -221,14 +263,25 @@ export function buildFlowIndex(
 // ---------------------------------------------------------------------------
 // Entry-point ranking
 //
-// LANGUAGE-AGNOSTIC BY CONSTRUCTION: one generic pattern set applied uniformly
-// to every file, with no per-language or per-framework branch. It is a RANKING
-// heuristic, not dispatch — a miss costs a lower score, never a wrong result.
-// Measured on 20 stored snapshots: entries matching these patterns produce
-// traces with a median of 10 nodes and 64% usable, vs 5 nodes and 41% for
-// everything else. A real framework-aware entry-point pass (route tables,
-// decorators, exported handlers) would replace this and should; until then this
-// buys most of the benefit for none of the architecture.
+// TWO SOURCES, IN PRECEDENCE ORDER.
+//
+//  1. DECLARED (v0.82+) — a language plugin recognised a route decorator, a
+//     URLconf row, a registration call. Evidence. Carried on
+//     FunctionDef.entryPoint and read here via idx.declaredEntries. The plugin
+//     owns every framework detail; this file only asks "did someone declare
+//     it", which is what keeps the module language-agnostic.
+//
+//  2. HEURISTIC — the pattern set below, applied uniformly to every file with
+//     no per-language branch. A RANKING signal, not dispatch: a miss costs a
+//     lower score, never a wrong result. Measured on 20 stored snapshots,
+//     entries matching it produce traces with a median of 10 nodes and 64%
+//     usable, vs 5 nodes and 41% for everything else.
+//
+// The heuristic was always meant to be replaced by (1) — measured on Python it
+// found 1 route-like entry in a Flask app and 1 in a Django app, because it
+// looks at file and function NAMES and routing is declared somewhere else
+// entirely. It stays as the fallback for languages and frameworks no reader
+// covers yet, which is still most of them.
 // ---------------------------------------------------------------------------
 
 const ROUTE_LIKE_PATH =
@@ -264,15 +317,21 @@ export function findFlowEntryPoints(
     if (fanOut === 0) continue;
     const fanIn = idx.inDegree.get(id) ?? 0;
     const [filePath, name] = splitFlowNodeId(id);
-    const routeLike = looksLikeEntryPoint(filePath, name);
+    const declared = idx.declaredEntries.get(id);
+    const routeLike = !!declared || looksLikeEntryPoint(filePath, name);
     const isRoot = fanIn === 0;
     if (!routeLike && !isRoot && fanOut < minFanOut) continue;
 
-    // Score: route-like dominates (it is the measured signal), then nothing-
-    // calls-it, then raw fan-out as a weak tiebreak.
+    // Score: a plugin's declaration outranks everything — it is evidence, where
+    // the rest is inference. Then route-like (the measured heuristic), then
+    // nothing-calls-it, then raw fan-out as a weak tiebreak.
     const kind: FlowEntryKind = routeLike ? "route-like" : isRoot ? "root" : "orchestrator";
-    const score = (routeLike ? 1000 : 0) + (isRoot ? 100 : 0) + Math.min(fanOut, 50);
-    out.push({ id, filePath, name, fanOut, fanIn, kind, score });
+    const score =
+      (declared ? 2000 : 0) +
+      (routeLike ? 1000 : 0) +
+      (isRoot ? 100 : 0) +
+      Math.min(fanOut, 50);
+    out.push({ id, filePath, name, fanOut, fanIn, kind, score, declared });
   }
 
   out.sort(
@@ -282,6 +341,42 @@ export function findFlowEntryPoints(
       cmpStr(a.name, b.name)
   );
   return out.slice(0, limit);
+}
+
+/** Every function a plugin DECLARED an entry point, whatever its fan-out.
+ *
+ *  Separate from findFlowEntryPoints because the two answer different
+ *  questions. That one ranks starting points for a readable diagram, so it
+ *  drops fan-out-0 functions — a one-node trace is not a story. Reachability
+ *  cannot drop them: a route handler that calls nothing still executes its own
+ *  body, and a vulnerable sink written inline in that handler is as reachable
+ *  as anything gets.
+ *
+ *  Sorted deterministically; no ranking, because every result here is evidence
+ *  and there is nothing to rank. */
+export function findDeclaredEntryPoints(
+  cg: CodeGraph,
+  index?: FlowGraphIndex
+): FlowEntryPoint[] {
+  const idx = index ?? buildFlowIndex(cg);
+  const out: FlowEntryPoint[] = [];
+  for (const [id, declared] of idx.declaredEntries) {
+    const [filePath, name] = splitFlowNodeId(id);
+    out.push({
+      id,
+      filePath,
+      name,
+      fanOut: idx.adjacency.get(id)?.size ?? 0,
+      fanIn: idx.inDegree.get(id) ?? 0,
+      kind: "route-like",
+      score: 2000,
+      declared,
+    });
+  }
+  out.sort(
+    (a, b) => cmpStr(a.filePath, b.filePath) || cmpStr(a.name, b.name)
+  );
+  return out;
 }
 
 // ---------------------------------------------------------------------------

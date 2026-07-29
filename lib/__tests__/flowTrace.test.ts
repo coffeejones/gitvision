@@ -2,14 +2,32 @@ import { describe, it, expect } from "vitest";
 import {
   buildFlowIndex,
   computeFlowTrace,
+  findDeclaredEntryPoints,
   findFlowEntryPoints,
   flowNodeId,
   looksLikeEntryPoint,
 } from "../codeAnalysis/flowTrace";
-import type { CodeGraph, CallEdge, FunctionDef } from "../codeAnalysis/types";
+import type {
+  CodeGraph,
+  CallEdge,
+  EntryPointInfo,
+  FunctionDef,
+} from "../codeAnalysis/types";
 
 function fn(filePath: string, name: string, complexity = 1): FunctionDef {
   return { filePath, name, startRow: 0, endRow: 5, complexity };
+}
+/** A function a plugin declared an entry point — a decorated route handler. */
+function routeFn(
+  filePath: string,
+  name: string,
+  route: string,
+  methods?: string[]
+): FunctionDef {
+  const entryPoint: EntryPointInfo = methods
+    ? { kind: "http-route", methods, route, via: "@app.get" }
+    : { kind: "http-route", route, via: "@app.route" };
+  return { ...fn(filePath, name), entryPoint };
 }
 function call(
   fromFile: string,
@@ -240,5 +258,150 @@ describe("computeFlowTrace", () => {
     const t = computeFlowTrace(wide, { filePath: "r.ts", name: "root" }, { maxNodes: 4 })!;
     expect(t.nodes).toHaveLength(4);
     expect(t.truncated).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Declared entry points — evidence from a plugin, not inference from a name.
+// ---------------------------------------------------------------------------
+describe("declared entry points", () => {
+  it("indexes a plugin's declaration verbatim", () => {
+    const cg = graph([routeFn("views.py", "search", "/search", ["GET"])], []);
+    const idx = buildFlowIndex(cg);
+    expect(idx.declaredEntries.get(flowNodeId("views.py", "search"))).toEqual({
+      kind: "http-route",
+      methods: ["GET"],
+      route: "/search",
+      via: "@app.get",
+    });
+  });
+
+  it("counts a declared handler as route-like even when its name and path look like nothing", () => {
+    // The heuristic cannot see this: "search" in "views.py" matches neither the
+    // route-like path list nor the name patterns. That miss is exactly why
+    // Python measured 1 route-like entry across a whole Flask app.
+    expect(looksLikeEntryPoint("views.py", "search")).toBe(false);
+
+    const cg = graph(
+      [routeFn("views.py", "search", "/search", ["GET"]), fn("db.py", "query")],
+      [call("views.py", "search", "db.py", "query")]
+    );
+    const [entry] = findFlowEntryPoints(cg);
+    expect(entry.kind).toBe("route-like");
+    expect(entry.declared?.route).toBe("/search");
+  });
+
+  it("ranks a declared entry above one the heuristic merely guessed", () => {
+    const cg = graph(
+      [
+        routeFn("views.py", "search", "/search", ["GET"]),
+        fn("handlers/main.py", "main"),
+        fn("db.py", "query"),
+        fn("db.py", "other"),
+      ],
+      [
+        call("views.py", "search", "db.py", "query"),
+        call("handlers/main.py", "main", "db.py", "other"),
+      ]
+    );
+    const eps = findFlowEntryPoints(cg);
+    expect(eps[0].name).toBe("search");
+    expect(eps[0].declared).toBeDefined();
+    // The guessed one still qualifies — it just ranks below the evidence.
+    expect(eps.find((e) => e.name === "main")?.declared).toBeUndefined();
+  });
+
+  it("returns declared handlers that call nothing, which the ranked list drops", () => {
+    // A route handler with no own-repo callees is not a story worth drawing, so
+    // findFlowEntryPoints skips it. Reachability still needs it: a sink written
+    // inline in that handler is as reachable as code gets.
+    const cg = graph([routeFn("views.py", "ping", "/ping", ["GET"])], []);
+    expect(findFlowEntryPoints(cg)).toHaveLength(0);
+
+    const declared = findDeclaredEntryPoints(cg);
+    expect(declared).toHaveLength(1);
+    expect(declared[0]).toMatchObject({ name: "ping", fanOut: 0, kind: "route-like" });
+  });
+
+  it("is empty for a graph no plugin declared anything in", () => {
+    const cg = graph([fn("a.py", "a"), fn("b.py", "b")], [call("a.py", "a", "b.py", "b")]);
+    expect(findDeclaredEntryPoints(cg)).toEqual([]);
+    expect(buildFlowIndex(cg).declaredEntries.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The resolution metric counts EVIDENCE, not name collisions.
+// ---------------------------------------------------------------------------
+describe("FlowResolution — own-code evidence", () => {
+  it("does not count a method call on an untyped receiver as our own miss", () => {
+    // `request.POST.get()` in a repo that happens to define a `get` somewhere.
+    // Scoring this as "we failed to resolve our own code" put pygoat at 25%
+    // when the resolver was correctly refusing 74 dict and ORM calls.
+    const cg = graph(
+      [fn("challenge/views.py", "get")],
+      [
+        {
+          fromFile: "app/views.py",
+          fromFunction: "search",
+          calleeName: "get",
+          toFile: null,
+          toFunction: null,
+          hasReceiver: true,
+        },
+      ]
+    );
+    const r = buildFlowIndex(cg).resolution;
+    expect(r.ownMissed).toBe(0);
+    expect(r.ownTotal).toBe(0);
+  });
+
+  it("still counts a bare call naming one of our functions", () => {
+    const cg = graph(
+      [fn("app/util.py", "helper")],
+      [call("app/views.py", "search", null, null)]
+    );
+    const withName = {
+      ...cg,
+      calls: [{ ...cg.calls[0], calleeName: "helper" }],
+    };
+    expect(buildFlowIndex(withName).resolution.ownMissed).toBe(1);
+  });
+
+  it("counts a receiver typed as a class we define — that one should have resolved", () => {
+    const cg = graph(
+      [{ ...fn("app/repo.py", "save"), containerType: "Repo" }],
+      [
+        {
+          fromFile: "app/views.py",
+          fromFunction: "create",
+          calleeName: "save",
+          toFile: null,
+          toFunction: null,
+          hasReceiver: true,
+          calleeType: "Repo",
+        },
+      ]
+    );
+    expect(buildFlowIndex(cg).resolution.ownMissed).toBe(1);
+  });
+
+  it("does not count a receiver typed as a class we do not define", () => {
+    // `session.exec()` where Session comes from a library.
+    const cg = graph(
+      [fn("app/db.py", "exec")],
+      [
+        {
+          fromFile: "app/views.py",
+          fromFunction: "run",
+          calleeName: "exec",
+          toFile: null,
+          toFunction: null,
+          hasReceiver: true,
+          calleeType: "Session",
+        },
+      ]
+    );
+    expect(buildFlowIndex(cg).resolution.ownMissed).toBe(0);
   });
 });

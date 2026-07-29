@@ -20,6 +20,12 @@ import Link from "next/link";
 import { ArrowUpRight, ShieldCheck } from "lucide-react";
 import { TOK } from "@/lib/sessionTheme";
 import type { IncidentMatch } from "@/lib/security/knownIncidents";
+import {
+  formatPath,
+  sinkRuleLabel,
+  REACHABILITY_LABELS,
+  type ClassifiedSink,
+} from "@/lib/security/reachability";
 import type { RiskyPatternFinding } from "@/lib/security/riskyPatterns";
 import type { SecretFinding } from "@/lib/security/types";
 import {
@@ -31,6 +37,7 @@ interface Props {
   incidentMatches: IncidentMatch[];
   secretFindings: SecretFinding[];
   patternFindings: RiskyPatternFinding[];
+  sinkFindings?: ClassifiedSink[];
   sessionId: string;
 }
 
@@ -38,12 +45,14 @@ export function FindingsList({
   incidentMatches,
   secretFindings,
   patternFindings,
+  sinkFindings = [],
   sessionId,
 }: Props) {
   const all = buildUnifiedFindings(
     incidentMatches,
     secretFindings,
     patternFindings,
+    sinkFindings,
   );
 
   if (all.length === 0) {
@@ -90,6 +99,9 @@ function rowKey(f: UnifiedFinding, fallbackIdx: number): string {
   if (f.kind === "secret") {
     return `secret-${f.data.filePath}-${f.data.line}-${fallbackIdx}`;
   }
+  if (f.kind === "sink") {
+    return `sink-${f.data.filePath}-${f.data.line}-${f.data.ruleId}-${fallbackIdx}`;
+  }
   return `pattern-${f.data.filePath}-${f.data.line}-${fallbackIdx}`;
 }
 
@@ -118,6 +130,9 @@ function FindingRow({
         )}
         {finding.kind === "secret" && (
           <SecretRowContent data={finding.data} sessionId={sessionId} />
+        )}
+        {finding.kind === "sink" && (
+          <SinkRowContent data={finding.data} sessionId={sessionId} />
         )}
         {finding.kind === "pattern" && (
           <PatternRowContent data={finding.data} sessionId={sessionId} />
@@ -356,5 +371,84 @@ function CleanListState() {
         </p>
       </div>
     </div>
+  );
+}
+
+/** A sink row carries TWO axes, deliberately kept apart: severity (what the
+ *  operation is) on the left badge, reachability (whether anything can get to
+ *  it) as its own chip. Collapsing them into one number would be the noise the
+ *  reachability work exists to remove.
+ *
+ *  When there is a path, it is shown. That is the finding's argument, and a
+ *  reader who disagrees can follow it — arrows mean REACHES, not "and then". */
+function SinkRowContent({
+  data,
+  sessionId,
+}: {
+  data: ClassifiedSink;
+  sessionId: string;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3">
+        <span
+          className="text-sm font-semibold tracking-tight truncate"
+          style={{ color: TOK.textPrimary }}
+          title={data.ruleId}
+        >
+          {sinkRuleLabel(data.ruleId)}
+        </span>
+        <ReachabilityChip reachability={data.reachability} />
+      </div>
+      <SourcePathLink
+        sessionId={sessionId}
+        filePath={data.filePath}
+        line={data.line}
+      />
+      {data.path && (
+        <span
+          className="text-xs font-mono truncate"
+          style={{ color: TOK.textSecondary }}
+          title={formatPath(data.path)}
+        >
+          {formatPath(data.path)}
+        </span>
+      )}
+      <span
+        className="text-xs font-mono truncate"
+        style={{ color: TOK.textMuted }}
+        title={data.snippet}
+      >
+        {data.snippet}
+      </span>
+    </>
+  );
+}
+
+/** Reachability reads as confidence, not severity — so only the state we can
+ *  actually prove gets colour. Everything else stays muted rather than
+ *  borrowing urgency it hasn't earned. */
+function ReachabilityChip({
+  reachability,
+}: {
+  reachability: ClassifiedSink["reachability"];
+}) {
+  const proven = reachability === "reachable";
+  return (
+    <span
+      className="text-[9px] uppercase tracking-[0.14em] font-medium px-1.5 py-0.5 rounded flex-shrink-0 whitespace-nowrap"
+      style={{
+        background: proven ? `${TOK.rose}1a` : "rgba(255,255,255,0.04)",
+        color: proven ? TOK.rose : TOK.textMuted,
+        border: `1px solid ${proven ? `${TOK.rose}40` : TOK.border}`,
+      }}
+      title={
+        proven
+          ? "A path exists from a function the outside world can trigger. It does not mean the call happens on every request."
+          : "No path to an entry point was found. That is not proof it is unreachable."
+      }
+    >
+      {REACHABILITY_LABELS[reachability]}
+    </span>
   );
 }

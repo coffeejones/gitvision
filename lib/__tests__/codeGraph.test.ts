@@ -15,6 +15,7 @@ function pf(over: Partial<ParsedFile> & { rel: string }): ParsedFile {
     fileComplexity: over.fileComplexity ?? 1,
     parseError: over.parseError ?? false,
     ...(over.classes !== undefined ? { classes: over.classes } : {}),
+    ...(over.routes !== undefined ? { routes: over.routes } : {}),
   };
 }
 
@@ -959,5 +960,571 @@ describe("buildCodeGraph — constructor calls", () => {
     const edge = g.calls.find((c) => c.calleeName === "Widget");
     expect(edge?.toFile).toBe("src/legacy.js");
     expect(edge?.toFunction).toBe("Widget");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Routing tables → handler entry points.
+//
+// A table names its handler in another file, so only this layer can resolve it.
+// The declining cases carry the weight: an entry point asserts that untrusted
+// input reaches a function, and a wrong one invents reachability that the
+// security layer would then use to justify suppressing real findings.
+// ---------------------------------------------------------------------------
+describe("buildCodeGraph — route declarations", () => {
+  const fn = (name: string, filePath: string) => ({
+    name,
+    startRow: 0,
+    endRow: 3,
+    complexity: 1,
+    filePath,
+  });
+  const view = (rel: string, ...names: string[]) =>
+    pf({ rel, functions: names.map((n) => fn(n, rel)) });
+  const entryOf = (g: ReturnType<typeof buildCodeGraph>, name: string) =>
+    g.functions.find((f) => f.name === name)?.entryPoint;
+
+  it("resolves a table row to a handler defined in another file", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        view("app/views.py", "xss"),
+        pf({
+          rel: "app/urls.py",
+          routes: [
+            { route: "/xss", targetModule: "views", targetName: "xss", via: "path()" },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "xss")).toEqual({
+      kind: "http-route",
+      route: "/xss",
+      via: "path()",
+    });
+  });
+
+  it("uses the module qualifier to pick between same-named handlers", () => {
+    // `from . import apis, views` then `apis.ping` must not land on views.ping.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        view("app/views.py", "ping"),
+        view("app/apis.py", "ping"),
+        pf({
+          rel: "app/urls.py",
+          routes: [
+            { route: "/api/ping", targetModule: "apis", targetName: "ping", via: "path()" },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.functions.find((f) => f.filePath === "app/apis.py")?.entryPoint?.route).toBe(
+      "/api/ping"
+    );
+    expect(g.functions.find((f) => f.filePath === "app/views.py")?.entryPoint).toBeUndefined();
+  });
+
+  it("falls back to the table's own directory when the module can't decide", () => {
+    // Two Django apps, each with views.home. The table in app_a owns app_a's.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        view("app_a/views.py", "home"),
+        view("app_b/views.py", "home"),
+        pf({
+          rel: "app_a/urls.py",
+          routes: [
+            { route: "/", targetModule: "views", targetName: "home", via: "path()" },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.functions.find((f) => f.filePath === "app_a/views.py")?.entryPoint).toBeDefined();
+    expect(g.functions.find((f) => f.filePath === "app_b/views.py")?.entryPoint).toBeUndefined();
+  });
+
+  it("stamps NOTHING when the target stays ambiguous", () => {
+    // Same name, same module name, neither in the table's directory. Picking
+    // one would invent reachability for whichever we guessed wrong.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        view("app_a/views.py", "home"),
+        view("app_b/views.py", "home"),
+        pf({
+          rel: "config/urls.py",
+          routes: [
+            { route: "/", targetModule: "views", targetName: "home", via: "path()" },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.functions.every((f) => f.entryPoint === undefined)).toBe(true);
+  });
+
+  it("resolves a bare target with no module qualifier", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        view("app/views.py", "home"),
+        pf({
+          rel: "app/urls.py",
+          routes: [{ route: "/", targetModule: null, targetName: "home", via: "path()" }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "home")?.route).toBe("/");
+  });
+
+  it("ignores a row naming a handler that doesn't exist", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        view("app/views.py", "home"),
+        pf({
+          rel: "app/urls.py",
+          routes: [
+            { route: "/gone", targetModule: "views", targetName: "missing", via: "path()" },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "home")).toBeUndefined();
+  });
+
+  it("lets a decorator on the handler win over a table pointing at it", () => {
+    const decorated = pf({ rel: "app/views.py", functions: [fn("home", "app/views.py")] });
+    decorated.functions[0].entryPoint = {
+      kind: "http-route",
+      methods: ["POST"],
+      route: "/decorated",
+      via: "@app.post",
+    };
+    const g = buildCodeGraph({
+      parsedFiles: [
+        decorated,
+        pf({
+          rel: "app/urls.py",
+          routes: [
+            { route: "/from-table", targetModule: "views", targetName: "home", via: "path()" },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "home")?.route).toBe("/decorated");
+  });
+
+  it("keeps the smallest route when one handler is wired to several", () => {
+    // pygoat wires sql_lab to both "sql_lab" and "sql_lab1". Whichever we keep
+    // must not depend on file iteration order.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        view("app/views.py", "lab"),
+        pf({
+          rel: "app/urls.py",
+          routes: [
+            { route: "/lab1", targetModule: "views", targetName: "lab", via: "path()" },
+            { route: "/lab", targetModule: "views", targetName: "lab", via: "path()" },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "lab")?.route).toBe("/lab");
+  });
+
+  it("carries methods through when a table states them", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        view("app/views.py", "submit"),
+        pf({
+          rel: "app/urls.py",
+          routes: [
+            {
+              route: "/submit",
+              methods: ["POST"],
+              targetModule: "views",
+              targetName: "submit",
+              via: "path()",
+            },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "submit")?.methods).toEqual(["POST"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Module-qualified calls: `crud.get_user_by_email()` where crud is a FILE.
+//
+// The plugin reports calleeType="crud" because that is what precedes the dot,
+// but no class carries that containerType, so the strict type match can never
+// hit — and hasReceiver blocks the top-level fallthrough. Measured on
+// full-stack-fastapi-template: 45 dropped edges, all of them route→crud and
+// route→security, i.e. the spine.
+//
+// Verified inert on Java (spring-petclinic) and TypeScript (this repo): +0/-0
+// edges, because those plugins don't report a bare module name as calleeType.
+// ---------------------------------------------------------------------------
+describe("buildCodeGraph — module-qualified calls", () => {
+  const crud = pf({
+    rel: "app/crud.py",
+    functions: [{ name: "get_user", startRow: 1, endRow: 5, complexity: 1 }],
+  });
+
+  it("resolves module.fn() when the caller imports the module's package", () => {
+    // `from app import crud` resolves to app/__init__.py, NOT app/crud.py — so
+    // a plain "did you import this file" check fails and the sibling-directory
+    // rule is what carries it.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        crud,
+        pf({ rel: "app/__init__.py" }),
+        pf({
+          rel: "app/api/login.py",
+          imports: [{ rawSpec: "app", resolvedPath: "app/__init__.py" }],
+          calls: [
+            { calleeName: "get_user", inFunction: "login", calleeType: "crud", hasReceiver: true },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls[0].toFile).toBe("app/crud.py");
+  });
+
+  it("resolves when the module file itself is imported", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        crud,
+        pf({
+          rel: "app/api/login.py",
+          imports: [{ rawSpec: "app.crud", resolvedPath: "app/crud.py" }],
+          calls: [
+            { calleeName: "get_user", inFunction: "login", calleeType: "crud", hasReceiver: true },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls[0].toFile).toBe("app/crud.py");
+  });
+
+  it("refuses when the receiver name doesn't match the file", () => {
+    // `helpers.get_user()` must not land in crud.py just because crud.py is the
+    // only file defining get_user.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        crud,
+        pf({
+          rel: "app/api/login.py",
+          imports: [{ rawSpec: "app.crud", resolvedPath: "app/crud.py" }],
+          calls: [
+            { calleeName: "get_user", inFunction: "login", calleeType: "helpers", hasReceiver: true },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls[0].toFile).toBeNull();
+  });
+
+  it("refuses when the caller imports nothing near the module", () => {
+    // Name-matching a file somewhere in the repo is not evidence on its own.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        crud,
+        pf({
+          rel: "other/place.py",
+          calls: [
+            { calleeName: "get_user", inFunction: "go", calleeType: "crud", hasReceiver: true },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls[0].toFile).toBeNull();
+  });
+
+  it("refuses to reach a METHOD through a module name", () => {
+    // A module call cannot land on a class method. Without this guard, an
+    // ordinary `x.push()` can resolve into any file that happens to define a
+    // same-named member.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "app/crud.py",
+          functions: [
+            { name: "get_user", startRow: 1, endRow: 5, complexity: 1, containerType: "Repo" },
+          ],
+        }),
+        pf({
+          rel: "app/api/login.py",
+          imports: [{ rawSpec: "app.crud", resolvedPath: "app/crud.py" }],
+          calls: [
+            { calleeName: "get_user", inFunction: "login", calleeType: "crud", hasReceiver: true },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls[0].toFile).toBeNull();
+  });
+
+  it("still prefers an exact containerType match over the module reading", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        crud,
+        pf({
+          rel: "app/models.py",
+          functions: [
+            { name: "get_user", startRow: 1, endRow: 5, complexity: 1, containerType: "crud" },
+          ],
+        }),
+        pf({
+          rel: "app/api/login.py",
+          imports: [{ rawSpec: "app.crud", resolvedPath: "app/crud.py" }],
+          calls: [
+            { calleeName: "get_user", inFunction: "login", calleeType: "crud", hasReceiver: true },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    // A real class named `crud` wins — that is the strict, evidence-backed match.
+    expect(g.calls[0].toFile).toBe("app/models.py");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Class-based views: the table names a CLASS, so the entry points are the
+// methods the framework invokes on it — which nothing in the repo calls.
+// ---------------------------------------------------------------------------
+describe("buildCodeGraph — class-based view routes", () => {
+  const method = (name: string, filePath: string, containerType: string) => ({
+    name,
+    startRow: 0,
+    endRow: 3,
+    complexity: 1,
+    containerType,
+    filePath,
+  });
+  const cls = (name: string, parentClass?: string) => ({
+    name,
+    startRow: 0,
+    endRow: 10,
+    fields: [],
+    methodNames: [],
+    ...(parentClass ? { parentClass } : {}),
+  });
+  const entryOf = (g: ReturnType<typeof buildCodeGraph>, name: string, file?: string) =>
+    g.functions.find((f) => f.name === name && (!file || f.filePath === file))?.entryPoint;
+
+  const asViewRow = {
+    route: "notifications/",
+    targetModule: "views",
+    targetName: "NotificationsView",
+    targetIsClass: true,
+    via: "path()",
+  };
+
+  it("marks the HTTP-verb methods a registered view defines", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "app/views.py",
+          classes: [cls("NotificationsView")],
+          functions: [
+            method("get", "app/views.py", "NotificationsView"),
+            method("post", "app/views.py", "NotificationsView"),
+            method("build_context", "app/views.py", "NotificationsView"),
+          ],
+        }),
+        pf({ rel: "app/urls.py", routes: [asViewRow] }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "get")?.route).toBe("notifications/");
+    expect(entryOf(g, "post")?.route).toBe("notifications/");
+    // A helper the framework never calls is not an entry point. It stays
+    // reachable only if something actually calls it.
+    expect(entryOf(g, "build_context")).toBeUndefined();
+  });
+
+  it("climbs to a base class when the registered class is pure configuration", () => {
+    // NetBox's shape: `class WirelessLANViewSet(NetBoxModelViewSet)` declares
+    // only queryset/serializer_class. The handlers live on the base, which the
+    // repo also defines — and that base really is externally invocable.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "app/api/views.py",
+          classes: [cls("SiteViewSet", "BaseViewSet")],
+        }),
+        pf({
+          rel: "app/api/base.py",
+          classes: [cls("BaseViewSet")],
+          functions: [
+            method("list", "app/api/base.py", "BaseViewSet"),
+            method("retrieve", "app/api/base.py", "BaseViewSet"),
+          ],
+        }),
+        pf({
+          rel: "app/api/urls.py",
+          routes: [
+            {
+              route: "sites",
+              targetModule: "views",
+              targetName: "SiteViewSet",
+              targetIsClass: true,
+              via: "router.register()",
+            },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "list")?.route).toBe("sites");
+    expect(entryOf(g, "retrieve")?.route).toBe("sites");
+  });
+
+  it("follows a LATER base when the first one is a mixin", () => {
+    // `class NetBoxModelViewSet(ETagMixin, ..., BaseViewSet)` — Python puts
+    // mixins first, so anything following only the head base walks into the
+    // mixin and never reaches the class that defines the handlers.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "app/views.py",
+          classes: [
+            {
+              ...cls("SiteView"),
+              parentClass: "LoginRequiredMixin",
+              baseClasses: ["LoginRequiredMixin", "BaseView"],
+            },
+          ],
+        }),
+        pf({
+          rel: "app/mixins.py",
+          classes: [cls("LoginRequiredMixin")],
+          functions: [method("check_perms", "app/mixins.py", "LoginRequiredMixin")],
+        }),
+        pf({
+          rel: "app/base.py",
+          classes: [cls("BaseView")],
+          functions: [method("post", "app/base.py", "BaseView")],
+        }),
+        pf({
+          rel: "app/urls.py",
+          routes: [
+            { route: "/site", targetModule: "views", targetName: "SiteView", targetIsClass: true, via: "path()" },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "post", "app/base.py")?.route).toBe("/site");
+    expect(entryOf(g, "check_perms")).toBeUndefined();
+  });
+
+  it("takes the nearest level's handlers, not a grandparent's override", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "app/views.py",
+          classes: [cls("SiteView", "MidView")],
+        }),
+        pf({
+          rel: "app/mid.py",
+          classes: [cls("MidView", "RootView")],
+          functions: [method("get", "app/mid.py", "MidView")],
+        }),
+        pf({
+          rel: "app/root.py",
+          classes: [cls("RootView")],
+          functions: [method("get", "app/root.py", "RootView")],
+        }),
+        pf({
+          rel: "app/urls.py",
+          routes: [
+            { route: "/site", targetModule: "views", targetName: "SiteView", targetIsClass: true, via: "path()" },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "get", "app/mid.py")?.route).toBe("/site");
+    expect(entryOf(g, "get", "app/root.py")).toBeUndefined();
+  });
+
+  it("stops climbing when the base class isn't in the repo", () => {
+    // DRF's ModelViewSet owns list/retrieve. There is nothing of ours to mark,
+    // and inventing an entry point would be worse than the miss.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "app/api/views.py",
+          classes: [cls("SiteViewSet", "ModelViewSet")],
+          functions: [method("get_queryset", "app/api/views.py", "SiteViewSet")],
+        }),
+        pf({
+          rel: "app/api/urls.py",
+          routes: [
+            {
+              route: "sites",
+              targetModule: "views",
+              targetName: "SiteViewSet",
+              targetIsClass: true,
+              via: "router.register()",
+            },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(entryOf(g, "get_queryset")).toBeUndefined();
+  });
+
+  it("declines when two classes share the registered name", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "a/views.py",
+          classes: [cls("HomeView")],
+          functions: [method("get", "a/views.py", "HomeView")],
+        }),
+        pf({
+          rel: "b/views.py",
+          classes: [cls("HomeView")],
+          functions: [method("get", "b/views.py", "HomeView")],
+        }),
+        pf({
+          rel: "config/urls.py",
+          routes: [
+            { route: "/", targetModule: "views", targetName: "HomeView", targetIsClass: true, via: "path()" },
+          ],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.functions.every((f) => f.entryPoint === undefined)).toBe(true);
+  });
+
+  it("survives an inheritance cycle", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "app/views.py", classes: [cls("A", "B"), cls("B", "A")] }),
+        pf({
+          rel: "app/urls.py",
+          routes: [{ route: "/", targetModule: "views", targetName: "A", targetIsClass: true, via: "path()" }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.functions).toEqual([]);
   });
 });

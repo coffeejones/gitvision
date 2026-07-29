@@ -64,11 +64,107 @@ export interface ParsedImport {
   kind?: ImportKind;
 }
 
+/** Something the outside world triggers directly — the start of a path that
+ *  untrusted input can travel (v0.82+).
+ *
+ *  Produced by the language plugin, which owns ALL framework knowledge.
+ *  Consumers (flow traces, reachability) read only this field and stay
+ *  language-agnostic — the invariant that keeps flowTrace free of per-framework
+ *  branches.
+ *
+ *  Why a declared field rather than a heuristic: routing is almost never a call
+ *  edge, so the graph cannot see it. Python alone declares routes four
+ *  unrelated ways — decorators (Flask/FastAPI), a URLconf table (Django), an
+ *  OpenAPI spec (connexion), and registration calls (aiohttp). Each needs its
+ *  own reader; they all emit this one shape. */
+export interface EntryPointInfo {
+  kind: "http-route";
+  /** Uppercased HTTP methods when the framework states them. `@app.route(...)`
+   *  with no explicit `methods=` is GET-only in Flask, but we record what was
+   *  WRITTEN rather than inferring a default — an inferred method would be
+   *  indistinguishable from a declared one downstream. */
+  methods?: string[];
+  /** Route path, when it is a static string literal. f-strings and computed
+   *  paths are left undefined rather than guessed. */
+  route?: string;
+  /** What matched, verbatim ("@app.get"). Evidence for the UI, and the first
+   *  thing to look at when a detection turns out to be wrong. */
+  via: string;
+}
+
+/** How bad the operation is if untrusted input reaches it (v0.82+).
+ *
+ *  This is the SINK-CLASS axis only — what the call does, never whether anyone
+ *  can trigger it. Reachability is the other axis and is computed separately.
+ *  Nothing here means "exploitable": that word is not available until taint
+ *  analysis exists. */
+export type SinkSeverity = "high" | "medium" | "low";
+
+/** A dangerous operation found in source (v0.82+).
+ *
+ *  Deterministic and syntactic: a sink is recorded because of what the code
+ *  SAYS, never because of what it might receive. Every rule carries a
+ *  discriminator tight enough that the finding stands on its own — the
+ *  reachability pass ranks these, it does not rescue them. */
+export interface SinkFinding {
+  /** Stable rule id, e.g. "py-os-system". Keyed by analytics and the UI. */
+  ruleId: string;
+  severity: SinkSeverity;
+  /** 1-indexed line of the call. */
+  line: number;
+  /** Enclosing function, null at module scope. Module-scope sinks run at
+   *  import time and can never be reached FROM an entry point — that is a real
+   *  distinction, not a gap, so it is recorded rather than dropped. */
+  inFunction: string | null;
+  /** Class of the enclosing function, when there is one. Mirrors
+   *  ParsedCall.fromContainerType so the same-named-method ambiguity is
+   *  resolvable downstream. */
+  inContainerType?: string;
+  /** The source line, trimmed and length-capped. Evidence for the reader. */
+  snippet: string;
+}
+
+/** A route declared in a routing TABLE rather than on the handler itself —
+ *  Django's `urls.py`, an OpenAPI spec, a registration call (v0.82+).
+ *
+ *  The handler lives in a different file, so a per-file parser can only NAME
+ *  its target. Resolving that name to a function needs every file parsed, which
+ *  happens in buildCodeGraph — the same place call edges are resolved, and for
+ *  the same reason.
+ *
+ *  Deliberately dumb: the plugin records what it READ. It does not guess which
+ *  function is meant, and the resolver declines rather than pick when the name
+ *  is ambiguous. */
+export interface RouteDeclaration {
+  /** Route path as written. */
+  route: string;
+  /** Uppercased HTTP methods when the table states them. Django's `path()`
+   *  does not, so this is usually undefined — the handler decides. */
+  methods?: string[];
+  /** Module qualifier exactly as written: "views" for `views.home`. null when
+   *  the handler was referenced bare (`path("x", home)`). */
+  targetModule: string | null;
+  /** Handler name — a function, or a CLASS when targetIsClass is set. */
+  targetName: string;
+  /** True when the table registered a class-based view (`MyView.as_view()`, a
+   *  DRF ViewSet) rather than a function (v0.82+). The entry point is then not
+   *  the class but the methods the framework invokes on it — see
+   *  FRAMEWORK_INVOKED_METHODS in codeGraph. */
+  targetIsClass?: boolean;
+  /** What matched, verbatim ("path()"). Evidence, and the first thing to look
+   *  at when a resolution turns out wrong. */
+  via: string;
+}
+
 export interface ParsedFunction {
   name: string;
   startRow: number;
   endRow: number;
   complexity: number;
+  /** Set when the plugin recognises this function as an entry point the outside
+   *  world triggers (v0.82+). Undefined for ordinary functions — absence means
+   *  "no reader claimed it", NOT "not an entry point". */
+  entryPoint?: EntryPointInfo;
   /** When the plugin can identify the class/struct/etc. this function
    *  belongs to. Java methods know their class; Go methods know their
    *  receiver type; Python methods know their class. Top-level / module-
@@ -174,6 +270,14 @@ export interface ParsedFile {
    *  other languages fill the same shape as they adopt. Optional for
    *  backward-compat. */
   testMeta?: TestFileMeta;
+  /** Routes this file declares for handlers defined ELSEWHERE (v0.82+).
+   *  Resolved to functions in buildCodeGraph. Handlers that declare their own
+   *  route inline (a decorator) never appear here — they carry
+   *  ParsedFunction.entryPoint directly. */
+  routes?: RouteDeclaration[];
+  /** Dangerous operations found in this file (v0.82+). Absent when the plugin
+   *  has no sink rules for the language, which is not the same as "none here". */
+  sinks?: SinkFinding[];
 }
 
 /** Per-file class definition emitted by language plugins.
@@ -193,6 +297,17 @@ export interface ParsedClass {
   /** Direct parent class name (single-inheritance languages) or
    *  the first listed when the language allows multiple. */
   parentClass?: string;
+  /** EVERY base, in source order, for languages with multiple inheritance
+   *  (v0.82+). `parentClass` stays the first one so class diagrams keep drawing
+   *  a single primary arrow; this is the full list for consumers that must
+   *  follow the real hierarchy.
+   *
+   *  Why it exists: `class NetBoxModelViewSet(ETagMixin, mixins.CustomFieldsMixin,
+   *  ModelViewSet)` puts a mixin first, so anything walking `parentClass` alone
+   *  wanders into the mixin and never reaches the class that defines the HTTP
+   *  handlers. Absent for plugins that haven't adopted it — consumers should
+   *  fall back to `[parentClass, ...implements]`. */
+  baseClasses?: string[];
   /** Names of interfaces / protocols / mixins declared via
    *  `implements`, `:`, `<:`, etc. depending on language. Empty
    *  array for languages without an explicit interface concept. */
@@ -320,6 +435,9 @@ export interface FunctionDef {
    *  FNV-1a 64. Used by duplicates.ts to find structurally identical
    *  functions across the codebase. */
   bodyHash?: string;
+  /** Mirrors ParsedFunction.entryPoint (v0.82+). Optional so snapshots taken
+   *  before entry-point readers existed keep deserializing. */
+  entryPoint?: EntryPointInfo;
 }
 
 /** A call edge — function X in file A calls callable Y, possibly resolved to
@@ -335,6 +453,19 @@ export interface CallEdge {
   toFile: string | null;
   /** Function name in toFile, when resolvable. */
   toFunction: string | null;
+  /** True when the call went through a receiver (`obj.method()`) rather than
+   *  being a bare `method()` (v0.82+). Mirrors ParsedCall.hasReceiver.
+   *
+   *  Carried onto the edge because the RESOLUTION metric needs it: without it,
+   *  `request.POST.get()` counts as "a call at this repo's own code that we
+   *  failed to resolve" for any repo that happens to define a function named
+   *  `get`. See FlowResolution. */
+  hasReceiver?: boolean;
+  /** Receiver type the plugin inferred, when it could (v0.82+). Mirrors
+   *  ParsedCall.calleeType. Undefined means the receiver could not be typed —
+   *  which is the difference between "a call at code we own" and "a call at
+   *  something we know nothing about". */
+  calleeType?: string;
   /** Container (class/struct/etc.) of the resolved target, when known
    *  (v0.28+). Lets the function-level blast radius distinguish between
    *  same-named overloads in the same file (e.g. `Blueprint.__init__`
@@ -388,6 +519,9 @@ export interface ClassDef {
    *  radius / complexity data is consistent. */
   methods: FunctionDef[];
   parentClass?: string;
+  /** Mirrors ParsedClass.baseClasses (v0.82+) — every base, not just the
+   *  first. Optional so legacy snapshots keep deserializing. */
+  baseClasses?: string[];
   implements?: string[];
   isInterface?: boolean;
   isAbstract?: boolean;
@@ -425,8 +559,16 @@ export interface CodeGraph {
    *  per test file a plugin classified. Raw material for computeWeakSuite;
    *  optional/absent on legacy graphs and non-test-bearing repos. */
   testFiles?: TestFileGraphEntry[];
+  /** Dangerous operations across all files, path-tagged (v0.82+). Optional so
+   *  snapshots taken before sink rules existed keep deserializing. */
+  sinks?: SinkGraphEntry[];
   /** Truncation reason if any cap was hit. */
   truncated?: string;
+}
+
+/** A SinkFinding with its file attached, for the cross-file graph. */
+export interface SinkGraphEntry extends SinkFinding {
+  filePath: string;
 }
 
 /** A test file's assertion-quality metadata, path-tagged for the graph layer. */

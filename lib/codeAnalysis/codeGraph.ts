@@ -2,11 +2,14 @@
 // by parseFile + plugin pipeline) and builds the unified CodeGraph that lives
 // on AnalysisSnapshot.codeGraph.
 //
-// Two pieces of cross-file resolution happen here:
+// Three pieces of cross-file resolution happen here:
 //   1. Call → callee disambiguation (which function, in which file, does
 //      `foo()` refer to?). Uses file-level import knowledge to disambiguate
 //      between same-named functions in different files.
-//   2. Per-plugin stats roll-up — useful for the debug API to surface which
+//   2. Route declaration → handler (v0.82+). A routing TABLE names its handler
+//      in another file, so only this layer can resolve it. See
+//      applyRouteDeclarations.
+//   3. Per-plugin stats roll-up — useful for the debug API to surface which
 //      plugin produced what.
 
 import type {
@@ -18,6 +21,8 @@ import type {
   ParsedClass,
   ParsedFile,
   PluginStats,
+  RouteDeclaration,
+  SinkGraphEntry,
   TestFileGraphEntry,
 } from "./types";
 import { isTestFile } from "./testCoverage";
@@ -30,6 +35,228 @@ export interface BuildCodeGraphInput {
   truncated?: string;
 }
 
+const dirOf = (p: string) => p.slice(0, p.lastIndexOf("/") + 1);
+/** "introduction/views.py" → "views". The module name a routing table — or a
+ *  module-qualified call like `views.home()` — would have written to reach it. */
+const moduleOf = (p: string) => {
+  const base = p.slice(p.lastIndexOf("/") + 1);
+  const dot = base.lastIndexOf(".");
+  return dot > 0 ? base.slice(0, dot) : base;
+};
+
+/** Stamp `entryPoint` onto the handlers named by routing tables.
+ *
+ *  A table (`urls.py`) names its handler as `views.home` — a module and a
+ *  function, in a file the per-file parser never saw. Resolution narrows in
+ *  three steps, each of which can only REMOVE candidates:
+ *
+ *    1. functions with that name
+ *    2. if the table qualified the module, files whose module name matches
+ *    3. files in the same directory as the table (a Django app is one folder)
+ *
+ *  If more than one candidate survives, we stamp NOTHING. An entry point is
+ *  evidence that untrusted input reaches a function; guessing which of two
+ *  same-named functions it reaches would invent reachability, and reachability
+ *  is what the security layer suppresses findings with.
+ *
+ *  Decorators win over tables: a handler that declared its own route said so
+ *  more precisely than a table pointing at it. */
+/** Methods a web framework calls on a registered view class, without anything
+ *  in the repo calling them. HTTP verbs and `dispatch` for Django's class-based
+ *  views; the action names for DRF viewsets.
+ *
+ *  Deliberately bounded. Django also invokes lifecycle hooks — `form_valid`,
+ *  `get_queryset`, `get_context_data` — but it does so from ITS base classes,
+ *  which are not in the repo, so we cannot show a path and will not claim one.
+ *  Those land in `unknown`, which is the honest answer rather than a hidden
+ *  one. Where a repo defines its own base class (NetBox does), the graph
+ *  connects the chain on its own and no special case is needed. */
+const FRAMEWORK_INVOKED_METHODS: ReadonlySet<string> = new Set([
+  // Django View
+  "get",
+  "post",
+  "put",
+  "patch",
+  "delete",
+  "head",
+  "options",
+  "trace",
+  "dispatch",
+  // DRF ViewSet actions
+  "list",
+  "create",
+  "retrieve",
+  "update",
+  "partial_update",
+  "destroy",
+]);
+
+/** How far up an inheritance chain to look for the handler methods. Six is far
+ *  past any real view hierarchy and stops a cycle dead. */
+const MAX_BASE_CLASS_HOPS = 6;
+
+function applyRouteDeclarations(
+  parsedFiles: ParsedFile[],
+  funcsByName: Map<string, FunctionDef[]>,
+  methodsByContainer: Map<string, FunctionDef[]>
+): void {
+  // Deterministic: a handler wired to several routes keeps the smallest one, so
+  // the result never depends on file iteration order.
+  const claimed = new Map<FunctionDef, RouteDeclaration>();
+
+  /** Narrow a candidate set the same way for functions and classes: module
+   *  qualifier first, then the table's own directory. Both steps can only
+   *  remove. */
+  const narrow = <T extends { filePath: string }>(
+    candidates: T[],
+    decl: RouteDeclaration,
+    fromFile: string
+  ): T[] => {
+    let out = candidates;
+    if (decl.targetModule) {
+      const byModule = out.filter((f) => moduleOf(f.filePath) === decl.targetModule);
+      if (byModule.length > 0) out = byModule;
+    }
+    if (new Set(out.map((f) => f.filePath)).size > 1) {
+      const sameDir = out.filter((f) => dirOf(f.filePath) === dirOf(fromFile));
+      if (sameDir.length > 0) out = sameDir;
+    }
+    return out;
+  };
+
+  // Class name → where it is defined and what it extends. Registered view
+  // classes are routinely pure configuration —
+  //   class WirelessLANViewSet(NetBoxModelViewSet):
+  //       queryset = WirelessLAN.objects.all()
+  // — with the handler methods on a base class the repo also defines. Marking
+  // only the leaf finds nothing for 139 of NetBox's 167 registrations.
+  const classesByName = new Map<
+    string,
+    { filePath: string; name: string; bases: string[] }[]
+  >();
+  for (const f of parsedFiles) {
+    for (const c of f.classes ?? []) {
+      const arr = classesByName.get(c.name) ?? [];
+      // baseClasses when the plugin emits it (Python), otherwise reconstruct
+      // from the older pair — which gives Java/C#/PHP the same multi-base walk
+      // for free, since their interfaces land in `implements`.
+      const bases =
+        c.baseClasses ??
+        [c.parentClass, ...(c.implements ?? [])].filter((n): n is string => !!n);
+      arr.push({ filePath: f.rel, name: c.name, bases });
+      classesByName.set(c.name, arr);
+    }
+  }
+
+  /** The methods a registered class exposes to the framework — its own if it
+   *  defines any, otherwise the nearest ancestor's.
+   *
+   *  Sound because inheritance is: if a registered viewset inherits `list()`
+   *  from a base the repo defines, that `list()` really is externally
+   *  invocable. It gets marked once and shared by every subclass, which
+   *  matches how the code actually runs.
+   *
+   *  BREADTH-FIRST over ALL bases, not up a single chain. Python view
+   *  hierarchies put mixins first —
+   *  `class NetBoxModelViewSet(ETagMixin, mixins.CustomFieldsMixin, ModelViewSet)`
+   *  — so following only the head walks into the mixin and never reaches the
+   *  class defining the handlers. Source order approximates Python's MRO,
+   *  which is what its own linearisation starts from. */
+  const frameworkMethodsFor = (
+    startFile: string,
+    startName: string
+  ): FunctionDef[] => {
+    let frontier: { filePath: string; name: string }[] = [
+      { filePath: startFile, name: startName },
+    ];
+    const seen = new Set<string>();
+    for (let hop = 0; hop < MAX_BASE_CLASS_HOPS && frontier.length > 0; hop++) {
+      const found: FunctionDef[] = [];
+      const next: { filePath: string; name: string }[] = [];
+      for (const cls of frontier) {
+        const key = `${cls.filePath}\u001F${cls.name}`;
+        if (seen.has(key)) continue; // diamond or cycle
+        seen.add(key);
+        for (const m of methodsByContainer.get(cls.name) ?? []) {
+          if (m.filePath === cls.filePath && FRAMEWORK_INVOKED_METHODS.has(m.name)) {
+            found.push(m);
+          }
+        }
+        const self = (classesByName.get(cls.name) ?? []).find(
+          (c) => c.filePath === cls.filePath
+        );
+        for (const baseName of self?.bases ?? []) {
+          // Follow a base only when exactly one class in the repo carries that
+          // name - the same decline-on-ambiguity rule as everywhere else.
+          const defs = classesByName.get(baseName) ?? [];
+          if (defs.length !== 1) continue;
+          next.push({ filePath: defs[0].filePath, name: baseName });
+        }
+      }
+      // Stop at the first level that defines handlers: going deeper would
+      // collect a grandparent implementation the nearer class overrides.
+      if (found.length > 0) return found;
+      frontier = next;
+    }
+    return [];
+  };
+
+  for (const file of parsedFiles) {
+    for (const decl of file.routes ?? []) {
+      // A class-based view: the entry points are the framework-invoked methods
+      // ON the class, not the class itself. Nothing in the repo calls them, so
+      // without this they look like dead code — which is exactly how 84 NetBox
+      // routes and 139 DRF viewsets went missing.
+      if (decl.targetIsClass) {
+        // Resolve the CLASS first — it may define no methods of its own.
+        const classes = narrow(
+          classesByName.get(decl.targetName) ?? [],
+          decl,
+          file.rel
+        );
+        if (classes.length !== 1) continue; // absent or ambiguous ⇒ decline
+        for (const m of frameworkMethodsFor(classes[0].filePath, classes[0].name)) {
+          if (m.entryPoint) continue;
+          const prev = claimed.get(m);
+          if (!prev || decl.route < prev.route) claimed.set(m, decl);
+        }
+        continue;
+      }
+
+      let candidates = funcsByName.get(decl.targetName) ?? [];
+      if (candidates.length === 0) continue;
+
+      if (decl.targetModule) {
+        const byModule = candidates.filter(
+          (f) => moduleOf(f.filePath) === decl.targetModule
+        );
+        if (byModule.length > 0) candidates = byModule;
+      }
+      if (candidates.length > 1) {
+        const sameDir = candidates.filter(
+          (f) => dirOf(f.filePath) === dirOf(file.rel)
+        );
+        if (sameDir.length > 0) candidates = sameDir;
+      }
+      if (candidates.length !== 1) continue; // ambiguous → decline
+
+      const target = candidates[0];
+      if (target.entryPoint) continue; // a decorator already said it better
+      const prev = claimed.get(target);
+      if (!prev || decl.route < prev.route) claimed.set(target, decl);
+    }
+  }
+
+  for (const [target, decl] of claimed) {
+    target.entryPoint = {
+      kind: "http-route",
+      route: decl.route,
+      via: decl.via,
+      ...(decl.methods ? { methods: decl.methods } : {}),
+    };
+  }
+}
+
 export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
   const { parsedFiles, pluginByFile, truncated } = input;
 
@@ -37,6 +264,9 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
   //    different files are common, so we keep the full list per name and
   //    resolve disambiguation later via import context + containerType.
   const funcsByName = new Map<string, FunctionDef[]>();
+  /** Class name → its methods. Lets a routing table that names a CLASS reach
+   *  the methods the framework invokes on it. */
+  const methodsByContainer = new Map<string, FunctionDef[]>();
   const functions: FunctionDef[] = [];
   for (const f of parsedFiles) {
     for (const fn of f.functions) {
@@ -48,13 +278,21 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
         complexity: fn.complexity,
         containerType: fn.containerType,
         bodyHash: fn.bodyHash,
+        entryPoint: fn.entryPoint,
       };
       functions.push(def);
       const arr = funcsByName.get(fn.name) ?? [];
       arr.push(def);
       funcsByName.set(fn.name, arr);
+      if (def.containerType) {
+        const methods = methodsByContainer.get(def.containerType) ?? [];
+        methods.push(def);
+        methodsByContainer.set(def.containerType, methods);
+      }
     }
   }
+
+  applyRouteDeclarations(parsedFiles, funcsByName, methodsByContainer);
 
   // 2. Per-file resolved-import lookup, used for call disambiguation. Set of
   //    target-file paths the calling file imports (any kind: import / extends
@@ -123,6 +361,11 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
         toFile: target?.filePath ?? null,
         toFunction: target?.name ?? null,
         toContainerType: target?.containerType,
+        // Receiver evidence, carried opaquely for the resolution metric — an
+        // unresolved call through an untyped receiver is not evidence that we
+        // failed at our own code. Omitted when absent so snapshots stay lean.
+        ...(c.hasReceiver ? { hasReceiver: true } : {}),
+        ...(c.calleeType ? { calleeType: c.calleeType } : {}),
       });
     }
   }
@@ -248,6 +491,7 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
       fields: pc.fields,
       methods,
       parentClass: pc.parentClass,
+      baseClasses: pc.baseClasses,
       implements: pc.implements,
       isInterface: pc.isInterface,
       isAbstract: pc.isAbstract,
@@ -263,6 +507,14 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
     if (f.testMeta) testFiles.push({ file: f.rel, ...f.testMeta });
   }
 
+  // Security sinks: path-tagged and carried up verbatim. Test files are kept —
+  // filtering is the consumer's call, and the reachability pass drops them
+  // anyway by never finding a path from an entry point.
+  const sinks: SinkGraphEntry[] = [];
+  for (const f of parsedFiles) {
+    for (const s of f.sinks ?? []) sinks.push({ filePath: f.rel, ...s });
+  }
+
   return {
     functions,
     calls,
@@ -272,6 +524,7 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
     byPlugin,
     classes: classes.length > 0 ? classes : undefined,
     testFiles: testFiles.length > 0 ? testFiles : undefined,
+    sinks: sinks.length > 0 ? sinks : undefined,
     truncated,
   };
 }
@@ -362,6 +615,40 @@ function pickCallTarget(
     if (!hasReceiver) {
       const topLevel = candidates.filter((c) => c.containerType === undefined);
       if (topLevel.length === 1) return topLevel[0];
+    }
+    // 1b. The "receiver" may be a MODULE, not an object.
+    //
+    //   from app import crud
+    //   crud.get_user_by_email(session=..., email=...)
+    //
+    // The plugin reports calleeType="crud" because that is what precedes the
+    // dot, but crud is app/crud.py — no class carries that containerType, so
+    // the strict match above can never hit and hasReceiver blocks the
+    // top-level fallthrough. Every module-qualified call, which is the whole
+    // point of `from app import crud`, was dropped. Measured on
+    // full-stack-fastapi-template: 14 of 264 own-code calls, and they are
+    // route→crud / route→security edges, so each one carries a subtree.
+    //
+    // Three conditions together, because a bare filename match is not enough
+    // evidence on its own:
+    //   - the candidate is top-level (a module call cannot reach a method)
+    //   - its file is named after the receiver
+    //   - the caller imports that file, or a file sitting beside it — which is
+    //     what `from app import crud` produces, since the spec resolves to
+    //     app/__init__.py rather than to crud.py itself
+    // Exactly one survivor, or we decline.
+    const importedFiles = importsByFile.get(fromFile);
+    if (importedFiles) {
+      const importedDirs = new Set<string>();
+      for (const p of importedFiles) importedDirs.add(p.slice(0, p.lastIndexOf("/") + 1));
+      const asModule = candidates.filter(
+        (c) =>
+          c.containerType === undefined &&
+          moduleOf(c.filePath) === calleeType &&
+          (importedFiles.has(c.filePath) ||
+            importedDirs.has(c.filePath.slice(0, c.filePath.lastIndexOf("/") + 1)))
+      );
+      if (asModule.length === 1) return asModule[0];
     }
     return null;
   }

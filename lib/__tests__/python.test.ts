@@ -543,3 +543,445 @@ describe("pythonPlugin — class extraction for Architecture tab", () => {
     expect(byName.get("timeout")?.type).toBe("int");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Route decorators → FunctionDef.entryPoint
+//
+// Routing is never a call edge, so a decorated handler looks like dead code to
+// the graph. These tests pin BOTH directions: real routes are marked, and the
+// things that merely look like routes are not. The false-positive cases matter
+// more than the positive ones — a wrong entry point invents reachability, and
+// reachability is what the security layer suppresses findings with.
+// ---------------------------------------------------------------------------
+describe("pythonPlugin — route decorators", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+
+  const parse = (content: string) => {
+    const file: SourceFile = { rel: "api.py", ext: "py", content };
+    return parseFile(pythonPlugin, file, makeIndex([file]));
+  };
+  const entryOf = (content: string, name: string) =>
+    parse(content).functions.find((f) => f.name === name)?.entryPoint;
+
+  it("marks a FastAPI verb decorator with its method and path", () => {
+    const ep = entryOf('@app.get("/items")\ndef read_items():\n    return []\n', "read_items");
+    expect(ep).toEqual({
+      kind: "http-route",
+      methods: ["GET"],
+      route: "/items",
+      via: "@app.get",
+    });
+  });
+
+  it("reads methods= off a Flask @app.route", () => {
+    const ep = entryOf(
+      "@app.route('/serialize', methods=['POST', 'put'])\ndef serialize():\n    pass\n",
+      "serialize"
+    );
+    expect(ep?.methods).toEqual(["POST", "PUT"]);
+    expect(ep?.route).toBe("/serialize");
+  });
+
+  it("leaves methods undefined on a bare @app.route rather than assuming GET", () => {
+    // Flask defaults to GET-only, but an INFERRED method is indistinguishable
+    // from a declared one downstream. Record silence as silence.
+    const ep = entryOf("@app.route('/')\ndef index():\n    pass\n", "index");
+    expect(ep?.route).toBe("/");
+    expect(ep?.methods).toBeUndefined();
+  });
+
+  it("works on any router object, not just one named `app`", () => {
+    expect(entryOf('@router.post("/login")\ndef login():\n    pass\n', "login")?.methods).toEqual([
+      "POST",
+    ]);
+    expect(entryOf('@bp.delete("/x")\ndef drop():\n    pass\n', "drop")?.methods).toEqual([
+      "DELETE",
+    ]);
+  });
+
+  it("does NOT mark a cache lookup that happens to be spelled @x.get", () => {
+    // The discriminator is the leading "/" on a static first argument. Without
+    // it this is indistinguishable from a route, and marking it would invent an
+    // entry point that untrusted input never touches.
+    expect(entryOf('@cache.get("session-key")\ndef helper():\n    pass\n', "helper")).toBeUndefined();
+  });
+
+  it("does NOT mark ordinary decorators", () => {
+    const content =
+      "@property\ndef name(self):\n    pass\n\n@csrf_exempt\ndef view(request):\n    pass\n";
+    expect(entryOf(content, "name")).toBeUndefined();
+    expect(entryOf(content, "view")).toBeUndefined();
+  });
+
+  it("does NOT mark a route whose path is computed", () => {
+    // f-strings and variables resolve at runtime; any path we printed would be
+    // a guess, so we decline rather than guess.
+    expect(entryOf('@app.get(f"/items/{x}")\ndef fstr():\n    pass\n', "fstr")).toBeUndefined();
+    expect(entryOf("@app.get(PATH)\ndef var():\n    pass\n", "var")).toBeUndefined();
+  });
+
+  it("gives the marker to the decorated function, not to a function nested in it", () => {
+    // The body is walked before the outer function is pushed, so a naive
+    // implementation hands the marker to the inner definition.
+    const content =
+      '@app.get("/outer")\n' +
+      "def outer():\n" +
+      "    def inner():\n" +
+      "        return 1\n" +
+      "    return inner()\n";
+    expect(entryOf(content, "outer")?.route).toBe("/outer");
+    expect(entryOf(content, "inner")).toBeUndefined();
+  });
+
+  it("marks decorated methods inside a class", () => {
+    const content =
+      "class Views:\n" +
+      '    @router.get("/me")\n' +
+      "    def me(self):\n" +
+      "        pass\n";
+    expect(entryOf(content, "me")?.route).toBe("/me");
+  });
+
+  it("keeps recording the decorator's own call edge", () => {
+    // The decorator expression is still visited exactly as before — this pins
+    // that adding the marker did not change call extraction.
+    const parsed = parse('@app.get("/items")\ndef read_items():\n    pass\n');
+    expect(parsed.calls.some((c) => c.calleeName === "get")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Django URLconf rows → ParsedFile.routes
+//
+// The plugin only READS the table; buildCodeGraph resolves the names (covered
+// in codeGraph.test.ts). These tests pin what counts as a row worth recording.
+// ---------------------------------------------------------------------------
+describe("pythonPlugin — Django URLconf", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+
+  const DJANGO = "from django.urls import include, path\nfrom . import views\n";
+  const parseUrls = (content: string, rel = "app/urls.py") => {
+    const file: SourceFile = { rel, ext: "py", content };
+    return parseFile(pythonPlugin, file, makeIndex([file]));
+  };
+
+  it("reads a path() row into a route declaration", () => {
+    const parsed = parseUrls(
+      DJANGO + "urlpatterns = [\n    path('xss', views.xss, name='xss'),\n]\n"
+    );
+    expect(parsed.routes).toEqual([
+      { route: "xss", targetModule: "views", targetName: "xss", via: "path()" },
+    ]);
+  });
+
+  it("reads the re_path() and url() spellings too", () => {
+    const parsed = parseUrls(
+      "from django.conf.urls import url\nfrom django.urls import re_path\nfrom . import views\n" +
+        "urlpatterns = [\n" +
+        "    re_path(r'^a$', views.a),\n" +
+        "    url(r'^b$', views.b),\n" +
+        "]\n"
+    );
+    expect(parsed.routes?.map((r) => r.via).sort()).toEqual(["re_path()", "url()"]);
+  });
+
+  it("records a bare handler reference with no module qualifier", () => {
+    const parsed = parseUrls(
+      "from django.urls import path\nfrom .views import home\nurlpatterns = [path('', home)]\n"
+    );
+    expect(parsed.routes?.[0]).toMatchObject({ targetModule: null, targetName: "home" });
+  });
+
+  it("skips include() — it delegates to another table, it isn't a handler", () => {
+    const parsed = parseUrls(
+      DJANGO + "urlpatterns = [path('accounts/', include('allauth.urls'))]\n"
+    );
+    expect(parsed.routes ?? []).toEqual([]);
+  });
+
+  it("reads class-based views as a class target, not a function", () => {
+    // Was a declared miss in the first URLconf reader; see the class-based
+    // views block below for the full behaviour.
+    const parsed = parseUrls(
+      DJANGO + "urlpatterns = [path('x', views.MyView.as_view())]\n"
+    );
+    expect(parsed.routes?.[0]).toMatchObject({
+      targetName: "MyView",
+      targetIsClass: true,
+    });
+  });
+
+  it("records nothing without a django.urls import, whatever the file is called", () => {
+    // `path(...)` and especially `url(...)` are far too common a spelling to
+    // claim on sight. The import is the local evidence that this is a URLconf.
+    const parsed = parseUrls(
+      "from . import views\nurlpatterns = [path('xss', views.xss)]\n"
+    );
+    expect(parsed.routes ?? []).toEqual([]);
+  });
+
+  it("skips a row whose route isn't a static string", () => {
+    const parsed = parseUrls(DJANGO + "urlpatterns = [path(PREFIX, views.home)]\n");
+    expect(parsed.routes ?? []).toEqual([]);
+  });
+
+  it("leaves routes unset for an ordinary Python file", () => {
+    const file: SourceFile = { rel: "app/views.py", ext: "py", content: "def home():\n    pass\n" };
+    expect(parseFile(pythonPlugin, file, makeIndex([file])).routes).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Security sinks.
+//
+// Paired by design: every rule gets a case that must fire and a neighbouring
+// case that must not. The negatives are the point — a sink scanner earns its
+// reputation on what it stays quiet about, and reachability RANKS findings, it
+// does not rescue bad ones.
+// ---------------------------------------------------------------------------
+describe("pythonPlugin — security sinks", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+
+  const sinksIn = (content: string) => {
+    const file: SourceFile = { rel: "app/views.py", ext: "py", content };
+    return parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? [];
+  };
+  const ruleIds = (content: string) => sinksIn(content).map((s) => s.ruleId);
+
+  it("flags os.system and os.popen", () => {
+    expect(ruleIds("def f(c):\n    os.system(c)\n")).toEqual(["py-os-command"]);
+    expect(ruleIds("def f(c):\n    os.popen(c)\n")).toEqual(["py-os-command"]);
+  });
+
+  it("does not flag a system() method on something that isn't os", () => {
+    expect(ruleIds("def f(self, c):\n    self.system(c)\n")).toEqual([]);
+    expect(ruleIds("def f(p, c):\n    parser.system(c)\n")).toEqual([]);
+  });
+
+  it("flags subprocess only when shell=True", () => {
+    expect(ruleIds("def f(c):\n    subprocess.Popen(c, shell=True)\n")).toEqual([
+      "py-subprocess-shell",
+    ]);
+    // The argv form has no shell to inject into — safe by construction.
+    expect(ruleIds("def f(c):\n    subprocess.run(['ls', c])\n")).toEqual([]);
+    expect(ruleIds("def f(c):\n    subprocess.run(c, shell=False)\n")).toEqual([]);
+  });
+
+  it("flags bare eval/exec but not a method spelled the same", () => {
+    expect(ruleIds("def f(s):\n    eval(s)\n")).toEqual(["py-eval"]);
+    expect(ruleIds("def f(s):\n    exec(s)\n")).toEqual(["py-exec"]);
+    // Somebody's own evaluator. Matching this is how a scanner earns a
+    // reputation for noise.
+    expect(ruleIds("def f(e, s):\n    engine.eval(s)\n")).toEqual([]);
+  });
+
+  it("flags pickle loading", () => {
+    expect(ruleIds("def f(b):\n    pickle.loads(b)\n")).toEqual(["py-pickle-load"]);
+    expect(ruleIds("def f(b):\n    dill.load(b)\n")).toEqual(["py-pickle-load"]);
+    expect(ruleIds("def f(b):\n    json.loads(b)\n")).toEqual([]);
+  });
+
+  it("flags yaml.load unless a Safe loader is named", () => {
+    expect(ruleIds("def f(s):\n    yaml.load(s)\n")).toEqual(["py-yaml-unsafe-load"]);
+    expect(ruleIds("def f(s):\n    yaml.load(s, Loader=yaml.Loader)\n")).toEqual([
+      "py-yaml-unsafe-load",
+    ]);
+    expect(ruleIds("def f(s):\n    yaml.load(s, Loader=yaml.SafeLoader)\n")).toEqual([]);
+    expect(ruleIds("def f(s):\n    yaml.safe_load(s)\n")).toEqual([]);
+  });
+
+  it("flags TLS verification switched off", () => {
+    expect(ruleIds("def f(u):\n    requests.get(u, verify=False)\n")).toEqual([
+      "py-tls-verify-disabled",
+    ]);
+    expect(ruleIds("def f(u):\n    requests.get(u)\n")).toEqual([]);
+  });
+
+  it("does not flag hashing at all — see the plan doc's §4g", () => {
+    // Dropped after measuring: md5/sha1 was 19 of Zulip's 25 findings and
+    // essentially all of it was cache keys and gravatar hashes. The rule was
+    // honestly labelled and still drowned the list.
+    expect(ruleIds("def f(x):\n    hashlib.md5(x)\n")).toEqual([]);
+    expect(ruleIds("def f(x):\n    hashlib.sha1(x)\n")).toEqual([]);
+  });
+
+  describe("SQL assembled from parts", () => {
+    it("flags an f-string query at the call site", () => {
+      expect(ruleIds('def f(c, n):\n    c.execute(f"SELECT * FROM t WHERE n = {n}")\n')).toEqual([
+        "py-sql-assembled",
+      ]);
+    });
+
+    it("does NOT flag a parameterised query", () => {
+      // Literal + params tuple is the fix we would tell someone to apply.
+      expect(ruleIds('def f(c, n):\n    c.execute("SELECT * FROM t WHERE n = %s", (n,))\n')).toEqual(
+        []
+      );
+      expect(ruleIds('def f(c):\n    c.execute("SELECT 1")\n')).toEqual([]);
+    });
+
+    it("flags concatenation and %-formatting", () => {
+      expect(ruleIds('def f(c, n):\n    c.execute("SELECT * FROM t WHERE n = \'" + n + "\'")\n')).toEqual(
+        ["py-sql-assembled"]
+      );
+      expect(ruleIds('def f(c, n):\n    c.execute("SELECT * FROM t WHERE n = \'%s\'" % n)\n')).toEqual(
+        ["py-sql-assembled"]
+      );
+      expect(ruleIds('def f(c, n):\n    c.execute("SELECT {}".format(n))\n')).toEqual([
+        "py-sql-assembled",
+      ]);
+    });
+
+    it("follows a query assembled on an earlier line in the same function", () => {
+      // pygoat's SQL lab, and the shape almost all real SQL injection takes.
+      const src =
+        "def sql_lab(request, name):\n" +
+        "    q = \"SELECT * FROM login WHERE user='\" + name + \"'\"\n" +
+        "    return login.objects.raw(q)\n";
+      expect(ruleIds(src)).toEqual(["py-sql-assembled"]);
+    });
+
+    it("follows a query built with +=", () => {
+      const src =
+        "def f(c, n):\n" +
+        '    q = "SELECT * FROM t"\n' +
+        '    q += n\n' +
+        "    c.execute(q)\n";
+      expect(ruleIds(src)).toEqual(["py-sql-assembled"]);
+    });
+
+    it("does not treat psycopg2's safe composition API as string assembly", () => {
+      // Zulip's real code. sql.SQL/Identifier/Literal exist to build dynamic
+      // SQL SAFELY — they escape for you. Flagging them was this rule's only
+      // reachable high-severity finding on a real production codebase, and it
+      // was wrong.
+      const src =
+        "def f(presence, field):\n" +
+        '    query = sql.SQL("UPDATE t")\n' +
+        '    query += sql.SQL("SET {f} = {v}").format(f=sql.Identifier(field), v=sql.Literal(1))\n' +
+        "    with connection.cursor() as cursor:\n" +
+        "        cursor.execute(query)\n";
+      expect(ruleIds(src)).toEqual([]);
+    });
+
+    it("does not treat appending a constant as assembly", () => {
+      const src =
+        'def f(c):\n    q = "SELECT * FROM t"\n    q += " WHERE active"\n    c.execute(q)\n';
+      expect(ruleIds(src)).toEqual([]);
+    });
+
+    it("does not follow a constant local", () => {
+      const src = 'def f(c):\n    q = "SELECT 1"\n    c.execute(q)\n';
+      expect(ruleIds(src)).toEqual([]);
+    });
+
+    it("does not carry assembly across function boundaries", () => {
+      // The lookback is same-function only; anything wider is taint analysis
+      // and is not claimed here.
+      const src =
+        'def build(n):\n    q = f"SELECT {n}"\n    return q\n\ndef run(c, q):\n    c.execute(q)\n';
+      expect(ruleIds(src)).toEqual([]);
+    });
+
+    it("sees through SQLAlchemy's text() wrapper", () => {
+      // VAmPI's real SQL injection: db.session.execute(text(user_query)).
+      const src =
+        "def get_user(username):\n" +
+        '    user_query = f"SELECT * FROM users WHERE username = \'{username}\'"\n' +
+        "    return db.session.execute(text(user_query))\n";
+      expect(ruleIds(src)).toEqual(["py-sql-assembled"]);
+    });
+  });
+
+  it("records where the sink is, for the reachability pass to use", () => {
+    const src = "class Repo:\n    def load(self, b):\n        return pickle.loads(b)\n";
+    const [sink] = sinksIn(src);
+    expect(sink).toMatchObject({
+      ruleId: "py-pickle-load",
+      severity: "high",
+      line: 3,
+      inFunction: "load",
+      inContainerType: "Repo",
+      snippet: "return pickle.loads(b)",
+    });
+  });
+
+  it("records a module-scope sink with no enclosing function", () => {
+    // It runs at import, so it can never be reached FROM a route — a real
+    // distinction, not a gap, so it is recorded rather than dropped.
+    const [sink] = sinksIn('import os\nos.system("id")\n');
+    expect(sink.inFunction).toBeNull();
+  });
+
+  it("leaves sinks unset for a clean file", () => {
+    expect(sinksIn("def add(a, b):\n    return a + b\n")).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Class-based views. Large Django codebases are overwhelmingly CBV — NetBox
+// has 84 as_view() rows and 139 DRF registrations against zero function views
+// in its URLconfs — and every one of them used to be skipped.
+// ---------------------------------------------------------------------------
+describe("pythonPlugin — class-based views", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+
+  const DJANGO = "from django.urls import include, path\nfrom . import views\n";
+  const routesIn = (content: string, rel = "app/urls.py") => {
+    const file: SourceFile = { rel, ext: "py", content };
+    return parseFile(pythonPlugin, file, makeIndex([file])).routes ?? [];
+  };
+
+  it("reads a module-qualified as_view() row", () => {
+    expect(
+      routesIn(DJANGO + "urlpatterns = [path('notifications/', views.NotificationsView.as_view())]\n")
+    ).toEqual([
+      {
+        route: "notifications/",
+        targetModule: "views",
+        targetName: "NotificationsView",
+        targetIsClass: true,
+        via: "path()",
+      },
+    ]);
+  });
+
+  it("reads a bare as_view() row", () => {
+    expect(
+      routesIn(
+        "from django.urls import path\nfrom .views import HomeView\nurlpatterns = [path('', HomeView.as_view())]\n"
+      )[0]
+    ).toMatchObject({ targetName: "HomeView", targetModule: null, targetIsClass: true });
+  });
+
+  it("reads a DRF router registration", () => {
+    expect(
+      routesIn("router.register('wireless-lans', views.WirelessLANViewSet)\n", "app/api/urls.py")[0]
+    ).toMatchObject({
+      route: "wireless-lans",
+      targetModule: "views",
+      targetName: "WirelessLANViewSet",
+      targetIsClass: true,
+      via: "router.register()",
+    });
+  });
+
+  it("requires the ViewSet naming convention before claiming a register() call", () => {
+    // `register` is used by signal handlers, plugin registries and admin sites.
+    // The DRF convention is the only local evidence for which one this is.
+    expect(routesIn("registry.register('thing', views.Handler)\n", "app/setup.py")).toEqual([]);
+    expect(routesIn("admin.register('x', SomeAdmin)\n", "app/admin.py")).toEqual([]);
+  });
+
+  it("does not read DRF registrations without a static prefix", () => {
+    expect(routesIn("router.register(PREFIX, views.SiteViewSet)\n", "app/api/urls.py")).toEqual([]);
+  });
+});

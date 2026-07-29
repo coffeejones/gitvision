@@ -53,6 +53,7 @@ import {
   walkRepoForSecrets,
 } from "./security/secretsScan";
 import { scanForRiskyPatterns } from "./security/riskyPatterns";
+import { classifySinks } from "./security/reachability";
 import type { RiskyPatternScanResult } from "./security/riskyPatterns";
 import type { SecretScanResult } from "./security/types";
 import { cmpStr } from "./deterministicSort";
@@ -836,6 +837,7 @@ export async function analyzeRepo(
   let codeGraphSkipReason: string | undefined;
   let secretFindings: SecretScanResult | undefined;
   let riskyPatternFindings: RiskyPatternScanResult | undefined;
+  let sinkFindings: import("./security/reachability").ReachabilityReport | undefined;
   let ciHardening: import("./ciHardening/types").CIHardeningReport | undefined;
   let cleanup: (() => Promise<void>) | null = null;
   try {
@@ -948,6 +950,11 @@ export async function analyzeRepo(
         "Code analysis failed — see server logs. Other snapshot data is still accurate.";
     } else {
       codeGraph = cgResult.codeGraph;
+      // Classify the plugins' sinks by reachability. Pure function over the
+      // graph — no I/O — so it rides along here rather than needing its own
+      // stage. Only meaningful when codeGraph exists: a timed-out analysis has
+      // no graph, and "no findings" would then be a lie rather than a result.
+      sinkFindings = classifySinks(codeGraph);
       // Hand the parse layer to the cache-write seam (Shadow-Graph patcher).
       // Fire-and-forget with a swallowed error: this is a pure optimization for
       // a future incremental simulate, never on the session-creation critical
@@ -1048,6 +1055,7 @@ export async function analyzeRepo(
     analyzedExcludeFolders: excludeFolders.length > 0 ? excludeFolders : undefined,
     secretFindings,
     riskyPatternFindings,
+    sinkFindings,
     ciHardening,
     rateLimitInfo,
   };

@@ -360,6 +360,12 @@ export interface AnalysisSnapshot {
   riskyPatternFindings?: import(
     "./security/riskyPatterns"
   ).RiskyPatternScanResult;
+  /** Security sinks classified by reachability (v0.82+). Unlike the scanners
+   *  above this is derived from the CODE GRAPH, not from a file walk — a sink
+   *  is only worth acting on if untrusted input can get to it, and only the
+   *  graph knows that. Absent when code analysis was skipped or timed out,
+   *  which is why the panel distinguishes "no findings" from "not analysed". */
+  sinkFindings?: import("./security/reachability").ReachabilityReport;
   rateLimitInfo?: {
     limit: number;
     remaining: number;

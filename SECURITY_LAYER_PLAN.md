@@ -1,0 +1,475 @@
+# Security Layer — scope lock (Phase 0)
+
+> Status: **SCOPE LOCKED (2026-07-28)** — output of a scoping survey, revised twice by
+> evidence. Two premises in the original brief were false and are corrected here: (1) the
+> brief said "nothing is built yet" — dependency scanning and secret scanning are already
+> shipped; (2) the brief named a dogfood repo, "Reprise", that does not exist. A third
+> revision came from measurement: reachability on Python currently covers **3–9%** of
+> functions, which moves graph work ahead of security rules in the build order.
+>
+> Working title: *Sentinel* (placeholder). No code written yet.
+
+## 1. Thesis (unchanged)
+
+The deterministic layer is the source of truth. The AI is only a translator. **Reachability
+is the differentiator.**
+
+- Deterministic layer finds vulnerabilities. The AI may never invent a finding — if it isn't
+  in the deterministic output, it doesn't exist.
+- The AI triages and explains findings the deterministic layer already produced. Three jobs:
+  is this a true positive given context and reachability; explain it in plain language;
+  suggest a fix.
+- The call graph proves reachability: is this sink reachable from an entry point that takes
+  untrusted input? That filter is what turns an unreadable finding list into a short one.
+
+This is SAST. No live systems are touched. Defensive tool, disclosure-friendly output, never
+an exploit generator.
+
+## 2. What already exists (do not rebuild)
+
+| Capability | Where | State |
+|---|---|---|
+| Dependency CVEs via OSV.dev | `lib/depsHealth/osv.ts` | Shipped. npm/pypi/cargo, resolved dep tree, 4 live signals |
+| SBOM export | `lib/sbom/` | Shipped. CycloneDX + SPDX + purl |
+| Secret scanning | `lib/security/secretsScan.ts` | Shipped. Severity tiers, redacted previews, confidence-based FP filters |
+| Known supply-chain incidents | `lib/security/knownIncidents.ts` | Shipped. Drives `/exposure` |
+| Risky patterns | `lib/security/riskyPatterns.ts` | **Regex, not AST.** eval / new Function / exec only, JS+Py only, informational only |
+| Findings merge + UI | `lib/security/unifiedFindings.ts`, `components/views/security/` | Shipped. `/session/[id]/security`, status grid + severity-sorted list |
+| PR bot | `lib/githubApp/` | Real, but comment format is self-described "thin v1" |
+| MCP server | `mcp/` | Real, 10 tools, published as `codetrawl-mcp` |
+
+The original brief's Phase 1 (dependencies) and Phase 2 (secrets) are therefore **complete**.
+This project starts at the hard part.
+
+## 3. Locked decisions
+
+| Decision | Choice | Why |
+|---|---|---|
+| Shape | Module inside CodeTrawl | The panel, the merge layer and the graph already exist |
+| Surface | Web panel only (`/session/[id]/security`) | One surface done well; no secondary in v1 |
+| Language | **Python** | Chosen over Java after both were argued; see §6 |
+| Rules engine | Own tree-sitter rules | A 5th query family (`securitySinks`) beside the existing four |
+| Claim model | Two axes: sink class → severity, reachability → confidence | "Exploitable" is not claimed until taint exists |
+| No-path handling | **Three states: reachable / unknown / provably-unreachable** | Unknown is the default; only genuine dead code is suppressed |
+| Taint ambition | Interprocedural is the destination, not v1 | Reachability first, on rails taint reuses |
+| LLM | Anthropic, reusing `aiSummary.ts` + `aiBudget.ts` | Already wired, already budgeted |
+| Corpus | RealVuln (26 repos, 796 labelled, 120 FP traps) + a golden Python fixture | Labelled ground truth incl. deliberate false positives |
+| First visible state | **Hold the panel until findings are filtered** | Deliberately breaks "every phase ships" — the first thing anyone sees is the good version |
+| Cadence | Shippable slices, no calendar | Hours per week vary |
+
+### Architecture invariants
+
+1. **The AI never adds a finding.** Enforced by a test, not by prompt wording.
+2. **The engine is a pure function from files to findings.** No DB, no network, no server in
+   the core. Persistence and AI layer on top. This is what keeps a future desktop build
+   possible — the standard objection to hosted SAST is "I'm not uploading my source," and a
+   local build answers it completely. The two things that would break this are the AI layer
+   (needs a key) and OSV lookups (leak the dependency list, never source); both sit at the
+   edges by design.
+3. **Absence of evidence is not evidence of safety.** A sink we cannot trace is `unknown`,
+   never `safe`. Same discipline that makes hygiene read `ciHardening` green only on named
+   evidence rather than on silence.
+
+## 4. The measurement that reordered the plan
+
+Probe: for every function, could we walk back to an entry point? (Measured as forward BFS
+from the entry set over resolved edges. Harness in `.scratch/reachProbe.ts`.)
+
+| repo | framework | own-call resolution | route-like entries | **reach from route-like** | orphans |
+|---|---|---|---|---|---|
+| VAmPI | Flask | 98% | 1 | **9.1%** | 21% |
+| pygoat | Django | 25% | 1 | **2.8%** | 80% |
+| fastapi | (library) | 67% | 13 | **5.5%** | 59% |
+
+Only route-like entries count, because only they plausibly carry untrusted input; roots and
+orchestrators are internal. **At 3–9% coverage, the three-state rule would file 90%+ of
+findings as `unknown`.** Honest, and worthless.
+
+Three independent causes:
+
+1. **The entry-point heuristic is blind to Python web frameworks.** `flowTrace.ts:234` matches
+   paths named `route|handler|controller|endpoint|main|cmd|server|app|index` and names like
+   `handleX` / `*Handler`. Django routes are `def xss(request)` in `introduction/views.py` —
+   `views` is absent from the path list and the names match nothing. Flask's are
+   `def get_all_users()` in `api_views/` — the pattern wants a directory named exactly `api`.
+   0-for-2 on the frameworks that matter. The heuristic's own comment predicts this and says a
+   framework-aware pass "would replace this and should."
+2. **Django routing is invisible to the call graph by construction.** `urls.py` wires
+   `path('xss', views.xss, name="xss")` — a reference, not a call. View functions therefore
+   have zero inbound edges no matter how good the resolver gets. Needs a URLconf reader.
+3. ~~**Own-call resolution collapses on class-heavy Python**~~ — **diagnosed, and the premise
+   was false.** See §4d. Two earlier explanations in this document were both wrong: missing
+   variable-type tracking (`parsePyDirect` has it), and then "cause unknown". The 25% was a
+   defect in the METRIC, not the resolver. A separate, real resolver bug turned up in the repo
+   nobody was looking at.
+
+### 4a. Routing is declared four different ways, and none of them is a call edge
+
+Discovered while building the first reader — the reason the heuristic could never have worked:
+
+| mechanism | example | seen in |
+|---|---|---|
+| Decorators | `@app.route("/x", methods=["POST"])` | Flask, FastAPI |
+| URLconf table | `path('xss', views.xss)` in `urls.py` | Django |
+| OpenAPI spec | `operationId: api_views.users.get_all_users` in YAML | connexion (VAmPI) |
+| Registration call | `app.router.add_get("/x", handler)` | aiohttp (dvpwa) |
+
+Only the last is a call edge, and even that one passes the handler as a *reference*. So
+"framework-aware entry points" is not one feature — it is a small family of readers behind
+one interface (`EntryPointInfo`). Which reader a repo needs is decided by its framework, not
+by its language.
+
+### 4b. Results — two readers shipped
+
+Shipped: `EntryPointInfo` + `RouteDeclaration` on the parse types, a route-decorator reader
+and a Django URLconf reader in `python.ts`, `applyRouteDeclarations()` in `codeGraph.ts`,
+`declaredEntries` + `findDeclaredEntryPoints()` in `flowTrace.ts`. `ANALYZER_VERSION` 5 → 6.
+
+| repo | routing | baseline | + decorators | + URLconf |
+|---|---|---|---|---|
+| full-stack-fastapi-template | decorators | 36.6% | **59.2%** | 59.2% |
+| pygoat | Django URLconf | 2.9% | 8.7% | **82.1%** |
+| VAmPI | connexion YAML | 9.1% | 9.1% | 9.1% |
+
+Each reader moves exactly the repo whose mechanism it reads, and nothing else — which is the
+mechanism table (§4a) showing up in the numbers. pygoat's declared entry points went 10 → 129
+and its orphan functions 74.7% → 11.0%. VAmPI stays flat at 9.1% and will until someone
+writes the connexion reader; it is the control.
+
+Caveat on pygoat's 82%: it is a vulnerability lab, so an unusually high share of its functions
+genuinely *are* views (129 declared of 173 total). A conventional Django app has a smaller
+handler-to-helper ratio and should be expected to land lower.
+
+Two measurement errors were corrected along the way, both of which had made the picture look
+worse than it was: the population included a repo's React frontend (125 TypeScript component
+functions counted as "unreachable from a Python route"), and the original corpus contained no
+repo that used decorators at all.
+
+**Verdict: the approach works, and the remaining gap is per-mechanism, not conceptual.**
+Two of three corpus repos now sit where a reachability filter is worth building.
+
+### 4c. Resolution rules for table-declared routes
+
+A table names its handler in another file, so `applyRouteDeclarations` resolves it. Three
+narrowing steps, each of which can only REMOVE candidates: functions with that name → files
+whose module name matches the qualifier (`apis.ping` must not land on `views.ping`) → files
+in the table's own directory (a Django app is one folder).
+
+**If more than one candidate survives, nothing is stamped.** An entry point asserts that
+untrusted input reaches a function; guessing between two same-named handlers would invent
+reachability, and reachability is what this project suppresses findings with. A decorator on
+the handler always beats a table pointing at it — it said the same thing more precisely.
+
+Known misses, all silent-and-safe rather than wrong: `include()` rows (delegate to another
+table), class-based views via `MyView.as_view()` (names a class, no class→method mapping
+yet), and routes whose path is a variable.
+
+### 4d. The resolution gap: one phantom, one real bug
+
+**pygoat's 25% was a metric artifact.** Of 138 own-code calls, 103 "failed": 74 were `.get()`
+(`request.POST.get()`, `request.META.get()`, `Challenge.objects.get()`,
+`form.cleaned_data.get()`), 20 were `.save()` on Django ORM objects, 7 were `logger.error/info`.
+The repo defines exactly one `get` — `def get(self, request, challenge)` in
+`challenge/views.py` — and **none of the 74 calls target it**. The resolver was right to refuse
+every one. Genuine misses: 2.
+
+`FlowResolution.ownMissed` counted any unresolved call whose *name* collided with a function
+defined anywhere in the repo. Python is worst hit, because `get`, `save`, `error`, `filter`
+and `update` are simultaneously ubiquitous library methods and ordinary function names. This
+was shipped and user-visible: FlowsView told users "of the 138 calls that point at this repo's
+own functions, 25% were traced" — a claim the metric could not support.
+
+**The real bug was on the FastAPI repo.** `from app import crud` → `crud.get_user_by_email(...)`.
+The plugin reports `calleeType="crud"`, but `crud` is a *module*, not a class, so no
+`containerType` can match — and `hasReceiver` blocked the single-top-level-candidate
+fallthrough. Module-qualified calls, the whole point of `from app import crud`, were dropped.
+
+Both fixed:
+
+| | before | after |
+|---|---|---|
+| pygoat own-call resolution | 25% | **95%** (the 2 real misses) |
+| fsft own-call resolution | 93% | **100%** |
+| fastapi own-call resolution | 67% | **96%** |
+| VAmPI own-call resolution | 98% | **100%** |
+| **fsft reachability** | 59.2% | **66.2%** |
+
+The 45 recovered edges on fsft are `route → crud` and `route → security` — spine, not leaves,
+which is why 14 unresolved calls were worth 7 points of reachability.
+
+Validated for false positives by diffing every resolved edge before and after:
+**spring-petclinic (Java) +0/−0, this repo (TypeScript) +0/−0**, fsft +45/−0, fastapi +6/−0,
+pygoat +1/−0. The change is inert in languages that don't report a bare module name as a
+receiver type. The guard requires all three of: candidate is top-level, its filename matches
+the receiver, and the caller imports that file or one beside it — then exactly one survivor,
+or it declines.
+
+*Method note:* the first A/B run reported 66 new TypeScript edges and was **wrong** — the
+throwaway feature-flag patch had matched two identical lines and disabled a pre-existing
+resolver path as well. The tell was that `calleeType` was `undefined` on the supposedly-new
+edges, meaning the new code could not have produced them.
+
+### 4e. Sinks, and the first end-to-end measurement
+
+Nine rules, in `python.ts` beside the route readers (`SinkFinding` → `ParsedFile.sinks` →
+`CodeGraph.sinks`): `py-os-command`, `py-subprocess-shell`, `py-eval`, `py-exec`,
+`py-pickle-load`, `py-yaml-unsafe-load`, `py-sql-assembled`, `py-tls-verify-disabled`,
+`py-weak-hash`.
+
+| repo | sinks | reachable | unknown | module-scope |
+|---|---|---|---|---|
+| pygoat | 11 | **10** | 0 | 1 |
+| VAmPI | 1 | 0 | **1** | 0 |
+| full-stack-fastapi-template | 0 | — | — | — |
+| fastapi | 0 | — | — | — |
+
+Every pygoat finding is a genuine vulnerability that maps to one of its advertised lessons —
+`pickle.loads(token)` in `insec_des_lab()`, `eval(expression)` in `mitre_lab_25_api()`,
+`subprocess.Popen(command, shell=True)` in `command_out()`, `login.objects.raw(sql_query)` in
+`sql_lab()`. Zero findings on two well-maintained codebases is the other half of the result.
+
+**The three-state rule earned its keep immediately.** VAmPI's one finding is its real SQL
+injection, and it lands in `unknown` — not because the finding is weak, but because VAmPI
+routes through a connexion YAML spec no reader covers, so no path can be drawn to it. Under
+"suppress anything without a path" (§ Section D, the option not taken) that vulnerability
+would have been silently hidden.
+
+Two rules needed more than a call-site match to be worth anything:
+
+- **Bounded lookback for SQL.** Real code assembles the query on one line and executes it on
+  the next, so a call-site-only rule fires on almost nothing. A same-function lookup of
+  locals assigned an assembled string catches pygoat's lab. It is deliberately *not* taint:
+  it establishes that a query was BUILT rather than written, and says nothing about whether
+  the parts are untrusted. Marking is sticky — if any assignment in the function assembles
+  the string, it stays assembled — because branches would otherwise resolve on AST walk order,
+  which is arbitrary.
+- **`text()` unwrapping.** SQLAlchemy raw SQL is `execute(text(q))`; without unwrapping, VAmPI's
+  injection reads as a function call and is missed.
+
+Known misses, all deliberate and documented in the source: `from os import system` then a bare
+`system(...)` (needs import aliasing), and any assembly that crosses a function boundary
+(that is slice 5).
+
+### 4f. The reachability filter
+
+`classifySinks(codeGraph)` — pure, no I/O, invariant #2 intact. One multi-source BFS from
+every entry point with parent pointers, so each sink gets a path without a walk per finding.
+
+**Four states, not three.** The locked scope said reachable / unknown / provably-unreachable;
+module-scope earned its own. A sink at module scope runs at import, so it is neither reachable
+from a route nor dead, and saying either would be false. The other three are as locked, with
+`unknown` the default.
+
+One rule was added after the fact and matters: **`unreachable` is never claimed when the repo
+has zero entry points.** With no entry points our readers didn't understand the framework, and
+a zero-caller function is exactly what an unread route handler looks like — VAmPI's shape.
+Without that guard the filter would confidently bury findings in precisely the repos it
+understands least.
+
+Rendered in `/session/[id]/security`: a fourth status tile ("Code paths — N reachable, traced
+from M entry points"), and finding rows carrying severity and reachability as **separate**
+axes plus the path itself. Only proven reach counts toward the high rollup — an unresolved
+path is a gap in our readers, not a claim about the code, and letting it inflate the headline
+would undo the filtering. `unreachable` findings are the one class demoted out of the list.
+
+Verified in the browser against a session carrying real classifier output from pygoat:
+`POST /deserialize → deserialize_data()`, and the multi-hop
+`ANY mitre/17/lab/api → mitre_lab_17_api() → command_out()`. The page's "Three deterministic
+scanners" line was stale on arrival and now says four, plus what a traced path does and does
+not mean.
+
+### 4g. Three large real Django/Python apps — and what they say about the thesis
+
+The lab corpus couldn't test the premise, so: Zulip (2,012 `.py`), Saleor (4,196), NetBox (1,212).
+
+| repo | functions | entry points (declared) | reach | sinks | reachable | unknown | unreachable |
+|---|---|---|---|---|---|---|---|
+| zulip | 6,913 | 592 (146) | 26.0% | 25 | 9 | 6 | **10** |
+| netbox | 2,400 | 112 (**0**) | 8.8% | 5 | 1 | 2 | 2 |
+| saleor | 6,985 | 84 (4) | 12.6% | 3 | 2 | 1 | 0 |
+
+Four findings, and the first one is uncomfortable.
+
+**1. "400 findings → 6" does not describe this tool.** Real codebases produce **3 to 25** sinks,
+not 400. That number comes from scanners with hundreds of rules; nine conservative ones with
+tight discriminators produce a short list before any filtering. On Zulip the filter does real
+work — 10 of 25 demoted as unreachable, 40% — but the headline the original brief imagined
+isn't available at this rule count. Two honest ways forward: add many more rules and let
+reachability do the suppression it was designed for, or accept that the value here is
+precision-by-construction and stop quoting a ratio nobody's corpus produces.
+
+**2. `py-weak-hash` is the noise.** 19 of Zulip's 25 sinks, and essentially all of them are
+SHA-1/MD5 for **cache keys and gravatar hashes** — legitimate non-cryptographic uses. The rule
+is honestly *labelled* (it is a weak hash) but its actionable rate is near zero, and it drowns
+the list. Candidates: drop it, or leave it to AI triage in slice 4. Product call, not a code
+call.
+
+**3. NetBox found ZERO declared entry points — a fifth routing mechanism.** Every route is
+`path(..., include(get_model_urls(...)))`, where the URL list is *generated at import time*
+from a registry populated by **1,142 `@register_model_view(...)` decorators**. No static reader
+can resolve that; the paths do not exist until the code runs. Related and bigger: NetBox and
+Saleor are **class-based-view** codebases, and the entry-point machinery marks functions.
+Zulip scores well precisely because it is function-view-based. CBVs are not an edge case in
+large Django — they are the norm, and they are the single biggest gap in the reader set.
+
+**4. Running on real code found a real false positive.** Zulip's only reachable high-severity
+finding was `query += sql.SQL(...).format(field=sql.Identifier(f))` — psycopg2's composition
+API, which exists to build dynamic SQL *safely*. The `+=` rule marked any augmented-assignment
+target as assembled without looking at what was appended. Now it requires text: an assembled
+expression or a bare name counts, a call or a plain literal does not. Zulip 5 → 4 SQL findings,
+and the wrong one is the one that went.
+
+Reach of 26% on Zulip against 83% on pygoat is not a regression: a real app has migrations,
+management commands, workers and libraries that genuinely aren't behind a route.
+
+### 4h. `py-weak-hash` dropped, and class-based views
+
+**`py-weak-hash` is gone.** It was 19 of Zulip's 25 findings and essentially all of it was
+cache keys and gravatar hashes. The rule was honestly labelled and still drowned the list.
+Zulip's sink count fell 25 → 6, and with it every "reachable" finding it had — which is the
+correct answer for a well-maintained codebase, not a regression.
+
+**Class-based views**, the mechanism that made large Django invisible. Two readers added:
+`views.MyView.as_view()` rows, and DRF `router.register('sites', views.SiteViewSet)` — gated on
+the `ViewSet` naming convention, because `register` is also what signal handlers, plugin
+registries and admin sites call.
+
+Resolving a class target is not the same as resolving a function. The entry point is not the
+class, it is the methods the framework invokes on it (`get`/`post`/`dispatch`, and DRF's
+`list`/`create`/`retrieve`/…), which nothing in the repo calls. And a registered class is
+routinely pure configuration — `class WirelessLANViewSet(NetBoxModelViewSet)` declaring only
+`queryset` and `serializer_class` — so the resolver climbs the inheritance chain to the nearest
+repo-defined ancestor that actually defines handlers.
+
+| repo | entry points before | after | declared | reach before | after |
+|---|---|---|---|---|---|
+| netbox | 112 | **137** | 0 → **39** | 8.8% | **13.5%** |
+| pygoat | 130 | 134 | 129 → 133 | 82.7% | 85.5% |
+| zulip | 592 | 592 | 146 | 26.0% | 26.0% |
+| saleor | 84 | 84 | 4 | 12.6% | 12.6% |
+
+Zulip and Saleor are unchanged and should be: Zulip is function-view-based, and Saleor is
+GraphQL with essentially no Django views at all — which is also why its 84 entry points are
+almost entirely heuristic.
+
+**Two limits, and one of them is not fixable here.**
+
+1. *Mixin-first multiple inheritance breaks the chain.* `ParsedClass` carries one parent, the
+   first non-ABC name, so `class NetBoxModelViewSet(ETagMixin, mixins.CustomFieldsMixin, …)`
+   walks into the mixin. Fixable — carry all bases — but it touches ParsedClass, ClassDef and
+   the Architecture tab, so it is its own change.
+2. *DRF owns the dispatch.* Only 31 classes in all of NetBox define `list`/`create`/`retrieve`;
+   the rest live in DRF itself. There is nothing of ours to mark, and inventing an entry point
+   would be worse than the miss. Sinks in DRF hook methods land in `unknown` — visible, not
+   suppressed, which is the correct behaviour.
+
+That caps NetBox at 39 declared entry points against 223 registrations, and the ceiling is
+structural rather than a bug.
+
+### 4i. The mixin fix — and the ceiling it turned out not to be
+
+`ParsedClass.baseClasses` now carries EVERY base in source order (`parentClass` unchanged, so
+class diagrams are untouched), and the entry-point walk is breadth-first over all of them,
+stopping at the first level that defines handlers. Where a plugin hasn't adopted the field the
+walk falls back to `[parentClass, ...implements]`, which gives Java/C#/PHP the same multi-base
+traversal for free.
+
+It works — `NetBoxModelViewSet`'s twelve bases are all captured — **and it moves this corpus
+not at all.** NetBox stayed at 39 declared entry points. The chains here find their handlers
+at the first base anyway; mixin-first ordering was a hazard I could construct a test for, not
+one the corpus was actually hitting. Predicted ceiling, wrong ceiling. Kept because it is
+correct and cheap, and because the next Django codebase may well need it.
+
+**The real ceiling is node identity.** 224 route declarations resolve to **99 marked
+functions**, which collapse into **41 flow-graph nodes**, because `flowNodeId` is
+`(file, function name)`:
+
+```
+get() in netbox/account/views.py  ←  LoginView, LogoutView, ProfileView,
+                                     UserConfigView, ChangePasswordView, UserTokenListView
+```
+
+Six classes, one node. For class-based codebases — where `get`, `post`, `list` and `retrieve`
+repeat throughout a single file — this collapses both the entry-point count and the precision
+of every path through them. A sink in `LoginView.get()` and one in `ProfileView.get()` are
+currently indistinguishable to the walk.
+
+`flowTrace.ts` documents the reason: node ids had to match what call edges could address, and
+edges resolved to `(file, function)`. **That is no longer true** — `CallEdge` has carried
+`fromContainerType` and `toContainerType` since v0.44/v0.28, so container-qualified ids are now
+constructible. It is a change to the identity of every node in the graph, so it affects Flows,
+blast radius and the reach diagrams as much as security. Its own piece of work, and the one
+that would actually raise NetBox's number.
+
+## 5. Build order
+
+Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across
+Flows, blast radius and the reach diagrams, so it is not security-only spend.
+
+**Slice 1 — Make reachability mean something in Python.** *(the gate)*
+Framework-aware entry points, one reader per mechanism (§4a). Ship nothing user-visible.
+
+- **1a — decorators (Flask/FastAPI). DONE.** 36.6% → 59.2% on a decorator-based app; see §4b.
+  10 plugin tests + 5 flowTrace tests, full suite green (2054).
+- **1b — Django URLconf reader. DONE.** 2.9% → 82.1% on pygoat; see §4b and §4c.
+  9 resolver tests + 8 plugin tests, full suite green (2071).
+- **1c — resolution diagnosis. DONE.** No resolver gap existed where the doc said there was
+  one; a real one existed elsewhere. Both the metric and the module-qualified bug are fixed —
+  see §4d. 10 tests, full suite green (2081).
+- **1d — remaining, decide by measurement.** The connexion/OpenAPI reader (VAmPI is still the
+  9.1% control), an aiohttp registration-call reader, class-based Django views (`as_view()`).
+  Or stop here: two of three repos are at 66% and 83%, which is enough to build a filter on.
+
+**Slice 2 — Sinks. DONE.** ~~A `securitySinks` query family in `parse.ts`~~ — that approach
+was wrong: Python parses via `parseDirect` and never touches the query pipeline, so a fifth
+query family would have done nothing for it. Sink recognition lives in the plugin's walk,
+beside the route readers. See §4e. 19 tests, full suite green (2100). Still not user-visible.
+
+**Slice 3 — Reachability filter. DONE.** `lib/security/reachability.ts` — `classifySinks()`
+plus the panel integration. **The differentiator, and the first user-visible slice.** See §4f.
+17 tests, full suite green (2117).
+
+**Slice 4 — AI triage + explanation.** Deterministic finding + code context + reachability
+path in; `{verdict, confidence, explanation, suggested_fix}` out. Hard test that the AI cannot
+introduce a finding absent from the input.
+
+**Slice 5 — Intraprocedural taint.** Source→sink within one function. Upgrades the confidence
+axis; no rewording needed.
+
+**Slice 6 — Interprocedural taint.** Function summaries stitched over the existing call graph.
+The stated goal. Only after 1–5 are solid.
+
+## 6. Decisions taken against a recommendation
+
+Recorded so they aren't silently relitigated.
+
+- **Python over Java.** Java was recommended: OWASP Benchmark gives 2,740 labelled cases with
+  an official scorecard; the author writes Java (10+ repos); `TheDeckForge` is a real Spring
+  dogfood; `java.ts` already tracks variable types. Python was chosen anyway — it is where
+  AI-adjacent codebases live, its dangerous idioms are genuinely common, and RealVuln closes
+  most of the corpus gap. **Java was never measured**; the §4 numbers are Python-only, and the
+  comparison remains measured-vs-assumed.
+- **Dogfood corpus is vulnerable apps only.** Consequence: the false-positive rate on real
+  code stays unmeasured until real-repo sweeps are enabled. `graph-precision` already has the
+  machinery.
+- **No repo of the author's own is a Python dogfood.** There is no Python app in the account,
+  so the "found a real bug in my own code" story is unavailable in this language.
+
+## 7. Non-goals
+
+- Any claim of exploitability before taint analysis exists.
+- Semgrep in v1 (revisit for breadth once the filter can suppress its noise).
+- A CLI or GitHub Action surface. The `codetrawl scan ...` commands in the original brief do
+  not exist; `npm run analyze` is a dev script.
+- Diff-scoped findings on PRs (needs baseline comparison — a separate correctness problem).
+- Languages other than Python.
+- A desktop build. Kept *possible* by invariant #2, not pursued.
+
+## 8. Open
+
+- Promote `.scratch/reachProbe.ts` to `scripts/reach-probe.mjs` alongside `flow-probe` and
+  `graph-precision` once slice 1 starts.
+- Pricing: the web panel is free-tier under current free-phase pricing. Not decided, just
+  noted.
+- Whether slice 1's entry-point work should be generalised to other languages immediately
+  (it would benefit Flows everywhere) or kept Python-shaped until the filter proves out.
