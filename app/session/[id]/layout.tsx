@@ -29,7 +29,7 @@
 
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
-import { getSessionCached, getDriftReport } from "@/lib/sessionCache";
+import { getSessionCached } from "@/lib/sessionCache";
 import { requireSessionReadAccess } from "@/lib/ownership";
 import { SessionToolbar } from "@/components/SessionToolbar";
 import { SessionShell } from "@/components/SessionShell";
@@ -95,11 +95,15 @@ export default async function SessionLayout({
   const current = session.snapshots[session.snapshots.length - 1];
   if (!current) notFound();
 
-  // Multi-sweep drift report for the toolbar's drift share card (Arc 3).
-  // Request-cached + keyed on id, so on the Overview route the layout and the
-  // page share one computation (and one session read) instead of two. Only the
-  // two span endpoints are ever fingerprinted, not every snapshot.
-  const driftReport = await getDriftReport(id);
+  // NO DRIFT REPORT HERE ANY MORE. This layout used to compute it for the
+  // toolbar's share card, which meant all seventeen tabs paid for it on every
+  // navigation — and computeDriftTrends compares the OLDEST and NEWEST
+  // snapshots, walking two whole code graphs whenever the fingerprint is
+  // missing (55 of the 57 snapshots on disk). The card's dialog starts closed,
+  // so it now fetches /api/sessions/[id]/drift when it opens.
+  //
+  // The Overview page still computes it, because it actually renders a drift
+  // panel. That is the one route that still needs snapshots[0].
 
   return (
     <div className={`${ctDisplay.variable} ${ctMono.variable}`} style={FONT_VARS}>
@@ -115,7 +119,6 @@ export default async function SessionLayout({
           targetId="screenshot-target"
           updatedAtISO={session.updatedAt}
           snapshotCount={session.snapshots.length}
-          driftReport={driftReport}
         />
       </HideOnMarketing>
 

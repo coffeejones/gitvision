@@ -1,9 +1,18 @@
 "use client";
 
 // Modal that previews the drift "direction of travel" share card and downloads
-// a PNG. Mirrors WallCardModal; the difference is the content — it renders a
-// precomputed DriftReport (the trend math is server-side, since it spans every
-// snapshot's fingerprint) rather than deriving from a single snapshot.
+// a PNG. Mirrors WallCardModal; the difference is the content — a DriftReport
+// spanning every snapshot's fingerprint rather than one snapshot's numbers.
+//
+// THE REPORT IS FETCHED WHEN THIS OPENS, not handed down as a prop. It used to
+// be computed in app/session/[id]/layout.tsx, so all seventeen session tabs paid
+// for it on every navigation to fill a dialog that starts closed. Worse than the
+// JSON: computeDriftTrends compares the OLDEST and NEWEST snapshots, and 55 of
+// the 57 snapshots on disk have no persisted fingerprint, so it walked two whole
+// code graphs — 2.1 ms on gin, 7.9 on zod, 8.5 on our own repo, every page load.
+//
+// Opening a share-card dialog is a deliberate act, so paying the cost here is
+// the right trade. It also freed the session layout of any need for snapshot[0].
 
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisSnapshot } from "@/lib/types";
@@ -14,7 +23,7 @@ import { DriftCard, DRIFT_CARD_DIMS, type DriftCardVariant } from "./DriftCard";
 
 interface Props {
   snapshot: AnalysisSnapshot;
-  report: DriftReport;
+  sessionId: string;
   sessionName: string;
   open: boolean;
   onClose: () => void;
@@ -22,7 +31,7 @@ interface Props {
 
 export function DriftCardModal({
   snapshot,
-  report,
+  sessionId,
   sessionName,
   open,
   onClose,
@@ -30,6 +39,8 @@ export function DriftCardModal({
   const [variant, setVariant] = useState<DriftCardVariant>("landscape");
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<DriftReport | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,10 +53,26 @@ export function DriftCardModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Fetch once per open, and keep the result — reopening the same dialog in one
+  // visit should not re-walk the graphs. Aborted if the dialog closes first.
+  useEffect(() => {
+    if (!open || report) return;
+    const ac = new AbortController();
+    setLoadError(null);
+    fetch(`/api/sessions/${sessionId}/drift`, { signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Could not load drift"))))
+      .then((r: DriftReport) => setReport(r))
+      .catch((e: unknown) => {
+        if (e instanceof Error && e.name === "AbortError") return;
+        setLoadError(e instanceof Error ? e.message : "Could not load drift");
+      });
+    return () => ac.abort();
+  }, [open, report, sessionId]);
+
   if (!open) return null;
 
   const dim = DRIFT_CARD_DIMS[variant];
-  const hasData = report.hasBaseline && report.trends.length > 0;
+  const hasData = !!report && report.hasBaseline && report.trends.length > 0;
 
   async function download() {
     setDownloading(true);
@@ -124,6 +151,16 @@ export function DriftCardModal({
                 <DriftCard snapshot={snapshot} report={report} variant={variant} />
               </div>
             </div>
+          ) : loadError ? (
+            <p className="text-sm text-center max-w-sm" style={{ color: TOK.rose }}>
+              {loadError}
+            </p>
+          ) : !report ? (
+            // The fetch, not the card. Distinct from the "needs two sweeps"
+            // message below, which is a real answer rather than a wait.
+            <p className="text-sm text-center max-w-sm" style={{ color: TOK.textMuted }}>
+              Comparing sweeps…
+            </p>
           ) : (
             <p className="text-sm text-center max-w-sm" style={{ color: TOK.textMuted }}>
               Drift needs at least two sweeps to compare. Refresh this session

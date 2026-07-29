@@ -50,7 +50,6 @@ import { WallCardModal } from "./WallCardModal";
 import { DriftCardModal } from "./DriftCardModal";
 import { BadgeModal } from "./BadgeModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
-import type { DriftReport } from "@/lib/driftMetrics";
 import { FeedbackModal } from "./FeedbackModal";
 import { Logo } from "./Logo";
 
@@ -62,9 +61,6 @@ interface Props {
   // Delivered from the parent session page so we know what to show in the top strip
   updatedAtISO: string;
   snapshotCount: number;
-  // Multi-sweep drift report (Arc 3) — computed server-side in the layout since
-  // it spans every snapshot's fingerprint; feeds the drift share card.
-  driftReport: DriftReport;
 }
 
 function formatRel(iso: string): string {
@@ -86,7 +82,6 @@ export function SessionToolbar({
   targetId,
   updatedAtISO,
   snapshotCount,
-  driftReport,
 }: Props) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
@@ -472,7 +467,7 @@ export function SessionToolbar({
       />
       <DriftCardModal
         snapshot={snapshot}
-        report={driftReport}
+        sessionId={sessionId}
         sessionName={sessionName}
         open={driftOpen}
         onClose={() => setDriftOpen(false)}
