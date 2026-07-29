@@ -14,7 +14,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getSession } from "@/lib/storage";
+import { getSessionCached } from "@/lib/sessionCache";
 import { computeMergeConfidenceRead } from "@/lib/intelligence/mergeConfidenceRead";
 import { TOK } from "@/lib/sessionTheme";
 import { MergeConfidenceReadCard } from "@/components/views/verdict/MergeConfidenceRead";
@@ -44,7 +44,7 @@ export default async function MergeConfidenceRoute({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
 
   const sessionBase = `/session/${session.id}`;
@@ -102,7 +102,7 @@ export default async function MergeConfidenceRoute({
     );
   }
 
-  const baseSession = await getSession(baseId);
+  const baseSession = await getSessionCached(baseId);
   const headSnap = session.snapshots[session.snapshots.length - 1];
   const baseSnap = baseSession?.snapshots[baseSession.snapshots.length - 1];
 

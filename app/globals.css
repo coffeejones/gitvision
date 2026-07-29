@@ -151,3 +151,23 @@ body {
     transition: none;
   }
 }
+
+/* Session-tab skeleton (app/session/[id]/loading.tsx).
+
+   A slow, low-contrast breath rather than a sweeping highlight: the wait is
+   100-450ms depending on session size, and a fast shimmer over that window
+   reads as a glitch rather than as progress. The blocks are already TOK.surface
+   against TOK.bg, so this only has to lift them slightly.
+
+   Staggered by inline animation-delay at the call site so the blocks wake in
+   reading order, which points the eye where the content will appear. */
+.ct-skeleton {
+  animation: ct-skeleton-breathe 1.6s ease-in-out infinite;
+}
+@keyframes ct-skeleton-breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ct-skeleton { animation: none; opacity: 0.8; }
+}

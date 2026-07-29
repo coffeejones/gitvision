@@ -5,7 +5,7 @@
 // useSearchParams; we don't need to thread them through here.
 
 import { notFound } from "next/navigation";
-import { getSession } from "@/lib/storage";
+import { getSessionCached } from "@/lib/sessionCache";
 import { CodePanel } from "@/components/views/CodePanel";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
 import { RollupCounts } from "@/components/views/RollupBar";
@@ -24,7 +24,7 @@ export default async function CodeRoute({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 

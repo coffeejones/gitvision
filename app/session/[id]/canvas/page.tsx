@@ -1,7 +1,7 @@
 // /session/[id]/canvas — Canvas tab as its own route (v0.42).
 
 import { notFound } from "next/navigation";
-import { getSession } from "@/lib/storage";
+import { getSessionCached } from "@/lib/sessionCache";
 import { TOK } from "@/lib/sessionTheme";
 import { Constellation } from "@/components/views/Constellation";
 import { TermInfo } from "@/components/TermInfo";
@@ -14,7 +14,7 @@ export default async function CanvasPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 

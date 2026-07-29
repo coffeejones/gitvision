@@ -21,7 +21,7 @@
 // belongs on a client component when it lands.
 
 import { notFound } from "next/navigation";
-import { getSession } from "@/lib/storage";
+import { getSessionCached } from "@/lib/sessionCache";
 import { extractHealthSignals } from "@/lib/signals";
 import { TOK } from "@/lib/sessionTheme";
 import { SignalsPanel } from "@/components/views/SignalsPanel";
@@ -34,7 +34,7 @@ export default async function SignalsRoute({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
 
   const latest = session.snapshots[session.snapshots.length - 1];

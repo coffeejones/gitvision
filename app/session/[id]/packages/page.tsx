@@ -1,7 +1,7 @@
 // /session/[id]/packages — Packages tab as its own route (v0.42).
 
 import { notFound } from "next/navigation";
-import { getSession } from "@/lib/storage";
+import { getSessionCached } from "@/lib/sessionCache";
 import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
 import { isDemoSession } from "@/lib/demoSessions";
@@ -19,7 +19,7 @@ export default async function PackagesRoute({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 

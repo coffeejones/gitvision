@@ -12,10 +12,20 @@
 // scrolltop, and any client state we hang on the shell.
 //
 // The session is fetched once here and passed to SessionToolbar +
-// SessionShell. Each route's page.tsx fetches its own copy too —
-// Next.js dedupes within a request, and the per-page fetch keeps
-// pages independently testable + composable without a layout-context
-// dance.
+// SessionShell. Each route's page.tsx fetches its own copy too, which keeps
+// pages independently testable + composable without a layout-context dance.
+//
+// THE DEDUP IS getSessionCached, NOT NEXT. This comment used to claim "Next.js
+// dedupes within a request", which is not true of an fs.readFile — Next dedups
+// fetch(), and getSession is readFile + JSON.parse. React's cache() memoizes
+// per WRAPPED FUNCTION IDENTITY, so a page importing the raw getSession gets a
+// different memo cell from this layout's getSessionCached and the file is read
+// and parsed twice per request. Sixteen pages did exactly that. Measured on the
+// 55 MB zod session, /prs went 292ms → 209ms once it used the cached one.
+//
+// So: every page under this layout must import getSessionCached from
+// lib/sessionCache. The two route handlers (evidence, sbom) may keep the raw
+// getSession — they render no React tree, so cache() would be a no-op there.
 
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";

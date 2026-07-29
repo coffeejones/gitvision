@@ -7,7 +7,7 @@
 
 import { notFound } from "next/navigation";
 import { FileCode } from "lucide-react";
-import { getSession } from "@/lib/storage";
+import { getSessionCached } from "@/lib/sessionCache";
 import { getAuthSession } from "@/lib/authSession";
 import { isDemoSession } from "@/lib/demoSessions";
 import { TOK } from "@/lib/sessionTheme";
@@ -25,7 +25,7 @@ export default async function SourcePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
   if (!current) notFound();

@@ -14,7 +14,7 @@
 // the actionable cut.
 
 import { notFound } from "next/navigation";
-import { getSession } from "@/lib/storage";
+import { getSessionCached } from "@/lib/sessionCache";
 import { SecurityPanel } from "@/components/views/security/SecurityPanel";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
 
@@ -26,7 +26,7 @@ export default async function SecurityRoute({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 

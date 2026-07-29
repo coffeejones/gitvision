@@ -14,7 +14,7 @@
 
 import { notFound } from "next/navigation";
 import { Route } from "lucide-react";
-import { getSession } from "@/lib/storage";
+import { getSessionCached } from "@/lib/sessionCache";
 import {
   buildFlowIndex,
   computeFlowTrace,
@@ -37,7 +37,7 @@ export default async function FlowsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
   if (!current) notFound();

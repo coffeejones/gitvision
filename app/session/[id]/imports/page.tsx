@@ -2,7 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { Network } from "lucide-react";
-import { getSession } from "@/lib/storage";
+import { getSessionCached } from "@/lib/sessionCache";
 import { TOK } from "@/lib/sessionTheme";
 import { ImpactWorkbench } from "@/components/views/ImpactWorkbench";
 import { HelpHint } from "@/components/HelpHint";
@@ -24,7 +24,7 @@ export default async function ImportsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getSession(id);
+  const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
 
