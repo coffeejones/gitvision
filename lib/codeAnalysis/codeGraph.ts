@@ -279,6 +279,7 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
         containerType: fn.containerType,
         bodyHash: fn.bodyHash,
         entryPoint: fn.entryPoint,
+        params: fn.params,
       };
       functions.push(def);
       const arr = funcsByName.get(fn.name) ?? [];
@@ -366,6 +367,7 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
         // failed at our own code. Omitted when absent so snapshots stay lean.
         ...(c.hasReceiver ? { hasReceiver: true } : {}),
         ...(c.calleeType ? { calleeType: c.calleeType } : {}),
+        ...(c.taintedArgs ? { taintedArgs: c.taintedArgs } : {}),
       });
     }
   }

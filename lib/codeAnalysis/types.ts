@@ -116,6 +116,10 @@ export interface TaintEvidence {
   source: string;
   /** 1-indexed line where the untrusted value entered the function. */
   line: number;
+  /** Functions the value travelled through, entry first, the sink's own
+   *  function last. Present only for interprocedural findings (slice 6);
+   *  a same-function flow needs no itinerary. */
+  hops?: { filePath: string; name: string }[];
   /** The local it travelled through, when it travelled through one. Absent
    *  when the source is used directly at the sink. */
   via?: string;
@@ -146,6 +150,13 @@ export interface SinkFinding {
   /** Set when untrusted input provably reaches this sink inside the same
    *  function. Absence means UNPROVEN, never safe — see TaintEvidence. */
   taint?: TaintEvidence;
+  /** The enclosing function's PARAMETER whose value reaches this sink (v0.82+,
+   *  slice 6). Not a finding on its own — a parameter is only untrusted if a
+   *  caller passes something untrusted into it, which only the call graph can
+   *  say. This is the hand-off: the plugin records "this sink consumes param
+   *  `cmd`", and the graph pass decides whether anyone ever fills `cmd` with
+   *  user input. */
+  taintedByParam?: string;
 }
 
 /** A route declared in a routing TABLE rather than on the handler itself —
@@ -185,6 +196,9 @@ export interface ParsedFunction {
   startRow: number;
   endRow: number;
   complexity: number;
+  /** Parameter names in declaration order (v0.82+). Interprocedural taint maps
+   *  a caller's argument position onto the callee's parameter name. */
+  params?: string[];
   /** Set when the plugin recognises this function as an entry point the outside
    *  world triggers (v0.82+). Undefined for ordinary functions — absence means
    *  "no reader claimed it", NOT "not an entry point". */
@@ -205,7 +219,22 @@ export interface ParsedFunction {
   bodyHash?: string;
 }
 
+/** An argument at a call site that carries data worth following (v0.82+).
+ *  `source` means it is untrusted here and now; `param` means it is only as
+ *  untrusted as whatever the ENCLOSING function was handed — which is the
+ *  question the call graph answers. */
+export interface TaintedArg {
+  /** Positional index, or the parameter name for a keyword argument. */
+  index: number;
+  name?: string;
+  source?: string;
+  param?: string;
+  line: number;
+}
+
 export interface ParsedCall {
+  /** Arguments carrying untrusted or parameter-derived data (v0.82+). */
+  taintedArgs?: TaintedArg[];
   calleeName: string;
   /** Name of the enclosing function/method. null for module-scope calls. */
   inFunction: string | null;
@@ -462,6 +491,8 @@ export interface FunctionDef {
   /** Mirrors ParsedFunction.entryPoint (v0.82+). Optional so snapshots taken
    *  before entry-point readers existed keep deserializing. */
   entryPoint?: EntryPointInfo;
+  /** Mirrors ParsedFunction.params (v0.82+). */
+  params?: string[];
 }
 
 /** A call edge — function X in file A calls callable Y, possibly resolved to
@@ -485,6 +516,8 @@ export interface CallEdge {
    *  failed to resolve" for any repo that happens to define a function named
    *  `get`. See FlowResolution. */
   hasReceiver?: boolean;
+  /** Arguments carrying untrusted or parameter-derived data (v0.82+). */
+  taintedArgs?: TaintedArg[];
   /** Receiver type the plugin inferred, when it could (v0.82+). Mirrors
    *  ParsedCall.calleeType. Undefined means the receiver could not be typed —
    *  which is the difference between "a call at code we own" and "a call at

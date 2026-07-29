@@ -45,6 +45,7 @@ import {
   type FlowGraphIndex,
 } from "../codeAnalysis/flowTrace";
 import { isTestFile } from "../codeAnalysis/testCoverage";
+import { computeInterproceduralTaint } from "./interproceduralTaint";
 import { cmpStr } from "../deterministicSort";
 
 export type Reachability = "reachable" | "unknown" | "unreachable" | "module-scope";
@@ -153,7 +154,16 @@ function buildPath(
  *  Pure: a CodeGraph in, findings out. No database, no network, no filesystem —
  *  the property that keeps a local/desktop build possible. */
 export function classifySinks(cg: CodeGraph): ReachabilityReport {
-  const sinks = (cg.sinks ?? []).filter((s) => !isTestFile(s.filePath));
+  // Slice 6 runs first: a sink the plugin could only tie to a parameter may
+  // turn out to be fed untrusted input by a caller two functions away.
+  const crossFunction = computeInterproceduralTaint(cg);
+  const sinks = (cg.sinks ?? [])
+    .filter((s) => !isTestFile(s.filePath))
+    .map((s) => {
+      if (s.taint) return s;
+      const ev = crossFunction.get(`${s.filePath}\u001F${s.line}\u001F${s.ruleId}`);
+      return ev ? { ...s, taint: ev } : s;
+    });
 
   const idx = buildFlowIndex(cg);
   const declared = findDeclaredEntryPoints(cg, idx);

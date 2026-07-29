@@ -28,6 +28,7 @@ import type {
   PluginQueries,
   RouteDeclaration,
   SinkFinding,
+  TaintedArg,
   SinkSeverity,
   TaintEvidence,
   SourceFile,
@@ -612,6 +613,40 @@ const TAINT_ROOT_MODULES: Record<string, ReadonlySet<string>> = {
   os: new Set(["environ"]),
 };
 
+/** The name a parameter node binds.
+ *
+ *  `typed_parameter` — `def f(x: str)` — carries no `name` field in the
+ *  grammar, only an anonymous identifier child. Reading the field returned
+ *  null, which silently skipped every annotated parameter and so disabled
+ *  interprocedural taint across all typed Python: Zulip recorded parameters
+ *  for 1,220 of 21,274 functions. Splats bind a collection rather than a
+ *  value and are left alone. */
+function parameterName(node: TsNode): string | null {
+  switch (node.type) {
+    case "identifier":
+      return node.text;
+    case "default_parameter":
+    case "typed_default_parameter":
+      return node.childForFieldName("name")?.text ?? null;
+    case "typed_parameter": {
+      const ident = node.namedChildren.find((c) => c?.type === "identifier");
+      return ident?.text ?? null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Where a value came from.
+ *
+ *  `source` is untrusted here and now. `param` is only as untrusted as whatever
+ *  the caller passed — undecidable in this file, and exactly the question the
+ *  graph pass answers in slice 6. Keeping them apart is what stops the plugin
+ *  from claiming a vulnerability it cannot see the other half of. */
+type TaintOrigin =
+  | { kind: "source"; ev: TaintEvidence }
+  | { kind: "param"; name: string; line: number };
+
 /** Calls whose RESULT is untrusted regardless of their arguments. */
 const TAINT_SOURCE_CALLS = new Set(["input", "raw_input"]);
 
@@ -687,6 +722,9 @@ interface SinkRuleHit {
   severity: SinkSeverity;
   /** Set when the rule could show untrusted input reaching this call. */
   taint?: TaintEvidence;
+  /** Set when the value reaching this call is a parameter — untrusted only if
+   *  a caller makes it so, which the graph pass decides. */
+  taintedByParam?: string;
 }
 
 /** Match one call node against the sink rules. Returns null for the
@@ -698,8 +736,8 @@ function matchSinkRule(
   /** Was this local name assigned a string built from parts, earlier in the
    *  same function? See the bounded-lookback note on the SQL rule. */
   isAssembledVar: (name: string) => boolean,
-  /** Does this expression carry untrusted input? Slice 5. */
-  taintOf: (node: TsNode | null) => TaintEvidence | null
+  /** Where does this expression's value come from? Slice 5/6. */
+  taintOf: (node: TsNode | null) => TaintOrigin | null
 ): SinkRuleHit | null {
   const argList = call.childForFieldName("arguments");
   const bare = fnNode.type === "identifier";
@@ -709,25 +747,33 @@ function matchSinkRule(
   // method and matching it is how a scanner earns its reputation for noise.
   if (bare && (calleeName === "eval" || calleeName === "exec")) {
     const args = call.childForFieldName("arguments");
-    const t = args ? taintOf(firstPositional(args)) : null;
-    return { ruleId: `py-${calleeName}`, severity: "high", ...(t ? { taint: t } : {}) };
+    const o = args ? taintOf(firstPositional(args)) : null;
+    const fields =
+      o === null ? {} : o.kind === "source" ? { taint: o.ev } : { taintedByParam: o.name };
+    return { ruleId: `py-${calleeName}`, severity: "high", ...fields };
   }
 
   if (!argList) return null;
-  /** Untrusted input reaching this call's first argument, when it can be
-   *  shown. Attached as EVIDENCE — its absence never removes a finding. */
-  const argTaint = () => taintOf(firstPositional(argList)) ?? undefined;
+  /** Split an origin into the two fields a finding carries: proven taint, or
+   *  the parameter the graph pass has to decide about. */
+  const originFields = (o: TaintOrigin | null) =>
+    o === null
+      ? {}
+      : o.kind === "source"
+        ? { taint: o.ev }
+        : { taintedByParam: o.name };
+  const argTaint = () => originFields(taintOf(firstPositional(argList)));
 
   // Command execution.
   if (recv === "os" && (calleeName === "system" || calleeName === "popen")) {
-    return { ruleId: "py-os-command", severity: "high", taint: argTaint() };
+    return { ruleId: "py-os-command", severity: "high", ...argTaint() };
   }
   if (recv === "subprocess" && SUBPROCESS_FUNCTIONS.has(calleeName)) {
     // Without shell=True the argv form is safe by construction — no shell to
     // inject into — so the kwarg IS the finding.
     const shell = kwarg(argList, "shell");
     if (shell?.text === "True") {
-      return { ruleId: "py-subprocess-shell", severity: "high", taint: argTaint() };
+      return { ruleId: "py-subprocess-shell", severity: "high", ...argTaint() };
     }
     return null;
   }
@@ -740,13 +786,13 @@ function matchSinkRule(
       recv === "marshal") &&
     (calleeName === "load" || calleeName === "loads")
   ) {
-    return { ruleId: "py-pickle-load", severity: "high", taint: argTaint() };
+    return { ruleId: "py-pickle-load", severity: "high", ...argTaint() };
   }
   if (recv === "yaml" && (calleeName === "load" || calleeName === "load_all")) {
     // yaml.load with a Safe loader is the documented safe form.
     const loader = kwarg(argList, "Loader");
     if (loader && /Safe/.test(loader.text)) return null;
-    return { ruleId: "py-yaml-unsafe-load", severity: "high", taint: argTaint() };
+    return { ruleId: "py-yaml-unsafe-load", severity: "high", ...argTaint() };
   }
 
   // SQL built by string assembly.
@@ -771,7 +817,7 @@ function matchSinkRule(
       isAssembledString(arg) ||
       (arg?.type === "identifier" && isAssembledVar(arg.text));
     return assembled
-      ? { ruleId: "py-sql-assembled", severity: "high", taint: taintOf(arg) ?? undefined }
+      ? { ruleId: "py-sql-assembled", severity: "high", ...originFields(taintOf(arg)) }
       : null;
   }
 
@@ -781,7 +827,7 @@ function matchSinkRule(
   if (bare && calleeName === "render_template_string") {
     const arg = firstPositional(argList);
     if (isAssembledString(arg) || arg?.type === "identifier") {
-      return { ruleId: "py-ssti", severity: "high", taint: argTaint() };
+      return { ruleId: "py-ssti", severity: "high", ...argTaint() };
     }
     return null;
   }
@@ -809,7 +855,7 @@ function matchSinkRule(
       isAssembledString(arg) ||
       (arg?.type === "identifier" && isAssembledVar(arg.text));
     return assembled
-      ? { ruleId: "py-mark-safe", severity: "medium", taint: taintOf(arg) ?? undefined }
+      ? { ruleId: "py-mark-safe", severity: "medium", ...originFields(taintOf(arg)) }
       : null;
   }
 
@@ -864,7 +910,7 @@ interface PyMethodScope {
    *  isAssembledString and the note on bounded lookback in matchSinkRule. */
   assembled: Set<string>;
   /** Locals holding a value derived from untrusted input, with the evidence. */
-  tainted: Map<string, TaintEvidence>;
+  tainted: Map<string, TaintOrigin>;
 }
 
 function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
@@ -911,11 +957,11 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   const markAssembled = (name: string) => {
     (currentMethod()?.assembled ?? moduleAssembled).add(name);
   };
-  const moduleTainted = new Map<string, TaintEvidence>();
-  const markTainted = (name: string, ev: TaintEvidence) => {
-    (currentMethod()?.tainted ?? moduleTainted).set(name, ev);
+  const moduleTainted = new Map<string, TaintOrigin>();
+  const markTainted = (name: string, origin: TaintOrigin) => {
+    (currentMethod()?.tainted ?? moduleTainted).set(name, origin);
   };
-  const taintedVar = (name: string): TaintEvidence | null => {
+  const taintedVar = (name: string): TaintOrigin | null => {
     for (let i = methodStack.length - 1; i >= 0; i--) {
       const hit = methodStack[i].tainted.get(name);
       if (hit) return hit;
@@ -926,7 +972,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   /** Does this expression carry untrusted input? Recursive, and deliberately
    *  conservative: anything it cannot explain returns null, so a sink without
    *  taint is UNPROVEN rather than declared safe. */
-  const taintOf = (node: TsNode | null): TaintEvidence | null => {
+  const taintOf = (node: TsNode | null): TaintOrigin | null => {
     if (!node) return null;
     const here = () => node.startPosition.row + 1;
     switch (node.type) {
@@ -941,14 +987,14 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         // untrusted. Matched as a whole path segment, so `self.request.args`
         // in a class-based view qualifies and `myrequest.x` does not.
         if (/(^|\.)request\.[A-Za-z_]/.test(node.text)) {
-          return { source: node.text.split("(")[0], line: here() };
+          return { kind: "source", ev: { source: node.text.split("(")[0], line: here() } };
         }
         const base =
           node.childForFieldName("object") ?? node.childForFieldName("value");
         if (base?.type === "identifier") {
           const attr = node.childForFieldName("attribute")?.text;
           if (attr && TAINT_ROOT_MODULES[base.text]?.has(attr)) {
-            return { source: `${base.text}.${attr}`, line: here() };
+            return { kind: "source", ev: { source: `${base.text}.${attr}`, line: here() } };
           }
         }
         // Indexing or reading an attribute off tainted data stays tainted.
@@ -964,7 +1010,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         // A sanitiser ENDS the flow — that is the whole point of calling one.
         if (name && TAINT_SANITIZERS.has(name)) return null;
         if (fn?.type === "identifier" && TAINT_SOURCE_CALLS.has(fn.text)) {
-          return { source: `${fn.text}()`, line: here() };
+          return { kind: "source", ev: { source: `${fn.text}()`, line: here() } };
         }
         // `request.POST.get("name")` — the receiver is the source. Also covers
         // string methods on tainted values: `value.strip()` stays tainted.
@@ -1494,29 +1540,29 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           decisionPoints: 0,
           isInClassMethod: isInClass,
           assembled: new Set<string>(),
-          tainted: new Map<string, TaintEvidence>(),
+          tainted: new Map<string, TaintOrigin>(),
         };
         // A declared route handler receives its path and query parameters as
         // arguments — in FastAPI that IS the request data, with no `request`
         // object in sight. `self`, `cls` and `request` are the framework's
         // own, not user input.
-        if (entryPoint) {
-          const params = node.childForFieldName("parameters");
-          for (const p of params?.namedChildren ?? []) {
-            if (!p) continue;
-            const pname =
-              p.type === "identifier"
-                ? p.text
-                : p.childForFieldName("name")?.text;
-            if (!pname || pname === "self" || pname === "cls" || pname === "request") {
-              continue;
-            }
-            scope.tainted.set(pname, {
-              source: `${fnName}(${pname})`,
-              line: p.startPosition.row + 1,
-              via: pname,
-            });
-          }
+        const paramNames: string[] = [];
+        for (const p of node.childForFieldName("parameters")?.namedChildren ?? []) {
+          if (!p) continue;
+          const pname = parameterName(p);
+          if (!pname || pname === "self" || pname === "cls") continue;
+          paramNames.push(pname);
+          if (pname === "request") continue; // the framework's object, not input
+          const line = p.startPosition.row + 1;
+          scope.tainted.set(
+            pname,
+            entryPoint
+              ? {
+                  kind: "source",
+                  ev: { source: `${fnName}(${pname})`, line, via: pname },
+                }
+              : { kind: "param", name: pname, line }
+          );
         }
         methodStack.push(scope);
         const body = node.childForFieldName("body");
@@ -1530,6 +1576,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           containerType: isInClass ? currentClass()?.name : undefined,
           bodyHash: body ? hashSubtree(body) : undefined,
           entryPoint,
+          ...(paramNames.length ? { params: paramNames } : {}),
         });
         return;
       }
@@ -1576,7 +1623,14 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           const t = taintOf(valueNode);
           // Record the local it now travels through, so the finding can say
           // where the value entered AND what carried it to the sink.
-          if (t) markTainted(left.text, { ...t, via: left.text });
+          if (t) {
+            markTainted(
+              left.text,
+              t.kind === "source"
+                ? { kind: "source", ev: { ...t.ev, via: left.text } }
+                : t
+            );
+          }
         }
         for (const child of node.namedChildren) visit(child);
         return;
@@ -1651,12 +1705,41 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
                 inContainerType: currentClass()?.name,
                 snippet: snippetAt(node.startPosition.row),
                 ...(hit.taint ? { taint: hit.taint } : {}),
+                ...(hit.taintedByParam ? { taintedByParam: hit.taintedByParam } : {}),
               });
+            }
+          }
+          // What this call HANDS ON. A source-tainted argument starts a flow;
+          // a parameter-derived one continues whatever the caller began. The
+          // graph pass needs both to stitch a path across functions.
+          let taintedArgs: TaintedArg[] | undefined;
+          const callArgs = node.childForFieldName("arguments");
+          if (calleeName && callArgs) {
+            let position = 0;
+            for (const arg of callArgs.namedChildren) {
+              if (!arg) continue;
+              const isKeyword = arg.type === "keyword_argument";
+              const value = isKeyword ? arg.childForFieldName("value") : arg;
+              const origin = taintOf(value ?? null);
+              if (origin) {
+                (taintedArgs ??= []).push({
+                  index: isKeyword ? -1 : position,
+                  ...(isKeyword
+                    ? { name: arg.childForFieldName("name")?.text ?? "" }
+                    : {}),
+                  ...(origin.kind === "source"
+                    ? { source: origin.ev.source }
+                    : { param: origin.name }),
+                  line: arg.startPosition.row + 1,
+                });
+              }
+              if (!isKeyword) position++;
             }
           }
           if (calleeName) {
             calls.push({
               calleeName,
+              ...(taintedArgs ? { taintedArgs } : {}),
               inFunction: currentMethod()?.name ?? null,
               // Same live scope that stamps FunctionDef.containerType — gives the
               // caller side an exact container instead of a name-only guess.

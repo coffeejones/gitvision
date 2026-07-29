@@ -503,6 +503,54 @@ plugin feature.** It belongs beside `classifySinks`, walking the same call graph
 already walks, with per-function summaries (which parameters flow to which sinks and returns)
 stitched over the resolved edges.
 
+### 4l. Interprocedural taint
+
+Built where §4k said it had to be: beside `classifySinks`, on the same resolved call graph,
+**not** in the plugin. The plugin contributes two halves that are worthless alone —
+
+  - *"this call passes `request.POST['cmd']` as argument 0"* (`CallEdge.taintedArgs`)
+  - *"this sink consumes my parameter `cmd`"* (`SinkFinding.taintedByParam`)
+
+— and the graph pass decides whether argument 0 of that call actually IS that parameter. A
+parameter is not untrusted because it is a parameter; it is untrusted when somebody fills it
+with user input, and only the graph knows if anybody does.
+
+The pass also seeds a declared route handler's own parameters, which slice 5 structurally
+could not: a plugin looking at `def search(request, q)` cannot know it is a route handler,
+because the URLconf saying so is in another file.
+
+Same discipline as everywhere: resolved edges only, decline on ambiguity, six-hop cap, and the
+shortest itinerary wins.
+
+**A real bug fell out of building it.** Tree-sitter's `typed_parameter` — `def f(x: str)` —
+carries no `name` field, only an anonymous identifier child. Reading the field returned null,
+which silently skipped every annotated parameter and so disabled taint across all typed
+Python. Zulip recorded parameters for **1,220 of 21,274** functions; after the fix, **6,517**,
+and its sinks awaiting a parameter went 0 → 5.
+
+| repo | sinks | tainted (slice 5) | tainted (slice 6) |
+|---|---|---|---|
+| pygoat | 11 | 8 | **9** |
+| netbox | 30 | 0 | **1** |
+| zulip | 6 | 0 | 0 |
+| saleor | 2 | 0 | 0 |
+| VAmPI | 2 | 0 | 0 |
+
+Modest, and the reasons are structural rather than fixable by tuning:
+
+- **NetBox**: 12 sinks wait on a parameter, 1 connects. The other 11 are django-tables2
+  `render(self, value, record, table)` methods — invoked by the framework, so no caller in the
+  repo passes anything into them. The same wall as DRF owning viewset dispatch (§4h).
+- **Zulip**: 5 sinks wait on a parameter and none is fed untrusted input by any resolved
+  caller. That is a plausible true negative for a codebase this well maintained, not a gap we
+  have evidence of.
+- **VAmPI**: still needs the connexion reader before anything can be seeded at all.
+
+The recurring limit across §4h, §4i and here is one thing said three ways: **where a framework
+owns the dispatch, the repo contains only the handler bodies, and static analysis of the repo
+cannot see who calls them.** That is not an argument for more taint work — it is the boundary
+of what analysing this repository can establish.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across
@@ -539,8 +587,9 @@ introduce a finding absent from the input.
 `SinkFinding.taint`. See §4k — it fires on 8 of pygoat's 11 sinks and on **none** of 40
 findings across four real applications, which is the measured case for slice 6.
 
-**Slice 6 — Interprocedural taint.** Function summaries stitched over the existing call graph.
-The stated goal. Only after 1–5 are solid.
+**Slice 6 — Interprocedural taint. DONE.** `lib/security/interproceduralTaint.ts` — a
+summary-based fixpoint over the resolved call graph, run inside `classifySinks`. See §4l.
+12 tests, full suite green (2161).
 
 ## 6. Decisions taken against a recommendation
 
