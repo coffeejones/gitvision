@@ -67,7 +67,7 @@ export async function createSession(params: {
     updatedAt: now,
     snapshots: [params.initialSnapshot],
   };
-  await atomicWriteJson(sessionPath(session.id), session);
+  await atomicWriteJson(sessionPath(session.id), session, { compact: true });
   return session;
 }
 
@@ -143,7 +143,7 @@ export async function appendSnapshot(
   if (!session) return null;
   session.snapshots.push(snapshot);
   session.updatedAt = new Date().toISOString();
-  await atomicWriteJson(sessionPath(id), session);
+  await atomicWriteJson(sessionPath(id), session, { compact: true });
   return session;
 }
 
@@ -152,7 +152,7 @@ export async function renameSession(id: string, name: string): Promise<Session |
   if (!session) return null;
   session.name = name;
   session.updatedAt = new Date().toISOString();
-  await atomicWriteJson(sessionPath(id), session);
+  await atomicWriteJson(sessionPath(id), session, { compact: true });
   return session;
 }
 
@@ -171,7 +171,7 @@ export async function patchLatestSnapshot(
   if (!last) return null;
   session.snapshots[session.snapshots.length - 1] = { ...last, ...patch };
   session.updatedAt = new Date().toISOString();
-  await atomicWriteJson(sessionPath(id), session);
+  await atomicWriteJson(sessionPath(id), session, { compact: true });
   return session;
 }
 

@@ -41,3 +41,61 @@ try {
 }
 
 sqlite.close();
+
+// ── Session files: re-serialise any left indented ────────────────────────────
+//
+// lib/atomicWrite.ts writes sessions compact now. Existing files stay indented
+// until something rewrites them, and a session is only rewritten on a refresh —
+// so without this pass an analysis nobody re-sweeps keeps paying for whitespace
+// forever. Measured on the stored colinhacks/zod session: 55.3 MB indented,
+// 33.8 MB compact, and read+parse 118ms → 55ms.
+//
+// Deliberately dumb: parse, re-serialise, atomic-rename. No schema knowledge, no
+// types — which is the only reason this can live in a plain .mjs that Railway
+// runs before `next start`. (A migration needing CodeGraph types could not.)
+//
+// Idempotent and cheap to skip: an indented file starts with `{\n`, a compact
+// one with `{"`, so already-migrated files cost one 2-byte read. Failures are
+// logged and skipped rather than fatal — a single unreadable session must not
+// stop the container from booting.
+try {
+  const sessionsDir = path.join(dataDir, "sessions");
+  if (fs.existsSync(sessionsDir)) {
+    let done = 0;
+    let saved = 0;
+    for (const name of fs.readdirSync(sessionsDir)) {
+      if (!name.endsWith(".json")) continue;
+      const file = path.join(sessionsDir, name);
+      let fd;
+      try {
+        // Cheapest possible "is it already compact?" — the second byte.
+        fd = fs.openSync(file, "r");
+        const head = Buffer.alloc(2);
+        fs.readSync(fd, head, 0, 2, 0);
+        fs.closeSync(fd);
+        fd = undefined;
+        if (head.toString("utf-8") !== "{\n") continue;
+
+        const before = fs.statSync(file).size;
+        const compact = JSON.stringify(JSON.parse(fs.readFileSync(file, "utf-8")));
+        // Same temp-then-rename dance as lib/atomicWrite.ts, so a kill mid-pass
+        // can never leave a half-written session behind.
+        const tmp = `${file}.${process.pid}.tmp`;
+        fs.writeFileSync(tmp, compact, "utf-8");
+        fs.renameSync(tmp, file);
+        done++;
+        saved += before - Buffer.byteLength(compact);
+      } catch (err) {
+        if (fd !== undefined) try { fs.closeSync(fd); } catch {}
+        console.error(`[migrate] ✗ could not compact ${name}:`, err.message);
+      }
+    }
+    if (done > 0) {
+      console.log(
+        `[migrate] ✓ Compacted ${done} session file(s), ${(saved / 1048576).toFixed(1)} MB reclaimed.`,
+      );
+    }
+  }
+} catch (err) {
+  console.error("[migrate] ✗ session compaction pass failed:", err.message);
+}
