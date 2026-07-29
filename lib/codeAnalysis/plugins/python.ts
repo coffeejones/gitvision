@@ -594,6 +594,20 @@ function isAssembledString(node: TsNode | null): boolean {
   }
 }
 
+/** Escaping helpers whose presence around an interpolation makes it safe. */
+const ESCAPE_FUNCTIONS = /\b(escape|conditional_escape|escapejs|urlencode|format_html)\s*\(/;
+
+/** True when an f-string interpolates at least once and EVERY interpolation
+ *  runs through an escaping helper. Text-matched on the interpolation subtree
+ *  rather than resolved, which is the right precision for a guard whose job is
+ *  only to suppress the obviously-correct form. */
+function isEveryInterpolationEscaped(node: TsNode): boolean {
+  if (node.type !== "string") return false;
+  const parts = node.namedChildren.filter((c) => c?.type === "interpolation");
+  if (parts.length === 0) return false;
+  return parts.every((p) => ESCAPE_FUNCTIONS.test(p!.text));
+}
+
 /** Methods that hand a string to a database engine. Matched on the method name
  *  plus an assembled-string argument, not on the receiver — real code calls
  *  these on `cursor`, `conn`, `db`, `session` and half a dozen ORM objects, so
@@ -673,7 +687,10 @@ function matchSinkRule(
 
   // Deserialisation.
   if (
-    (recv === "pickle" || recv === "cPickle" || recv === "dill") &&
+    (recv === "pickle" ||
+      recv === "cPickle" ||
+      recv === "dill" ||
+      recv === "marshal") &&
     (calleeName === "load" || calleeName === "loads")
   ) {
     return { ruleId: "py-pickle-load", severity: "high" };
@@ -707,6 +724,61 @@ function matchSinkRule(
       isAssembledString(arg) ||
       (arg?.type === "identifier" && isAssembledVar(arg.text));
     return assembled ? { ruleId: "py-sql-assembled", severity: "high" } : null;
+  }
+
+  // Server-side template injection. A template built at runtime is compiled
+  // AND executed, so it is `eval` wearing a web framework's clothes. A literal
+  // template is just a template, hence the assembled-argument requirement.
+  if (bare && calleeName === "render_template_string") {
+    const arg = firstPositional(argList);
+    if (isAssembledString(arg) || arg?.type === "identifier") {
+      return { ruleId: "py-ssti", severity: "high" };
+    }
+    return null;
+  }
+
+  // Escaping switched off, on markup ASSEMBLED at runtime.
+  //
+  // "not a string literal" was too loose: NetBox wraps translated literals —
+  // `mark_safe(_("Values must match <code>{regex}</code>"))` — and that is a
+  // developer-authored constant passing through gettext, which produced 32 of
+  // its 38 findings and none of them actionable. Requiring the same dynamism
+  // discriminator the other rules use keeps
+  // `mark_safe('<img src="{url}">'.format(...))` and drops the translations.
+  if (bare && (calleeName === "mark_safe" || calleeName === "Markup")) {
+    const arg = firstPositional(argList);
+    // Every interpolation escaped is the documented safe form —
+    // `mark_safe(f'<a href="{escape(v)}">{escape(v)}</a>')` is markup the
+    // developer assembled and escaped on purpose. Flagging it teaches people
+    // to ignore the rule.
+    if (arg && isEveryInterpolationEscaped(arg)) return null;
+    // Same bounded lookback the SQL rule uses: a bare `mark_safe(html)` counts
+    // only when `html` was assembled in this function. Markup handed in from
+    // elsewhere is a taint question, and NetBox's table-rendering code is full
+    // of it — 31 findings there, none of them answerable from this call site.
+    const assembled =
+      isAssembledString(arg) ||
+      (arg?.type === "identifier" && isAssembledVar(arg.text));
+    return assembled ? { ruleId: "py-mark-safe", severity: "medium" } : null;
+  }
+
+  // A JWT decoded without checking its signature is an attacker-authored JWT.
+  if (recv === "jwt" && calleeName === "decode") {
+    const options = kwarg(argList, "options");
+    if (
+      kwarg(argList, "verify")?.text === "False" ||
+      (options && /verify_signature["']?\s*:\s*False/.test(options.text))
+    ) {
+      return { ruleId: "py-jwt-unverified", severity: "high" };
+    }
+    return null;
+  }
+
+  // Debug mode serves a remote-code-execution console (Werkzeug) and full
+  // tracebacks. Only a finding on the server-start call, never on a config
+  // constant we cannot tie to a running app.
+  if (calleeName === "run" && kwarg(argList, "debug")?.text === "True") {
+    return { ruleId: "py-debug-server", severity: "medium" };
   }
 
   // Transport security switched off.

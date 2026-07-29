@@ -236,6 +236,10 @@ export const SINK_RULE_LABELS: Record<string, string> = {
   "py-pickle-load": "Pickle deserialisation",
   "py-yaml-unsafe-load": "YAML loaded without a safe loader",
   "py-sql-assembled": "SQL query built by string assembly",
+  "py-ssti": "Template built and rendered at runtime",
+  "py-mark-safe": "Output escaping switched off",
+  "py-jwt-unverified": "JWT decoded without verifying its signature",
+  "py-debug-server": "Debug server enabled",
   "py-tls-verify-disabled": "TLS certificate verification disabled",
 };
 

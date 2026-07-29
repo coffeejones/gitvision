@@ -401,6 +401,55 @@ constructible. It is a change to the identity of every node in the graph, so it 
 blast radius and the reach diagrams as much as security. Its own piece of work, and the one
 that would actually raise NetBox's number.
 
+### 4j. More rules — and the trap they walked into twice
+
+§4g said nine rules were too thin for reachability to have work to do, so: five added
+(`py-ssti`, `py-mark-safe`, `py-jwt-unverified`, `py-debug-server`, and `marshal` folded into
+the deserialisation rule).
+
+The first pass added `py-csrf-exempt` too, and it went straight into the `py-weak-hash` trap —
+30 of Zulip's 42 findings. Looking at them: `@csrf_exempt @require_POST @typed_endpoint` on
+token-authenticated API endpoints, an unsubscribe view guarded by a confirmation key, a Sentry
+tunnel. CSRF exemption on an endpoint that does not use cookie auth is **correct design**.
+Dropped.
+
+`py-mark-safe` walked into the same trap from a different direction and took three passes to
+land:
+
+| pass | rule | NetBox | Zulip |
+|---|---|---|---|
+| 1 | argument is not a string literal | 32 | 6 |
+| 2 | + must be assembled or a bare name | 33 | 1 |
+| 3 | + every interpolation escaped ⇒ safe | 31 | 1 |
+| 4 | + bare name only if assembled in this function | **25** | **0** |
+
+Pass 1 flagged `mark_safe(_("Values must match <code>{regex}</code>"))` — gettext-wrapped
+constants. Pass 3 stopped flagging `mark_safe(f'<a href="{escape(v)}">{escape(v)}</a>')`, the
+documented safe form. Pass 4 reused the SQL rule's same-function lookback so `mark_safe(html)`
+counts only when `html` was built here.
+
+**The lesson, stated once so it does not have to be relearned: a rule that flags a PATTERN
+rather than a dangerous DATA FLOW produces volume without actionability.** `weak-hash`,
+`csrf_exempt` and loose `mark_safe` all share the shape — the syntax is present, but whether
+it is a vulnerability depends on what flows through it, which is taint, not pattern matching.
+The rules that survived scrutiny are the ones where the operation is dangerous regardless of
+input (`eval`, `pickle`, `yaml.load`, `shell=True`, unverified JWT) or where the discriminator
+already encodes dynamism (`sql-assembled`, `ssti`, narrowed `mark_safe`).
+
+Where the corpus landed:
+
+| repo | sinks | reachable | unknown | unreachable | module-scope |
+|---|---|---|---|---|---|
+| pygoat | 11 | 9 | 0 | 0 | 2 |
+| netbox | 30 | 3 | 11 | 10 | 6 |
+| zulip | 6 | 0 | 1 | 5 | 0 |
+| saleor | 2 | 0 | 2 | 0 | 0 |
+| VAmPI | 2 | 0 | 1 | 0 | 1 |
+
+NetBox's remaining 25 `mark_safe` findings are f-strings with unescaped interpolations in
+table-rendering code. Genuinely ambiguous XSS territory that only taint resolves — left
+visible rather than guessed at either way.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across
@@ -434,7 +483,9 @@ path in; `{verdict, confidence, explanation, suggested_fix}` out. Hard test that
 introduce a finding absent from the input.
 
 **Slice 5 — Intraprocedural taint.** Source→sink within one function. Upgrades the confidence
-axis; no rewording needed.
+axis; no rewording needed. §4j is the argument for why this, and not more rules, is what comes
+next: every remaining precision problem in the rule set is a taint question wearing a pattern
+rule's clothes.
 
 **Slice 6 — Interprocedural taint.** Function summaries stitched over the existing call graph.
 The stated goal. Only after 1–5 are solid.

@@ -919,6 +919,61 @@ describe("pythonPlugin — security sinks", () => {
     expect(sink.inFunction).toBeNull();
   });
 
+  it("flags a template built and rendered at runtime", () => {
+    expect(ruleIds('def f(t):\n    render_template_string(f"Hi {t}")\n')).toEqual(["py-ssti"]);
+    expect(ruleIds("def f(t):\n    render_template_string(t)\n")).toEqual(["py-ssti"]);
+    // A constant template is just a template.
+    expect(ruleIds('def f():\n    render_template_string("<h1>Hi</h1>")\n')).toEqual([]);
+  });
+
+  it("flags a JWT decoded without signature verification", () => {
+    expect(ruleIds('def f(t):\n    jwt.decode(t, verify=False)\n')).toEqual([
+      "py-jwt-unverified",
+    ]);
+    expect(
+      ruleIds('def f(t):\n    jwt.decode(t, options={"verify_signature": False})\n')
+    ).toEqual(["py-jwt-unverified"]);
+    expect(ruleIds('def f(t, k):\n    jwt.decode(t, k, algorithms=["HS256"])\n')).toEqual([]);
+  });
+
+  it("flags a debug server, which serves a remote console", () => {
+    expect(ruleIds("def main():\n    app.run(debug=True)\n")).toEqual(["py-debug-server"]);
+    expect(ruleIds("def main():\n    app.run(host='0.0.0.0')\n")).toEqual([]);
+  });
+
+  it("treats marshal like the other deserialisers", () => {
+    expect(ruleIds("def f(b):\n    marshal.loads(b)\n")).toEqual(["py-pickle-load"]);
+  });
+
+  describe("escaping switched off", () => {
+    it("flags markup assembled with an unescaped interpolation", () => {
+      expect(
+        ruleIds('def f(v):\n    return mark_safe(f"<span>{v}</span>")\n')
+      ).toEqual(["py-mark-safe"]);
+    });
+
+    it("does NOT flag markup where every interpolation is escaped", () => {
+      // The documented safe form. Flagging it teaches people to ignore the rule.
+      expect(
+        ruleIds('def f(v):\n    return mark_safe(f\'<a href="{escape(v)}">{escape(v)}</a>\')\n')
+      ).toEqual([]);
+    });
+
+    it("does NOT flag a translated literal", () => {
+      // NetBox wraps gettext constants — 32 of its 38 findings before this,
+      // none actionable.
+      expect(ruleIds('def f():\n    return mark_safe(_("Values must match"))\n')).toEqual([]);
+    });
+
+    it("follows a bare variable only when it was assembled in this function", () => {
+      const assembled =
+        'def f(v):\n    html = f"<b>{v}</b>"\n    return mark_safe(html)\n';
+      expect(ruleIds(assembled)).toEqual(["py-mark-safe"]);
+      // Handed in from elsewhere — a taint question, not a call-site one.
+      expect(ruleIds("def f(html):\n    return mark_safe(html)\n")).toEqual([]);
+    });
+  });
+
   it("leaves sinks unset for a clean file", () => {
     expect(sinksIn("def add(a, b):\n    return a + b\n")).toEqual([]);
   });
