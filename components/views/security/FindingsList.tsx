@@ -405,6 +405,16 @@ function SinkRowContent({
         filePath={data.filePath}
         line={data.line}
       />
+      {data.taint && (
+        <span
+          className="text-xs font-mono truncate"
+          style={{ color: TOK.rose }}
+          title={`Untrusted input from ${data.taint.source} (line ${data.taint.line}) reaches this call`}
+        >
+          {data.taint.source} (line {data.taint.line})
+          {data.taint.via ? ` → ${data.taint.via}` : ""} → here
+        </span>
+      )}
       {data.path && (
         <span
           className="text-xs font-mono truncate"

@@ -974,6 +974,90 @@ describe("pythonPlugin — security sinks", () => {
     });
   });
 
+  describe("intraprocedural taint", () => {
+    const taintOf = (content: string) => sinksIn(content)[0]?.taint;
+
+    it("traces request data through a local into a sink", () => {
+      // pygoat's SQL lab, three hops: request.POST -> name -> q -> raw(q).
+      const src =
+        "def sql_lab(request):\n" +
+        "    name = request.POST.get('name')\n" +
+        "    q = \"SELECT * FROM t WHERE u='\" + name + \"'\"\n" +
+        "    return login.objects.raw(q)\n";
+      expect(taintOf(src)).toMatchObject({ source: "request.POST", via: "q" });
+    });
+
+    it("records the line the value entered, not the line of the sink", () => {
+      const src =
+        "def f(request):\n" +
+        "    v = request.GET['x']\n" +
+        "    return eval(v)\n";
+      expect(taintOf(src)).toMatchObject({ line: 2 });
+      expect(sinksIn(src)[0].line).toBe(3);
+    });
+
+    it("carries taint through an f-string", () => {
+      const src =
+        'def f(request):\n    return mark_safe(f"<b>{request.POST[\'n\']}</b>")\n';
+      expect(taintOf(src)?.source).toContain("request.POST");
+    });
+
+    it("recognises Flask and DRF request shapes too", () => {
+      expect(
+        taintOf("def f(request):\n    return eval(request.args.get('x'))\n")?.source
+      ).toBe("request.args");
+      expect(
+        taintOf("def f(request):\n    return eval(request.query_params['x'])\n")?.source
+      ).toContain("request.query_params");
+    });
+
+    it("sees request data through self in a class-based view", () => {
+      const src =
+        "class V:\n    def post(self):\n        return eval(self.request.POST['x'])\n";
+      expect(sinksIn(src)[0]?.taint?.source).toContain("request.POST");
+    });
+
+    it("treats a declared route handler's own parameters as untrusted", () => {
+      // FastAPI has no request object — the parameters ARE the input.
+      const src =
+        '@app.get("/items/{item_id}")\ndef read_item(item_id):\n    return eval(item_id)\n';
+      expect(taintOf(src)).toMatchObject({ via: "item_id" });
+    });
+
+    it("does not taint self, cls or request themselves", () => {
+      const src = '@app.get("/x")\ndef h(request):\n    return eval(request)\n';
+      expect(taintOf(src)).toBeUndefined();
+    });
+
+    it("stops at a sanitiser", () => {
+      expect(
+        taintOf("def f(request):\n    return eval(int(request.GET['id']))\n")
+      ).toBeUndefined();
+      expect(
+        taintOf(
+          'def f(request):\n    return mark_safe(f"<b>{escape(request.GET[\'n\'])}</b>")\n'
+        )
+      ).toBeUndefined();
+    });
+
+    it("does NOT claim taint across a function boundary", () => {
+      // The whole limit of slice 5, pinned so nobody mistakes silence for
+      // safety: source in one function, sink in another.
+      const src =
+        "def view(request):\n" +
+        "    return run(request.POST['cmd'])\n" +
+        "\ndef run(cmd):\n" +
+        "    os.system(cmd)\n";
+      const osSink = sinksIn(src).find((x) => x.ruleId === "py-os-command");
+      expect(osSink).toBeDefined();
+      expect(osSink?.taint).toBeUndefined();
+    });
+
+    it("leaves taint unset on findings that are config, not data flow", () => {
+      expect(taintOf("def main():\n    app.run(debug=True)\n")).toBeUndefined();
+    });
+  });
+
   it("leaves sinks unset for a clean file", () => {
     expect(sinksIn("def add(a, b):\n    return a + b\n")).toEqual([]);
   });

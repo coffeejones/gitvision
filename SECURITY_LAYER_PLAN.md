@@ -450,6 +450,59 @@ NetBox's remaining 25 `mark_safe` findings are f-strings with unescaped interpol
 table-rendering code. Genuinely ambiguous XSS territory that only taint resolves — left
 visible rather than guessed at either way.
 
+### 4k. Intraprocedural taint — what it proves, and where it stops
+
+`TaintEvidence` on `SinkFinding`: which untrusted expression reached the call, the line it
+entered, and the local that carried it.
+
+- **Sources**: any path segment `request.*` (Django, Flask and DRF all name it that, including
+  `self.request` in class-based views), `sys.argv`, `sys.stdin`, `os.environ`, `input()`, and
+  a declared route handler's own parameters — FastAPI has no request object, the parameters
+  ARE the input.
+- **Propagation**: assignment, f-string interpolation, `+` and `%`, `.format()`, subscript and
+  attribute access, and method calls on a tainted receiver (`value.strip()` stays tainted).
+- **Sanitisers end the flow**: `int`, `float`, `escape`, `conditional_escape`, `quote`,
+  `urlencode`, `UUID` and friends. Anything not on the list keeps the taint.
+
+Ranking is now reachability → **taint** → severity. Taint outranks severity on purpose: "this
+codebase feeds untrusted input to this call" is a demonstrated fact, while severity is a
+property of the operation's class. A tainted medium is a described vulnerability; an untainted
+high is a dangerous call nobody has been shown able to reach.
+
+On pygoat it traces the real thing, three hops:
+
+```
+request.POST (line 150) → name → sql_query → login.objects.raw(sql_query) (line 162)
+```
+
+8 of 11 findings tainted. And on real applications:
+
+| repo | sinks | tainted |
+|---|---|---|
+| pygoat | 11 | **8** |
+| netbox | 30 | **0** |
+| zulip | 6 | **0** |
+| saleor | 2 | **0** |
+| VAmPI | 2 | **0** |
+
+**Zero out of forty.** Not a bug — the definition of the slice. A lab puts
+`request.POST.get()` and the sink in one function; real code puts a view, a service and a
+repository between them. VAmPI's SQL injection takes `username` as a parameter of a static
+method the route handler calls. Zulip's is in `do_update_user_presence(...)`, several layers
+below any view. NetBox's `mark_safe` calls take `value` as a method parameter.
+
+So the honest summary of slice 5: it proves the machinery works, it is worth having, and it
+answers approximately nothing on production code by itself.
+
+**One architectural finding, which decides how slice 6 is built.** Taint currently lives in
+the plugin walk, but a URLconf- or CBV-declared handler gets its `entryPoint` stamped in
+`buildCodeGraph`, cross-file, long AFTER parsing. The plugin therefore cannot taint those
+handlers' parameters — only decorator-declared ones. The same layering that forced routing to
+be resolved at the graph level forces taint there too: **interprocedural taint cannot be a
+plugin feature.** It belongs beside `classifySinks`, walking the same call graph reachability
+already walks, with per-function summaries (which parameters flow to which sinks and returns)
+stitched over the resolved edges.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across
@@ -482,10 +535,9 @@ plus the panel integration. **The differentiator, and the first user-visible sli
 path in; `{verdict, confidence, explanation, suggested_fix}` out. Hard test that the AI cannot
 introduce a finding absent from the input.
 
-**Slice 5 — Intraprocedural taint.** Source→sink within one function. Upgrades the confidence
-axis; no rewording needed. §4j is the argument for why this, and not more rules, is what comes
-next: every remaining precision problem in the rule set is a taint question wearing a pattern
-rule's clothes.
+**Slice 5 — Intraprocedural taint. DONE.** Source→sink within one function, attached as
+`SinkFinding.taint`. See §4k — it fires on 8 of pygoat's 11 sinks and on **none** of 40
+findings across four real applications, which is the measured case for slice 6.
 
 **Slice 6 — Interprocedural taint.** Function summaries stitched over the existing call graph.
 The stated goal. Only after 1–5 are solid.

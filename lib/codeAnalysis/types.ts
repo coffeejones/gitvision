@@ -100,6 +100,27 @@ export interface EntryPointInfo {
  *  analysis exists. */
 export type SinkSeverity = "high" | "medium" | "low";
 
+/** Proof that an untrusted value reaches a sink, established WITHIN one
+ *  function (v0.82+, slice 5).
+ *
+ *  The distinction this finally lets the tool draw: `cursor.execute(query)`
+ *  where `query` was assembled says the query was BUILT; the same call where
+ *  the assembly included `request.POST["name"]` says it was built FROM
+ *  UNTRUSTED INPUT. Everything before this could only claim the first.
+ *
+ *  Intraprocedural on purpose. A source in one function and a sink in another
+ *  is interprocedural taint, and this does not claim it — a sink with no
+ *  `taint` is not thereby clean, only unproven. */
+export interface TaintEvidence {
+  /** The source expression as written: `request.POST.get`. */
+  source: string;
+  /** 1-indexed line where the untrusted value entered the function. */
+  line: number;
+  /** The local it travelled through, when it travelled through one. Absent
+   *  when the source is used directly at the sink. */
+  via?: string;
+}
+
 /** A dangerous operation found in source (v0.82+).
  *
  *  Deterministic and syntactic: a sink is recorded because of what the code
@@ -122,6 +143,9 @@ export interface SinkFinding {
   inContainerType?: string;
   /** The source line, trimmed and length-capped. Evidence for the reader. */
   snippet: string;
+  /** Set when untrusted input provably reaches this sink inside the same
+   *  function. Absence means UNPROVEN, never safe — see TaintEvidence. */
+  taint?: TaintEvidence;
 }
 
 /** A route declared in a routing TABLE rather than on the handler itself —

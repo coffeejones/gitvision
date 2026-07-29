@@ -84,6 +84,9 @@ export interface ReachabilityReport {
   counts: Record<Reachability, number>;
   /** Sinks considered, after dropping test files. */
   total: number;
+  /** Findings where untrusted input was shown to reach the call. Never a
+   *  filter — a sink without taint is unproven, not clean. */
+  tainted: number;
   /** Entry points the walk started from. Zero means every finding lands in
    *  `unknown`, which is a statement about our readers, not about the code. */
   entryPoints: number;
@@ -203,10 +206,17 @@ export function classifySinks(cg: CodeGraph): ReachabilityReport {
     return { ...sink, reachability: "unknown" as const };
   });
 
-  // Most actionable first: proven reach, then severity, then a stable tiebreak.
+  // Most actionable first: proven reach, then PROVEN UNTRUSTED INPUT, then
+  // severity, then a stable tiebreak.
+  //
+  // Taint outranks severity deliberately. "Untrusted input reaches this call"
+  // is demonstrated fact about this codebase; severity is a property of the
+  // operation's class. A tainted medium is a described vulnerability; an
+  // untainted high is a dangerous call we cannot show anyone can feed.
   findings.sort(
     (a, b) =>
       REACHABILITY_RANK[b.reachability] - REACHABILITY_RANK[a.reachability] ||
+      Number(!!b.taint) - Number(!!a.taint) ||
       SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] ||
       cmpStr(a.filePath, b.filePath) ||
       a.line - b.line ||
@@ -221,7 +231,13 @@ export function classifySinks(cg: CodeGraph): ReachabilityReport {
   };
   for (const f of findings) counts[f.reachability]++;
 
-  return { findings, counts, total: findings.length, entryPoints: entryMeta.size };
+  return {
+    findings,
+    counts,
+    total: findings.length,
+    tainted: findings.filter((f) => f.taint).length,
+    entryPoints: entryMeta.size,
+  };
 }
 
 /** Human labels for the rule ids. Kept here rather than in the component so

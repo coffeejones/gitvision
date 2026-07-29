@@ -29,6 +29,7 @@ import type {
   RouteDeclaration,
   SinkFinding,
   SinkSeverity,
+  TaintEvidence,
   SourceFile,
 } from "../types";
 import { loadBuiltinGrammar } from "../runtime";
@@ -594,6 +595,43 @@ function isAssembledString(node: TsNode | null): boolean {
   }
 }
 
+// ------------------- Intraprocedural taint (slice 5) -------------------
+//
+// "Assembled" says a string was built. "Tainted" says it was built from
+// something the outside world controls. Every precision problem left in the
+// rule set was that gap: `execute(query)`, `mark_safe(html)` and
+// `render_template_string(t)` are all fine until untrusted input reaches them.
+//
+// SCOPE: one function. A source here and a sink in a callee is interprocedural
+// and is NOT claimed. Absence of taint therefore means unproven, never clean —
+// which is why taint upgrades a finding's confidence and never removes one.
+
+/** Module-level sources that are untrusted without a request object. */
+const TAINT_ROOT_MODULES: Record<string, ReadonlySet<string>> = {
+  sys: new Set(["argv", "stdin"]),
+  os: new Set(["environ"]),
+};
+
+/** Calls whose RESULT is untrusted regardless of their arguments. */
+const TAINT_SOURCE_CALLS = new Set(["input", "raw_input"]);
+
+/** Functions that render a value harmless. `int(x)` cannot carry an injection;
+ *  `escape(x)` cannot carry markup; `shlex.quote(x)` cannot carry a shell
+ *  metacharacter. Conservative list — anything not here keeps the taint. */
+const TAINT_SANITIZERS = new Set([
+  "int",
+  "float",
+  "bool",
+  "len",
+  "escape",
+  "conditional_escape",
+  "escapejs",
+  "quote",
+  "quote_plus",
+  "urlencode",
+  "UUID",
+]);
+
 /** Escaping helpers whose presence around an interpolation makes it safe. */
 const ESCAPE_FUNCTIONS = /\b(escape|conditional_escape|escapejs|urlencode|format_html)\s*\(/;
 
@@ -647,6 +685,8 @@ const SUBPROCESS_FUNCTIONS = new Set([
 interface SinkRuleHit {
   ruleId: string;
   severity: SinkSeverity;
+  /** Set when the rule could show untrusted input reaching this call. */
+  taint?: TaintEvidence;
 }
 
 /** Match one call node against the sink rules. Returns null for the
@@ -657,7 +697,9 @@ function matchSinkRule(
   calleeName: string,
   /** Was this local name assigned a string built from parts, earlier in the
    *  same function? See the bounded-lookback note on the SQL rule. */
-  isAssembledVar: (name: string) => boolean
+  isAssembledVar: (name: string) => boolean,
+  /** Does this expression carry untrusted input? Slice 5. */
+  taintOf: (node: TsNode | null) => TaintEvidence | null
 ): SinkRuleHit | null {
   const argList = call.childForFieldName("arguments");
   const bare = fnNode.type === "identifier";
@@ -666,21 +708,26 @@ function matchSinkRule(
   // Code execution: bare eval()/exec() only. `obj.eval()` is somebody's own
   // method and matching it is how a scanner earns its reputation for noise.
   if (bare && (calleeName === "eval" || calleeName === "exec")) {
-    return { ruleId: `py-${calleeName}`, severity: "high" };
+    const args = call.childForFieldName("arguments");
+    const t = args ? taintOf(firstPositional(args)) : null;
+    return { ruleId: `py-${calleeName}`, severity: "high", ...(t ? { taint: t } : {}) };
   }
 
   if (!argList) return null;
+  /** Untrusted input reaching this call's first argument, when it can be
+   *  shown. Attached as EVIDENCE — its absence never removes a finding. */
+  const argTaint = () => taintOf(firstPositional(argList)) ?? undefined;
 
   // Command execution.
   if (recv === "os" && (calleeName === "system" || calleeName === "popen")) {
-    return { ruleId: "py-os-command", severity: "high" };
+    return { ruleId: "py-os-command", severity: "high", taint: argTaint() };
   }
   if (recv === "subprocess" && SUBPROCESS_FUNCTIONS.has(calleeName)) {
     // Without shell=True the argv form is safe by construction — no shell to
     // inject into — so the kwarg IS the finding.
     const shell = kwarg(argList, "shell");
     if (shell?.text === "True") {
-      return { ruleId: "py-subprocess-shell", severity: "high" };
+      return { ruleId: "py-subprocess-shell", severity: "high", taint: argTaint() };
     }
     return null;
   }
@@ -693,13 +740,13 @@ function matchSinkRule(
       recv === "marshal") &&
     (calleeName === "load" || calleeName === "loads")
   ) {
-    return { ruleId: "py-pickle-load", severity: "high" };
+    return { ruleId: "py-pickle-load", severity: "high", taint: argTaint() };
   }
   if (recv === "yaml" && (calleeName === "load" || calleeName === "load_all")) {
     // yaml.load with a Safe loader is the documented safe form.
     const loader = kwarg(argList, "Loader");
     if (loader && /Safe/.test(loader.text)) return null;
-    return { ruleId: "py-yaml-unsafe-load", severity: "high" };
+    return { ruleId: "py-yaml-unsafe-load", severity: "high", taint: argTaint() };
   }
 
   // SQL built by string assembly.
@@ -723,7 +770,9 @@ function matchSinkRule(
     const assembled =
       isAssembledString(arg) ||
       (arg?.type === "identifier" && isAssembledVar(arg.text));
-    return assembled ? { ruleId: "py-sql-assembled", severity: "high" } : null;
+    return assembled
+      ? { ruleId: "py-sql-assembled", severity: "high", taint: taintOf(arg) ?? undefined }
+      : null;
   }
 
   // Server-side template injection. A template built at runtime is compiled
@@ -732,7 +781,7 @@ function matchSinkRule(
   if (bare && calleeName === "render_template_string") {
     const arg = firstPositional(argList);
     if (isAssembledString(arg) || arg?.type === "identifier") {
-      return { ruleId: "py-ssti", severity: "high" };
+      return { ruleId: "py-ssti", severity: "high", taint: argTaint() };
     }
     return null;
   }
@@ -759,7 +808,9 @@ function matchSinkRule(
     const assembled =
       isAssembledString(arg) ||
       (arg?.type === "identifier" && isAssembledVar(arg.text));
-    return assembled ? { ruleId: "py-mark-safe", severity: "medium" } : null;
+    return assembled
+      ? { ruleId: "py-mark-safe", severity: "medium", taint: taintOf(arg) ?? undefined }
+      : null;
   }
 
   // A JWT decoded without checking its signature is an attacker-authored JWT.
@@ -812,6 +863,8 @@ interface PyMethodScope {
   /** Local names assigned a string built from parts, for the SQL rule. See
    *  isAssembledString and the note on bounded lookback in matchSinkRule. */
   assembled: Set<string>;
+  /** Locals holding a value derived from untrusted input, with the evidence. */
+  tainted: Map<string, TaintEvidence>;
 }
 
 function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
@@ -858,6 +911,93 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   const markAssembled = (name: string) => {
     (currentMethod()?.assembled ?? moduleAssembled).add(name);
   };
+  const moduleTainted = new Map<string, TaintEvidence>();
+  const markTainted = (name: string, ev: TaintEvidence) => {
+    (currentMethod()?.tainted ?? moduleTainted).set(name, ev);
+  };
+  const taintedVar = (name: string): TaintEvidence | null => {
+    for (let i = methodStack.length - 1; i >= 0; i--) {
+      const hit = methodStack[i].tainted.get(name);
+      if (hit) return hit;
+    }
+    return moduleTainted.get(name) ?? null;
+  };
+
+  /** Does this expression carry untrusted input? Recursive, and deliberately
+   *  conservative: anything it cannot explain returns null, so a sink without
+   *  taint is UNPROVEN rather than declared safe. */
+  const taintOf = (node: TsNode | null): TaintEvidence | null => {
+    if (!node) return null;
+    const here = () => node.startPosition.row + 1;
+    switch (node.type) {
+      case "identifier":
+        return taintedVar(node.text);
+
+      case "attribute":
+      case "subscript": {
+        // Django, Flask and DRF all name the parameter `request`, and that
+        // convention is strong enough to key on: `request.POST`,
+        // `request.args`, `request.json`, `request.query_params` are all
+        // untrusted. Matched as a whole path segment, so `self.request.args`
+        // in a class-based view qualifies and `myrequest.x` does not.
+        if (/(^|\.)request\.[A-Za-z_]/.test(node.text)) {
+          return { source: node.text.split("(")[0], line: here() };
+        }
+        const base =
+          node.childForFieldName("object") ?? node.childForFieldName("value");
+        if (base?.type === "identifier") {
+          const attr = node.childForFieldName("attribute")?.text;
+          if (attr && TAINT_ROOT_MODULES[base.text]?.has(attr)) {
+            return { source: `${base.text}.${attr}`, line: here() };
+          }
+        }
+        // Indexing or reading an attribute off tainted data stays tainted.
+        return taintOf(base ?? null);
+      }
+
+      case "call": {
+        const fn = node.childForFieldName("function");
+        const name =
+          fn?.type === "identifier"
+            ? fn.text
+            : fn?.childForFieldName("attribute")?.text;
+        // A sanitiser ENDS the flow — that is the whole point of calling one.
+        if (name && TAINT_SANITIZERS.has(name)) return null;
+        if (fn?.type === "identifier" && TAINT_SOURCE_CALLS.has(fn.text)) {
+          return { source: `${fn.text}()`, line: here() };
+        }
+        // `request.POST.get("name")` — the receiver is the source. Also covers
+        // string methods on tainted values: `value.strip()` stays tainted.
+        const viaReceiver = taintOf(fn?.childForFieldName("object") ?? null);
+        if (viaReceiver) return viaReceiver;
+        for (const arg of node.childForFieldName("arguments")?.namedChildren ?? []) {
+          const t = taintOf(arg ?? null);
+          if (t) return t;
+        }
+        return null;
+      }
+
+      case "string": {
+        // f-string: any tainted interpolation taints the result.
+        for (const part of node.namedChildren) {
+          if (part?.type !== "interpolation") continue;
+          const t = taintOf(part.namedChildren[0] ?? null);
+          if (t) return t;
+        }
+        return null;
+      }
+
+      case "binary_operator":
+        return (
+          taintOf(node.childForFieldName("left")) ??
+          taintOf(node.childForFieldName("right"))
+        );
+
+      default:
+        return null;
+    }
+  };
+
   const isAssembledVar = (name: string): boolean => {
     for (let i = methodStack.length - 1; i >= 0; i--) {
       if (methodStack[i].assembled.has(name)) return true;
@@ -1348,13 +1488,37 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         const entryPoint = pendingEntryPoint ?? undefined;
         pendingEntryPoint = null;
 
-        methodStack.push({
+        const scope = {
           name: fnName,
           locals,
           decisionPoints: 0,
           isInClassMethod: isInClass,
-          assembled: new Set(),
-        });
+          assembled: new Set<string>(),
+          tainted: new Map<string, TaintEvidence>(),
+        };
+        // A declared route handler receives its path and query parameters as
+        // arguments — in FastAPI that IS the request data, with no `request`
+        // object in sight. `self`, `cls` and `request` are the framework's
+        // own, not user input.
+        if (entryPoint) {
+          const params = node.childForFieldName("parameters");
+          for (const p of params?.namedChildren ?? []) {
+            if (!p) continue;
+            const pname =
+              p.type === "identifier"
+                ? p.text
+                : p.childForFieldName("name")?.text;
+            if (!pname || pname === "self" || pname === "cls" || pname === "request") {
+              continue;
+            }
+            scope.tainted.set(pname, {
+              source: `${fnName}(${pname})`,
+              line: p.startPosition.row + 1,
+              via: pname,
+            });
+          }
+        }
+        methodStack.push(scope);
         const body = node.childForFieldName("body");
         if (body) for (const child of body.namedChildren) visit(child);
         const ms = methodStack.pop()!;
@@ -1407,6 +1571,12 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         // function — module-level query building is just as real.
         if (left?.type === "identifier" && isAssembledString(valueNode)) {
           markAssembled(left.text);
+        }
+        if (left?.type === "identifier") {
+          const t = taintOf(valueNode);
+          // Record the local it now travels through, so the finding can say
+          // where the value entered AND what carried it to the sink.
+          if (t) markTainted(left.text, { ...t, via: left.text });
         }
         for (const child of node.namedChildren) visit(child);
         return;
@@ -1471,7 +1641,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             if (reg) routes.push(reg);
           }
           if (calleeName && sinks.length < MAX_SINKS_PER_FILE) {
-            const hit = matchSinkRule(node, fnNode, calleeName, isAssembledVar);
+            const hit = matchSinkRule(node, fnNode, calleeName, isAssembledVar, taintOf);
             if (hit) {
               sinks.push({
                 ruleId: hit.ruleId,
@@ -1480,6 +1650,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
                 inFunction: currentMethod()?.name ?? null,
                 inContainerType: currentClass()?.name,
                 snippet: snippetAt(node.startPosition.row),
+                ...(hit.taint ? { taint: hit.taint } : {}),
               });
             }
           }
