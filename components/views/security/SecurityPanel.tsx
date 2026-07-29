@@ -172,6 +172,7 @@ export function SecurityPanel({ snapshot, sessionId }: Props) {
           patternFindings={patternFindings}
           sinkFindings={sinkFindings}
           sessionId={sessionId}
+          repoPrivate={snapshot.repo.private === true}
         />
       </div>
     </div>

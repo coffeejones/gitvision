@@ -579,6 +579,37 @@ Note for whoever reads the panel next: session creation is auth-gated, so this w
 through `analyzeRepo` directly rather than the HTTP route. The auth and HTTP layers are
 untouched by this work; the seam under test was the analysis pipeline.
 
+### 4n. Disclosure surface — the "#1" layer, wired into the panel
+
+The engine (§4m predecessor, `lib/security/disclosure.ts`) now has a UI:
+
+- `POST /api/sessions/[id]/security/disclose` — same gate stack as the Source
+  explainer (AI configured → AI rate-limit bucket → session → read access →
+  auth → finding exists AND is reachable → in-memory cache → daily budget →
+  generate). Re-classifies from the graph rather than trusting the client, so a
+  report can only be asked for on a real deterministic finding.
+- `DisclosureButton` — one button per REACHABLE sink row; reveals the report
+  inline. Private repos get the same one-time consent the explainer uses, since
+  the flagged line is private source.
+
+**The structural gate is in the route, not a checkbox:** ownership is hardcoded
+to `third-party`, and the client cannot override it. The hosted endpoint is
+therefore incapable of emitting a concrete payload for anyone's code. The
+`owned` calibration — the concrete PoC sketch — is reserved for the desktop
+build (where by construction you run your own uploaded project) or a future
+verified-ownership signal. This is the split from the vision, enforced in code.
+
+Verified in the browser against pygoat: the button renders on exactly the 9
+reachable findings and nowhere else; a click runs the full client → route →
+gate path; the gate progression is correct (no key → "not set"; key present →
+"sign in"). The happy-path report render sits behind the auth gate, which is
+pre-existing infrastructure, not this work — the engine's real output was
+verified live earlier, both calibrations.
+
+That closes "#1". "#2" — local dynamic confirmation on your own uploaded
+project — remains the desktop pillar: quarters of work, its own hard problems
+(booting an arbitrary project, sandboxing, the confirmation oracle).
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across

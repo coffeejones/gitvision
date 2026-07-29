@@ -26,6 +26,8 @@ import {
   REACHABILITY_LABELS,
   type ClassifiedSink,
 } from "@/lib/security/reachability";
+import { findingKeyOf } from "@/lib/security/disclosure";
+import { DisclosureButton } from "./DisclosureButton";
 import type { RiskyPatternFinding } from "@/lib/security/riskyPatterns";
 import type { SecretFinding } from "@/lib/security/types";
 import {
@@ -39,6 +41,9 @@ interface Props {
   patternFindings: RiskyPatternFinding[];
   sinkFindings?: ClassifiedSink[];
   sessionId: string;
+  /** Whether the analyzed repo is private — threads to the disclosure action's
+   *  one-time consent, since the flagged line is private source. */
+  repoPrivate?: boolean;
 }
 
 export function FindingsList({
@@ -47,6 +52,7 @@ export function FindingsList({
   patternFindings,
   sinkFindings = [],
   sessionId,
+  repoPrivate = false,
 }: Props) {
   const all = buildUnifiedFindings(
     incidentMatches,
@@ -87,7 +93,7 @@ export function FindingsList({
 
       <div className="flex flex-col gap-2">
         {all.map((f, i) => (
-          <FindingRow key={rowKey(f, i)} finding={f} sessionId={sessionId} />
+          <FindingRow key={rowKey(f, i)} finding={f} sessionId={sessionId} repoPrivate={repoPrivate} />
         ))}
       </div>
     </section>
@@ -110,9 +116,11 @@ function rowKey(f: UnifiedFinding, fallbackIdx: number): string {
 function FindingRow({
   finding,
   sessionId,
+  repoPrivate,
 }: {
   finding: UnifiedFinding;
   sessionId: string;
+  repoPrivate: boolean;
 }) {
   return (
     <article
@@ -132,7 +140,7 @@ function FindingRow({
           <SecretRowContent data={finding.data} sessionId={sessionId} />
         )}
         {finding.kind === "sink" && (
-          <SinkRowContent data={finding.data} sessionId={sessionId} />
+          <SinkRowContent data={finding.data} sessionId={sessionId} repoPrivate={repoPrivate} />
         )}
         {finding.kind === "pattern" && (
           <PatternRowContent data={finding.data} sessionId={sessionId} />
@@ -384,9 +392,11 @@ function CleanListState() {
 function SinkRowContent({
   data,
   sessionId,
+  repoPrivate,
 }: {
   data: ClassifiedSink;
   sessionId: string;
+  repoPrivate: boolean;
 }) {
   return (
     <>
@@ -431,6 +441,13 @@ function SinkRowContent({
       >
         {data.snippet}
       </span>
+      {data.reachability === "reachable" && (
+        <DisclosureButton
+          sessionId={sessionId}
+          findingKey={findingKeyOf(data)}
+          repoPrivate={repoPrivate}
+        />
+      )}
     </>
   );
 }
