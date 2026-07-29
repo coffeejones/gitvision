@@ -116,3 +116,40 @@ describe("buildUnifiedFindings — sinks", () => {
     expect(buildUnifiedFindings([], [], [pattern("a.ts")])).toHaveLength(1);
   });
 });
+
+describe("buildUnifiedFindings — evidence outranks severity", () => {
+  it("puts a reachable, tainted medium above an unreachable high", () => {
+    // The NetBox case that end-to-end testing surfaced: mark_safe fed
+    // request.POST across two functions and traced from a route was ranked
+    // below two exec() calls nothing can reach, purely because exec is "high".
+    const demonstrated: ClassifiedSink = {
+      ...sink("medium", "reachable"),
+      ruleId: "py-mark-safe",
+      taint: { source: "request.POST", line: 12 },
+    };
+    const unproven: ClassifiedSink = { ...sink("high", "unknown"), ruleId: "py-exec" };
+    const out = buildUnifiedFindings([], [], [], [unproven, demonstrated]);
+    expect(out.map((f) => (f.kind === "sink" ? f.data.ruleId : ""))).toEqual([
+      "py-mark-safe",
+      "py-exec",
+    ]);
+  });
+
+  it("ranks reachable-with-taint above reachable-without", () => {
+    const tainted: ClassifiedSink = {
+      ...sink("medium", "reachable", "a.py"),
+      taint: { source: "request.GET", line: 3 },
+    };
+    const plain: ClassifiedSink = { ...sink("medium", "reachable", "b.py") };
+    const out = buildUnifiedFindings([], [], [], [plain, tainted]);
+    expect(out.map((f) => (f.kind === "sink" ? f.data.filePath : ""))).toEqual([
+      "a.py",
+      "b.py",
+    ]);
+  });
+
+  it("leaves non-sink findings on the severity ordering they always had", () => {
+    const out = buildUnifiedFindings([], [secret("high", "a.ts")], [pattern("b.ts")], []);
+    expect(out.map((f) => f.kind)).toEqual(["secret", "pattern"]);
+  });
+});

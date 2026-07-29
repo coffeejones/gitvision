@@ -81,7 +81,7 @@ export function FindingsList({
           className="text-[10px] uppercase tracking-[0.14em] font-medium"
           style={{ color: TOK.textMuted }}
         >
-          Sorted by severity
+          What we can show, first
         </span>
       </header>
 

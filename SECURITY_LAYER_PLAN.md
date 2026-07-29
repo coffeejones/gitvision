@@ -551,6 +551,34 @@ owns the dispatch, the repo contains only the handler bodies, and static analysi
 cannot see who calls them.** That is not an argument for more taint work — it is the boundary
 of what analysing this repository can establish.
 
+### 4m. End-to-end test — the seam runs, and it found one bug
+
+The one thing never executed was `classifySinks` inside the real `analyzeRepo` pipeline. Run
+for real (GitHub fetch → tarball → extract → analyze → classify → snapshot), against the
+compiled build the MCP server ships:
+
+| repo | via analyzeRepo | matches the probe? |
+|---|---|---|
+| pygoat | 11 sinks, 134 entry points, 9 reachable, 9 tainted, 11.6s | yes, exactly |
+| netbox | 30 sinks, 137 entry points, 3 reachable, 1 tainted | yes, exactly |
+
+NetBox at 11.6s clears the pipeline's 25s `CODE_ANALYSIS_TIMEOUT_MS`. Both snapshots were then
+written as real sessions and opened in the panel.
+
+**The bug it found.** NetBox's strongest finding — `mark_safe` fed `request.POST` across two
+functions AND traced from a route — ranked BELOW two `exec()` calls with no path to them at
+all, because `exec` is high and `mark_safe` is medium. `classifySinks` ranks correctly;
+`buildUnifiedFindings` then re-sorted on severity alone and threw the reachability work away at
+the last step. Nothing unit-testable had caught it, because each half was right on its own.
+
+Fixed with an evidence tier ahead of severity: reachable-and-tainted, then reachable, then
+everything else, with severity ordering inside each tier. The list header said "Sorted by
+severity" and now says what it actually does. Three tests pin it.
+
+Note for whoever reads the panel next: session creation is auth-gated, so this was driven
+through `analyzeRepo` directly rather than the HTTP route. The auth and HTTP layers are
+untouched by this work; the seam under test was the analysis pipeline.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across

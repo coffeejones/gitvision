@@ -22,6 +22,15 @@ export type UnifiedFinding =
   | { kind: "sink"; severity: "high" | "medium" | "low"; data: ClassifiedSink }
   | { kind: "pattern"; severity: "info"; data: RiskyPatternFinding };
 
+/** How much the tool can actually SHOW about a finding, independent of how bad
+ *  the operation would be. Only sinks carry reachability, so only they can
+ *  reach a tier above zero — an incident or a leaked secret is already a fact,
+ *  and sorts on severity as before. */
+function evidenceTier(f: UnifiedFinding): number {
+  if (f.kind !== "sink" || f.data.reachability !== "reachable") return 0;
+  return f.data.taint ? 2 : 1;
+}
+
 export const SEVERITY_RANK: Record<UnifiedFinding["severity"], number> = {
   high: 3,
   medium: 2,
@@ -65,6 +74,23 @@ export function buildUnifiedFindings(
       (p) => ({ kind: "pattern", severity: "info", data: p }) as const,
     ),
   ];
-  all.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
+  // Severity alone is the wrong primary key once reachability exists.
+  //
+  // Found by running NetBox through the real pipeline: a mark_safe fed
+  // `request.POST` across two functions AND traced from a route ranked BELOW
+  // two exec() calls with no path to them at all, because exec is "high" and
+  // mark_safe is "medium". That is the reachability work being computed and
+  // then thrown away at the last step.
+  //
+  // So demonstrated findings sort first. A sink we can show is reachable AND
+  // fed untrusted input is the strongest claim this tool makes; an unproven
+  // high is a dangerous call nobody has been shown able to trigger. Severity
+  // still orders everything within a tier, and the sort stays stable, so
+  // classifySinks' own ordering survives inside each band.
+  all.sort(
+    (a, b) =>
+      evidenceTier(b) - evidenceTier(a) ||
+      SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]
+  );
   return all;
 }
