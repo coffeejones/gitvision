@@ -69,6 +69,13 @@ const SAFE_FILTER = /\{\{\s*([^|}]*?)\s*\|\s*safe\b(?:[^}]*?)\}\}/g;
  *  they are NOT excluded — we keep the finding and let the reader judge. */
 const TRUSTED_TEMPLATE_VALUES = new Set(["csrf_token"]);
 
+/** Attributes the FRAMEWORK fills from the developer's own form definition, not
+ *  from a request. `{{ field.help_text|safe }}` is the standard Django
+ *  crispy-forms idiom and appeared in 10 of 64 false positives across 39
+ *  realistic applications (§4w) — always as boilerplate in a generated form
+ *  template. The `|safe` there is correct: help text is authored in Python. */
+const TRUSTED_TEMPLATE_ATTRS = /\.(help_text|label|label_tag|as_p|as_table|as_ul|errors)$/;
+
 /** `{% autoescape off %}` (Django) / `{% autoescape false %}` (Jinja). */
 const AUTOESCAPE_OFF = /\{%\s*autoescape\s+(?:off|false)\s*%\}/gi;
 
@@ -117,6 +124,7 @@ export function scanTemplateXss(files: SourceLike[]): SinkGraphEntry[] {
   for (const m of file.content.matchAll(SAFE_FILTER)) {
       const piped = (m[1] ?? "").trim();
       if (TRUSTED_TEMPLATE_VALUES.has(piped)) continue;
+      if (TRUSTED_TEMPLATE_ATTRS.test(piped)) continue;
       emit(m.index ?? 0, "py-template-safe-filter");
     }
     for (const m of file.content.matchAll(AUTOESCAPE_OFF)) {

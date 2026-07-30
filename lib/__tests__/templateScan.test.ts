@@ -114,3 +114,19 @@ describe("scanTemplateXss — bootstrap-flask safe_columns", () => {
     expect(scan("{% render_table table 'inc/table.html' %}")).toEqual([]);
   });
 });
+
+describe("scanTemplateXss — framework-authored values", () => {
+  const scan = (content: string) =>
+    scanTemplateXss([{ rel: "form.html", ext: "html", content }] as never).map((f) => f.ruleId);
+
+  it("does NOT flag Django form help text", () => {
+    // 10 of 64 false positives across 39 realistic apps were this one line.
+    // help_text is authored in Python, so `|safe` on it is correct.
+    expect(scan('{% if field.help_text %}<p>{{ field.help_text|safe }}</p>{% endif %}')).toEqual([]);
+    expect(scan("{{ field.label|safe }}")).toEqual([]);
+  });
+
+  it("still flags a genuinely user-controlled value", () => {
+    expect(scan("{{ comment.body|safe }}")).toEqual(["py-template-safe-filter"]);
+  });
+});

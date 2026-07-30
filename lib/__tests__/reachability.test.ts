@@ -6,7 +6,7 @@
 // and hides it confidently.
 
 import { describe, it, expect } from "vitest";
-import { classifySinks, formatPath } from "../security/reachability";
+import { classifySinks, formatPath , isNonProductionPath} from "../security/reachability";
 import type {
   CallEdge,
   CodeGraph,
@@ -220,5 +220,39 @@ describe("classifySinks", () => {
     expect(f.reachability).toBe("reachable");
     expect(f.path?.entry.declared).toBe(false);
     expect(formatPath(f.path!)).toBe("handle_request → handle_request()");
+  });
+});
+
+// The single largest false-positive source measured on realistic applications
+// (§4w): 57% of all FPs across 39 business apps were in files that exist to set
+// the app up, not to serve it. The tuning corpus contains none of these,
+// because deliberately-vulnerable teaching apps have no tests and no seed data.
+describe("isNonProductionPath", () => {
+  it("recognises setup and fixture code", () => {
+    for (const p of [
+      "crm/tests.py",
+      "accounts/management/commands/seed_demo.py",
+      "backend/app/seed.py",
+      "app/conftest.py",
+      "core/migrations/0002_add_user.py",
+      "shop/factories.py",
+      "tests/fixtures/data.py",
+      "scripts/create_db.py",
+    ]) {
+      expect(isNonProductionPath(p)).toBe(true);
+    }
+  });
+
+  it("does NOT swallow application code", () => {
+    for (const p of [
+      "app/views.py",
+      "backend/app/routers/users.py",
+      "crm/models.py",
+      "portal_core/files.py",
+      "app/services/seeding_service.py", // "seed" inside a longer word
+      "api/commands.py", // not under management/
+    ]) {
+      expect(isNonProductionPath(p)).toBe(false);
+    }
   });
 });

@@ -1504,3 +1504,35 @@ describe("pythonPlugin — HTML returned straight from a view", () => {
     expect(ids('import os\ndef health():\n    return f"<h1>Stage: {os.environ[\'STAGE\']}</h1>"\n')).toEqual([]);
   });
 });
+
+describe("pythonPlugin — names that only look like secrets", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const ids = (content: string) => {
+    const file: SourceFile = { rel: "models.py", ext: "py", content };
+    return (parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? []).map((s) => s.ruleId);
+  };
+
+  it("does NOT flag a header name", () => {
+    expect(ids('API_KEY_HEADER = "X-API-Key"\n')).toEqual([]);
+  });
+
+  it("does NOT flag an enum tag that echoes its own constant name", () => {
+    expect(ids("ACTION_API_KEY_CREATED = 'api_key_created'\n")).toEqual([]);
+  });
+
+  it("does NOT flag an audit marker", () => {
+    expect(ids('changes["password"] = "reset"\n')).toEqual([]);
+  });
+
+  // The counter-cases: each of these was lost to a first version of the guards
+  // above that reached too far, and each is a real finding.
+  it("still flags a secret whose name merely CONTAINS the value", () => {
+    expect(ids("app.config['SECRET_KEY_HMAC'] = 'secret'\n")).toEqual(["py-hardcoded-secret"]);
+  });
+
+  it("still flags a credential in a *_NAME constant", () => {
+    expect(ids('SUPER_SECRET_NAME = "John Ripper"\n')).toEqual(["py-hardcoded-secret"]);
+  });
+});

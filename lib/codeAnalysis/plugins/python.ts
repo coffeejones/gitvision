@@ -1131,6 +1131,30 @@ function matchConfigAssignment(
   return null;
 }
 
+/** Names that hold the NAME of something, not its value. `API_KEY_HEADER =
+ *  "X-API-Key"` is a header name; there is no secret in it. */
+// `name` is deliberately NOT here: `SUPER_SECRET_NAME = "John Ripper"` is a
+// committed credential, and excluding the suffix wholesale cost that finding.
+const NAMES_A_THING = /_(header|field|label|prefix|suffix|param|claim)$/i;
+
+/** Values that are audit markers or enum tags, never secrets. */
+const NOT_A_SECRET_VALUE = new Set([
+  "reset", "changed", "updated", "unchanged", "none", "null", "true", "false",
+  "redacted", "hidden", "masked", "removed", "added", "set", "unset",
+]);
+
+/** Is this value just the constant's own name in slug form?
+ *  `ACTION_API_KEY_CREATED = 'api_key_created'` is an enum tag. */
+function echoesOwnName(name: string, value: string): boolean {
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const n = norm(name);
+  const v = norm(value);
+  // The value must be MOST of the name, not merely inside it. Without the
+  // ratio, `SECRET_KEY_HMAC = 'secret'` reads as an enum tag and a real
+  // finding is lost — measured.
+  return v.length >= 4 && n.includes(v) && v.length * 10 >= n.length * 6;
+}
+
 /** A credential committed as a literal. Returns the rule hit, or null. */
 function matchSecretAssignment(
   left: TsNode | null,
@@ -1143,6 +1167,12 @@ function matchSecretAssignment(
   // pattern and must never be flagged.
   const value = pyStringLiteral(right);
   if (value === null || value.trim().length < MIN_SECRET_LEN) return null;
+  // Three shapes that carry a credential-ish NAME but no credential. Measured
+  // against 39 realistic applications (§4w); each was a false positive there
+  // and none of them costs a true positive on the tuning corpus.
+  if (NAMES_A_THING.test(name)) return null;
+  if (NOT_A_SECRET_VALUE.has(value.trim().toLowerCase())) return null;
+  if (echoesOwnName(name, value)) return null;
   return { ruleId: "py-hardcoded-secret", severity: "high" };
 }
 

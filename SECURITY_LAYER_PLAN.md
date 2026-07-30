@@ -1196,3 +1196,101 @@ declined failed on the same test — it flagged a pattern, and the pattern was
 common in correct code. The adversarial pass is what turned three of these from
 "looks safe" into "measured safe", and it narrowed two of the six before they
 shipped.
+
+## §4w — The held-out set: precision generalises, recall does not
+
+Every number in §4a–§4v was measured on 23 repositories. RealVuln has 66. The
+other 43 had never been run — and every rule in this document was narrowed
+against the 23, which makes those numbers a fit, not a forecast. 39 of the 43
+cloned successfully (three had dead URLs, one pointing at
+`github.com/yourrepo/...`).
+
+The held-out set is not more of the same. It is a **different kind of code**:
+
+| | tuning set (23) | held-out set (39) |
+|---|---|---|
+| what they are | pygoat, dsvw, vulnpy — deliberately vulnerable *teaching apps* | `vc-*-seeded-v2-*` — realistic business apps: education LMS, healthcare clinic, fintech lending, HR payroll |
+| the vulnerability is | the point of the code | seeded into otherwise ordinary code |
+| ground-truth vulns | 641 | 1,171 |
+| safe/trap snippets | 107 | 155 |
+
+### First run: precision collapsed
+
+```
+TUNED     TP=186  FP=16   precision 0.921
+HELD-OUT  TP=60   FP=64   precision 0.484
+```
+
+Triaging all 64 false positives gave three mechanical causes covering 81%:
+
+| cause | n | what it was |
+|---|---:|---|
+| test / seed / fixture files | 37 (57%) | `DEMO_PASSWORD = "Demo!Password123"` in seed scripts and `tests.py` |
+| `{{ field.help_text\|safe }}` | 10 (15%) | Django's own form help text, authored in Python |
+| constant names read as secrets | 5 (8%) | `API_KEY_HEADER = "X-API-Key"`, `ACTION_API_KEY_CREATED = 'api_key_created'` |
+
+**The first one is the finding.** 57% of all false positives on realistic code
+came from a file category the tuning corpus does not contain *at all* — a
+deliberately-vulnerable teaching app has no test suite and no seed data. This
+is what a held-out set is for: not a harder version of the same test, a
+category of mistake the original corpus could not express.
+
+The fix is a reachability judgement, not a rule, so it lives in
+`classifySinks`: seed scripts, fixtures, factories, migrations and Django
+management commands exist to set the app up, not to serve a request. A demo
+password an operator runs from a shell is not a credential an attacker reaches.
+
+### Second run
+
+```
+TUNED     TP=186  FP=16   precision 0.921   traps 107/107 clean
+HELD-OUT  TP=60   FP=9    precision 0.870   traps 155/155 clean
+```
+
+55 false positives removed, **zero true positives lost on either set**.
+
+Two of the three guards had to be loosened after they were measured. The first
+version of the enum-tag check killed `app.config['SECRET_KEY_HMAC'] = 'secret'`,
+because the value is a substring of the name; requiring the value to be *most*
+of the name (≥60%) restores it. The first version of the "names a thing" check
+included the `_NAME` suffix and killed `SUPER_SECRET_NAME = "John Ripper"`.
+Both counter-cases are now regression tests.
+
+### What did NOT generalise
+
+| | tuned | held-out |
+|---|---:|---:|
+| precision | 0.921 | **0.870** |
+| traps clean | 107/107 | **155/155** |
+| in-scope recall | 0.664 | **0.115** |
+
+Precision transfers. The trap record transfers perfectly — 262 of 262
+deliberately-safe snippets clean across both corpora, including 155 the tool
+had never seen. **Recall does not transfer, and the gap is a factor of six.**
+
+Two separate reasons, and they should not be conflated:
+
+1. **Distribution.** 55% of the held-out ground truth (651 of 1,171) lies
+   outside every CWE class we emit, and it is dominated by exactly the families
+   §4u declined as absence-detection or semantic: CWE-307 rate limiting (112),
+   CWE-312 cleartext storage (53), CWE-532 secrets in logs (51), CWE-639 IDOR
+   (39). Those declines were correct on the evidence available then, and this
+   set confirms they are also the bulk of what realistic seeded code contains.
+   That is an uncomfortable pair of facts to hold together.
+
+2. **Depth.** Even restricted to classes we do detect, recall is 0.115 against
+   0.664. In a teaching app the sink is three lines from the route handler. In
+   a business app it is behind a service class, a repository, and dependency
+   injection. This is a call-graph and taint-depth problem, not a rule-coverage
+   problem, and no number of new rules will move it.
+
+### The honest summary
+
+The layer is **precise and trap-safe on code it has never seen** — that
+property survived contact with a corpus it was not fitted to, which is the
+single most important thing this measurement could have shown. It is **not yet
+sensitive on realistic applications**, and the reason is now measured rather
+than guessed: interprocedural depth, not missing rules.
+
+Reported figures from here on should quote both corpora. A precision number
+from the tuning set alone is a fit.

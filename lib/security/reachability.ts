@@ -153,12 +153,42 @@ function buildPath(
  *
  *  Pure: a CodeGraph in, findings out. No database, no network, no filesystem —
  *  the property that keeps a local/desktop build possible. */
+/** Files that exist to SET UP or EXERCISE the application, never to serve a
+ *  request: seed scripts, fixtures, factories, Django management commands.
+ *
+ *  This is a reachability judgement, not a pattern one, which is why it lives
+ *  here and not in a rule. `DEMO_PASSWORD = "Demo!Password123"` in a seeding
+ *  command is fixture data an operator runs from a shell; it is not a
+ *  credential an attacker can reach. Measured on 39 realistic business
+ *  applications, this shape alone was 57% of all false positives (§4w) — a
+ *  category the deliberately-vulnerable teaching apps in the tuning corpus do
+ *  not contain at all, because they have no tests and no seed data.
+ *
+ *  `isTestFile` already covers `/tests/` directories and `*_test.py`; this
+ *  covers what it misses. */
+export function isNonProductionPath(filePath: string): boolean {
+  if (!filePath) return false;
+  const p = `/${filePath.toLowerCase()}/`;
+  if (p.includes("/management/commands/")) return true; // Django: operator-run
+  if (p.includes("/migrations/")) return true;
+  if (p.includes("/factories/") || p.includes("/fixtures/")) return true;
+  const base = filePath.slice(filePath.lastIndexOf("/") + 1).toLowerCase();
+  return (
+    base === "tests.py" ||
+    base === "conftest.py" ||
+    base === "factories.py" ||
+    base === "fixtures.py" ||
+    /^seed([_-].*)?\.py$/.test(base) ||
+    /^(create_db|check_flows|populate[_a-z]*)\.py$/.test(base)
+  );
+}
+
 export function classifySinks(cg: CodeGraph): ReachabilityReport {
   // Slice 6 runs first: a sink the plugin could only tie to a parameter may
   // turn out to be fed untrusted input by a caller two functions away.
   const crossFunction = computeInterproceduralTaint(cg);
   const sinks = (cg.sinks ?? [])
-    .filter((s) => !isTestFile(s.filePath))
+    .filter((s) => !isTestFile(s.filePath) && !isNonProductionPath(s.filePath))
     .map((s) => {
       if (s.taint) return s;
       const ev = crossFunction.get(`${s.filePath}\u001F${s.line}\u001F${s.ruleId}`);
