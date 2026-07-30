@@ -1294,3 +1294,120 @@ than guessed: interprocedural depth, not missing rules.
 
 Reported figures from here on should quote both corpora. A precision number
 from the tuning set alone is a fit.
+
+## §4x — The depth hypothesis was wrong. The engine was blind.
+
+§4w concluded: *"This is a call-graph and taint-depth problem, not a
+rule-coverage problem, and no number of new rules will move it."* That was
+written without measuring it, and it is **wrong**.
+
+Six diagnostic groups read the real code at all 443 missed in-scope
+vulnerabilities on the held-out corpus. Every one of them reported the same
+figure for how many misses need taint to cross a function boundary: **zero**.
+The missed code looks like this:
+
+```python
+def course_shell_probe_400(request):
+    import os as _os
+    host = request.GET.get("host", "127.0.0.1")
+    status = _os.system("ping -c 1 " + host)
+```
+
+Four lines. Taint straight from `request.GET` in the same function. We missed
+it because the rule matches the literal receiver name `os` and the import is
+aliased.
+
+### Result
+
+| | before §4x | after |
+|---|---:|---:|
+| held-out TP | 60 | **314** |
+| held-out FP | 9 | 48 |
+| held-out precision | 0.484 → 0.870¹ | **0.867** |
+| held-out in-scope recall | 0.115 | **0.604** |
+| tuned TP | 186 | 192 |
+| tuned precision | 0.921 | 0.914 |
+| traps clean | 262/262 | **262/262** |
+| production surfaced (zulip+netbox+saleor) | 67 | 72 |
+
+¹ after the §4w test/seed-file fix, before this section's work.
+
+**Recall went up 5.2× on code the tool has never seen, and the trap record
+held.** Two thirds of that came from four engine fixes that are not rules at
+all.
+
+### The engine was blind in four places
+
+Each of these silently disabled *every* rule that depended on it:
+
+1. **Aliased imports.** `import os as _os` → `_os.system(...)`. Receiver rules
+   match the literal identifier, so one alias disabled os-command, subprocess,
+   pickle, yaml, jwt, crypto keys, SSRF and ReDoS at once. 30 of 30 command
+   injections were exactly this shape. The map drops any alias that is *also*
+   bound elsewhere in the file, which closes the only demonstrated
+   false-positive class.
+2. **`await`.** `taintOf` had no `await` case, so taint was off inside every
+   async FastAPI and aiohttp handler. The held-out corpus alone holds 65
+   `await request.json()` and 59 `await request.body()`.
+3. **Methods called on `request` itself.** The source regex only fired two
+   levels down (`request.GET.get`), so `request.json()` read as an ordinary
+   call.
+4. **Dotted module receivers.** `urllib.request.urlopen(x)` — `plainReceiver`
+   refuses to flatten these by design, so SSRF never saw it.
+
+Plus two taint-propagation corrections: `boolean_operator` (`request.body
+.decode() or "{}"` — operator-aware, since `a and b` only ever yields `b`), and
+`binary_operator` now prefers a non-environment answer so `BASE_DIR /
+request.GET["n"]` is attributed to the request rather than to the `os.environ`
+the base was rooted in. Without the latter, 31 genuine path findings were
+discarded over a labelling artefact.
+
+### Rules built on top
+
+- **`py-ssti`** extended to `Template("Hi " + name).render()` — 35 of 35 SSTI
+  misses were this one shape. The judgement is on the *receiver expression*,
+  a primitive `matchSinkRule` did not have.
+- **`py-path-traversal`** extended to receiver-position sinks
+  (`target.write_text(data)`), since pathlib inverts `open()`.
+- **`py-open-redirect`** — new; there was no such rule, despite the family
+  being claimed as covered.
+- **`py-xxe`** — new; narrowed to `XMLParser(load_dtd=True | no_network=False)`.
+  `huge_tree=True` is excluded deliberately: it is an oversized-document guard,
+  not entity resolution, and reporting it under CWE-611 would state something
+  false about the code.
+- **`py-cors-origin-reflected`** — new; taint is the entire discriminator, so a
+  fixed origin or `'*'` never fires.
+- **`py-hardcoded-secret`** extended to `os.getenv("JWT_SECRET", "dev-secret")`
+  — the *fallback* ships in every environment where the variable is unset.
+
+### What the adversarial pass caught
+
+- **`py-nosql-injection` was killed.** The diagnosing agent claimed 31 true
+  positives; the adversary implemented the spec verbatim and measured **zero**.
+  Not built.
+- **`py-open-redirect` broke the trap record on first measurement** — 154/155,
+  plus 54 findings on production. The trap was a `next` parameter validated
+  with `url_has_allowed_host_and_scheme`; the production hits were
+  parameter-derived redirects and redirects to the request's own URL. Three
+  guards — source-taint only, not the request's own address, and silent when
+  the destination is tested in the same function — restored 262/262 and took
+  production from 54 to 5.
+
+That regression is the reason the trap corpus exists. It appeared, it was
+caught by measurement rather than by review, and it was fixed before the
+commit.
+
+### Left undone
+
+`py-unrestricted-upload` (Django storage `.save()` with a tainted name,
+adversary verdict *safe*, ~6 TP) is **not built**. It needs the existing
+`lookupVariableType` closure threaded into `matchSinkRule`, and it was the
+smallest of the measured wins. Recorded here rather than quietly dropped.
+
+### The lesson, again
+
+This is the sixth time in this document that asserting a cause without
+measuring it produced a wrong answer, and the second time the wrong answer
+made it into a written conclusion. The recall gap looked like depth because
+"realistic apps have more layers" is a plausible story. The code says the
+vulnerabilities are four lines long and we could not see the fourth line.

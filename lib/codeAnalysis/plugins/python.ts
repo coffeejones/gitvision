@@ -916,6 +916,49 @@ function matchSinkRule(
   // Server-side template injection. A template built at runtime is compiled
   // AND executed, so it is `eval` wearing a web framework's clothes. A literal
   // template is just a template, hence the assembled-argument requirement.
+  // XML parsed with external entities enabled. Config-shaped like
+  // py-autoescape-disabled: switching entity resolution on IS the dangerous
+  // decision, and no one does it by accident. No taint required.
+  if (calleeName === "XMLParser") {
+    for (const [kw, unsafe] of XXE_UNSAFE_KWARGS) {
+      if (kwarg(argList, kw)?.text === unsafe) {
+        return { ruleId: "py-xxe", severity: "high" };
+      }
+    }
+  }
+
+  // Open redirect: the browser is sent wherever the caller asks.
+  //
+  // Three guards, each one measured against a specific failure:
+  //  1. `source` taint only. Parameter-derived taint produced 40 findings on
+  //     Zulip — `HttpResponseRedirect(billing_session_url)` — none of them a
+  //     redirect an attacker chooses.
+  //  2. Not the request's OWN url. `redirect(request.path_info)` sends the
+  //     browser back where it already is.
+  //  3. Silent when the destination is validated in the same function. The
+  //     benchmark contains a deliberate trap that is exactly this: a `next`
+  //     parameter checked with url_has_allowed_host_and_scheme before use.
+  if (
+    REDIRECT_CALLS.has(calleeName) &&
+    (bare || REDIRECT_RECEIVERS.has(recv ?? ""))
+  ) {
+    const dest = firstPositional(argList);
+    const t = taintOf(dest);
+    if (
+      t?.kind === "source" &&
+      !SELF_URL_SOURCE.test(t.ev.source) &&
+      !isValidatedInFunction(call, dest)
+    ) {
+      return {
+        ruleId: "py-open-redirect",
+        severity: "medium",
+        requiresTaint: true,
+        taint: t.ev,
+      };
+    }
+    return null;
+  }
+
   // SSTI written as a chained call: `Template("Hi " + name).render()`.
   //
   // The judgement is on the RECEIVER expression, not on an argument — the
@@ -1288,8 +1331,20 @@ function matchSecretAssignment(
   if (!name || !SECRET_NAME.test(name)) return null;
   // Only a plain string literal. A call (`os.environ.get(...)`, `gensalt()`) or
   // a subscript (`os.environ["X"]`) is reading config, which is the CORRECT
-  // pattern and must never be flagged.
-  const value = pyStringLiteral(right);
+  // pattern and must never be flagged — EXCEPT when the call supplies a
+  // fallback: `os.getenv("JWT_SECRET", "dev-secret")` ships that string in
+  // every environment where the variable is unset, which is the one that
+  // matters. The default is read; the lookup itself still is not.
+  let value = pyStringLiteral(right);
+  if (value === null && right?.type === "call") {
+    const fn = right.childForFieldName("function");
+    const nm = fn?.type === "attribute" ? fn.childForFieldName("attribute")?.text : fn?.text;
+    if (nm === "getenv" || nm === "get") {
+      const args = right.childForFieldName("arguments");
+      const positional = args ? args.namedChildren.filter((c) => c && c.type !== "keyword_argument") : [];
+      if (positional.length >= 2) value = pyStringLiteral(positional[1]);
+    }
+  }
   if (value === null || value.trim().length < MIN_SECRET_LEN) return null;
   // Three shapes that carry a credential-ish NAME but no credential. Measured
   // against 39 realistic applications (§4w); each was a false positive there
@@ -1447,6 +1502,72 @@ function isConditionTest(node: TsNode): boolean {
   }
   return false;
 }
+
+/** Response headers whose value must never come from the request. Reflecting
+ *  the caller's own Origin back with credentials enabled defeats the
+ *  same-origin policy entirely. */
+const REFLECTED_HEADER = /^access-control-allow-origin$/i;
+
+/** The request's own address. Redirecting there is a no-op, not a redirect an
+ *  attacker controls. */
+const SELF_URL_SOURCE = /\brequest\.(path|path_info|get_full_path|build_absolute_uri)/;
+
+/** Names that mean "this value was checked". */
+const URL_VALIDATORS =
+  /\b(\w*safe\w*|url_has_allowed_host_and_scheme|is_valid_redirect|urlparse|startswith|endswith|fullmatch|match|search|validate\w*|is_allowed\w*|check_\w+)\s*\(/i;
+
+/** Was the redirect destination TESTED anywhere in the enclosing function?
+ *
+ *  We have no control-flow graph, so we cannot prove the redirect sits inside
+ *  the guard. But a function that never tests the destination at all certainly
+ *  does not validate it, and that is the finding worth making. The inverse — a
+ *  function that does test it — is where the false positives live. */
+function isValidatedInFunction(call: TsNode, dest: TsNode | null): boolean {
+  if (!dest) return false;
+  const name = dest.type === "identifier" ? dest.text : null;
+  let fn: TsNode | null = call.parent;
+  while (fn && fn.type !== "function_definition") fn = fn.parent;
+  if (!fn) return false;
+  const body = fn.childForFieldName("body");
+  if (!body) return false;
+  let hit = false;
+  const walk = (n: TsNode) => {
+    if (hit) return;
+    if (n.type === "comparison_operator" && name && n.text.includes(name)) {
+      hit = true;
+      return;
+    }
+    if (n.type === "call" && URL_VALIDATORS.test(n.text)) {
+      if (!name || n.text.includes(name)) {
+        hit = true;
+        return;
+      }
+    }
+    for (const c of n.namedChildren) if (c) walk(c);
+  };
+  walk(body);
+  return hit;
+}
+
+/** Calls that hand the browser a destination. `redirect` is Django/Flask,
+ *  the Response classes are Django and Starlette/FastAPI. */
+const REDIRECT_CALLS = new Set([
+  "redirect",
+  "HttpResponseRedirect",
+  "HttpResponsePermanentRedirect",
+  "RedirectResponse",
+]);
+const REDIRECT_RECEIVERS = new Set(["http", "responses"]);
+
+/** XMLParser settings that switch external-entity resolution ON. Narrowed to
+ *  these two after measurement: `resolve_entities=True` and
+ *  `dtd_validation=True` earn nothing the other two do not already catch, and
+ *  `huge_tree=True` is an oversized-document guard, NOT entity resolution —
+ *  reporting it under CWE-611 would say something false about the code. */
+const XXE_UNSAFE_KWARGS: ReadonlyArray<[string, string]> = [
+  ["load_dtd", "True"],
+  ["no_network", "False"],
+];
 
 /** pathlib methods that act on the path held by their RECEIVER. */
 const PATHLIB_WRITE_METHODS = new Set(["write_bytes", "write_text", "read_text"]);
@@ -1608,6 +1729,19 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         return null;
       }
 
+      // `request.body.decode() or "{}"` — the two-character defaulting idiom
+      // killed the flow one node before the sink. Operator-aware on purpose:
+      // `a and b` evaluates to `b` whenever `a` is truthy, so only the right
+      // operand survives; `a or b` can yield either.
+      case "boolean_operator": {
+        const op = node.childForFieldName("operator")?.text;
+        if (op === "and") return taintOf(node.childForFieldName("right"));
+        return (
+          taintOf(node.childForFieldName("left")) ??
+          taintOf(node.childForFieldName("right"))
+        );
+      }
+
       // `payload = await request.json()`. Without this the whole async half of
       // FastAPI and aiohttp had taint silently disabled — not for one rule, for
       // EVERY rule. The held-out corpus alone holds 65 `await request.json()`
@@ -1654,6 +1788,18 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         // `request.body()`, `request.form()`. The attribute regex below only
         // fires from two levels down (`request.GET.get`), so the one-level form
         // read as an ordinary call and lost its taint.
+        // `re.sub(r"[^A-Za-z0-9_.-]", "_", name)` rewrites everything outside
+        // a whitelist — the same reasoning as secure_filename, which is
+        // already a sanitiser. Only a NEGATED character class counts.
+        if (
+          fn?.type === "attribute" &&
+          /^subn?$/.test(fn.childForFieldName("attribute")?.text ?? "") &&
+          plainReceiver(fn, importAliases) === "re"
+        ) {
+          const a = node.childForFieldName("arguments");
+          const pat = a ? pyStringLiteral(firstPositional(a)) : null;
+          if (pat !== null && /^\[\^[^[\]]*\]$/.test(pat)) return null;
+        }
         const recvNode = fn?.childForFieldName("object") ?? null;
         if (recvNode?.type === "identifier" && /^(request|req)$/.test(recvNode.text)) {
           return {
@@ -2342,6 +2488,32 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           const lit = pyStringLiteral(valueNode);
           if (lit !== null) stringLiterals.set(left.text, lit);
         }
+        // `resp["Access-Control-Allow-Origin"] = origin` where origin came
+        // from the request. A literal ('*' or a fixed domain) must NOT fire —
+        // the taint IS the discriminator. Suppressed when the origin is tested
+        // anywhere in the function, same reasoning as open redirect.
+        const hdr = assignmentTargetName(left);
+        if (
+          hdr &&
+          REFLECTED_HEADER.test(hdr) &&
+          sinks.length < MAX_SINKS_PER_FILE &&
+          !isValidatedInFunction(node, valueNode)
+        ) {
+          const ht = taintOf(valueNode);
+          if (ht?.kind === "source") {
+            sinks.push({
+              ruleId: "py-cors-origin-reflected",
+              severity: "medium",
+              line: node.startPosition.row + 1,
+              inFunction: currentMethod()?.name ?? null,
+              inContainerType: currentClass()?.name,
+              snippet: snippetAt(node.startPosition.row),
+              taint: ht.ev,
+              requiresTaint: true,
+            });
+          }
+        }
+
         // A credential committed as a literal — assignment-shaped, so it
         // cannot go through matchSinkRule (which is call-shaped).
         if (sinks.length < MAX_SINKS_PER_FILE) {

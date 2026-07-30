@@ -1656,3 +1656,70 @@ describe("pythonPlugin — sinks that judge their receiver", () => {
     ).toEqual([]);
   });
 });
+
+describe("pythonPlugin — redirect, XXE, CORS and env-default secrets", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const ids = (content: string) => {
+    const file: SourceFile = { rel: "views.py", ext: "py", content };
+    return (parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? []).map((s) => s.ruleId);
+  };
+
+  it("flags a redirect to a destination from the request", () => {
+    expect(ids('def v(request):\n    return redirect(request.GET["next"])\n')).toEqual(["py-open-redirect"]);
+  });
+
+  it("stays silent when the destination is validated in the same function", () => {
+    // A deliberate benchmark trap, and the shape NetBox and Django both use.
+    const src =
+      'def v(request):\n    nxt = request.POST.get("next")\n' +
+      "    if nxt and url_has_allowed_host_and_scheme(url=nxt, allowed_hosts={request.get_host()}):\n" +
+      "        return redirect(nxt)\n    return redirect('home')\n";
+    expect(ids(src)).toEqual([]);
+  });
+
+  it("stays silent on a redirect back to the request's own url", () => {
+    expect(ids("def v(request):\n    return redirect(request.get_full_path())\n")).toEqual([]);
+  });
+
+  it("stays silent when the destination is only parameter-derived", () => {
+    // 40 findings on Zulip were this: HttpResponseRedirect(billing_session_url).
+    expect(ids("def v(url):\n    return HttpResponseRedirect(url)\n")).toEqual([]);
+  });
+
+  it("flags an XML parser told to load external entities", () => {
+    expect(ids("from lxml import etree\ndef v():\n    return etree.XMLParser(load_dtd=True)\n")).toEqual(["py-xxe"]);
+    expect(ids("from lxml import etree\ndef v():\n    return etree.XMLParser(no_network=False)\n")).toEqual(["py-xxe"]);
+  });
+
+  it("does NOT flag a default or hardened XML parser", () => {
+    expect(ids("from lxml import etree\ndef v():\n    return etree.XMLParser()\n")).toEqual([]);
+    expect(ids("from lxml import etree\ndef v():\n    return etree.XMLParser(load_dtd=False, no_network=True)\n")).toEqual([]);
+    // huge_tree is an oversized-document guard, not entity resolution —
+    // reporting it as XXE would say something false about the code.
+    expect(ids("from lxml import etree\ndef v():\n    return etree.XMLParser(huge_tree=True)\n")).toEqual([]);
+  });
+
+  it("flags an Origin reflected straight back", () => {
+    expect(
+      ids('def v(request, resp):\n    resp["Access-Control-Allow-Origin"] = request.headers["Origin"]\n')
+    ).toEqual(["py-cors-origin-reflected"]);
+  });
+
+  it("does NOT flag a fixed CORS origin", () => {
+    expect(ids('def v(resp):\n    resp["Access-Control-Allow-Origin"] = "https://app.example.com"\n')).toEqual([]);
+    expect(ids('def v(resp):\n    resp["Access-Control-Allow-Origin"] = "*"\n')).toEqual([]);
+  });
+
+  it("flags a secret shipped as an env-lookup fallback", () => {
+    expect(ids('import os\nJWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-value")\n')).toEqual([
+      "py-hardcoded-secret",
+    ]);
+  });
+
+  it("does NOT flag an env lookup with no fallback", () => {
+    expect(ids('import os\nJWT_SECRET = os.getenv("JWT_SECRET")\n')).toEqual([]);
+    expect(ids('import os\nJWT_SECRET = os.environ["JWT_SECRET"]\n')).toEqual([]);
+  });
+});
