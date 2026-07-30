@@ -1536,3 +1536,81 @@ describe("pythonPlugin — names that only look like secrets", () => {
     expect(ids('SUPER_SECRET_NAME = "John Ripper"\n')).toEqual(["py-hardcoded-secret"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Engine-level taint and receiver fixes (§4x). None of these is a new rule —
+// each one un-blinds every existing rule at once, which is why they are worth
+// more than the rules built on top of them.
+// ---------------------------------------------------------------------------
+describe("pythonPlugin — import aliases and dotted receivers", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const ids = (content: string) => {
+    const file: SourceFile = { rel: "views.py", ext: "py", content };
+    return (parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? []).map((s) => s.ruleId);
+  };
+
+  it("resolves `import os as _os` back to os", () => {
+    // 30 of 30 command injections on realistic apps were exactly this shape.
+    expect(ids('import os as _os\ndef v(request):\n    _os.system("ping " + request.GET["h"])\n')).toEqual([
+      "py-os-command",
+    ]);
+  });
+
+  it("resolves an alias imported inside the function", () => {
+    expect(ids('def v(request):\n    import os as _os\n    _os.system("ping " + request.GET["h"])\n')).toEqual([
+      "py-os-command",
+    ]);
+  });
+
+  it("drops the alias when the name is rebound anywhere in the file", () => {
+    // The one demonstrated false-positive class: `sp` is the module at the top
+    // and a local object further down. If we cannot tell them apart, stay quiet.
+    expect(
+      ids('import subprocess as sp\ndef v(request):\n    sp = Runner()\n    sp.run("x " + request.GET["q"], shell=True)\n')
+    ).toEqual([]);
+  });
+
+  it("sees a dotted module path as an HTTP client", () => {
+    expect(ids('import urllib.request\ndef v(request):\n    urllib.request.urlopen(request.GET["u"])\n')).toEqual([
+      "py-ssrf",
+    ]);
+  });
+});
+
+describe("pythonPlugin — taint through await and request methods", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const ids = (content: string) => {
+    const file: SourceFile = { rel: "api.py", ext: "py", content };
+    return (parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? []).map((s) => s.ruleId);
+  };
+
+  it("carries taint through await", () => {
+    // Without this, taint was silently disabled for EVERY rule inside every
+    // async FastAPI and aiohttp handler.
+    expect(ids("async def v(request):\n    p = await request.json()\n    open(p)\n")).toEqual([
+      "py-path-traversal",
+    ]);
+  });
+
+  it("treats a method called directly on request as a source", () => {
+    expect(ids("def v(request):\n    p = request.body()\n    open(p)\n")).toEqual(["py-path-traversal"]);
+  });
+
+  it("prefers a request over the environment when a path is joined", () => {
+    const src =
+      'from pathlib import Path\nimport os\nB = Path(os.environ["D"])\n' +
+      'def v(request):\n    t = B / request.GET["n"]\n    open(t)\n';
+    const file: SourceFile = { rel: "api.py", ext: "py", content: src };
+    const [sink] = parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? [];
+    expect(sink.ruleId).toBe("py-path-traversal");
+    expect(sink.taint?.source).toContain("request");
+  });
+
+  it("still says nothing when nothing untrusted is involved", () => {
+    expect(ids("async def v():\n    p = await load_config()\n    open(p)\n")).toEqual([]);
+  });
+});

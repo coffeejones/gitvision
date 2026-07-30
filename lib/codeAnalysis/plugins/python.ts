@@ -556,9 +556,72 @@ function firstPositional(argList: TsNode): TsNode | null {
 /** Receiver of an `obj.method()` call, when it is a plain identifier. Returns
  *  null for `self.x.method()` and other compound receivers — a module-level
  *  rule like `os.system` should not match `shim.os.system`. */
-function plainReceiver(fnNode: TsNode): string | null {
+function plainReceiver(fnNode: TsNode, aliases?: ReadonlyMap<string, string>): string | null {
   const obj = fnNode.childForFieldName("object");
-  return obj?.type === "identifier" ? obj.text : null;
+  if (obj?.type !== "identifier") return null;
+  return aliases?.get(obj.text) ?? obj.text;
+}
+
+/** `import os as _os` — map the alias back to the module it names.
+ *
+ *  Every receiver-keyed rule we have (os-command, subprocess, pickle, yaml,
+ *  jwt, crypto keys, SSRF, ReDoS) matches the literal identifier text, so an
+ *  alias silently disabled all of them at once. Measured: 30 of 30 command
+ *  injections on realistic apps were exactly `import os as _os` followed by
+ *  `_os.system(...)` (§4x).
+ *
+ *  Two deliberate limits. `import_from_statement` is NOT read — `from x import
+ *  y as z` binds a SYMBOL, not a module path, and including it was measured to
+ *  change nothing across 10,877 files. And an alias that is ALSO bound
+ *  somewhere else in the file (assigned, a parameter, a `with ... as`) is
+ *  dropped, because then the name is not reliably the module. */
+function collectImportAliases(root: TsNode): Map<string, string> {
+  const map = new Map<string, string>();
+  const rebound = new Set<string>();
+  const walk = (n: TsNode) => {
+    if (n.type === "import_statement") {
+      for (const child of n.namedChildren) {
+        if (child?.type !== "aliased_import") continue;
+        const alias = child.childForFieldName("alias")?.text;
+        const name = child.childForFieldName("name")?.text;
+        if (alias && name) map.set(alias, name);
+      }
+    } else if (n.type === "assignment" || n.type === "augmented_assignment") {
+      const left = n.childForFieldName("left");
+      if (left?.type === "identifier") rebound.add(left.text);
+    } else if (n.type === "parameters" || n.type === "lambda_parameters") {
+      for (const p of n.namedChildren) {
+        if (p?.type === "identifier") rebound.add(p.text);
+        else if (p?.type === "typed_parameter" || p?.type === "default_parameter") {
+          const inner = p.namedChildren[0];
+          if (inner?.type === "identifier") rebound.add(inner.text);
+        }
+      }
+    } else if (n.type === "as_pattern") {
+      const last = n.namedChildren[n.namedChildren.length - 1];
+      const id = last?.type === "as_pattern_target" ? last.namedChildren[0] : last;
+      if (id?.type === "identifier") rebound.add(id.text);
+    } else if (n.type === "for_statement") {
+      const left = n.childForFieldName("left");
+      if (left?.type === "identifier") rebound.add(left.text);
+    }
+    for (const c of n.namedChildren) if (c) walk(c);
+  };
+  walk(root);
+  for (const name of rebound) map.delete(name);
+  return map;
+}
+
+/** Receiver written as a dotted module path: `urllib.request.urlopen(x)`.
+ *  Returns "urllib.request". Null unless the object is an attribute over a
+ *  plain identifier, so `self.client.get` and deeper chains stay out. */
+function dottedReceiver(fnNode: TsNode): string | null {
+  const obj = fnNode.childForFieldName("object");
+  if (obj?.type !== "attribute") return null;
+  const base = obj.childForFieldName("object");
+  const attr = obj.childForFieldName("attribute")?.text;
+  if (base?.type !== "identifier" || !attr) return null;
+  return `${base.text}.${attr}`;
 }
 
 /** Is this expression a string ASSEMBLED at runtime?
@@ -764,11 +827,13 @@ function matchSinkRule(
   taintOf: (node: TsNode | null) => TaintOrigin | null,
   /** A literal, or a name this file bound to one. Lets `KEY = "..."` at the top
    *  of a file be judged where the key is USED. */
-  literalOf: (node: TsNode | null) => string | null
+  literalOf: (node: TsNode | null) => string | null,
+  /** `import os as _os` -> `_os` resolves to `os`. See collectImportAliases. */
+  aliases: ReadonlyMap<string, string>
 ): SinkRuleHit | null {
   const argList = call.childForFieldName("arguments");
   const bare = fnNode.type === "identifier";
-  const recv = bare ? null : plainReceiver(fnNode);
+  const recv = bare ? null : plainReceiver(fnNode, aliases);
 
   // Code execution: bare eval()/exec() only. `obj.eval()` is somebody's own
   // method and matching it is how a scanner earns its reputation for noise.
@@ -985,7 +1050,11 @@ function matchSinkRule(
   if (
     (recv !== null && HTTP_CLIENT_RECEIVERS.has(recv) && HTTP_CLIENT_METHODS.has(calleeName)) ||
     (bare && calleeName === "urlopen") ||
-    (recv === "request" && calleeName === "urlopen")
+    (recv === "request" && calleeName === "urlopen") ||
+    // `urllib.request.urlopen(x)` — the receiver is a dotted module path, which
+    // plainReceiver deliberately refuses to flatten.
+    (HTTP_CLIENT_MODULE_PATHS.has(dottedReceiver(fnNode) ?? "") &&
+      HTTP_CLIENT_METHODS.has(calleeName))
   ) {
     const t = taintOf(firstPositional(argList));
     if (t) {
@@ -1018,7 +1087,7 @@ function matchSinkRule(
   // positives when the receiver was left open.
   if (
     HTML_RESPONSE_CALLS.has(calleeName) &&
-    (bare || HTML_RESPONSE_RECEIVERS.has(plainReceiver(fnNode) ?? ""))
+    (bare || HTML_RESPONSE_RECEIVERS.has(plainReceiver(fnNode, aliases) ?? ""))
   ) {
     // aiohttp writes the body as `web.Response(text=..., content_type=...)`.
     // Only `text` — `body=` is the kwarg the mock libraries use, and `content=`
@@ -1324,6 +1393,11 @@ function isConditionTest(node: TsNode): boolean {
   return false;
 }
 
+/** Modules whose dotted path issues an outbound request: `urllib.request
+ *  .urlopen(x)`. Only `urllib.request` — every other candidate measured zero
+ *  true positives, and a whitelist entry that earns nothing is future noise. */
+const HTTP_CLIENT_MODULE_PATHS = new Set(["urllib.request"]);
+
 /** HTTP client objects whose methods issue an outbound request. */
 // NOT `session`: that is SQLAlchemy's DB session far more often than an HTTP
 // one, and `session.delete(row)` was measured being flagged as SSRF.
@@ -1438,6 +1512,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   const stringLiterals = new Map<string, string>();
   /** Functions that already reported a hardcoded-credential comparison. */
   const credentialComparisonSeen = new Set<string>();
+  let importAliases: ReadonlyMap<string, string> = new Map();
   const literalOf = (node: TsNode | null): string | null =>
     pyStringLiteral(node) ??
     (node?.type === "identifier" ? stringLiterals.get(node.text) ?? null : null);
@@ -1475,6 +1550,13 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         return null;
       }
 
+      // `payload = await request.json()`. Without this the whole async half of
+      // FastAPI and aiohttp had taint silently disabled — not for one rule, for
+      // EVERY rule. The held-out corpus alone holds 65 `await request.json()`
+      // and 59 `await request.body()` (§4x).
+      case "await":
+        return taintOf(node.namedChildren[0] ?? null);
+
       case "attribute":
       case "subscript": {
         // Django, Flask and DRF all name the parameter `request`, and that
@@ -1510,7 +1592,18 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         }
         // `request.POST.get("name")` — the receiver is the source. Also covers
         // string methods on tainted values: `value.strip()` stays tainted.
-        const viaReceiver = taintOf(fn?.childForFieldName("object") ?? null);
+        // A method called DIRECTLY on the request: `request.json()`,
+        // `request.body()`, `request.form()`. The attribute regex below only
+        // fires from two levels down (`request.GET.get`), so the one-level form
+        // read as an ordinary call and lost its taint.
+        const recvNode = fn?.childForFieldName("object") ?? null;
+        if (recvNode?.type === "identifier" && /^(request|req)$/.test(recvNode.text)) {
+          return {
+            kind: "source",
+            ev: { source: `${recvNode.text}.${fn?.childForFieldName("attribute")?.text ?? "?"}`, line: here() },
+          };
+        }
+        const viaReceiver = taintOf(recvNode);
         if (viaReceiver) return viaReceiver;
         for (const arg of node.childForFieldName("arguments")?.namedChildren ?? []) {
           const t = taintOf(arg ?? null);
@@ -1529,11 +1622,20 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         return null;
       }
 
-      case "binary_operator":
-        return (
-          taintOf(node.childForFieldName("left")) ??
-          taintOf(node.childForFieldName("right"))
-        );
+      case "binary_operator": {
+        // `BASE_DIR / request.GET["n"]` — BASE_DIR is usually rooted in
+        // os.environ, and answering left-first labelled the flow as
+        // environment-derived, which then looked unattributable. Prefer the
+        // side that names a REQUEST. Measured: without this, 31 genuine path
+        // findings are thrown away for a labelling artefact.
+        const l = taintOf(node.childForFieldName("left"));
+        const r = taintOf(node.childForFieldName("right"));
+        const isEnv = (t: TaintOrigin | null) =>
+          t?.kind === "source" && /^(os\.environ|sys\.argv)/.test(t.ev.source);
+        if (l && !isEnv(l)) return l;
+        if (r && !isEnv(r)) return r;
+        return l ?? r;
+      }
 
       default:
         return null;
@@ -2278,7 +2380,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           if (
             calleeName &&
             sinks.length < MAX_SINKS_PER_FILE &&
-            plainReceiver(fnNode) === "re" &&
+            plainReceiver(fnNode, importAliases) === "re" &&
             /^(match|fullmatch|search|compile|sub|subn|findall|finditer|split)$/.test(calleeName)
           ) {
             const args = node.childForFieldName("arguments");
@@ -2298,7 +2400,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             }
           }
           if (calleeName && sinks.length < MAX_SINKS_PER_FILE) {
-            const hit = matchSinkRule(node, fnNode, calleeName, isAssembledVar, taintOf, literalOf);
+            const hit = matchSinkRule(node, fnNode, calleeName, isAssembledVar, taintOf, literalOf, importAliases);
             if (hit) {
               sinks.push({
                 ruleId: hit.ruleId,
@@ -2373,6 +2475,10 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         for (const child of node.namedChildren) visit(child);
     }
   }
+
+  // Built before the walk so a sink can be judged against the module its
+  // receiver really names, whatever the file chose to call it.
+  importAliases = collectImportAliases(tree.rootNode);
 
   visit(tree.rootNode);
 
