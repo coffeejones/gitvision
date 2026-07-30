@@ -812,6 +812,39 @@ returns one hit, and an unconditional config fact should beat a taint-dependent 
 
 Net: +4 true positives, precision UP from 0.925 to 0.927, trap record intact.
 
+### 4s. Security misconfiguration — and one rule that didn't earn its place
+
+The last of the §4p "pile 1" families (66 vulns, and notably **zero traps** in this class).
+Four rules were built; three shipped.
+
+**Shipped** — all assignment- or kwarg-shaped, matched on the target name, same discipline as
+the secret rule:
+
+- `py-debug-enabled` — `DEBUG = True`, `app.debug = True`. Included deliberately even though it
+  is Django's own generated default: shipped that way it leaks tracebacks and, on Flask, a
+  remote console. Being a common default is what makes it worth reporting.
+- `py-wildcard-allowed-hosts` — `ALLOWED_HOSTS = ['*']`.
+- `py-autoescape-disabled` — `autoescape=False` in a template environment. **This is the other
+  half of the template XSS story**: §4o documented bare `{{ }}` as a miss precisely because
+  autoescape is configured in Python, and this is that configuration.
+
+**Dropped: `py-insecure-cookie-flag`** (`set_cookie(..., secure=False)`). Measured at **1 true
+positive against 3 false positives** — the flag alone doesn't establish the cookie carries
+anything worth protecting, so it fires where it is irrelevant. The rule is right in principle
+and needs a discriminator (session/auth cookie names, or taint on the value) before it earns a
+place. Kept out rather than shipped at a 1:3 ratio.
+
+| | before | with cookie rule | shipped |
+|---|---|---|---|
+| true positives | 139 | 148 | **147** |
+| false positives | 11 | 16 | **13** |
+| precision | 0.927 | 0.902 | **0.919** |
+| in-scope recall | 0.558 | 0.587 | **0.586** |
+| traps hit | 0/107 | 0/107 | **0/107** |
+
+Per-rule contribution made the call obvious: debug 13 TP / 2 FP, the CWE-16 pair 3 TP / 0 FP,
+cookies 1 TP / 3 FP.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across

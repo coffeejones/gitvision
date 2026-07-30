@@ -932,6 +932,19 @@ function matchSinkRule(
     return null;
   }
 
+  // Template auto-escaping disabled at CONFIG level — the other half of the
+  // template XSS story (§4o documented the bare `{{ }}` case as needing exactly
+  // this). `Environment(autoescape=False)`, `aiohttp_jinja2.setup(...)`.
+  if (kwarg(argList, "autoescape")?.text === "False") {
+    return { ruleId: "py-autoescape-disabled", severity: "medium" };
+  }
+
+  // NOT a rule: `set_cookie(..., secure=False)`. Measured at 1 true positive
+  // against 3 false positives — the flag alone doesn't say the cookie carries
+  // anything worth protecting, and a bare `secure=False` fires on cookies where
+  // it is irrelevant. It needs a discriminator (session/auth cookie names, or
+  // taint on the value) before it earns a place. Documented deferral, §4s.
+
   // Transport security switched off. Checked BEFORE SSRF: a call can be both,
   // but a rule returns one hit, and `verify=False` is an unconditional fact
   // about the code while SSRF depends on taint. The certain finding wins.
@@ -1037,6 +1050,38 @@ function assignmentTargetName(left: TsNode | null): string | null {
     for (const c of left.namedChildren) {
       const lit = pyStringLiteral(c ?? null);
       if (lit) return lit;
+    }
+  }
+  return null;
+}
+
+/** Security-relevant settings turned off or opened up, in an assignment.
+ *
+ *  Assignment-shaped like the secret rule, and matched on the TARGET name for
+ *  the same reason: a dict key or a string's contents is not a setting.
+ *
+ *  `DEBUG = True` is deliberately included even though it is Django's own
+ *  generated default — shipped that way it leaks tracebacks and, on Flask, a
+ *  remote console. Being a common default is what makes it worth reporting,
+ *  not a reason to stay quiet. */
+function matchConfigAssignment(
+  left: TsNode | null,
+  right: TsNode | null
+): SinkRuleHit | null {
+  const name = assignmentTargetName(left);
+  if (!name || !right) return null;
+
+  // DEBUG = True / app.debug = True
+  if (/^(debug|debug_propagate_exceptions)$/i.test(name) && right.text === "True") {
+    return { ruleId: "py-debug-enabled", severity: "medium" };
+  }
+
+  // ALLOWED_HOSTS = ['*'] — accepts any Host header.
+  if (/^allowed_hosts$/i.test(name) && right.type === "list") {
+    for (const item of right.namedChildren) {
+      if (pyStringLiteral(item ?? null) === "*") {
+        return { ruleId: "py-wildcard-allowed-hosts", severity: "medium" };
+      }
     }
   }
   return null;
@@ -1823,7 +1868,9 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         // A credential committed as a literal — assignment-shaped, so it
         // cannot go through matchSinkRule (which is call-shaped).
         if (sinks.length < MAX_SINKS_PER_FILE) {
-          const secret = matchSecretAssignment(left, valueNode);
+          const secret =
+            matchSecretAssignment(left, valueNode) ??
+            matchConfigAssignment(left, valueNode);
           if (secret) {
             sinks.push({
               ruleId: secret.ruleId,

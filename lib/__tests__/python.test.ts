@@ -967,6 +967,40 @@ describe("pythonPlugin — security sinks", () => {
     expect(ruleIds("def f(b):\n    marshal.loads(b)\n")).toEqual(["py-pickle-load"]);
   });
 
+  describe("security misconfiguration", () => {
+    it("flags debug mode enabled", () => {
+      expect(ruleIds("DEBUG = True\n")).toEqual(["py-debug-enabled"]);
+      expect(ruleIds("app.debug = True\n")).toEqual(["py-debug-enabled"]);
+    });
+
+    it("does NOT flag debug disabled or read from config", () => {
+      expect(ruleIds("DEBUG = False\n")).toEqual([]);
+      expect(ruleIds("DEBUG = os.environ.get('DEBUG')\n")).toEqual([]);
+    });
+
+    it("flags a wildcard ALLOWED_HOSTS", () => {
+      expect(ruleIds("ALLOWED_HOSTS = ['*']\n")).toEqual(["py-wildcard-allowed-hosts"]);
+    });
+
+    it("does NOT flag a specific ALLOWED_HOSTS", () => {
+      expect(ruleIds("ALLOWED_HOSTS = ['example.com', 'www.example.com']\n")).toEqual([]);
+      expect(ruleIds("ALLOWED_HOSTS = []\n")).toEqual([]);
+    });
+
+    it("flags template auto-escaping disabled in config", () => {
+      // The other half of the template XSS story — the config-level case §4o
+      // documented as a miss.
+      expect(
+        ruleIds("def setup():\n    return Environment(loader=l, autoescape=False)\n")
+      ).toEqual(["py-autoescape-disabled"]);
+    });
+
+    it("does NOT flag autoescape left on", () => {
+      expect(ruleIds("def setup():\n    return Environment(autoescape=True)\n")).toEqual([]);
+      expect(ruleIds("def setup():\n    return Environment(loader=l)\n")).toEqual([]);
+    });
+  });
+
   describe("path traversal and SSRF (taint-required rules)", () => {
     it("flags open() on a path built from request data", () => {
       const src =
