@@ -14,6 +14,7 @@ import type {
 } from "./types";
 import { parseFile } from "./parse";
 import { buildCodeGraph } from "./codeGraph";
+import { scanTemplateXss } from "../security/templateScan";
 import {
   DEFAULT_MAX_FILES,
   MAX_FILE_BYTES,
@@ -179,6 +180,16 @@ export async function analyzeDirectory(
   const contentHashes: Record<string, string> = {};
   for (const f of sourceFiles) contentHashes[f.rel] = djb2(f.content);
   codeGraph.contentHashes = contentHashes;
+
+  // Template XSS sinks live in .html/.jinja files, not in the AST the plugins
+  // parse, so they are scanned here over the raw walked content and merged into
+  // the graph's sink list. classifySinks then classifies them (as `unknown` —
+  // a template has no call edge). Kept in analyzeDirectory so codeGraph.sinks
+  // is complete for every consumer, not just the production pipeline.
+  const templateSinks = scanTemplateXss(sourceFiles);
+  if (templateSinks.length > 0) {
+    codeGraph.sinks = [...(codeGraph.sinks ?? []), ...templateSinks];
+  }
 
   const totals: AnalysisTotals = {
     filesScanned: sourceFiles.length,

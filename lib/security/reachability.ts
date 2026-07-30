@@ -189,6 +189,13 @@ export function classifySinks(cg: CodeGraph): ReachabilityReport {
   const { parent, origin } = walkFromEntries(idx, [...entryMeta.keys()]);
 
   const findings: ClassifiedSink[] = sinks.map((sink) => {
+    // A template sink has no function and no call edge. We found an
+    // escape-disabled interpolation but cannot prove which view renders it, so
+    // it is `unknown` — surfaced, never suppressed, and never mislabelled as
+    // module-scope (which means "runs at import").
+    if (sink.origin === "template") {
+      return { ...sink, reachability: "unknown" as const };
+    }
     if (!sink.inFunction) {
       return { ...sink, reachability: "module-scope" as const };
     }
@@ -262,6 +269,8 @@ export const SINK_RULE_LABELS: Record<string, string> = {
   "py-pickle-load": "Pickle deserialisation",
   "py-yaml-unsafe-load": "YAML loaded without a safe loader",
   "py-sql-assembled": "SQL query built by string assembly",
+  "py-template-safe-filter": "Template output escaping disabled (| safe)",
+  "py-template-autoescape-off": "Template auto-escaping turned off",
   "py-ssti": "Template built and rendered at runtime",
   "py-mark-safe": "Output escaping switched off",
   "py-jwt-unverified": "JWT decoded without verifying its signature",

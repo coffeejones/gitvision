@@ -101,14 +101,17 @@ describe("extractImportsFromSourceFiles", () => {
 });
 
 describe("regexFallbackPlugin", () => {
-  it("advertises only Kotlin (plus html/css for resolution targets)", () => {
+  it("advertises Kotlin plus render-target and template file types", () => {
     // Python migrated in v0.12, Go in v0.13, Java in v0.14, C# in v0.21,
     // PHP in v0.22, Ruby in v0.23 — all have their own tree-sitter
     // plugins. Kotlin remains here because its WASM grammar is ABI-
     // incompatible with web-tree-sitter (see PROGRESS.md "Kotlin WASM
-    // blocker"). HTML/CSS are render-target file types only.
+    // blocker"). HTML/CSS are render-target file types. The template
+    // extensions (htm/jinja/jinja2/j2, v0.82+) are registered ONLY so the file
+    // walker reads them — the fallback extracts nothing from them; the template
+    // XSS scanner (lib/security/templateScan) is what consumes the content.
     expect([...regexFallbackPlugin.extensions].sort()).toEqual(
-      ["css", "html", "kt"]
+      ["css", "htm", "html", "j2", "jinja", "jinja2", "kt"]
     );
   });
 

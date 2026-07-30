@@ -147,6 +147,12 @@ export interface SinkFinding {
   inContainerType?: string;
   /** The source line, trimmed and length-capped. Evidence for the reader. */
   snippet: string;
+  /** Where the sink was found (v0.82+). "code" is the call-graph world — a
+   *  Python call in a function. "template" is an HTML/Jinja template, which has
+   *  no function and no call edge, so it is classified `unknown` rather than
+   *  module-scope: we found an escape-disabled interpolation but cannot yet
+   *  prove which view renders it. Defaults to "code" when absent. */
+  origin?: "code" | "template";
   /** Set when untrusted input provably reaches this sink inside the same
    *  function. Absence means UNPROVEN, never safe — see TaintEvidence. */
   taint?: TaintEvidence;

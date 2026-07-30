@@ -113,6 +113,17 @@ describe("classifySinks", () => {
     expect(classifySinks(cg).findings[0].reachability).toBe("unknown");
   });
 
+  it("classifies a template sink as unknown, not module-scope", () => {
+    // A template has no function and no call edge. It must not be called
+    // module-scope (which means "runs at import"), and must not be suppressed —
+    // we found an escape-disabled interpolation, we just can't link it to a view.
+    const s = sink("templates/page.html", null, { ruleId: "py-template-safe-filter", origin: "template" });
+    const cg = graph([routeFn("views.py", "home", "/")], [], [s]);
+    const r = classifySinks(cg);
+    expect(r.findings[0].reachability).toBe("unknown");
+    expect(r.counts["module-scope"]).toBe(0);
+  });
+
   it("classifies a module-scope sink separately — it runs, but not from a route", () => {
     const cg = graph([routeFn("views.py", "home", "/")], [], [sink("boot.py", null)]);
     const r = classifySinks(cg);

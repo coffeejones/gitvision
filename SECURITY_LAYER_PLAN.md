@@ -653,6 +653,45 @@ benchmark authors' own scan outputs (their configs, one run), matched identicall
 0 / 107 traps** — the quietest, most trustworthy scanner in the comparison, at the cost of
 being a focused injection/RCE detector rather than a general-purpose one.
 
+### 4o. Template XSS — closing the biggest measured gap
+
+§4n named XSS (0/79) as the single largest in-scope hole, and diagnosed why: the XSS lives in
+TEMPLATE files (`.html`, `.jinja2`), not in the Python AST the plugins parse. `lib/security/
+templateScan.ts` scans them, wired into `analyzeDirectory` so `codeGraph.sinks` is complete for
+every consumer.
+
+Two rules, chosen from what the ground truth actually labels (calibrated against RealVuln, not
+guessed):
+
+- **`py-template-safe-filter`** — `{{ x | safe }}`. The `safe` filter disables the engine's
+  auto-escaping; it is the template equivalent of `mark_safe`, a deliberate escape-off shared
+  by Django and Jinja. `\bsafe\b` so `safely` / `safe_html` don't match. `csrf_token` is
+  excluded (a framework value, not user input) — the one unambiguous FP source.
+- **`py-template-autoescape-off`** — `{% autoescape off %}` / `{% autoescape false %}`.
+
+**Deliberately NOT flagged: a bare `{{ x }}`.** In an auto-escaping template (the default) that
+is safe, and flagging it would wreck precision. The cases where a bare interpolation IS XSS
+depend on `autoescape=False` set in Python config (a cross-file read we don't do) — a
+documented miss.
+
+Reachability: a template sink is `unknown` — no function, no call edge, no view→template
+linkage yet. Surfaced, never suppressed, never mislabelled module-scope.
+
+Re-measured on the same 23 repos:
+
+| | before | after |
+|---|---|---|
+| true positives | 77 | **97** (+20) |
+| precision | 0.951 | **0.924** |
+| reflected_xss | 0/44 | 13/44 |
+| stored_xss | 0/24 | 7/24 |
+| in-scope recall | 0.363 | **0.458** |
+| **traps hit** | 0/107 | **0/107** |
+
++20 real XSS at a 3-point precision cost, traps still perfect. The residual XSS gap is bare
+`{{ }}` under config-level autoescape (needs a Jinja-config reader) and DOM XSS in `.js`
+(a JavaScript sink, separate). Both are honest, documented misses — not noise we chose to add.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across

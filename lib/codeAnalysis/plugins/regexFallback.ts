@@ -47,6 +47,14 @@ const EXTENSIONS = [
   "kt",
   "html",
   "css",
+  // Template extensions (v0.82+). The regex fallback extracts nothing from
+  // them (templates have no functions/imports it recognises), but registering
+  // the extension is what makes the file WALKER read them at all — which the
+  // template XSS scanner in lib/security/templateScan.ts then needs.
+  "htm",
+  "jinja",
+  "jinja2",
+  "j2",
 ] as const;
 
 interface RegexFallbackData {
