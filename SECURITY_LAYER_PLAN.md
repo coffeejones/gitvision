@@ -610,6 +610,49 @@ That closes "#1". "#2" — local dynamic confirmation on your own uploaded
 project — remains the desktop pillar: quarters of work, its own hard problems
 (booting an arbitrary project, sandboxing, the confirmation oracle).
 
+### 4n. RealVuln — measured against Semgrep, SonarQube and Snyk
+
+The corpus we chose in scope, finally run. 23 of the 26 canonical `realvuln-*` repos
+(3 had dead/renamed URLs — 63 vulns, 13 traps unrecoverable), each cloned at its pinned
+commit, scored with RealVuln's OWN matcher (`scorer.matcher.match_findings`, ±10-line window,
+CWE-in-acceptable-set) so the numbers are directly comparable to their leaderboard.
+
+Like-for-like on the same 23 repos (107 deliberate false-positive traps):
+
+| scanner | precision | recall | F3 | TP | FP | **traps hit** |
+|---|---|---|---|---|---|---|
+| **CodeTrawl** | **0.951** | 0.120 | 0.132 | 77 | 4 | **0 / 107** |
+| Semgrep | 0.273 | 0.193 | 0.199 | 124 | 331 | 4 |
+| Snyk | 0.411 | 0.179 | 0.190 | 115 | 165 | 3 |
+| SonarQube | 0.615 | 0.062 | 0.069 | 40 | 25 | 1 |
+| kolega-devsec (LLM) | 0.346 | 0.824 | 0.724 | 528 | 1000 | 11 |
+
+**The thesis, measured.** CodeTrawl has the highest precision of every rule-based tool here —
+0.95 against Semgrep's 0.27, Snyk's 0.41, SonarQube's 0.62 — and is the **only** scanner that
+flagged **zero** of the 107 traps. Semgrep hit 4, Snyk 3, SonarQube 1, the recall-maximizing
+LLM scanner 11. In raw noise: Semgrep emits 455 findings, 73% of them false; CodeTrawl emits
+81, 5% false. That is "400 findings nobody reads → the handful people act on," as a number.
+
+**The cost is coverage, by design.** Overall recall is 0.12 because we target ~6 of 18+ CWE
+families. On the injection / code-execution / deserialization families we actually built rules
+for, recall is **~59%** (54/92: sql 27/41, command 9/18, code-exec 7/12, deserialization 9/16,
+ssti 2/5) — competitive with any rule-based tool, at a fraction of the noise. Outside that:
+near zero, and honestly so. The single biggest in-scope gap is XSS (0/79) — `py-mark-safe` is a
+weak stand-in and RealVuln's XSS is template-level (`{{ }}` in `.html`), which we don't parse.
+
+**The reachability filter's cost is visible here too.** "Surfaced" (what the panel shows,
+dropping `unreachable`) scores 64 TP vs. detection's 77 — the filter demotes 13 real vulns as
+unreachable on these tiny CTF apps, where the entry-point readers cover fewer frameworks. On
+the large real apps earlier it demoted correctly; on toy apps it over-demotes. A real trade-off
+to keep measuring, not a bug.
+
+Caveats kept on the record: 23/26 repos (dead URLs); the peer tools are scored from the
+benchmark authors' own scan outputs (their configs, one run), matched identically to ours.
+
+**Bottom line for the value claim:** the number to put next to SonarQube is **95% precision,
+0 / 107 traps** — the quietest, most trustworthy scanner in the comparison, at the cost of
+being a focused injection/RCE detector rather than a general-purpose one.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across
