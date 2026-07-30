@@ -961,6 +961,72 @@ describe("pythonPlugin — security sinks", () => {
     expect(ruleIds("def f(b):\n    marshal.loads(b)\n")).toEqual(["py-pickle-load"]);
   });
 
+  describe("hardcoded secrets", () => {
+    it("flags a module-level secret assigned a literal", () => {
+      expect(ruleIds("SECRET_KEY = 'lr66%-a!$km5ed@n5ug'\n")).toEqual(["py-hardcoded-secret"]);
+      expect(ruleIds('SECRET_COOKIE_KEY = "PYGOAT"\n')).toEqual(["py-hardcoded-secret"]);
+    });
+
+    it("flags an attribute assignment (app.secret_key)", () => {
+      expect(ruleIds("app.secret_key = 'super secret key'\n")).toEqual(["py-hardcoded-secret"]);
+    });
+
+    it("flags a config subscript (app.config['SECRET_KEY'])", () => {
+      expect(ruleIds("app.config['SECRET_KEY'] = 'dvga'\n")).toEqual(["py-hardcoded-secret"]);
+    });
+
+    it("flags a JWT signed or verified with a literal secret", () => {
+      expect(ruleIds("def f(p):\n    return jwt.encode(p, 'csrf_vulneribility')\n")).toEqual([
+        "py-hardcoded-secret",
+      ]);
+      expect(
+        ruleIds("def f(c):\n    return jwt.decode(c, 'secret', algorithms=['HS256'])\n")
+      ).toEqual(["py-hardcoded-secret"]);
+    });
+
+    it("does NOT flag a secret read from the environment — the correct pattern", () => {
+      expect(ruleIds("SECRET_KEY = os.environ['SECRET_KEY']\n")).toEqual([]);
+      expect(ruleIds("SECRET_KEY = os.environ.get('SECRET_KEY')\n")).toEqual([]);
+      expect(ruleIds("app.secret_key = config('SECRET_KEY')\n")).toEqual([]);
+    });
+
+    it("does NOT flag a JWT whose key comes from config", () => {
+      expect(ruleIds("def f(p):\n    return jwt.encode(p, settings.SECRET_KEY)\n")).toEqual([]);
+    });
+
+    // The corpus's own traps. Our 0-of-107 record lives or dies on these.
+    it("does NOT flag a benign dict literal (the CONFIG trap)", () => {
+      expect(ruleIds("CONFIG = {\n    'app_name': 'Damn Vulnerable Flask Application'\n}\n")).toEqual([]);
+    });
+
+    it("does NOT flag a tuple that merely CONTAINS a secret-ish word", () => {
+      // reviewer_data = (112, "...", "auth_token") — the word is the VALUE, and
+      // the target name is benign. Matching string contents would hit this.
+      expect(
+        ruleIds('reviewer_data = (112, "reviewer@x.com", "12321", True, "auth_token")\n')
+      ).toEqual([]);
+    });
+
+    it("does NOT flag a dict of hashed demo passwords (the USER_A7_LAB3 trap)", () => {
+      // The dict KEY is "password", but the assignment target is benign. A
+      // key-matching rule would fire here; a target-matching rule does not.
+      const src =
+        'USER_A7_LAB3 = {\n    "User1": {"username": "User1", "password": "491a2800b807"}\n}\n';
+      expect(ruleIds(src)).toEqual([]);
+    });
+
+    it("does NOT flag an empty or trivial value", () => {
+      expect(ruleIds('SECRET_KEY = ""\n')).toEqual([]);
+      expect(ruleIds('SECRET_KEY = "  "\n')).toEqual([]);
+    });
+
+    it("does not fire on a generic name we deliberately excluded", () => {
+      // KEY / USERNAME are too generic to carry a finding alone — a documented
+      // recall trade for the trap record.
+      expect(ruleIds("USERNAME = 'admin'\n")).toEqual([]);
+    });
+  });
+
   describe("reflected XSS in an HTML response", () => {
     it("flags an HttpResponse assembled from request data", () => {
       const src =

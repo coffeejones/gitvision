@@ -269,6 +269,7 @@ export const SINK_RULE_LABELS: Record<string, string> = {
   "py-pickle-load": "Pickle deserialisation",
   "py-yaml-unsafe-load": "YAML loaded without a safe loader",
   "py-sql-assembled": "SQL query built by string assembly",
+  "py-hardcoded-secret": "Credential committed as a literal",
   "py-reflected-xss": "HTML response built from untrusted input (reflected XSS)",
   "py-template-safe-filter": "Template output escaping disabled (| safe)",
   "py-template-autoescape-off": "Template auto-escaping turned off",

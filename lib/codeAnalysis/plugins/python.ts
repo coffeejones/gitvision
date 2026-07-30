@@ -874,6 +874,18 @@ function matchSinkRule(
       : null;
   }
 
+  // A JWT signed or verified with a literal secret — anyone reading the repo
+  // can mint tokens. `jwt.encode(payload, 'csrf_vulneribility')` in the corpus.
+  if (recv === "jwt" && (calleeName === "encode" || calleeName === "decode")) {
+    const positional = argList.namedChildren.filter(
+      (c): c is TsNode => !!c && c.type !== "keyword_argument"
+    );
+    const key = pyStringLiteral(positional[1] ?? null);
+    if (key !== null && key.trim().length >= MIN_SECRET_LEN) {
+      return { ruleId: "py-hardcoded-secret", severity: "high" };
+    }
+  }
+
   // A JWT decoded without checking its signature is an attacker-authored JWT.
   if (recv === "jwt" && calleeName === "decode") {
     const options = kwarg(argList, "options");
@@ -924,6 +936,74 @@ function matchSinkRule(
   }
 
   return null;
+}
+
+// ------------------- Hardcoded secrets (assignment-shaped) -------------------
+//
+// The biggest single out-of-scope family in the RealVuln measurement (§4p):
+// framework signing keys and credentials committed as literals —
+// `SECRET_KEY = '...'`, `app.secret_key = '...'`, `app.config['SECRET_KEY'] = '...'`.
+//
+// NOT covered by the existing secretsScan, which hunts HIGH-ENTROPY API keys
+// and private-key blocks. `SECRET_COOKIE_KEY = "PYGOAT"` is low-entropy by
+// construction — it is a bad secret, which is exactly why it is a finding, and
+// exactly why an entropy scanner cannot see it. Different rule class.
+//
+// PRECISION, calibrated against the corpus's own traps — every one of these is
+// a trap we must NOT hit:
+//   CONFIG = {'app_name': '...'}                    dict literal, benign key
+//   reviewer_data = (112, "...", "auth_token")      a tuple CONTAINING the word
+//   USER_A7_LAB3 = {"password": "<sha256 hash>"}    dict of hashed demo data
+// All three are avoided by the same decision: match only the ASSIGNMENT TARGET's
+// name, never a dict key, never the string's contents. A benign variable name
+// holding secret-looking text is not a finding.
+//
+// And the value must be a plain string LITERAL, which is what separates
+// `SECRET_KEY = 'abc'` from the correct `SECRET_KEY = os.environ["SECRET_KEY"]`
+// — a call or subscript is config being read, not a secret being committed.
+
+/** Names that denote a credential. Deliberately conservative: bare `KEY` and
+ *  `USERNAME` are excluded even though the corpus labels a couple of them,
+ *  because they are far too generic to carry a finding on their own. Costs a
+ *  little recall, protects the trap record. */
+const SECRET_NAME = /(secret|password|passwd|pwd|api_?key|access_?token|auth_?token|private_?key|signing_?key)/i;
+
+/** Shortest literal worth reporting — guards against `SECRET_KEY = ""`. */
+const MIN_SECRET_LEN = 3;
+
+/** The name an assignment target binds, for the three shapes that carry a
+ *  secret: `NAME = ...`, `obj.attr = ...`, `obj['KEY'] = ...`. Returns null for
+ *  everything else — notably dict/tuple literals, which is what keeps the
+ *  corpus's traps clean. */
+function assignmentTargetName(left: TsNode | null): string | null {
+  if (!left) return null;
+  if (left.type === "identifier") return left.text;
+  if (left.type === "attribute") {
+    return left.childForFieldName("attribute")?.text ?? null;
+  }
+  if (left.type === "subscript") {
+    // app.config['SECRET_KEY'] — the subscript is the name being set.
+    for (const c of left.namedChildren) {
+      const lit = pyStringLiteral(c ?? null);
+      if (lit) return lit;
+    }
+  }
+  return null;
+}
+
+/** A credential committed as a literal. Returns the rule hit, or null. */
+function matchSecretAssignment(
+  left: TsNode | null,
+  right: TsNode | null
+): SinkRuleHit | null {
+  const name = assignmentTargetName(left);
+  if (!name || !SECRET_NAME.test(name)) return null;
+  // Only a plain string literal. A call (`os.environ.get(...)`, `gensalt()`) or
+  // a subscript (`os.environ["X"]`) is reading config, which is the CORRECT
+  // pattern and must never be flagged.
+  const value = pyStringLiteral(right);
+  if (value === null || value.trim().length < MIN_SECRET_LEN) return null;
+  return { ruleId: "py-hardcoded-secret", severity: "high" };
 }
 
 /** Response constructors whose body defaults to a text/html content type, so
@@ -1680,6 +1760,21 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         // function — module-level query building is just as real.
         if (left?.type === "identifier" && isAssembledString(valueNode)) {
           markAssembled(left.text);
+        }
+        // A credential committed as a literal — assignment-shaped, so it
+        // cannot go through matchSinkRule (which is call-shaped).
+        if (sinks.length < MAX_SINKS_PER_FILE) {
+          const secret = matchSecretAssignment(left, valueNode);
+          if (secret) {
+            sinks.push({
+              ruleId: secret.ruleId,
+              severity: secret.severity,
+              line: node.startPosition.row + 1,
+              inFunction: currentMethod()?.name ?? null,
+              inContainerType: currentClass()?.name,
+              snippet: snippetAt(node.startPosition.row),
+            });
+          }
         }
         if (left?.type === "identifier") {
           const t = taintOf(valueNode);

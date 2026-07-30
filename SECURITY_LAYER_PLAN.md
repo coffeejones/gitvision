@@ -724,6 +724,50 @@ reflected XSS):
 +24 real vulnerabilities this session, precision still 92.7%, still zero of 107 traps. The
 reflected-XSS rule even nudged precision UP — its taint requirement added only true positives.
 
+### 4q. Hardcoded secrets — the biggest single win
+
+The largest out-of-scope family in §4p's gap table (58 vulns, zero coverage): framework signing
+keys and credentials committed as literals. New `py-hardcoded-secret`, assignment-shaped:
+
+    SECRET_KEY = 'lr66%-a!$km5ed@...'      module-level name
+    app.secret_key = 'super secret key'    attribute target
+    app.config['SECRET_KEY'] = 'dvga'      subscript target
+    jwt.encode(payload, 'literal')         literal signing key (call-shaped)
+
+**Why the shipped `secretsScan` did not already cover this.** That scanner hunts HIGH-ENTROPY
+API keys and private-key blocks. `SECRET_COOKIE_KEY = "PYGOAT"` is low-entropy *by construction*
+— which is precisely why it is a finding, and precisely why an entropy scanner cannot see it.
+A different rule class, not a wiring gap.
+
+**Precision was designed against the corpus's own traps**, all three of which this rule must
+not hit:
+
+| trap | why it isn't a finding | how we avoid it |
+|---|---|---|
+| `CONFIG = {'app_name': ...}` | benign dict literal | match the assignment TARGET, never a dict key |
+| `reviewer_data = (112, …, "auth_token")` | the word is the VALUE | never match string CONTENTS |
+| `USER_A7_LAB3 = {"password": "<sha256>"}` | hashed demo data | target name is benign; a key-matching rule would fire |
+
+One decision does all three: **match only the assignment target's name.** And the value must be
+a plain string literal — a call or subscript (`os.environ["SECRET_KEY"]`) is config being read,
+the correct pattern, and never flagged.
+
+`KEY` and `USERNAME` are deliberately excluded as too generic, costing a couple of true
+positives to protect the trap record.
+
+| | before | after |
+|---|---|---|
+| true positives | 101 | **135** (+34) |
+| precision | 0.927 | **0.925** |
+| in-scope recall | 0.476 | **0.551** |
+| overall recall | 0.158 | **0.211** |
+| traps hit | 0/107 | **0/107** |
+
+The biggest single jump of the project, at no precision cost. All three new "false positives"
+are real hardcoded secrets the ground truth simply did not label at those exact lines
+(`app.config["JWT_SECRET_KEY"] = 'dvga'`, and two `jwt.decode` calls sharing the literal GT
+labelled only on the `encode` line) — so true precision is higher than 0.925.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across
