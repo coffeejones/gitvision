@@ -72,8 +72,8 @@ export const LANDING_SOURCE: PinnedSource = {
   path: "lib/codeAnalysis/plugins/javascript.ts",
   commit: "3a443c2",
   lang: "ts",
-  fn: { name: "lookupVariableType", line: 696 },
-  firstLine: 696,
+  fn: { name: "lookupVariableType", line: 816 },
+  firstLine: 816,
   // Verbatim from the file at that commit, leading indentation included — it is
   // a nested function, and the slice is compared byte-for-byte in the tests. Do
   // not reformat it to fit; choose a different slice instead.

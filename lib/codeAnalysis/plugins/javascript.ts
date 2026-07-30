@@ -15,6 +15,8 @@ import path from "node:path";
 import { Parser } from "web-tree-sitter";
 import type { Language, Node as TsNode } from "web-tree-sitter";
 import type {
+  SinkFinding,
+  TaintEvidence,
   ClassMemberVisibility,
   CodeAnalysisPlugin,
   FileIndex,
@@ -356,6 +358,34 @@ function extractParamNameAndType(
   return { name, type, isParamProperty };
 }
 
+// ------------------- DOM XSS sinks (v0.82+) -------------------
+//
+// The security layer was Python-only. Every JS/TS repo analysed returned zero
+// findings — not "clean", just unexamined. This is the first JavaScript sink
+// set, and it follows the discipline the Python rules arrived at the hard way:
+//
+// TAINT IS REQUIRED. `el.innerHTML = x` is one of the most common lines in
+// front-end JavaScript and is usually harmless (rendering internal data).
+// Flagging it unconditionally would be the precision disaster this project has
+// walked into three times (weak-hash, csrf_exempt, loose mark_safe). The rule
+// fires only when the value provably came from an attacker-controllable DOM
+// source in the same function.
+
+/** Browser-side values an attacker controls: the URL, the referrer, the frame
+ *  name. `location.search`, `location.hash`, `document.URL`, `window.name`. */
+const JS_TAINT_SOURCE = /(^|\.)(location|document)\.(search|hash|href|URL|documentURI|referrer)\b|(^|\.)window\.name\b|(^|\.)location\b\s*$/;
+
+/** Functions that render a value harmless before it reaches markup. */
+const JS_SANITIZERS = new Set([
+  "encodeURIComponent", "encodeURI", "escape", "sanitize", "DOMPurify", "Number", "parseInt", "parseFloat",
+]);
+
+/** Properties whose assignment parses the value as HTML. */
+const JS_HTML_PROPERTIES = new Set(["innerHTML", "outerHTML"]);
+
+/** Calls that parse their argument as HTML or as code. */
+const JS_HTML_CALLS = new Set(["write", "writeln", "insertAdjacentHTML", "html"]);
+
 // ------------------- parseDirect: AST walk with type tracking -------------------
 //
 // Same shape as plugins/java.ts and plugins/go.ts but adapted to the JS/TS
@@ -380,6 +410,8 @@ interface JsMethodScope {
   name: string;
   locals: Map<string, string>;
   decisionPoints: number;
+  /** Locals holding a value derived from a DOM source, with the evidence. */
+  tainted: Map<string, TaintEvidence>;
 }
 
 // ------------------- Weak-Suite: assertion-quality extraction -------------------
@@ -676,6 +708,94 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   const imports: ParsedImport[] = [];
   const functions: ParsedFunction[] = [];
   const calls: ParsedCall[] = [];
+  const sinks: SinkFinding[] = [];
+  const moduleTainted = new Map<string, TaintEvidence>();
+
+  let lineStarts: number[] | null = null;
+  const snippetAt = (row: number): string => {
+    if (!lineStarts) {
+      lineStarts = [0];
+      for (let i = 0; i < file.content.length; i++) {
+        if (file.content[i] === "\n") lineStarts.push(i + 1);
+      }
+    }
+    const start = lineStarts[row] ?? 0;
+    let end = file.content.indexOf("\n", start);
+    if (end < 0) end = file.content.length;
+    const t = file.content.slice(start, end).trim();
+    return t.length > 200 ? `${t.slice(0, 200)}\u2026` : t;
+  };
+
+  const markJsTainted = (name: string, ev: TaintEvidence) => {
+    (currentMethod()?.tainted ?? moduleTainted).set(name, ev);
+  };
+  const jsTaintedVar = (name: string): TaintEvidence | null => {
+    for (let i = methodStack.length - 1; i >= 0; i--) {
+      const hit = methodStack[i].tainted.get(name);
+      if (hit) return hit;
+    }
+    return moduleTainted.get(name) ?? null;
+  };
+
+  /** Does this expression carry an attacker-controllable DOM value? Mirrors the
+   *  Python evaluator: conservative, and anything it cannot explain is null. */
+  const jsTaintOf = (node: TsNode | null): TaintEvidence | null => {
+    if (!node) return null;
+    const here = () => node.startPosition.row + 1;
+    switch (node.type) {
+      case "identifier":
+        return jsTaintedVar(node.text);
+      case "member_expression":
+      case "subscript_expression": {
+        if (JS_TAINT_SOURCE.test(node.text)) {
+          return { source: node.text.split("(")[0], line: here() };
+        }
+        return jsTaintOf(node.childForFieldName("object") ?? null);
+      }
+      case "call_expression": {
+        const fn = node.childForFieldName("function");
+        const name =
+          fn?.type === "identifier"
+            ? fn.text
+            : fn?.childForFieldName("property")?.text;
+        if (name && JS_SANITIZERS.has(name)) return null;
+        const viaReceiver = jsTaintOf(fn?.childForFieldName("object") ?? null);
+        if (viaReceiver) return viaReceiver;
+        for (const arg of node.childForFieldName("arguments")?.namedChildren ?? []) {
+          const t = jsTaintOf(arg ?? null);
+          if (t) return t;
+        }
+        return null;
+      }
+      case "template_string": {
+        for (const part of node.namedChildren) {
+          if (part?.type !== "template_substitution") continue;
+          const t = jsTaintOf(part.namedChildren[0] ?? null);
+          if (t) return t;
+        }
+        return null;
+      }
+      case "binary_expression":
+        return (
+          jsTaintOf(node.childForFieldName("left")) ??
+          jsTaintOf(node.childForFieldName("right"))
+        );
+      default:
+        return null;
+    }
+  };
+
+  const emitSink = (ruleId: string, row: number, taint: TaintEvidence) => {
+    if (sinks.length >= 100) return;
+    sinks.push({
+      ruleId,
+      severity: "high",
+      line: row + 1,
+      inFunction: currentMethod()?.name ?? null,
+      snippet: snippetAt(row),
+      taint,
+    });
+  };
   /** v0.70: full ParsedClass entries for the Architecture tab.
    *  Built up alongside the existing classStack as the walker
    *  enters each class_declaration / interface_declaration. */
@@ -1035,6 +1155,27 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
       case "call_expression": {
         const fnNode = node.childForFieldName("function");
         if (fnNode) {
+          // document.write(x) / el.insertAdjacentHTML(pos, x) / $(sel).html(x)
+          // and eval(x) / new Function(x) — all parse their argument as HTML or
+          // as code. Taint-gated, for the reason in the rule-table header.
+          {
+            const bareName = fnNode.type === "identifier" ? fnNode.text : null;
+            const prop =
+              fnNode.type === "member_expression"
+                ? fnNode.childForFieldName("property")?.text
+                : null;
+            const args = node.childForFieldName("arguments")?.namedChildren ?? [];
+            const positional = args.filter((a): a is TsNode => !!a);
+            if (prop && JS_HTML_CALLS.has(prop) && positional.length > 0) {
+              // insertAdjacentHTML's markup is the SECOND argument.
+              const target = prop === "insertAdjacentHTML" ? positional[1] : positional[0];
+              const t = jsTaintOf(target ?? null);
+              if (t) emitSink("js-dom-xss", node.startPosition.row, t);
+            } else if (bareName === "eval" && positional.length > 0) {
+              const t = jsTaintOf(positional[0]);
+              if (t) emitSink("js-eval", node.startPosition.row, t);
+            }
+          }
           // Detect require("x") / import("x") for CommonJS + dynamic imports.
           if (
             (fnNode.type === "identifier" && fnNode.text === "require") ||
@@ -1261,7 +1402,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         const startRow = node.startPosition.row;
         const endRow = node.endPosition.row;
         const locals = collectMethodParams(node);
-        methodStack.push({ name: fnName, locals, decisionPoints: 0 });
+        methodStack.push({ name: fnName, locals, decisionPoints: 0, tainted: new Map() });
         const body = node.childForFieldName("body");
         if (body) for (const child of body.namedChildren) visit(child);
         const ms = methodStack.pop()!;
@@ -1292,7 +1433,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         const startRow = node.startPosition.row;
         const endRow = node.endPosition.row;
         const locals = collectMethodParams(node);
-        methodStack.push({ name: fnName, locals, decisionPoints: 0 });
+        methodStack.push({ name: fnName, locals, decisionPoints: 0, tainted: new Map() });
         const body = node.childForFieldName("body");
         if (body) for (const child of body.namedChildren) visit(child);
         const ms = methodStack.pop()!;
@@ -1326,6 +1467,8 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             const m = currentMethod();
             if (m) m.locals.set(nameNode.text, typeName);
           }
+          const t = jsTaintOf(valueNode);
+          if (t) markJsTainted(nameNode.text, { ...t, via: nameNode.text });
         }
 
         // 2. Arrow-function or function-expression assigned to a name?
@@ -1347,7 +1490,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
               if (info && info.type) locals.set(info.name, info.type);
             }
           }
-          methodStack.push({ name: fnName, locals, decisionPoints: 0 });
+          methodStack.push({ name: fnName, locals, decisionPoints: 0, tainted: new Map() });
           const body = valueNode.childForFieldName("body");
           if (body) {
             // body could be a statement_block or an expression (for arrow
@@ -1394,6 +1537,26 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         return;
       }
 
+      case "assignment_expression": {
+        // el.innerHTML = <tainted>  — the value is parsed as HTML.
+        const left = node.childForFieldName("left");
+        const right = node.childForFieldName("right");
+        if (left?.type === "member_expression") {
+          const prop = left.childForFieldName("property")?.text;
+          if (prop && JS_HTML_PROPERTIES.has(prop)) {
+            const t = jsTaintOf(right);
+            if (t) emitSink("js-dom-xss", node.startPosition.row, t);
+          }
+        }
+        // Propagate: `x = <tainted>` keeps the flow alive.
+        if (left?.type === "identifier") {
+          const t = jsTaintOf(right);
+          if (t) markJsTainted(left.text, { ...t, via: left.text });
+        }
+        for (const child of node.namedChildren) visit(child);
+        return;
+      }
+
       default:
         for (const child of node.namedChildren) visit(child);
     }
@@ -1419,6 +1582,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     parseError: false,
     classes: parsedClasses,
     ...(testMeta ? { testMeta } : {}),
+    ...(sinks.length ? { sinks } : {}),
   };
 }
 

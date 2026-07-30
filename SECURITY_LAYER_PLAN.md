@@ -845,6 +845,43 @@ place. Kept out rather than shipped at a 1:3 ratio.
 Per-rule contribution made the call obvious: debug 13 TP / 2 FP, the CWE-16 pair 3 TP / 0 FP,
 cookies 1 TP / 3 FP.
 
+### 4t. Pile 2 — DOM XSS, and the security layer stops being Python-only
+
+Until now every JavaScript or TypeScript repository analysed returned zero security findings.
+Not "clean" — **unexamined**. `js-dom-xss` and `js-eval` in `javascript.ts` are the first
+non-Python sinks, built with the same taint discipline the Python rules arrived at the hard way.
+
+- **Sources**: `location.search/hash/href`, `document.URL/referrer`, `window.name` — the
+  attacker-controllable parts of the browser environment.
+- **Sinks**: `innerHTML`/`outerHTML` assignment, `document.write(ln)`, `insertAdjacentHTML`
+  (second argument — the position is the first), jQuery `.html()`, and `eval`.
+- **Propagation** through assignment, template literals and `+`; sanitisers
+  (`encodeURIComponent`, `DOMPurify.sanitize`, `Number`) end the flow.
+
+**Taint is required, and that is the whole design.** `el.innerHTML = x` is one of the most
+common lines in front-end code and is usually harmless. Flagging it unconditionally is the
+precision disaster this project has walked into three times.
+
+**The measurement that matters is not RealVuln.** That corpus is Python: it contains 3 JS XSS
+findings, of which this catches 1 (the other two are a jQuery selector and a `fetch` response —
+neither is a DOM source). +1 TP, no new FPs, traps still 0/107.
+
+The result worth having is the negative one:
+
+| codebase | JS findings |
+|---|---|
+| this repo (~1,200 TS files) | **0** |
+| full-stack-fastapi-template React frontend | **0** |
+| dsvpwa (`document.write(location.hash)`) | 1 — correct |
+
+Zero false positives on two real TypeScript codebases is what makes the rule shippable, and it
+is the reason to build it: CodeTrawl's users are heavily JS/TS, and the security panel was
+silent on all of them.
+
+*Side effect worth noting:* the landing page quotes `lookupVariableType` from `javascript.ts`
+at a pinned line number, and a lockstep test caught the line moving. Re-pinned 696 → 816. The
+test did exactly what it was written for.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across
