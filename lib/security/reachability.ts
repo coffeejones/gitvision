@@ -275,6 +275,7 @@ export const SINK_RULE_LABELS: Record<string, string> = {
   "py-sql-assembled": "SQL query built by string assembly",
   "js-dom-xss": "DOM XSS — attacker-controlled value parsed as HTML",
   "js-eval": "eval() of an attacker-controlled value",
+  "py-redos": "Regex can backtrack catastrophically (ReDoS)",
   "py-debug-enabled": "Debug mode enabled",
   "py-wildcard-allowed-hosts": "Any Host header accepted (ALLOWED_HOSTS = ['*'])",
   "py-autoescape-disabled": "Template auto-escaping disabled in config",

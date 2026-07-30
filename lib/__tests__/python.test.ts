@@ -1343,3 +1343,40 @@ describe("pythonPlugin — class-based views", () => {
     expect(routesIn("router.register(PREFIX, views.SiteViewSet)\n", "app/api/urls.py")).toEqual([]);
   });
 });
+
+describe("pythonPlugin — catastrophic regex (ReDoS)", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const sinksIn = (content: string) => {
+    const file: SourceFile = { rel: "re_use.py", ext: "py", content };
+    return parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? [];
+  };
+
+  // The narrowest rule in the whole set: a group that is quantified AND whose
+  // body is quantified. That shape backtracks exponentially. Measured 16 TP /
+  // 0 FP on RealVuln — it earns its place by never guessing.
+  it("flags a nested-quantifier literal passed straight to re.match", () => {
+    const s = sinksIn(`import re\ndef f(x):\n    return re.match(r"((a)+)+", x)\n`);
+    expect(s.map((r) => r.ruleId)).toEqual(["py-redos"]);
+  });
+
+  it("follows a pattern defined as a module constant", () => {
+    const s = sinksIn(`import re\nPATTERN = r"(a+)+"\ndef f(x):\n    return re.compile(PATTERN)\n`);
+    expect(s.map((r) => r.ruleId)).toEqual(["py-redos"]);
+  });
+
+  // ---- the negatives ----
+  it("does NOT flag an ordinary regex", () => {
+    expect(sinksIn(`import re\ndef f(x):\n    return re.match(r"^[a-z]+$", x)\n`)).toEqual([]);
+    expect(sinksIn(`import re\ndef f(x):\n    return re.search(r"\\\\d{3}-\\\\d{4}", x)\n`)).toEqual([]);
+  });
+
+  it("does NOT flag a catastrophic string that never reaches re", () => {
+    expect(sinksIn(`LABEL = "((a)+)+"\ndef f():\n    return LABEL\n`)).toEqual([]);
+  });
+
+  it("does NOT flag a same-named method on something that is not re", () => {
+    expect(sinksIn(`def f(db, x):\n    return db.match(r"((a)+)+", x)\n`)).toEqual([]);
+  });
+});

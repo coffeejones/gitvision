@@ -956,3 +956,110 @@ Recorded so they aren't silently relitigated.
   noted.
 - Whether slice 1's entry-point work should be generalised to other languages immediately
   (it would benefit Flows everywhere) or kept Python-shaped until the filter proves out.
+
+## §4u — Pile 3, closed: one rule shipped, three built and thrown away
+
+Pile 3 was the leftovers — the families I had ranked as "probably not
+mechanical". I had been wrong about that ranking once before
+(`security_misconfiguration` was in pile 3 and turned out to have a mechanical
+core worth +8 TP), so this pass looked for the same mechanical subsets rather
+than declining the pile wholesale.
+
+### What the remaining ground truth actually contains
+
+487 ground-truth vulnerabilities sit outside the classes we detect. Splitting
+them by whether they are a *new family* or a *recall gap inside a family we
+already cover*:
+
+| Family | n | Verdict |
+|---|---:|---|
+| `hardcoded_credentials` | 66 | recall gap in a covered class, not a new family |
+| `reflected_xss` / `stored_xss` | 72 | recall gap in a covered class |
+| `weak_cryptography` | 16 | recall gap in a covered class |
+| `sensitive_data_exposure` | 87 | **pile 3** |
+| `csrf` | 39 | **pile 3** |
+| `denial_of_service` | 22 | **pile 3** |
+| `missing_authentication` | 20 | **pile 3** |
+| `missing_rate_limiting` | 19 | **pile 3** |
+| `broken_access_control` | 18 | **pile 3** |
+
+### Shipped: `py-redos` — 16 TP, 0 FP
+
+`PATTERN = r"((a)+)+"` reaching `re.match/compile/search/...`. A group that is
+quantified whose body is *also* quantified backtracks exponentially; that is a
+genuinely **syntactic** property, which is what makes it a fair rule in a pile
+that is otherwise semantic. The pattern is followed through a module constant,
+so a regex defined at the top of a file is judged where it is *used*.
+
+Deliberately narrow: only the classic nested-quantifier shape, never "this
+regex looks slow". Result — the only rule in the whole layer that raised
+precision while adding recall:
+
+| | before | after |
+|---|---:|---:|
+| TP | 148 | **164** |
+| FP | 13 | **13** |
+| precision | 0.919 | **0.927** |
+| in-scope recall | 0.590 | **0.614** |
+| traps | 0/107 | **0/107** |
+
+It does fire 3× on Zulip's markdown and Slack-import regexes. Those are not in
+any ground truth, and a nested quantifier in an importer *is* a real hazard, so
+they are left standing rather than special-cased away.
+
+### Built, measured, thrown away
+
+Two rules were written in full, measured, and deleted. Both are recorded here
+because the reason they failed is the same reason, and it is the single most
+repeated lesson in this document.
+
+**`py-plaintext-password-column`** — `password = db.Column(db.String(60))`.
+Measured **4 TP / 10 FP**. It flags a *pattern* (a field named password typed as
+a string) rather than a dangerous *data flow*. Django's own `AbstractUser`
+stores a hashed password in exactly that shape, so the rule cannot tell storage
+from hashing. It scored 0 on Zulip, NetBox and Saleor — which sounds like a
+clean bill of health, but only means those apps do not declare the field
+themselves. Deleted.
+
+**`py-error-detail-leak`** — the exception bound by `except ... as e` flowing
+into a response body (`jsonify({"error": str(e)})`). This one is a real data
+flow, not a pattern, and it targeted CWE-209, the second-largest CWE in the
+remaining ground truth (21 instances). Measured **4 TP / 2 FP**, dropping
+precision 0.927 → 0.918, and it fired 4× on NetBox:
+
+```
+netbox/netbox/api/viewsets/__init__.py:213  Response({'detail': e.message}, status=400)
+```
+
+That is a deliberate API error contract, not a disclosure. Telling an internal
+stack trace from an intended error message requires knowing what the endpoint
+promises its clients — semantic, not syntactic. Deleted.
+
+### Declined, with the reason
+
+- **`csrf` (39), `missing_authentication` (20), `missing_rate_limiting` (19)** —
+  absence detection. The finding is at `@app.route('/login', methods=['POST'])`
+  and consists of what is *not* there. We can see every route; we cannot see
+  which ones were *supposed* to have a token, a login check, or a limiter.
+  Flagging all of them is flagging the application.
+- **`broken_access_control` (18)** — CWE-639 IDOR: `user_id` read from the
+  request body instead of the authenticated token. Requires knowing which
+  identifier is authoritative. No syntactic difference exists.
+- **`denial_of_service` (22)** — CWE-400 resource consumption. Requires cost
+  modelling of a loop. The one CWE-1333 instance in the family is now covered by
+  `py-redos`.
+- **`sensitive_data_exposure` (87)** — CWE-200 (32) needs to know which data is
+  sensitive; CWE-209 (21) and CWE-256/312 (18) are the two rules above.
+
+### The standard this pile settled
+
+Four rules were built across piles 2 and 3 that flagged a **pattern** instead of
+a **dangerous data flow**. All four had to be deleted after measurement, and
+every one of them looked reasonable before it was measured. The bare-`{{ }}`
+XSS rule collapsed precision 0.919 → 0.684; the password column landed at 4:10.
+The rules that survived — taint-required SQLi, reflected XSS, path traversal,
+SSRF, ReDoS — all describe something *travelling* somewhere, or a structure that
+is dangerous no matter what surrounds it.
+
+**Pile 3 is closed.** In-scope recall stands at 0.614, precision at 0.927, traps
+at 0/107, on 2238 green tests.

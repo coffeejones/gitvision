@@ -1055,6 +1055,15 @@ function assignmentTargetName(left: TsNode | null): string | null {
   return null;
 }
 
+/** A regex whose structure can backtrack catastrophically: a quantified group
+ *  whose body is itself quantified — `(a+)+`, `(a*)*`, `((a)+)+`. Matching one
+ *  against attacker-supplied input hangs the process (ReDoS).
+ *
+ *  This is a genuinely SYNTACTIC property, which is what makes it a fair rule
+ *  in a family that is otherwise semantic. Deliberately narrow: only the
+ *  classic nested-quantifier shape, not every regex that might be slow. */
+const CATASTROPHIC_REGEX = /\([^)]*[+*]\)[+*]|\(\(.*\)[+*].*\)[+*]/;
+
 /** Security-relevant settings turned off or opened up, in an assignment.
  *
  *  Assignment-shaped like the secret rule, and matched on the TARGET name for
@@ -1204,6 +1213,9 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     (currentMethod()?.assembled ?? moduleAssembled).add(name);
   };
   const moduleTainted = new Map<string, TaintOrigin>();
+  /** name -> string literal it was assigned. Lets a regex defined as a constant
+   *  be judged where it is USED. */
+  const stringLiterals = new Map<string, string>();
   const markTainted = (name: string, origin: TaintOrigin) => {
     (currentMethod()?.tainted ?? moduleTainted).set(name, origin);
   };
@@ -1865,6 +1877,10 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         if (left?.type === "identifier" && isAssembledString(valueNode)) {
           markAssembled(left.text);
         }
+        if (left?.type === "identifier") {
+          const lit = pyStringLiteral(valueNode);
+          if (lit !== null) stringLiterals.set(left.text, lit);
+        }
         // A credential committed as a literal — assignment-shaped, so it
         // cannot go through matchSinkRule (which is call-shaped).
         if (sinks.length < MAX_SINKS_PER_FILE) {
@@ -1956,6 +1972,28 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             // the precision instead.
             const reg = readRouterRegistration(node, fnNode, calleeName);
             if (reg) routes.push(reg);
+          }
+          if (
+            calleeName &&
+            sinks.length < MAX_SINKS_PER_FILE &&
+            plainReceiver(fnNode) === "re" &&
+            /^(match|fullmatch|search|compile|sub|subn|findall|finditer|split)$/.test(calleeName)
+          ) {
+            const args = node.childForFieldName("arguments");
+            const first = args ? firstPositional(args) : null;
+            const pattern =
+              pyStringLiteral(first) ??
+              (first?.type === "identifier" ? stringLiterals.get(first.text) ?? null : null);
+            if (pattern !== null && CATASTROPHIC_REGEX.test(pattern)) {
+              sinks.push({
+                ruleId: "py-redos",
+                severity: "medium",
+                line: node.startPosition.row + 1,
+                inFunction: currentMethod()?.name ?? null,
+                inContainerType: currentClass()?.name,
+                snippet: snippetAt(node.startPosition.row),
+              });
+            }
           }
           if (calleeName && sinks.length < MAX_SINKS_PER_FILE) {
             const hit = matchSinkRule(node, fnNode, calleeName, isAssembledVar, taintOf);
