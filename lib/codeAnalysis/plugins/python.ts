@@ -568,19 +568,34 @@ function plainReceiver(fnNode: TsNode): string | null {
  *  the shape every SQL-injection finding has. Parameterised queries —
  *  `execute("... %s", (x,))` — are a literal plus a params tuple and correctly
  *  do not match. */
+/** A string literal, an f-string, or adjacent string literals ("a" "b"). */
+function isStringLike(node: TsNode | null): boolean {
+  return node?.type === "string" || node?.type === "concatenated_string";
+}
+
 function isAssembledString(node: TsNode | null): boolean {
   if (!node) return false;
   switch (node.type) {
+    // Unwrap `(...)` — a query is routinely written
+    // `q = ("INSERT ..." "VALUES ('%(x)s')" % {...})`, whose whole RHS is a
+    // parenthesized_expression. Not unwrapping it was a measured SQL-recall
+    // miss on dvpwa (RealVuln §4p).
+    case "parenthesized_expression":
+      return isAssembledString(node.namedChildren[0] ?? null);
     case "string":
+    case "concatenated_string":
       // An f-string carries `interpolation` children; a plain literal doesn't.
+      // Adjacent literals with no interpolation are still constant.
       return node.namedChildren.some((c) => c?.type === "interpolation");
     case "binary_operator": {
       const op = node.childForFieldName("operator")?.text;
       if (op !== "+" && op !== "%") return false;
-      // Require a string on one side so arithmetic doesn't match.
-      const left = node.childForFieldName("left");
-      const right = node.childForFieldName("right");
-      return left?.type === "string" || right?.type === "string";
+      // Require a string on one side so arithmetic doesn't match. Accept
+      // concatenated_string too — `("A" "B") % x` puts it on the left.
+      return (
+        isStringLike(node.childForFieldName("left")) ||
+        isStringLike(node.childForFieldName("right"))
+      );
     }
     case "call": {
       // "...".format(x)
@@ -588,7 +603,7 @@ function isAssembledString(node: TsNode | null): boolean {
       return (
         fn?.type === "attribute" &&
         fn.childForFieldName("attribute")?.text === "format" &&
-        fn.childForFieldName("object")?.type === "string"
+        isStringLike(fn.childForFieldName("object"))
       );
     }
     default:
@@ -878,12 +893,59 @@ function matchSinkRule(
     return { ruleId: "py-debug-server", severity: "medium" };
   }
 
+  // Reflected XSS: an HTML response body assembled from untrusted input.
+  //
+  // Django's HttpResponse and Flask's Response/make_response both default to a
+  // text/html content type, so a response built by string assembly from
+  // request data — `HttpResponse(f"<p>{request.GET['q']}</p>")` — is reflected
+  // XSS. This is the biggest single in-scope recall gap the RealVuln pass found
+  // (reflected_xss, §4p): the XSS is in Python that BUILDS html, not only in
+  // templates.
+  //
+  // TAINT IS REQUIRED, not optional. "An assembled HTML response" alone is far
+  // too broad — half the views in a framework build HTML. Requiring that the
+  // value provably carries untrusted input is what keeps this precise; without
+  // taint it does not fire.
+  if (bare && HTML_RESPONSE_CALLS.has(calleeName)) {
+    const arg = firstPositional(argList);
+    const built =
+      isAssembledString(arg) ||
+      (arg?.type === "identifier" && isAssembledVar(arg.text));
+    if (built && arg && isHtmlLike(arg)) {
+      const t = taintOf(arg);
+      if (t) return { ruleId: "py-reflected-xss", severity: "medium", taint: t.kind === "source" ? t.ev : undefined, taintedByParam: t.kind === "param" ? t.name : undefined };
+    }
+    return null;
+  }
+
   // Transport security switched off.
   if (kwarg(argList, "verify")?.text === "False" && recv !== null) {
     return { ruleId: "py-tls-verify-disabled", severity: "medium" };
   }
 
   return null;
+}
+
+/** Response constructors whose body defaults to a text/html content type, so
+ *  an assembled+tainted argument is reflected into the browser as markup. */
+const HTML_RESPONSE_CALLS = new Set([
+  "HttpResponse",
+  "HttpResponseBadRequest",
+  "HttpResponseServerError",
+  "HttpResponseNotFound",
+  "HttpResponseForbidden",
+  "Response",
+  "make_response",
+]);
+
+/** Does this expression's text look like it carries HTML markup? A cheap tag
+ *  check on the assembled literal — the precision guard that separates
+ *  `HttpResponse(f"<p>{x}</p>")` from `HttpResponse(user_json)`. For a bare
+ *  assembled var we cannot see the literal, so we accept it (taint still
+ *  gates), but for an inline assembled string we require a tag. */
+function isHtmlLike(node: TsNode): boolean {
+  if (node.type === "identifier") return true; // literal not visible; taint gates
+  return /<\/?[a-zA-Z]/.test(node.text) || /&lt;|<[a-zA-Z]/.test(node.text);
 }
 
 /** Cap per file so a generated or pathological file can't flood the panel. */

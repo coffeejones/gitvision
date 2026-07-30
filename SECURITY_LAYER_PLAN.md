@@ -692,6 +692,38 @@ Re-measured on the same 23 repos:
 `{{ }}` under config-level autoescape (needs a Jinja-config reader) and DOM XSS in `.js`
 (a JavaScript sink, separate). Both are honest, documented misses — not noise we chose to add.
 
+### 4p. Two measurement-driven extensions
+
+With RealVuln in hand, the next work was chosen from the recall-by-class table rather than
+guessed. Two extensions, both reusing existing machinery, both gated on the measurement holding
+precision + zero traps.
+
+**SQL recall — parenthesized / concatenated assembly.** dvpwa builds
+`q = ("INSERT ..." "VALUES ('%(n)s')" % {...})` — the whole RHS parenthesised, with adjacent
+string literals — and `isAssembledString` unwrapped neither. Now it unwraps
+`parenthesized_expression` and accepts `concatenated_string` on either side of `+`/`%`. Our
+strongest class, zero precision risk.
+
+**Reflected XSS in Python.** The biggest single in-scope gap was reflected_xss, and much of it
+is *not* in templates — it is a Python view building an HTML response from request data
+(`HttpResponse(f"<p>{request.GET['q']}</p>")`). New `py-reflected-xss` rule on the HTML-defaulting
+response constructors (Django `HttpResponse*`, Flask `Response`/`make_response`). **Taint is
+REQUIRED** — "an assembled HTML response" is far too broad, so the rule fires only when the value
+provably carries untrusted input. That is what keeps it precise.
+
+Cumulative on the same 23 repos, across this session's three additions (template XSS → SQL →
+reflected XSS):
+
+| | start | template XSS | + SQL | + reflected XSS |
+|---|---|---|---|---|
+| true positives | 77 | 97 | 98 | **101** |
+| precision | 0.951 | 0.924 | 0.925 | **0.927** |
+| in-scope recall | 0.363 | 0.458 | 0.462 | **0.476** |
+| traps hit | 0/107 | 0/107 | 0/107 | **0/107** |
+
++24 real vulnerabilities this session, precision still 92.7%, still zero of 107 traps. The
+reflected-XSS rule even nudged precision UP — its taint requirement added only true positives.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across

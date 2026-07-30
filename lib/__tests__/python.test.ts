@@ -889,6 +889,22 @@ describe("pythonPlugin — security sinks", () => {
       expect(ruleIds(src)).toEqual([]);
     });
 
+    it("follows a parenthesized assembled query (dvpwa's shape)", () => {
+      // RealVuln miss: `q = ("INSERT ..." "VALUES ('%(n)s')" % {...})` — the
+      // whole RHS is parenthesized, which the assembly check skipped.
+      const src =
+        "def create(conn, name):\n" +
+        "    q = (\"INSERT INTO t (name) \" \"VALUES ('%(name)s')\" % {'name': name})\n" +
+        "    return conn.execute(q)\n";
+      expect(ruleIds(src)).toEqual(["py-sql-assembled"]);
+    });
+
+    it("follows a concatenated-string query built with +", () => {
+      const src =
+        'def f(c, n):\n    q = ("SELECT * FROM t WHERE u=\'" + n + "\'")\n    c.execute(q)\n';
+      expect(ruleIds(src)).toEqual(["py-sql-assembled"]);
+    });
+
     it("sees through SQLAlchemy's text() wrapper", () => {
       // VAmPI's real SQL injection: db.session.execute(text(user_query)).
       const src =
@@ -943,6 +959,39 @@ describe("pythonPlugin — security sinks", () => {
 
   it("treats marshal like the other deserialisers", () => {
     expect(ruleIds("def f(b):\n    marshal.loads(b)\n")).toEqual(["py-pickle-load"]);
+  });
+
+  describe("reflected XSS in an HTML response", () => {
+    it("flags an HttpResponse assembled from request data", () => {
+      const src =
+        "def view(request):\n" +
+        "    return HttpResponse(f\"<p>Hello {request.GET[\'q\']}</p>\")\n";
+      expect(ruleIds(src)).toEqual(["py-reflected-xss"]);
+    });
+
+    it("flags a Flask make_response built from a route parameter", () => {
+      const src =
+        '@app.get("/g/<name>")\ndef g(name):\n    return make_response("<h1>" + name + "</h1>")\n';
+      expect(ruleIds(src)).toEqual(["py-reflected-xss"]);
+    });
+
+    it("does NOT flag a constant HTML response", () => {
+      expect(ruleIds('def v(request):\n    return HttpResponse("<p>static</p>")\n')).toEqual([]);
+    });
+
+    it("does NOT flag an assembled HTML response with no untrusted input", () => {
+      // Taint is required — this builds HTML from a constant, not from input.
+      const src =
+        'def v(request):\n    title = "Report"\n    return HttpResponse(f"<h1>{title}</h1>")\n';
+      expect(ruleIds(src)).toEqual([]);
+    });
+
+    it("does NOT flag a non-HTML assembled inline string", () => {
+      // f-string with request data but no HTML markup — not reflected XSS.
+      expect(
+        ruleIds('def v(request):\n    return HttpResponse(f"count={request.GET[\'n\']}")\n')
+      ).toEqual([]);
+    });
   });
 
   describe("escaping switched off", () => {
