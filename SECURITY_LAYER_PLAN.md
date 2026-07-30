@@ -768,6 +768,50 @@ are real hardcoded secrets the ground truth simply did not label at those exact 
 (`app.config["JWT_SECRET_KEY"] = 'dvga'`, and two `jwt.decode` calls sharing the literal GT
 labelled only on the `encode` line) — so true precision is higher than 0.925.
 
+### 4r. Path traversal + SSRF — and the rule class they forced us to invent
+
+Both are taint-shaped, so they reused the `py-reflected-xss` pattern. The naive version cost
+the project its first trap hit, and the fix is the interesting part.
+
+**Naive attempt:** `open(tainted)` → path traversal, `requests.get(tainted)` → SSRF, accepting
+either real-source taint or parameter-derived taint (as every earlier rule does).
+
+| | before | naive | fixed |
+|---|---|---|---|
+| true positives | 135 | 144 | **139** |
+| false positives | 11 | 20 | **11** |
+| precision | 0.925 | 0.878 | **0.927** |
+| **traps hit** | 0/107 | **1/107** | **0/107** |
+
+Two distinct causes, both instructive:
+
+**1. A plain bug.** `session` was in the HTTP-client receiver set, so SQLAlchemy's
+`session.delete(row)` was reported as SSRF. `session` is a database session far more often than
+an HTTP one — the same over-generic-name mistake as `weak-hash` and `csrf_exempt`. Removed.
+
+**2. A new rule class: `requiresTaint`.** The remaining false positives were `open(filename)` and
+`requests.get(url)` inside *utility scripts*, where the "taint" was only a bare function
+parameter. The trap we hit was vulnpy's `get_template(path)` — genuinely traversal-shaped, but
+the ground truth notes every caller passes code-controlled values.
+
+That exposed a distinction the rule set had never needed to make:
+
+- **Dangerous in itself** — `eval`, `pickle.loads`, an assembled SQL query. Worth surfacing even
+  unproven, because the operation is a problem regardless of what reaches it.
+- **Dangerous only with untrusted input** — `open()` and `requests.get()` are among the most
+  common calls in Python and appear constantly in ordinary code. Without confirmed taint they
+  are noise.
+
+`SinkFinding.requiresTaint` encodes it: the finding is emitted by the plugin, then **dropped by
+`classifySinks` unless taint survives the interprocedural pass**. A parameter later shown to be
+fed request data survives; a helper nobody feeds does not. Placing the filter after slice 6 is
+what keeps the genuine cross-function cases.
+
+One ordering fix fell out: `verify=False` is now checked before SSRF. A call can be both, a rule
+returns one hit, and an unconditional config fact should beat a taint-dependent inference.
+
+Net: +4 true positives, precision UP from 0.925 to 0.927, trap record intact.
+
 ## 5. Build order
 
 Reordered by §4. Slice 1 is graph work, not security work — and it pays for itself across

@@ -156,6 +156,16 @@ export interface SinkFinding {
   /** Set when untrusted input provably reaches this sink inside the same
    *  function. Absence means UNPROVEN, never safe — see TaintEvidence. */
   taint?: TaintEvidence;
+  /** This operation is only dangerous WITH untrusted input, so the finding is
+   *  dropped unless taint is confirmed (v0.82+).
+   *
+   *  The distinction is real and was measured. `eval`, `pickle.loads` and an
+   *  assembled SQL query are dangerous in themselves — worth surfacing even
+   *  unproven. `open(path)` and `requests.get(url)` are among the most common
+   *  calls in Python, and appear constantly in ordinary utility code; without
+   *  confirmed taint they are noise. Adding these two rules without this flag
+   *  cost 9 false positives and the project's first trap hit. */
+  requiresTaint?: boolean;
   /** The enclosing function's PARAMETER whose value reaches this sink (v0.82+,
    *  slice 6). Not a finding on its own — a parameter is only untrusted if a
    *  caller passes something untrusted into it, which only the call graph can

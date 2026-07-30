@@ -680,6 +680,9 @@ const TAINT_SANITIZERS = new Set([
   "quote_plus",
   "urlencode",
   "UUID",
+  // werkzeug.utils.secure_filename — strips directory components. The corpus
+  // labels a sanitised upload as explicitly NOT vulnerable.
+  "secure_filename",
 ]);
 
 /** Escaping helpers whose presence around an interpolation makes it safe. */
@@ -735,6 +738,8 @@ const SUBPROCESS_FUNCTIONS = new Set([
 interface SinkRuleHit {
   ruleId: string;
   severity: SinkSeverity;
+  /** See SinkFinding.requiresTaint. */
+  requiresTaint?: boolean;
   /** Set when the rule could show untrusted input reaching this call. */
   taint?: TaintEvidence;
   /** Set when the value reaching this call is a parameter — untrusted only if
@@ -905,6 +910,57 @@ function matchSinkRule(
     return { ruleId: "py-debug-server", severity: "medium" };
   }
 
+  // Path traversal: a filesystem path built from untrusted input.
+  //
+  // TAINT REQUIRED — `open(x)` is one of the most common calls in Python, so
+  // the rule fires only when the path provably carries user input. That is also
+  // what clears the corpus's traps: `open(os.path.join(MEDIA_ROOT, "data"))`
+  // is constant, and `secure_filename()` is a sanitiser that ends the flow.
+  //
+  // Deliberately NOT a sink: Flask's `send_from_directory(dir, name)`, which
+  // sanitises the name itself — the corpus labels it explicitly safe.
+  if (bare && calleeName === "open") {
+    const t = taintOf(firstPositional(argList));
+    if (t) {
+      return {
+        ruleId: "py-path-traversal",
+        severity: "high",
+        requiresTaint: true,
+        ...(t.kind === "source" ? { taint: t.ev } : { taintedByParam: t.name }),
+      };
+    }
+    return null;
+  }
+
+  // Transport security switched off. Checked BEFORE SSRF: a call can be both,
+  // but a rule returns one hit, and `verify=False` is an unconditional fact
+  // about the code while SSRF depends on taint. The certain finding wins.
+  if (kwarg(argList, "verify")?.text === "False" && recv !== null) {
+    return { ruleId: "py-tls-verify-disabled", severity: "medium" };
+  }
+
+  // SSRF: an outbound request to a URL built from untrusted input.
+  //
+  // TAINT REQUIRED, for the same reason and with the same trap in mind:
+  // `requests.get('https://example.com')` is a hardcoded URL the corpus labels
+  // as explicitly not SSRF.
+  if (
+    (recv !== null && HTTP_CLIENT_RECEIVERS.has(recv) && HTTP_CLIENT_METHODS.has(calleeName)) ||
+    (bare && calleeName === "urlopen") ||
+    (recv === "request" && calleeName === "urlopen")
+  ) {
+    const t = taintOf(firstPositional(argList));
+    if (t) {
+      return {
+        ruleId: "py-ssrf",
+        severity: "high",
+        requiresTaint: true,
+        ...(t.kind === "source" ? { taint: t.ev } : { taintedByParam: t.name }),
+      };
+    }
+    return null;
+  }
+
   // Reflected XSS: an HTML response body assembled from untrusted input.
   //
   // Django's HttpResponse and Flask's Response/make_response both default to a
@@ -928,11 +984,6 @@ function matchSinkRule(
       if (t) return { ruleId: "py-reflected-xss", severity: "medium", taint: t.kind === "source" ? t.ev : undefined, taintedByParam: t.kind === "param" ? t.name : undefined };
     }
     return null;
-  }
-
-  // Transport security switched off.
-  if (kwarg(argList, "verify")?.text === "False" && recv !== null) {
-    return { ruleId: "py-tls-verify-disabled", severity: "medium" };
   }
 
   return null;
@@ -1005,6 +1056,14 @@ function matchSecretAssignment(
   if (value === null || value.trim().length < MIN_SECRET_LEN) return null;
   return { ruleId: "py-hardcoded-secret", severity: "high" };
 }
+
+/** HTTP client objects whose methods issue an outbound request. */
+// NOT `session`: that is SQLAlchemy's DB session far more often than an HTTP
+// one, and `session.delete(row)` was measured being flagged as SSRF.
+const HTTP_CLIENT_RECEIVERS = new Set(["requests", "httpx", "urllib"]);
+const HTTP_CLIENT_METHODS = new Set([
+  "get", "post", "put", "patch", "delete", "head", "options", "request", "urlopen",
+]);
 
 /** Response constructors whose body defaults to a text/html content type, so
  *  an assembled+tainted argument is reflected into the browser as markup. */
@@ -1863,6 +1922,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
                 snippet: snippetAt(node.startPosition.row),
                 ...(hit.taint ? { taint: hit.taint } : {}),
                 ...(hit.taintedByParam ? { taintedByParam: hit.taintedByParam } : {}),
+                ...(hit.requiresTaint ? { requiresTaint: true } : {}),
               });
             }
           }

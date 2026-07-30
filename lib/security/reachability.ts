@@ -163,7 +163,11 @@ export function classifySinks(cg: CodeGraph): ReachabilityReport {
       if (s.taint) return s;
       const ev = crossFunction.get(`${s.filePath}\u001F${s.line}\u001F${s.ruleId}`);
       return ev ? { ...s, taint: ev } : s;
-    });
+    })
+    // Rules flagged requiresTaint are only findings WITH confirmed taint. This
+    // runs after the interprocedural pass, so a parameter later shown to be fed
+    // request data survives — but a utility helper nobody feeds does not.
+    .filter((s) => !s.requiresTaint || s.taint);
 
   const idx = buildFlowIndex(cg);
   const declared = findDeclaredEntryPoints(cg, idx);
@@ -269,6 +273,8 @@ export const SINK_RULE_LABELS: Record<string, string> = {
   "py-pickle-load": "Pickle deserialisation",
   "py-yaml-unsafe-load": "YAML loaded without a safe loader",
   "py-sql-assembled": "SQL query built by string assembly",
+  "py-path-traversal": "File path built from untrusted input",
+  "py-ssrf": "Outbound request to a URL built from untrusted input",
   "py-hardcoded-secret": "Credential committed as a literal",
   "py-reflected-xss": "HTML response built from untrusted input (reflected XSS)",
   "py-template-safe-filter": "Template output escaping disabled (| safe)",

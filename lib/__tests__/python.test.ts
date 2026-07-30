@@ -800,7 +800,13 @@ describe("pythonPlugin — security sinks", () => {
     expect(ruleIds("def f(u):\n    requests.get(u, verify=False)\n")).toEqual([
       "py-tls-verify-disabled",
     ]);
-    expect(ruleIds("def f(u):\n    requests.get(u)\n")).toEqual([]);
+    // A plain requests.get on a bare parameter is emitted by the plugin as a
+    // taint-REQUIRED sink; classifySinks drops it unless a caller is shown to
+    // feed it request data. Not a finding at the product level.
+    const plain = sinksIn("def f(u):\n    requests.get(u)\n");
+    expect(plain.map((x) => x.ruleId)).toEqual(["py-ssrf"]);
+    expect(plain[0].requiresTaint).toBe(true);
+    expect(plain[0].taint).toBeUndefined();
   });
 
   it("does not flag hashing at all — see the plan doc's §4g", () => {
@@ -959,6 +965,70 @@ describe("pythonPlugin — security sinks", () => {
 
   it("treats marshal like the other deserialisers", () => {
     expect(ruleIds("def f(b):\n    marshal.loads(b)\n")).toEqual(["py-pickle-load"]);
+  });
+
+  describe("path traversal and SSRF (taint-required rules)", () => {
+    it("flags open() on a path built from request data", () => {
+      const src =
+        "def view(request):\n" +
+        "    name = request.GET['f']\n" +
+        "    return open('./uploads/' + name, 'rb')\n";
+      expect(ruleIds(src)).toEqual(["py-path-traversal"]);
+    });
+
+    it("follows taint through os.path.join and abspath", () => {
+      const src =
+        "def view(request):\n" +
+        "    p = request.GET['p']\n" +
+        "    return open(os.path.join(BASE, p), 'rb')\n";
+      expect(ruleIds(src)).toEqual(["py-path-traversal"]);
+    });
+
+    it("flags an outbound request to a URL from request data", () => {
+      const src =
+        "def view(request):\n    return requests.get(request.POST['url'])\n";
+      expect(ruleIds(src)).toEqual(["py-ssrf"]);
+    });
+
+    it("flags urlopen too", () => {
+      expect(
+        ruleIds("def v(request):\n    return urlopen(request.GET['u'])\n")
+      ).toEqual(["py-ssrf"]);
+    });
+
+    it("does NOT flag a hardcoded URL (the corpus trap)", () => {
+      expect(ruleIds("def f():\n    return requests.get('https://example.com')\n")).toEqual([]);
+    });
+
+    it("does NOT flag a constant path", () => {
+      expect(ruleIds('def f():\n    return open("config.yml", "r")\n')).toEqual([]);
+    });
+
+    it("does NOT treat a DB session as an HTTP client", () => {
+      // session.delete(row) is SQLAlchemy, not an outbound request — measured
+      // being flagged as SSRF before `session` was removed from the receivers.
+      expect(ruleIds("def f(note):\n    session.delete(note)\n")).toEqual([]);
+    });
+
+    it("does NOT fire on a sanitised filename", () => {
+      const src =
+        "def upload(request):\n" +
+        "    name = secure_filename(request.FILES['f'].name)\n" +
+        "    return open(name, 'wb')\n";
+      expect(ruleIds(src)).toEqual([]);
+    });
+
+    it("marks these rules as requiring confirmed taint", () => {
+      // A bare parameter is NOT enough for these two — the finding is emitted
+      // with requiresTaint so classifySinks drops it unless a caller is shown
+      // to feed it. eval/pickle are dangerous in themselves and carry no flag.
+      const bareParam = sinksIn("def helper(path):\n    return open(path, 'r')\n");
+      expect(bareParam[0]?.requiresTaint).toBe(true);
+      expect(bareParam[0]?.taint).toBeUndefined();
+
+      const evalSink = sinksIn("def f(s):\n    return eval(s)\n");
+      expect(evalSink[0]?.requiresTaint).toBeUndefined();
+    });
   });
 
   describe("hardcoded secrets", () => {
