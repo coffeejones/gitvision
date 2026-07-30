@@ -916,6 +916,61 @@ function matchSinkRule(
   // Server-side template injection. A template built at runtime is compiled
   // AND executed, so it is `eval` wearing a web framework's clothes. A literal
   // template is just a template, hence the assembled-argument requirement.
+  // SSTI written as a chained call: `Template("Hi " + name).render()`.
+  //
+  // The judgement is on the RECEIVER expression, not on an argument — the
+  // template text is the inner call's argument, and `.render()` takes none.
+  // `Template` is accepted unconditionally because the name is unambiguous;
+  // `from_string` only when its receiver names a template engine, which keeps
+  // Saleor's `BaseThumbnailFormat.from_string(...)` and similar out.
+  if (!bare && calleeName === "render") {
+    const inner = fnNode.childForFieldName("object");
+    if (inner?.type === "call") {
+      const innerFn = inner.childForFieldName("function");
+      const innerName =
+        innerFn?.type === "attribute"
+          ? innerFn.childForFieldName("attribute")?.text
+          : innerFn?.type === "identifier"
+            ? innerFn.text
+            : null;
+      const fsRecv =
+        innerFn?.type === "attribute" ? innerFn.childForFieldName("object")?.text ?? "" : "";
+      const isTemplateEngine =
+        innerName === "Template" ||
+        (innerName === "from_string" && /jinja|env|template/i.test(fsRecv));
+      const innerArgs = inner.childForFieldName("arguments");
+      const tmpl = innerArgs ? firstPositional(innerArgs) : null;
+      if (isTemplateEngine && isAssembledString(tmpl)) {
+        const t = taintOf(tmpl);
+        if (t) {
+          return {
+            ruleId: "py-ssti",
+            severity: "high",
+            requiresTaint: true,
+            ...(t.kind === "source" ? { taint: t.ev } : { taintedByParam: t.name }),
+          };
+        }
+      }
+    }
+  }
+
+  // ---- receiver-position path sinks -------------------------------------
+  // `target.write_bytes(request.body)` — pathlib puts the PATH in the receiver
+  // and the CONTENT in the argument, the opposite of `open(path)`. The rule
+  // that only ever looked at arguments could not see it.
+  if (!bare && PATHLIB_WRITE_METHODS.has(calleeName)) {
+    const t = taintOf(fnNode.childForFieldName("object"));
+    if (t) {
+      return {
+        ruleId: "py-path-traversal",
+        severity: "high",
+        requiresTaint: true,
+        ...(t.kind === "source" ? { taint: t.ev } : { taintedByParam: t.name }),
+      };
+    }
+    return null;
+  }
+
   if (bare && calleeName === "render_template_string") {
     const arg = firstPositional(argList);
     if (isAssembledString(arg) || arg?.type === "identifier") {
@@ -1392,6 +1447,9 @@ function isConditionTest(node: TsNode): boolean {
   }
   return false;
 }
+
+/** pathlib methods that act on the path held by their RECEIVER. */
+const PATHLIB_WRITE_METHODS = new Set(["write_bytes", "write_text", "read_text"]);
 
 /** Modules whose dotted path issues an outbound request: `urllib.request
  *  .urlopen(x)`. Only `urllib.request` — every other candidate measured zero

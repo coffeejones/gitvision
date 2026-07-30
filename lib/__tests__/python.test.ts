@@ -1614,3 +1614,45 @@ describe("pythonPlugin — taint through await and request methods", () => {
     expect(ids("async def v():\n    p = await load_config()\n    open(p)\n")).toEqual([]);
   });
 });
+
+describe("pythonPlugin — sinks that judge their receiver", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const ids = (content: string) => {
+    const file: SourceFile = { rel: "ops.py", ext: "py", content };
+    return (parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? []).map((s) => s.ruleId);
+  };
+
+  it("flags a pathlib write whose PATH came from the request", () => {
+    // pathlib puts the path in the receiver and the content in the argument —
+    // the opposite of open(path), which is why an argument-only rule was blind.
+    expect(
+      ids('from pathlib import Path\nB = Path("/exports")\ndef v(request):\n    t = B / request.GET["ref"]\n    t.write_text("x")\n')
+    ).toEqual(["py-path-traversal"]);
+  });
+
+  it("does NOT flag a pathlib write to a server-chosen path", () => {
+    expect(
+      ids('from pathlib import Path\nB = Path("/exports")\ndef v():\n    (B / "daily.json").write_text("x")\n')
+    ).toEqual([]);
+  });
+
+  it("flags a template rendered from assembled untrusted text", () => {
+    expect(
+      ids('from jinja2 import Template\ndef v(request):\n    f = request.GET["f"]\n    return Template("R: " + f).render()\n')
+    ).toEqual(["py-ssti"]);
+  });
+
+  it("does NOT flag a constant template", () => {
+    expect(ids('from jinja2 import Template\ndef v():\n    return Template("<p>hi</p>").render()\n')).toEqual([]);
+  });
+
+  it("does NOT flag a from_string on something that is not a template engine", () => {
+    // Saleor writes BaseThumbnailFormat.from_string(...); the name alone is
+    // not evidence of a template.
+    expect(
+      ids('def v(request):\n    return Color.from_string("c" + request.GET["c"]).render()\n')
+    ).toEqual([]);
+  });
+});
