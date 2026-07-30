@@ -52,6 +52,15 @@ export const TEMPLATE_EXTENSIONS: ReadonlySet<string> = new Set([
  *  pipe, anywhere inside a `{{ }}` interpolation. `\bsafe\b` so `safely` or a
  *  `safe_html` custom filter don't match. Captures the piped expression so a
  *  framework-trusted value can be excluded. */
+/** bootstrap-flask's `render_table(..., safe_columns=['x'])` — the named
+ *  columns are emitted unescaped. `safe_columns=[]` is the escaping-ON form and
+ *  must stay quiet, which is why a non-empty first element is required.
+ *
+ *  Measured: 0 hits across 688 production template files, while NetBox uses the
+ *  bare name `render_table` 51 times (django_tables2's unrelated tag) — so the
+ *  silence is discrimination, not absence. */
+const SAFE_COLUMNS = /\{\{[^}]*\brender_table\s*\([^}]*\bsafe_columns\s*=\s*\[\s*[^\]\s][^}]*\}\}/g;
+
 const SAFE_FILTER = /\{\{\s*([^|}]*?)\s*\|\s*safe\b(?:[^}]*?)\}\}/g;
 
 /** Values the framework generates, not the user — `| safe` on them is correct
@@ -101,7 +110,11 @@ export function scanTemplateXss(files: SourceLike[]): SinkGraphEntry[] {
         snippet: lineText(file.content, offset),
       });
     };
-    for (const m of file.content.matchAll(SAFE_FILTER)) {
+    for (const m of file.content.matchAll(SAFE_COLUMNS)) {
+    emit(m.index ?? 0, "py-template-safe-columns");
+  }
+
+  for (const m of file.content.matchAll(SAFE_FILTER)) {
       const piped = (m[1] ?? "").trim();
       if (TRUSTED_TEMPLATE_VALUES.has(piped)) continue;
       emit(m.index ?? 0, "py-template-safe-filter");

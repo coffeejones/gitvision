@@ -1063,3 +1063,136 @@ is dangerous no matter what surrounds it.
 
 **Pile 3 is closed.** In-scope recall stands at 0.614, precision at 0.927, traps
 at 0/107, on 2238 green tests.
+
+## §4v — Recall gaps inside covered families: +22 TP, production still silent
+
+§4u closed the last un-covered family. What remained was 154 ground-truth
+vulnerabilities in classes we *already* detect — misses of SHAPE, not of
+capability. 86 of them were reachable-in-principle and got a full diagnostic
+pass: one agent per family read the **actual source at every missed line**
+(the ground-truth description is a hint; the code is the evidence), and every
+rule it proposed was then handed to an adversary whose job was to kill it by
+finding false positives in Zulip, NetBox and Saleor.
+
+Six rules survived. The measured result:
+
+| | before | after |
+|---|---:|---:|
+| TP | 164 | **186** |
+| FP | 13 | 16 |
+| precision | 0.927 | **0.921** |
+| in-scope recall | 0.614 | **0.664** |
+| traps | 0/107 | **0/107** |
+| production hits (zulip+netbox+saleor) | — | **0** |
+
+All three new FPs are `py-credential-compared-to-literal` firing in pygoat, and
+all three were opened and read: `password=='jacktheripper'`,
+`password == "P@$$w0rd"`, `password == "admin"` — one of them carrying pygoat's
+own comment `# Will implement hashing here`. They are genuine hardcoded
+credentials that the ground truth does not label at those lines. The precision
+number is reported as measured anyway; it is not adjusted for that.
+
+### `py-broken-hash-credential` — 8 TP, 0 FP
+
+**This is the rule `py-weak-hash` should have been.** The deleted one lived at
+the CALL site, where `hashlib.md5(x)` is genuinely undecidable — 19 of Zulip's
+25 findings were gravatar hashes and cache keys (§4h). The discriminating
+information is one level up, in the **assignment**: what slot the digest is
+stored into. `gravatar_hash = md5(email)` is fine. `token = md5(email)` is a
+forgeable password-reset token.
+
+Fires only on `<slot> = md5|sha1(ARG).hexdigest()` where the slot name is
+credential-ish and ARG is either a password-named value or derived from
+`random.*` / `datetime.now` / `time.time`. md5 and sha1 only — sha256 is the
+shape of ~15 deliberately-safe trap snippets and of Saleor's legitimate legacy
+PBKDF2 hasher, and widening the set is the obvious "improvement" that would
+break it. Measured silent across 10,105 production files including the CPython
+stdlib.
+
+### `py-credential-compared-to-literal` — 4 TP
+
+`if password == "admin123"`. The credential is never an assignment target, so
+the existing secret rule cannot see it — but the literal is just as committed,
+and it *is* the authentication decision. Three guards carry the whole margin,
+each pinned by a regression test naming the production line it protects:
+
+1. **Never a call as the credential operand** — `os.environ.get("X") == "True"`
+   is correct config reading (zulip/zproject/config.py:44).
+2. **Only inside an `if`/`while` condition** — a bare `assert password ==
+   "secret"` is a test (saleor .../test_plugin.py:355).
+3. **Only a plain string literal** on the other side; an f-string is a
+   comparison against something computed.
+
+### `py-reflected-xss`, extended two ways — 7 TP
+
+Flask, Bottle and Quart let a view return a bare string as the body, so the
+`HttpResponse(...)` anchor the existing rule needs is simply absent. A new
+`return_statement` rule fires on an **inline** assembled literal containing a
+real tag and carrying proven `source` taint.
+
+Every one of those words was measured. Accepting a bare identifier at a
+`return` — the way the response-constructor branch safely does, because there
+the constructor is the anchor — fires **26 times on Zulip, 13 on NetBox and 8
+on Saleor** (`return absolute_path`, `return full_name`). 47 production false
+positives to buy 3 benchmark true positives. Requiring the literal inline takes
+all three to zero.
+
+Separately the response anchor was widened along three axes and narrowed back
+on two of them by the adversary: `HTMLResponse` added but not `HtmlResponse`
+(Scrapy's *inbound* parser, whose first argument is a URL); attribute callees
+allowed only for receivers `web` and `http`, because `httpx.Response`,
+`responses.Response` and `client.Response` are mock objects that measurably
+fired; the `text=` kwarg accepted but not `body=`, which is the name the mock
+libraries use.
+
+Two supporting traversals were added to `taintOf` and `isAssembledString`
+(`parenthesized_expression`, `conditional_expression`) so that
+`"<p>" + (fmt(q) if q else "") + "</p>"` is visible. Both were verified no-ops:
+every existing rule's count on all three production apps was unchanged to the row.
+
+### `py-hardcoded-secret`, extended to cipher keys — 1 TP
+
+`Fernet("literal")` and `hmac.new("literal", ...)`. **Guardrail recorded at the
+call site:** the key argument is read *without* unwrapping `.encode()` /
+`force_bytes()`. That single "improvement" would turn
+`zulip/zerver/tests/test_webhooks_common.py:161` into a false positive.
+
+### `py-template-safe-columns` — 2 TP
+
+`{{ render_table(rows, safe_columns=['message']) }}`. Empty list must stay
+quiet — that is the escaping-*on* form. Zero hits across 688 production
+template files, while NetBox uses the bare name `render_table` 51 times for an
+unrelated django_tables2 tag: the silence is discrimination, not absence.
+
+### Declined, with the measurement that declined them
+
+- **Returning a bare variable that holds HTML** (5) — 47 production FPs, above.
+- **Hand-rolled `http.server` apps** (5) — the source is `self.path` /
+  `self.headers`, which requires knowing that a stdlib base class binds them
+  from the wire. Semantic, not syntactic.
+- **The storage site of a stored XSS** (rest of the family) — our taint sources
+  are `request.*`, `os.environ`/`sys.argv` and `input()`. A datastore read is
+  deliberately not a source; making it one turns every ORM read into a source.
+  Note 8 of the 17 stored-XSS misses are **location mismatches, not misses** —
+  we already report the same vulnerability at its render site.
+- **Credentials outside Python** (HTML tables, XML seed files, docker-compose)
+  and **credentials inside a string literal's contents** — out of scope for a
+  Python AST rule.
+- **Seed data as tuples and dict literals** — `assignmentTargetName` returns
+  null for these on purpose, and that is what keeps the traps clean.
+- **`mark_safe(self.attr)`** — built and adversarially cleared at 0 production
+  hits, then declined anyway for ~0 yield: the finding lands in a
+  template-invoked method the graph marks `unreachable`, so nothing surfaces.
+  The adversary's note is the useful part: **template-invoked methods should be
+  `unknown`, not `unreachable`** — a reachability fix, not a rule. Logged as
+  backlog.
+
+### What this pass confirms
+
+The standard from §4u held under fan-out: every rule that shipped describes
+something *travelling* (taint into a return, a password into a broken hash, a
+literal into a cipher) or a structure dangerous in itself. Every shape that was
+declined failed on the same test — it flagged a pattern, and the pattern was
+common in correct code. The adversarial pass is what turned three of these from
+"looks safe" into "measured safe", and it narrowed two of the six before they
+shipped.

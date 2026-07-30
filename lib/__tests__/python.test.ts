@@ -1380,3 +1380,127 @@ describe("pythonPlugin — catastrophic regex (ReDoS)", () => {
     expect(sinksIn(`def f(db, x):\n    return db.match(r"((a)+)+", x)\n`)).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The recall-gap rules (§4v). Each one exists because the family was already
+// covered but the SHAPE was not. The negatives below are not decoration — each
+// is a specific production line that a slightly looser rule fired on.
+// ---------------------------------------------------------------------------
+describe("pythonPlugin — credential built with a broken hash", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const sinksIn = (content: string) => {
+    const file: SourceFile = { rel: "auth.py", ext: "py", content };
+    return parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? [];
+  };
+  const ids = (c: string) => sinksIn(c).map((s) => s.ruleId);
+
+  it("flags a password hashed with md5", () => {
+    expect(ids("import hashlib\ndef f(password):\n    pwd = hashlib.md5(password.encode()).hexdigest()\n")).toContain(
+      "py-broken-hash-credential"
+    );
+  });
+
+  it("flags a reset token derived from the clock", () => {
+    expect(
+      ids("import hashlib, datetime\ndef f():\n    token = hashlib.sha1(str(datetime.now()).encode()).hexdigest()\n")
+    ).toContain("py-broken-hash-credential");
+  });
+
+  // ---- the negatives, each one a measured production line ----
+  it("stays silent on sha256 — that is what keeps the traps clean", () => {
+    expect(ids("import hashlib\ndef f(password):\n    pwd = hashlib.sha256(password).hexdigest()\n")).toEqual([]);
+  });
+
+  it("stays silent on a gravatar hash — the slot is not a credential", () => {
+    // The exact shape that made the old call-site rule 19/25 noise on Zulip.
+    expect(ids("import hashlib\ndef f(email):\n    gravatar_hash = hashlib.md5(email.lower().encode()).hexdigest()\n")).toEqual([]);
+  });
+
+  it("stays silent on a stateful hasher with no argument", () => {
+    expect(ids("import hashlib\ndef f():\n    token = hashlib.md5().hexdigest()\n")).toEqual([]);
+  });
+});
+
+describe("pythonPlugin — credential compared to a literal", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const sinksIn = (content: string) => {
+    const file: SourceFile = { rel: "login.py", ext: "py", content };
+    return parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? [];
+  };
+  const ids = (c: string) => sinksIn(c).map((s) => s.ruleId);
+
+  it("flags a login checked against a committed password", () => {
+    expect(ids('def login(u, password):\n    if u == "admin" and password == "admin123":\n        return True\n')).toEqual([
+      "py-credential-compared-to-literal",
+    ]);
+  });
+
+  it("reports a two-branch login once, not twice", () => {
+    const src =
+      'def login(u, password):\n' +
+      '    if u == "a" and password == "reaper":\n        return 1\n' +
+      '    elif u == "b" and password == "admin_pass":\n        return 2\n';
+    expect(ids(src)).toEqual(["py-credential-compared-to-literal"]);
+  });
+
+  // ---- the three guards, each measured against a real production line ----
+  it("does NOT flag reading config — the operand is a call", () => {
+    // zulip/zproject/config.py:44
+    expect(ids('import os\ndef f():\n    if os.environ.get("DISABLE_MANDATORY_SECRET_CHECK") == "True":\n        pass\n')).toEqual([]);
+  });
+
+  it("does NOT flag an assert — that is a test, not an auth decision", () => {
+    // saleor/plugins/admin_email/tests/test_plugin.py:355
+    expect(ids('def test_x(plugin):\n    assert plugin.config.password == "secret-password"\n')).toEqual([]);
+  });
+
+  it("does NOT flag a comparison against something computed", () => {
+    expect(ids('def f(password, salt):\n    if password == f"{salt}-x":\n        pass\n')).toEqual([]);
+  });
+});
+
+describe("pythonPlugin — HTML returned straight from a view", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const sinksIn = (content: string) => {
+    const file: SourceFile = { rel: "views.py", ext: "py", content };
+    return parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? [];
+  };
+  const ids = (c: string) => sinksIn(c).map((s) => s.ruleId);
+
+  it("flags an inline assembled tag carrying request data", () => {
+    expect(
+      ids('def search(request):\n    q = request.args.get("q")\n    return f"<h1>Results for {q}</h1>"\n')
+    ).toContain("py-reflected-xss");
+  });
+
+  it("sees through a parenthesised conditional in the middle of the string", () => {
+    expect(
+      ids('def f(request):\n    x = request.args.get("x")\n    return "<p>" + (str(x) if x else "") + "</p>"\n')
+    ).toContain("py-reflected-xss");
+  });
+
+  // ---- the negatives: accepting a bare identifier here fired 47 times
+  // across zulip/netbox/saleor. Each of these is one of those shapes. ----
+  it("does NOT flag returning a variable that merely holds html", () => {
+    expect(ids('def f(request):\n    template = build(request)\n    return template\n')).toEqual([]);
+  });
+
+  it("does NOT flag an assembled tag with no untrusted input", () => {
+    // netbox/netbox/tables/columns.py:531 shape
+    expect(ids('def f(item):\n    return f\'<a href="{item.url}">x</a>\'\n')).toEqual([]);
+  });
+
+  it("does NOT flag a parameter — an unknown caller is not evidence", () => {
+    expect(ids('def render_row(name):\n    return f"<td>{name}</td>"\n')).toEqual([]);
+  });
+
+  it("does NOT flag an environment variable echoed into html", () => {
+    expect(ids('import os\ndef health():\n    return f"<h1>Stage: {os.environ[\'STAGE\']}</h1>"\n')).toEqual([]);
+  });
+});

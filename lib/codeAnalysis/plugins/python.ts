@@ -582,6 +582,10 @@ function isAssembledString(node: TsNode | null): boolean {
     // miss on dvpwa (RealVuln §4p).
     case "parenthesized_expression":
       return isAssembledString(node.namedChildren[0] ?? null);
+    // `"<p>" + (f(x) if x else "") + "</p>"` — a branch that yields a piece of
+    // the string still makes the whole thing assembled.
+    case "conditional_expression":
+      return node.namedChildren.some((c) => isAssembledString(c ?? null));
     case "string":
     case "concatenated_string":
       // An f-string carries `interpolation` children; a plain literal doesn't.
@@ -757,7 +761,10 @@ function matchSinkRule(
    *  same function? See the bounded-lookback note on the SQL rule. */
   isAssembledVar: (name: string) => boolean,
   /** Where does this expression's value come from? Slice 5/6. */
-  taintOf: (node: TsNode | null) => TaintOrigin | null
+  taintOf: (node: TsNode | null) => TaintOrigin | null,
+  /** A literal, or a name this file bound to one. Lets `KEY = "..."` at the top
+   *  of a file be judged where the key is USED. */
+  literalOf: (node: TsNode | null) => string | null
 ): SinkRuleHit | null {
   const argList = call.childForFieldName("arguments");
   const bare = fnNode.type === "identifier";
@@ -881,6 +888,24 @@ function matchSinkRule(
 
   // A JWT signed or verified with a literal secret — anyone reading the repo
   // can mint tokens. `jwt.encode(payload, 'csrf_vulneribility')` in the corpus.
+  // A cipher or MAC keyed with a committed constant. Everyone who has the
+  // source can forge or decrypt.
+  //
+  // GUARDRAIL, do not remove: the key argument is read WITHOUT unwrapping
+  // `.encode()` / `bytes()` / `force_bytes()`. That single "improvement" turns
+  // zulip/zerver/tests/test_webhooks_common.py:161 into a false positive —
+  // `hmac.new(force_bytes(webhook_secret), ...)` where webhook_secret is a test
+  // fixture. Leaving calls unresolved is what keeps production at zero hits.
+  if (
+    calleeName === "Fernet" ||
+    (calleeName === "new" && CRYPTO_KEY_RECEIVERS.has(recv ?? ""))
+  ) {
+    const key = literalOf(firstPositional(argList));
+    if (key !== null && key.trim().length >= MIN_CRYPTO_KEY_LEN) {
+      return { ruleId: "py-hardcoded-secret", severity: "high" };
+    }
+  }
+
   if (recv === "jwt" && (calleeName === "encode" || calleeName === "decode")) {
     const positional = argList.namedChildren.filter(
       (c): c is TsNode => !!c && c.type !== "keyword_argument"
@@ -987,8 +1012,18 @@ function matchSinkRule(
   // too broad — half the views in a framework build HTML. Requiring that the
   // value provably carries untrusted input is what keeps this precise; without
   // taint it does not fire.
-  if (bare && HTML_RESPONSE_CALLS.has(calleeName)) {
-    const arg = firstPositional(argList);
+  // Receivers whose `.Response(...)` builds an OUTBOUND response. Whitelisted
+  // rather than accepting any receiver: `httpx.Response`, `responses.Response`
+  // and `client.Response` are all mock/inbound objects, measured as false
+  // positives when the receiver was left open.
+  if (
+    HTML_RESPONSE_CALLS.has(calleeName) &&
+    (bare || HTML_RESPONSE_RECEIVERS.has(plainReceiver(fnNode) ?? ""))
+  ) {
+    // aiohttp writes the body as `web.Response(text=..., content_type=...)`.
+    // Only `text` — `body=` is the kwarg the mock libraries use, and `content=`
+    // earns nothing in the corpus.
+    const arg = firstPositional(argList) ?? kwarg(argList, "text");
     const built =
       isAssembledString(arg) ||
       (arg?.type === "identifier" && isAssembledVar(arg.text));
@@ -1111,6 +1146,154 @@ function matchSecretAssignment(
   return { ruleId: "py-hardcoded-secret", severity: "high" };
 }
 
+/** Cipher and MAC constructors taking the key as their first argument. */
+const CRYPTO_KEY_RECEIVERS = new Set([
+  "hmac", "HMAC", "AES", "DES", "DES3", "ChaCha20", "Blowfish", "ARC4", "Salsa20",
+]);
+
+/** A one- or two-character "key" is a placeholder, not a committed secret. */
+const MIN_CRYPTO_KEY_LEN = 8;
+
+/** Hashes that are broken for any security purpose. md5 and sha1 ONLY.
+ *  sha256/sha512 are deliberately absent: a bare sha256 is the shape of ~15
+ *  deliberately-safe trap snippets in the benchmark and of Saleor's legitimate
+ *  legacy PBKDF2 hasher. Widening this set is the obvious "improvement" that
+ *  would break the rule. */
+const BROKEN_HASHES = new Set(["md5", "sha1"]);
+
+/** Slots whose contents are a credential or an unguessable value. */
+const CREDENTIAL_SLOT = /pass(word|wd)?|pwd|token|otp|nonce/i;
+
+/** Sources that are predictable to an attacker who knows roughly when the
+ *  value was made. `random` is the stdlib Mersenne Twister, not `secrets`. */
+const PREDICTABLE_SOURCE = /\b(random\.\w+|datetime\.(?:utc)?now|time\.time)\s*\(/;
+
+/** A credential or token built with a broken hash, caught at the ASSIGNMENT.
+ *
+ *  This is the rule `py-weak-hash` should have been. That one lived at the CALL
+ *  site, where `hashlib.md5(x)` is genuinely undecidable — 19 of Zulip's 25
+ *  findings were gravatar hashes and cache keys, and it had to be deleted (§4h).
+ *  The discriminating information is one level up: what slot the digest is
+ *  stored INTO. `gravatar_hash = md5(email)` is fine; `token = md5(email)` is a
+ *  forgeable password-reset token.
+ *
+ *  Measured silent across 10,105 production Python files (Zulip, NetBox,
+ *  Saleor, FastAPI, and the CPython stdlib). */
+function matchWeakHashCredential(
+  left: TsNode | null,
+  right: TsNode | null
+): SinkRuleHit | null {
+  const slot = assignmentTargetName(left);
+  if (!slot || !CREDENTIAL_SLOT.test(slot)) return null;
+
+  // RHS must be `<hash>(ARG).hexdigest()` / `.digest()`.
+  if (right?.type !== "call") return null;
+  const outer = right.childForFieldName("function");
+  if (outer?.type !== "attribute") return null;
+  const fin = outer.childForFieldName("attribute")?.text;
+  if (fin !== "hexdigest" && fin !== "digest") return null;
+
+  const hashCall = outer.childForFieldName("object");
+  if (hashCall?.type !== "call") return null;
+  const hashFn = hashCall.childForFieldName("function");
+  const hashName =
+    hashFn?.type === "attribute"
+      ? hashFn.childForFieldName("attribute")?.text
+      : hashFn?.type === "identifier"
+        ? hashFn.text
+        : null;
+  if (!hashName || !BROKEN_HASHES.has(hashName)) return null;
+
+  // A no-arg `hashlib.md5()` builds a stateful hasher and says nothing here.
+  const hashArgs = hashCall.childForFieldName("arguments");
+  const arg = hashArgs ? firstPositional(hashArgs) : null;
+  if (!arg) return null;
+
+  // Arm A: hashing a password. Unwrap one `.encode(...)`.
+  let base = arg;
+  if (base.type === "call") {
+    const f = base.childForFieldName("function");
+    if (f?.type === "attribute" && f.childForFieldName("attribute")?.text === "encode") {
+      base = f.childForFieldName("object") ?? base;
+    }
+  }
+  const baseName =
+    base.type === "identifier"
+      ? base.text
+      : base.type === "attribute"
+        ? base.childForFieldName("attribute")?.text ?? ""
+        : "";
+  // A string LITERAL is excluded on purpose: `md5("constant")` is a fixture.
+  if (baseName && /pass(word|wd)?|pwd/i.test(baseName)) {
+    return { ruleId: "py-broken-hash-credential", severity: "high" };
+  }
+
+  // Arm B: a token derived from a predictable clock or PRNG.
+  if (PREDICTABLE_SOURCE.test(arg.text)) {
+    return { ruleId: "py-broken-hash-credential", severity: "high" };
+  }
+  return null;
+}
+
+/** A credential checked against a literal: `if password == "admin123"`.
+ *
+ *  The credential never appears as an assignment target, so matchSecretAssignment
+ *  cannot see it — but the literal is just as committed, and it is the whole
+ *  authentication decision. Three guards carry the entire safety margin and
+ *  each was measured; do not relax any of them:
+ *
+ *   1. NEVER accept a call as the credential operand. `os.environ.get("X") ==
+ *      "True"` is correct config-reading, and Zulip does it.
+ *   2. Only inside an `if`/`while` condition. A bare `assert password ==
+ *      "secret"` is a test, and Saleor has those.
+ *   3. Only a plain string literal on the other side — an f-string is a
+ *      comparison against something computed.
+ *
+ *  Measured: 0 hits across Zulip, NetBox and Saleor. */
+function matchCredentialComparison(node: TsNode): SinkRuleHit | null {
+  const op = node.children.find((c) => c && (c.text === "==" || c.text === "!="));
+  if (!op) return null;
+  const operands = node.namedChildren.filter(Boolean);
+  if (operands.length !== 2) return null;
+
+  for (const [cred, lit] of [
+    [operands[0], operands[1]],
+    [operands[1], operands[0]],
+  ] as const) {
+    // Guard 1: assignmentTargetName returns null for a call, which is exactly
+    // what keeps `os.environ.get("DISABLE_CHECK") == "True"` out.
+    const name = assignmentTargetName(cred);
+    if (!name || !SECRET_NAME.test(name)) continue;
+    const value = pyStringLiteral(lit);
+    if (value === null || value.trim().length < MIN_SECRET_LEN) continue;
+    return { ruleId: "py-credential-compared-to-literal", severity: "high" };
+  }
+  return null;
+}
+
+/** Is this comparison the test of an `if`/`elif`/`while`, directly or through
+ *  an `and`/`or`? A comparison anywhere else is not an auth decision. */
+function isConditionTest(node: TsNode): boolean {
+  let cur: TsNode | null = node;
+  let parent = node.parent;
+  while (parent) {
+    if (parent.type === "boolean_operator" || parent.type === "parenthesized_expression") {
+      cur = parent;
+      parent = parent.parent;
+      continue;
+    }
+    if (
+      parent.type === "if_statement" ||
+      parent.type === "elif_clause" ||
+      parent.type === "while_statement"
+    ) {
+      return parent.childForFieldName("condition")?.id === cur?.id;
+    }
+    return false;
+  }
+  return false;
+}
+
 /** HTTP client objects whose methods issue an outbound request. */
 // NOT `session`: that is SQLAlchemy's DB session far more often than an HTTP
 // one, and `session.delete(row)` was measured being flagged as SSRF.
@@ -1121,8 +1304,15 @@ const HTTP_CLIENT_METHODS = new Set([
 
 /** Response constructors whose body defaults to a text/html content type, so
  *  an assembled+tainted argument is reflected into the browser as markup. */
+const HTML_RESPONSE_RECEIVERS = new Set([
+  "web", // aiohttp: web.Response(text=..., content_type="text/html")
+  "http", // Django, module-qualified: http.HttpResponse(...)
+]);
+
 const HTML_RESPONSE_CALLS = new Set([
   "HttpResponse",
+  "HTMLResponse", // FastAPI/Starlette — body is html by definition
+
   "HttpResponseBadRequest",
   "HttpResponseServerError",
   "HttpResponseNotFound",
@@ -1216,6 +1406,11 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   /** name -> string literal it was assigned. Lets a regex defined as a constant
    *  be judged where it is USED. */
   const stringLiterals = new Map<string, string>();
+  /** Functions that already reported a hardcoded-credential comparison. */
+  const credentialComparisonSeen = new Set<string>();
+  const literalOf = (node: TsNode | null): string | null =>
+    pyStringLiteral(node) ??
+    (node?.type === "identifier" ? stringLiterals.get(node.text) ?? null : null);
   const markTainted = (name: string, origin: TaintOrigin) => {
     (currentMethod()?.tainted ?? moduleTainted).set(name, origin);
   };
@@ -1236,6 +1431,19 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
     switch (node.type) {
       case "identifier":
         return taintedVar(node.text);
+
+      // `("..." + x)` and `x if cond else y` are transparent to taint. Adding
+      // these was measured a no-op on Zulip/NetBox/Saleor — every existing
+      // rule's finding count was unchanged to the row — and it is what lets a
+      // response built as `"<b>" + (fmt(q) if q else "") + "</b>"` be seen.
+      case "parenthesized_expression":
+      case "conditional_expression": {
+        for (const c of node.namedChildren) {
+          const t = taintOf(c ?? null);
+          if (t) return t;
+        }
+        return null;
+      }
 
       case "attribute":
       case "subscript": {
@@ -1855,6 +2063,69 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         return;
       }
 
+      case "return_statement": {
+        // Flask, Bottle and Quart let a view return a bare string as the
+        // response body, so the HttpResponse/Response anchor the other XSS
+        // rule needs simply is not there.
+        //
+        // FOUR conditions, and every one of them is load-bearing. Accepting a
+        // bare identifier here (the way the response-constructor branch does,
+        // where the constructor itself is the anchor) fires 26 times on Zulip,
+        // 13 on NetBox and 8 on Saleor — `return absolute_path`, `return
+        // full_name`. With the literal required inline, all three go silent.
+        const value = node.namedChildren[0] ?? null;
+        if (
+          value &&
+          sinks.length < MAX_SINKS_PER_FILE &&
+          isAssembledString(value) &&
+          // A real tag must be present in the literal — not isHtmlLike(), whose
+          // identifier escape hatch is precisely what is being closed here.
+          /<\/?[a-zA-Z]/.test(value.text) &&
+          !isEveryInterpolationEscaped(value)
+        ) {
+          const t = taintOf(value);
+          // `source`, never `param`: an unknown caller is not evidence. And not
+          // os.environ/sys.argv — a health endpoint echoing $STAGE into html is
+          // not a reflected XSS.
+          if (t?.kind === "source" && !/^(os\.environ|sys\.argv|input)/.test(t.ev.source)) {
+            sinks.push({
+              ruleId: "py-reflected-xss",
+              severity: "medium",
+              line: node.startPosition.row + 1,
+              inFunction: currentMethod()?.name ?? null,
+              inContainerType: currentClass()?.name,
+              snippet: snippetAt(node.startPosition.row),
+              taint: t.ev,
+            });
+          }
+        }
+        for (const child of node.namedChildren) visit(child);
+        return;
+      }
+
+      case "comparison_operator": {
+        if (sinks.length < MAX_SINKS_PER_FILE && isConditionTest(node)) {
+          const hit = matchCredentialComparison(node);
+          // One finding per function: a two-branch login (`if u=='a' and
+          // p=='x' ... elif u=='b' and p=='y'`) is one hardcoded credential
+          // check, not four.
+          const fnKey = currentMethod()?.name ?? `@${node.startPosition.row}`;
+          if (hit && !credentialComparisonSeen.has(fnKey)) {
+            credentialComparisonSeen.add(fnKey);
+            sinks.push({
+              ruleId: hit.ruleId,
+              severity: hit.severity,
+              line: node.startPosition.row + 1,
+              inFunction: currentMethod()?.name ?? null,
+              inContainerType: currentClass()?.name,
+              snippet: snippetAt(node.startPosition.row),
+            });
+          }
+        }
+        for (const child of node.namedChildren) visit(child);
+        return;
+      }
+
       case "assignment": {
         // Local annotated assignment: x: Foo = ... or `x = SomeType()`
         const left = node.childForFieldName("left");
@@ -1886,6 +2157,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         if (sinks.length < MAX_SINKS_PER_FILE) {
           const secret =
             matchSecretAssignment(left, valueNode) ??
+            matchWeakHashCredential(left, valueNode) ??
             matchConfigAssignment(left, valueNode);
           if (secret) {
             sinks.push({
@@ -1996,7 +2268,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             }
           }
           if (calleeName && sinks.length < MAX_SINKS_PER_FILE) {
-            const hit = matchSinkRule(node, fnNode, calleeName, isAssembledVar, taintOf);
+            const hit = matchSinkRule(node, fnNode, calleeName, isAssembledVar, taintOf, literalOf);
             if (hit) {
               sinks.push({
                 ruleId: hit.ruleId,

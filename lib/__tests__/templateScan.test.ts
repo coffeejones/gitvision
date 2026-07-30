@@ -93,3 +93,24 @@ describe("scanTemplateXss", () => {
     expect(hits.map((h) => h.filePath).sort()).toEqual(["a/x.html", "b/y.jinja2"]);
   });
 });
+
+describe("scanTemplateXss — bootstrap-flask safe_columns", () => {
+  const scan = (content: string) =>
+    scanTemplateXss([{ rel: "t.html", ext: "html", content }] as never).map((f) => f.ruleId);
+
+  it("flags columns named as safe", () => {
+    expect(
+      scan("{{ render_table(messages, safe_columns=['message']) }}")
+    ).toEqual(["py-template-safe-columns"]);
+  });
+
+  it("does NOT flag the empty list — that is the escaping-ON form", () => {
+    expect(scan("{{ render_table(rows, safe_columns=[]) }}")).toEqual([]);
+  });
+
+  it("does NOT flag an ordinary render_table", () => {
+    // NetBox uses this bare name 51 times for an unrelated django_tables2 tag.
+    expect(scan("{{ render_table(rows, responsive=True) }}")).toEqual([]);
+    expect(scan("{% render_table table 'inc/table.html' %}")).toEqual([]);
+  });
+});
