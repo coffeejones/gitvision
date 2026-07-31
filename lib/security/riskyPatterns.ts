@@ -17,7 +17,10 @@
 //     review is required.
 //   - Skip eval inside strings or comments. Single-line comments
 //     (// and #) are filtered with a basic check; multi-line block
-//     comments are accepted as a known FP source.
+//     block comments are accepted as a known FP source. Matches
+//     inside single-line string literals are NOT — see
+//     isInStringLiteral, added after every finding this scanner
+//     produced on our own repo turned out to be one.
 //   - Score severity. All findings are surfaced as informational
 //     (questions bucket) — we lack the context to say "this eval
 //     is bad" with confidence.
@@ -25,7 +28,9 @@
 // Performance:
 //   - One regex sweep per pattern per file (`.matchAll`).
 //   - Filters minified files (line length > MAX_LINE_LEN) and
-//     test / generated paths (PATH_SKIP_PATTERNS) before scanning.
+//     test / generated / bundled paths (shouldSkipPath, driven by
+//     SKIP_SUBSTRINGS + SKIP_DIRS) before scanning. The header used
+//     to name a PATH_SKIP_PATTERNS that has never existed.
 //   - Per-file finding cap protects against pathological inputs.
 //
 // Reuses ScanFile from secretsScan — both scanners walk the same
@@ -167,11 +172,38 @@ function extOf(filePath: string): string {
 
 function isCommented(line: string, matchStart: number): boolean {
   // Only catch the easy case: the match sits AFTER a `//` or `#`
-  // on the same line. Multi-line block comments and string literals
-  // are not handled — accepted as known false-positive sources, and
-  // documented in the module header.
+  // on the same line. Multi-line block comments are not handled —
+  // accepted as a known false-positive source, and documented in the
+  // module header. String literals ARE handled, below.
   const before = line.slice(0, matchStart);
   return /\/\/|^#|\s#/.test(before);
+}
+
+/** Is the match inside a string literal on its own line?
+ *
+ *  This was listed as an accepted false-positive source, and it turned out to
+ *  be the ONLY source on our own repository: all five findings were the word
+ *  `eval(` inside a quoted string. Three were this file's own rule names —
+ *  `name: "eval() call"` reported as an eval call — and two were a mock finding
+ *  in the landing's showcase, i.e. the marketing illustration of a security
+ *  result being reported as a security result.
+ *
+ *  Walks the line tracking quote state, so escapes and nested quote characters
+ *  ("it's", 'say "hi"') do not confuse it. Single-line only, which is the same
+ *  scope the comment check has: a match inside a multi-line template literal
+ *  still gets through, and that stays documented rather than half-solved. */
+function isInStringLiteral(line: string, matchStart: number): boolean {
+  let quote: string | null = null;
+  for (let i = 0; i < matchStart && i < line.length; i++) {
+    const ch = line[i];
+    if (quote) {
+      if (ch === "\\") i++; // skip the escaped character
+      else if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+    }
+  }
+  return quote !== null;
 }
 
 /** Compute 1-based line numbers cheaply by counting newlines up to
@@ -232,6 +264,7 @@ export function scanForRiskyPatterns(
         const offset = match.index ?? 0;
         const { text, startCol } = lineAtOffset(file.content, offset);
         if (isCommented(text, startCol)) continue;
+        if (isInStringLiteral(text, startCol)) continue;
         findings.push({
           patternId: pattern.id,
           patternName: pattern.name,

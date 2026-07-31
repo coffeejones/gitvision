@@ -134,3 +134,49 @@ describe("scanForRiskyPatterns", () => {
     expect(truncated).toBeUndefined();
   });
 });
+
+describe("matches inside string literals are not findings", () => {
+  // Every finding this scanner produced on our own repository was one of
+  // these: the word eval( inside a quoted string. Three were this scanner's
+  // OWN rule names, one was a mock security finding in the landing's showcase.
+  // Five findings, five false positives, on the codebase we know best.
+  const ids = (path: string, content: string) =>
+    scanForRiskyPatterns([file(path, content)]).findings.map((f) => f.patternId);
+
+  it("does not flag the scanner's own rule names", () => {
+    // Verbatim from lib/security/riskyPatterns.ts, which the scanner scans.
+    expect(ids("lib/security/riskyPatterns.ts", '    name: "eval() call",\n')).toEqual([]);
+    expect(
+      ids("lib/security/riskyPatterns.ts", '    name: "new Function() constructor",\n'),
+    ).toEqual([]);
+  });
+
+  it("does not flag a mock finding in a UI fixture", () => {
+    // Shape taken from components/landing/codetrawl/CTShowcaseMocks.tsx:214.
+    const line =
+      '  { sev: "info", kind: "pattern", loc: "tasks/runner.py:88", rule: "eval() call" },\n';
+    expect(ids("components/landing/codetrawl/CTShowcaseMocks.tsx", line)).toEqual([]);
+  });
+
+  it("still flags a real call on a line that also contains a string", () => {
+    // The quotes CLOSE before the call, so this is code, not a literal. The
+    // check has to be stateful rather than "is there a quote earlier".
+    expect(ids("app.js", 'const label = "run"; eval(payload);\n')).toEqual(["js-eval"]);
+  });
+
+  it("is not fooled by an apostrophe inside a double-quoted string", () => {
+    // A naive odd/even quote count would see the ' in "it's" and decide the
+    // eval below is inside a string.
+    expect(ids("app.js", 'const msg = "it\'s fine";\neval(payload);\n')).toEqual([
+      "js-eval",
+    ]);
+  });
+
+  it("handles an escaped quote without losing track", () => {
+    expect(ids("app.js", 'const s = "a \\" b"; eval(x);\n')).toEqual(["js-eval"]);
+  });
+
+  it("still flags Python exec outside a string", () => {
+    expect(ids("app.py", 'label = "exec() call"\nexec(code)\n')).toEqual(["py-exec"]);
+  });
+});
