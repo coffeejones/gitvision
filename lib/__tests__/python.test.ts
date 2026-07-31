@@ -1812,3 +1812,33 @@ describe("pythonPlugin — secrets from a predictable PRNG", () => {
     ).toEqual([]);
   });
 });
+
+describe("pythonPlugin — the request is not uniformly untrusted", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const ids = (content: string) => {
+    const file: SourceFile = { rel: "views.py", ext: "py", content };
+    return (parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? []).map((s) => s.ruleId);
+  };
+
+  it("still treats caller-supplied data as untrusted", () => {
+    expect(ids('def v(request):\n    return redirect(request.GET["next"])\n')).toEqual(["py-open-redirect"]);
+    expect(ids('def v(request):\n    return redirect(request.POST["next"])\n')).toEqual(["py-open-redirect"]);
+  });
+
+  // request.user comes from the auth middleware, request.session from a
+  // server-side store. Calling them untrusted claims an attacker controls
+  // values they cannot reach — found on NetBox, where a redirect to a model's
+  // own get_absolute_url() was reported as an open redirect.
+  it("does NOT treat framework-populated attributes as untrusted", () => {
+    expect(ids("def v(request):\n    return redirect(request.user.profile.url)\n")).toEqual([]);
+    expect(ids("def v(request):\n    return redirect(request.session['back'])\n")).toEqual([]);
+    expect(ids("def v(request):\n    return redirect(request.resolver_match.url_name)\n")).toEqual([]);
+  });
+
+  it("does not confuse a similarly-named attribute", () => {
+    // `request.user_input` IS caller data — only whole segments are excluded.
+    expect(ids("def v(request):\n    return redirect(request.user_input)\n")).toEqual(["py-open-redirect"]);
+  });
+});

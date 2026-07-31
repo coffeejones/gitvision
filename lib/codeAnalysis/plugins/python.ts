@@ -1517,6 +1517,18 @@ function isConditionTest(node: TsNode): boolean {
   return false;
 }
 
+/** Attributes the FRAMEWORK puts on the request, not the caller.
+ *
+ *  `request.user` is populated by Django's auth middleware from a verified
+ *  session; `request.session` is a server-side store the app itself wrote;
+ *  `request.id` and `request.resolver_match` are set during dispatch. Treating
+ *  these as untrusted input claims an attacker controls values they cannot
+ *  reach. Found on NetBox, where `redirect(notification.object.get_absolute_url())`
+ *  was reported as an open redirect because the object came off
+ *  `request.user.notifications` (§4z). */
+const SERVER_POPULATED_REQUEST_ATTR =
+  /(^|\.)request\.(user|auth|session|id|site|resolver_match|csrf_token|_messages|current_app|urlconf)\b/;
+
 /** Slots that hold a value whose whole job is to be unguessable. ANCHORED on
  *  purpose: `code` is a secret, `status_code` is an enum. */
 const PRNG_SECRET_SLOT_A =
@@ -1883,7 +1895,10 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         // `request.args`, `request.json`, `request.query_params` are all
         // untrusted. Matched as a whole path segment, so `self.request.args`
         // in a class-based view qualifies and `myrequest.x` does not.
-        if (/(^|\.)request\.[A-Za-z_]/.test(node.text)) {
+        if (
+          /(^|\.)request\.[A-Za-z_]/.test(node.text) &&
+          !SERVER_POPULATED_REQUEST_ATTR.test(node.text)
+        ) {
           return { kind: "source", ev: { source: node.text.split("(")[0], line: here() } };
         }
         const base =
