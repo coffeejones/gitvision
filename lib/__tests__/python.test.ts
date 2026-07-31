@@ -1842,3 +1842,85 @@ describe("pythonPlugin — the request is not uniformly untrusted", () => {
     expect(ids("def v(request):\n    return redirect(request.user_input)\n")).toEqual(["py-open-redirect"]);
   });
 });
+
+describe("rebinding a name to an untainted value ends its flow", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+
+  const sinks = (content: string) => {
+    const file: SourceFile = { rel: "app/views.py", ext: "py", content };
+    return parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? [];
+  };
+  const ids = (content: string) => sinks(content).map((s) => s.ruleId).sort();
+
+  // The bug this exists for: secure_filename is in TAINT_SANITIZERS, so the
+  // flow IS cut — but taint was only ever added, never removed, so the name
+  // stayed tainted and open() below was reported at high severity with a taint
+  // trace for a flow that no longer existed. The canonical remediation flagged
+  // as the vulnerability.
+  it("sanitising in place is not a finding", () => {
+    expect(
+      ids(
+        "from flask import request\n" +
+          "from werkzeug.utils import secure_filename\n" +
+          "def upload():\n" +
+          "    name = request.args['f']\n" +
+          "    name = secure_filename(name)\n" +
+          "    with open(name) as fh:\n" +
+          "        return fh.read()\n"
+      )
+    ).toEqual([]);
+  });
+
+  it("sanitising into a new name is still not a finding", () => {
+    // This always worked; pinned so the fix cannot regress it.
+    expect(
+      ids(
+        "from flask import request\n" +
+          "from werkzeug.utils import secure_filename\n" +
+          "def upload():\n" +
+          "    raw = request.args['f']\n" +
+          "    safe = secure_filename(raw)\n" +
+          "    with open(safe) as fh:\n" +
+          "        return fh.read()\n"
+      )
+    ).toEqual([]);
+  });
+
+  it("passing through an unknown helper keeps the flow alive", () => {
+    // taintOf propagates through any call it cannot explain, so `t` is truthy
+    // and the name is re-marked rather than cleared. This is the true positive
+    // the fix must not eat.
+    expect(
+      ids(
+        "from flask import request\n" +
+          "def upload():\n" +
+          "    name = request.args['f']\n" +
+          "    name = my_helper(name)\n" +
+          "    with open(name) as fh:\n" +
+          "        return fh.read()\n"
+      )
+    ).toEqual(["py-path-traversal"]);
+  });
+
+  it("a CONDITIONAL sanitise does not untaint the code after it", () => {
+    // The walk is a plain AST recursion with no control-flow graph, so a
+    // rebind inside an if-body is not known to happen. Clearing there would
+    // hide a real finding on the else path, so clearing is limited to
+    // straight-line code. This test pins that deliberate conservatism —
+    // if someone later adds a CFG, this expectation is the thing to revisit.
+    expect(
+      ids(
+        "from flask import request\n" +
+          "from werkzeug.utils import secure_filename\n" +
+          "def upload(trusted):\n" +
+          "    name = request.args['f']\n" +
+          "    if trusted:\n" +
+          "        name = secure_filename(name)\n" +
+          "    with open(name) as fh:\n" +
+          "        return fh.read()\n"
+      )
+    ).toEqual(["py-path-traversal"]);
+  });
+});

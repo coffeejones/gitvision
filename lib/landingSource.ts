@@ -70,10 +70,10 @@ export interface PinnedSource {
 export const LANDING_SOURCE: PinnedSource = {
   repo: "coffeejones/gitvision",
   path: "lib/codeAnalysis/plugins/javascript.ts",
-  commit: "3a443c2",
+  commit: "5f68189",
   lang: "ts",
-  fn: { name: "lookupVariableType", line: 816 },
-  firstLine: 816,
+  fn: { name: "lookupVariableType", line: 828 },
+  firstLine: 828,
   // Verbatim from the file at that commit, leading indentation included — it is
   // a nested function, and the slice is compared byte-for-byte in the tests. Do
   // not reformat it to fit; choose a different slice instead.

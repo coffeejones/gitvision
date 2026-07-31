@@ -1837,6 +1837,28 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   const markTainted = (name: string, origin: TaintOrigin) => {
     (currentMethod()?.tainted ?? moduleTainted).set(name, origin);
   };
+  /** Rebinding a name to something untainted ENDS its flow. Without this,
+   *  `name = secure_filename(name)` left `name` tainted and the open() below it
+   *  was reported as py-path-traversal at high severity — the canonical
+   *  remediation flagged as the vulnerability, carrying a taint trace for a
+   *  flow the sanitiser had already cut. Sanitising into a NEW name was always
+   *  silent; only rebinding the same one misfired.
+   *
+   *  Deletes from the innermost frame that holds it, mirroring taintedVar's
+   *  lookup, so an outer binding is not left shadowing the result. */
+  const clearTainted = (name: string) => {
+    for (let i = methodStack.length - 1; i >= 0; i--) {
+      if (methodStack[i].tainted.delete(name)) return;
+    }
+    moduleTainted.delete(name);
+  };
+  /** Depth of enclosing if/while/for/except bodies. The walk is a plain AST
+   *  recursion with no control-flow graph, so a rebind inside a branch is not
+   *  known to happen — `if c: x = clean(x)` must NOT untaint x for the code
+   *  after the block, or a real finding disappears on the else path. Clearing
+   *  is therefore limited to straight-line code, which is where the false
+   *  positive lives. */
+  let branchDepth = 0;
   const taintedVar = (name: string): TaintOrigin | null => {
     for (let i = methodStack.length - 1; i >= 0; i--) {
       const hit = methodStack[i].tainted.get(name);
@@ -2686,6 +2708,10 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
                 ? { kind: "source", ev: { ...t.ev, via: left.text } }
                 : t
             );
+          } else if (branchDepth === 0) {
+            // The value that lands here carries no taint, so whatever this name
+            // held before is gone. Straight-line only — see branchDepth.
+            clearTainted(left.text);
           }
         }
         for (const child of node.namedChildren) visit(child);
@@ -2841,7 +2867,11 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
       case "conditional_expression":
       case "case_clause":
         countDecisionPoint();
+        // Anything rebound in here is conditional, so it may not untaint the
+        // code that follows — see clearTainted.
+        branchDepth++;
         for (const child of node.namedChildren) visit(child);
+        branchDepth--;
         return;
 
       default:

@@ -100,3 +100,56 @@ describe("javascriptPlugin — DOM XSS sinks", () => {
     expect(sinksIn("export function add(a, b) {\n  return a + b;\n}\n")).toEqual([]);
   });
 });
+
+describe("rebinding a name to an untainted value ends its flow", () => {
+  beforeAll(async () => {
+    await javascriptPlugin.load();
+  });
+
+  const ids = (content: string) => {
+    const file: SourceFile = { rel: "app.js", ext: "js", content };
+    return (parseFile(javascriptPlugin, file, makeIndex([file])).sinks ?? []).map(
+      (s) => s.ruleId,
+    );
+  };
+
+  // Same bug as the Python plugin's: DOMPurify is in JS_SANITIZERS, so the flow
+  // is cut — but taint was only added, never removed, so innerHTML below was
+  // reported as js-dom-xss. The fix flagged as the bug.
+  it("sanitising in place is not a finding", () => {
+    expect(
+      ids(
+        "function render(el) {\n" +
+          "  let v = location.hash;\n" +
+          "  v = DOMPurify.sanitize(v);\n" +
+          "  el.innerHTML = v;\n" +
+          "}\n",
+      ),
+    ).toEqual([]);
+  });
+
+  it("an unsanitised flow is still reported", () => {
+    expect(
+      ids(
+        "function render(el) {\n" +
+          "  let v = location.hash;\n" +
+          "  el.innerHTML = v;\n" +
+          "}\n",
+      ),
+    ).toEqual(["js-dom-xss"]);
+  });
+
+  it("a CONDITIONAL sanitise does not untaint the code after it", () => {
+    // Deliberate: the walk has no control-flow graph, so clearing inside a
+    // branch could hide a real finding on the other path.
+    expect(
+      ids(
+        "function render(el, trusted) {\n" +
+          "  let v = location.hash;\n" +
+          "  if (trusted) { v = DOMPurify.sanitize(v); }\n" +
+          "  el.innerHTML = v;\n" +
+          "}\n",
+      ),
+    ).toEqual(["js-dom-xss"]);
+  });
+});

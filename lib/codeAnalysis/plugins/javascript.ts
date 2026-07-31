@@ -729,6 +729,18 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
   const markJsTainted = (name: string, ev: TaintEvidence) => {
     (currentMethod()?.tainted ?? moduleTainted).set(name, ev);
   };
+  /** Mirrors clearTainted in the Python plugin, for the same reason: without
+   *  it, `v = DOMPurify.sanitize(v)` left `v` tainted and the innerHTML below
+   *  was reported as js-dom-xss — the fix flagged as the bug. */
+  const clearJsTainted = (name: string) => {
+    for (let i = methodStack.length - 1; i >= 0; i--) {
+      if (methodStack[i].tainted.delete(name)) return;
+    }
+    moduleTainted.delete(name);
+  };
+  /** See the Python plugin: the walk has no control-flow graph, so a rebind
+   *  inside a branch cannot be trusted to untaint what follows it. */
+  let jsBranchDepth = 0;
   const jsTaintedVar = (name: string): TaintEvidence | null => {
     for (let i = methodStack.length - 1; i >= 0; i--) {
       const hit = methodStack[i].tainted.get(name);
@@ -1527,7 +1539,9 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
       case "ternary_expression":
       case "catch_clause":
         countDecisionPoint();
+        jsBranchDepth++;
         for (const child of node.namedChildren) visit(child);
+        jsBranchDepth--;
         return;
 
       case "binary_expression": {
@@ -1552,6 +1566,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         if (left?.type === "identifier") {
           const t = jsTaintOf(right);
           if (t) markJsTainted(left.text, { ...t, via: left.text });
+          else if (jsBranchDepth === 0) clearJsTainted(left.text);
         }
         for (const child of node.namedChildren) visit(child);
         return;
