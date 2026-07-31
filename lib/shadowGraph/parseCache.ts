@@ -34,7 +34,7 @@ const SCHEMA_VERSION = 1;
 // Bump whenever the SINK SET or the TAINT ENGINE changes: ParseLayer.files
 // carries ParsedFile.sinks, so a stale entry serves the old, weaker findings
 // back to a user who has already analysed a repo.
-export const ANALYZER_VERSION = "7"; // 7: ~15 new sink rules + import aliases, await/request-method taint, receiver-position sinks (6: Python entry points + security sinks; 5: Ruby parenless calls)
+export const ANALYZER_VERSION = "8"; // 8: taint cleared on reassignment, so a sanitiser is no longer reported as the vulnerability (7: ~15 new sink rules + import aliases, await/request-method taint, receiver-position sinks; 6: Python entry points + security sinks; 5: Ruby parenless calls)
 
 const GC_MAX_BYTES = 500 * 1024 * 1024; // 500 MB default namespace budget
 

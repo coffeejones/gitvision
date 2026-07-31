@@ -45,7 +45,7 @@ import type { AnalysisSnapshot } from "./types";
 export const LANDING_SECURITY_SESSION_ID = "2W8VJwPfzl";
 
 export const LANDING_SECURITY_PROVENANCE =
-  "analyzeRepo('pallets', 'flask') run 2026-07-31 on ANALYZER_VERSION 7, transcribed verbatim: 4 taint-confirmed sinks (0 reachable), 2 risky patterns, 0 secrets across 95 files scanned, 23 dependency versions checked against all 10 KNOWN_INCIDENTS with no match.";
+  "analyzeRepo('pallets', 'flask') run 2026-07-31 on ANALYZER_VERSION 8, transcribed verbatim: 4 taint-confirmed sinks (0 reachable), 2 risky patterns, 0 secrets across 95 files scanned, 23 dependency versions checked against all 10 KNOWN_INCIDENTS with no match.";
 
 const SRC = ["examples/celery/requirements.txt"];
 
