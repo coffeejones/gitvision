@@ -31,7 +31,10 @@ const SCHEMA_VERSION = 1;
  *  or the resolver logic changes in a way that alters the produced graph — a
  *  stale cache from an older analyzer must NOT be spliced against a newer engine.
  *  Mismatched entries are treated as absent (recompute path). */
-export const ANALYZER_VERSION = "6"; // 6: Python entry points (route decorators + Django URLconf) + security sinks (5: Ruby parenless calls)
+// Bump whenever the SINK SET or the TAINT ENGINE changes: ParseLayer.files
+// carries ParsedFile.sinks, so a stale entry serves the old, weaker findings
+// back to a user who has already analysed a repo.
+export const ANALYZER_VERSION = "7"; // 7: ~15 new sink rules + import aliases, await/request-method taint, receiver-position sinks (6: Python entry points + security sinks; 5: Ruby parenless calls)
 
 const GC_MAX_BYTES = 500 * 1024 * 1024; // 500 MB default namespace budget
 
