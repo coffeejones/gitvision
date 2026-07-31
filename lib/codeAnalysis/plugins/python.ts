@@ -916,6 +916,20 @@ function matchSinkRule(
   // Server-side template injection. A template built at runtime is compiled
   // AND executed, so it is `eval` wearing a web framework's clothes. A literal
   // template is just a template, hence the assembled-argument requirement.
+  // A request credential written to a log. Logs are shipped, indexed and read
+  // by people who are not supposed to hold the caller's bearer token.
+  if (!bare && isLogSinkCall(fnNode, calleeName)) {
+    const ev = credentialReachesLog(argList, taintOf);
+    if (ev) {
+      return {
+        ruleId: "py-credential-logged",
+        severity: "medium",
+        requiresTaint: true,
+        taint: ev,
+      };
+    }
+  }
+
   // XML parsed with external entities enabled. Config-shaped like
   // py-autoescape-disabled: switching entity resolution on IS the dangerous
   // decision, and no one does it by accident. No taint required.
@@ -1501,6 +1515,119 @@ function isConditionTest(node: TsNode): boolean {
     return false;
   }
   return false;
+}
+
+/** Slots that hold a value whose whole job is to be unguessable. ANCHORED on
+ *  purpose: `code` is a secret, `status_code` is an enum. */
+const PRNG_SECRET_SLOT_A =
+  /^(?:[a-z0-9]+_)?(?:token|otp|nonce|secret|passcode|password|passwd|pwd|verifier|salt|key)$/i;
+const PRNG_SECRET_SLOT_B =
+  /^(?:code|(?:reset|invite|invitation|verify|verification|confirm|confirmation|activation|auth|access|recovery|mfa|two_?factor|one_?time|otp|login|signup|share|unlock|pair|pairing|security|secret|temp|temporary|new|referral|redeem|voucher)_code)$/i;
+
+/** A draw from the stdlib Mersenne Twister, module-qualified. Qualification is
+ *  what makes this survivable: `secrets.*`, `os.urandom`, `uuid.uuid4` and
+ *  Django's `get_random_string` are excluded BY CONSTRUCTION, not by a
+ *  deny-list that the next library will slip past. */
+const STDLIB_PRNG_DRAW =
+  /\brandom\.(choice|choices|sample|randint|randrange|random|getrandbits|randbytes|uniform)\s*\(/;
+
+/** A secret assembled from the predictable PRNG.
+ *
+ *  `random` is the Mersenne Twister: observe a few outputs and you can predict
+ *  every future one. Fine for a dice roll, fatal for a password-reset code.
+ *
+ *  The `.join(` requirement is the entire safety margin and was measured: a
+ *  value BUILT character by character is a generated secret, while a single
+ *  draw is a PICK — `key = random.choice(list(keys))` samples a dict,
+ *  `partition_key = random.randint(0, n)` shards, and CPython's own
+ *  email/generator.py does `token = random.randrange(...)`. Requiring `.join`
+ *  takes all of those to silent while keeping every seeded case. */
+function matchWeakPrngSecret(
+  left: TsNode | null,
+  right: TsNode | null
+): SinkRuleHit | null {
+  const slot = assignmentTargetName(left);
+  if (!slot) return null;
+  if (!PRNG_SECRET_SLOT_A.test(slot) && !PRNG_SECRET_SLOT_B.test(slot)) return null;
+  const text = right?.text ?? "";
+  if (!STDLIB_PRNG_DRAW.test(text)) return null;
+  if (/\brandom\.SystemRandom\s*\(/.test(text)) return null; // the one CSPRNG in the module
+  if (!text.includes(".join(")) return null;
+  return { ruleId: "py-weak-prng-secret", severity: "high" };
+}
+
+/** Logging methods. */
+const LOG_LEVEL_METHODS = new Set([
+  "debug", "info", "warning", "warn", "error", "critical", "exception", "log",
+]);
+const LOGGER_RECEIVER = /^(logger|logging|log|_log|_logger|applog|app_logger|audit_log|audit_logger)$/i;
+
+/** Header names that carry a bearer credential. Deliberately short: a bare
+ *  `token` is a device token or a CSRF token far more often than a credential,
+ *  and including it was measured firing on the FCM-registration shape. */
+const CREDENTIAL_HEADER = /^(http_)?(authorization|proxy-authorization|cookie|x-api-key)$/i;
+
+/** Is this call a logging call? `logger.warning(...)`, `self.logger.error(...)`. */
+function isLogSinkCall(fnNode: TsNode, calleeName: string): boolean {
+  if (!LOG_LEVEL_METHODS.has(calleeName)) return false;
+  const obj = fnNode.childForFieldName("object");
+  if (!obj) return false;
+  const last =
+    obj.type === "identifier"
+      ? obj.text
+      : obj.type === "attribute"
+        ? obj.childForFieldName("attribute")?.text ?? ""
+        : "";
+  return LOGGER_RECEIVER.test(last);
+}
+
+/** Does the credential itself reach the log, unmodified?
+ *
+ *  THE DERIVATION GUARD, and the difference between a flow rule and a pattern
+ *  rule. We descend only through nodes that FORMAT a value — f-strings, `%`,
+ *  `+`, tuples, keyword args. At any other call we stop and answer no, because
+ *  `redact(auth)`, `sha256(auth).hexdigest()`, `bool(auth)`, `len(auth)` and
+ *  `auth[:6]` are all the developer doing the right thing. Without this the
+ *  rule claims "something computed from the credential reached the log", which
+ *  is false exactly when the code is correct. */
+function credentialReachesLog(
+  node: TsNode | null,
+  taintOf: (n: TsNode | null) => TaintOrigin | null
+): TaintEvidence | null {
+  if (!node) return null;
+  switch (node.type) {
+    case "call": {
+      // Only the read itself: `request.headers.get("authorization")`.
+      const fn = node.childForFieldName("function");
+      if (fn?.type !== "attribute" || fn.childForFieldName("attribute")?.text !== "get") return null;
+      const args = node.childForFieldName("arguments");
+      const key = args ? pyStringLiteral(firstPositional(args)) : null;
+      if (key === null || !CREDENTIAL_HEADER.test(key)) return null;
+      const t = taintOf(fn.childForFieldName("object"));
+      return t?.kind === "source" ? { ...t.ev, source: `${t.ev.source}.get("${key}")` } : null;
+    }
+    case "string":
+    case "concatenated_string":
+    case "interpolation":
+    case "binary_operator":
+    case "parenthesized_expression":
+    case "conditional_expression":
+    case "boolean_operator":
+    case "tuple":
+    case "list":
+    case "dictionary":
+    case "pair":
+    case "keyword_argument":
+    case "argument_list": {
+      for (const c of node.namedChildren) {
+        const ev = credentialReachesLog(c ?? null, taintOf);
+        if (ev) return ev;
+      }
+      return null;
+    }
+    default:
+      return null;
+  }
 }
 
 /** Response headers whose value must never come from the request. Reflecting
@@ -2520,6 +2647,7 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           const secret =
             matchSecretAssignment(left, valueNode) ??
             matchWeakHashCredential(left, valueNode) ??
+            matchWeakPrngSecret(left, valueNode) ??
             matchConfigAssignment(left, valueNode);
           if (secret) {
             sinks.push({

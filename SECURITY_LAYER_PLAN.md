@@ -1411,3 +1411,112 @@ measuring it produced a wrong answer, and the second time the wrong answer
 made it into a written conclusion. The recall gap looked like depth because
 "realistic apps have more layers" is a plausible story. The code says the
 vulnerabilities are four lines long and we could not see the fourth line.
+
+## §4y — Two data-flow families reopened, one killed
+
+§4u declined a pile of families as "absence detection or semantic". That
+judgement was made on the teaching-app corpus, with an engine that could not
+see aliased imports, `await`, or a method called on `request`. Three families
+were re-examined once §4x had un-blinded it. Two of them are genuinely data
+flows; one is not, and was killed after being fully implemented.
+
+This is **not** a reversal of §4u. The declines there — csrf, rate limiting
+(CWE-307, 112 in the held-out corpus), IDOR (CWE-639, 39) — stand. So does
+user enumeration (CWE-204, 36), which needs two response paths compared
+semantically. CWE-532, CWE-330 and CWE-915 were never examined individually.
+
+### Result
+
+| | before §4y | after |
+|---|---:|---:|
+| held-out TP | 314 | **375** |
+| held-out FP | 50 | 50 |
+| held-out precision | 0.867 | **0.882** |
+| held-out in-scope recall | 0.604 | **0.623** |
+| tuned TP | 192 | 193 |
+| traps clean | 262/262 | **262/262** |
+| production surfaced | 72 | **72, byte-identical** |
+
++61 true positives for zero new false positives, and precision went up.
+
+### `py-credential-logged` — 30 TP
+
+```python
+body = request.body.decode("utf-8", errors="replace")
+logger.warning("ops tally body=%s bearer=%s", body, request.headers.get("authorization"))
+```
+
+An Authorization header travelling into a log sink. Logs are shipped, indexed
+and read by people who are not meant to hold the caller's bearer token.
+
+**The derivation guard is the rule.** The first version judged taint on
+`request.headers` and never on what actually *reached* the log, so it fired on
+every safe idiom: `redact(auth)`, `sha256(auth).hexdigest()`, `bool(auth)`,
+`len(auth)`, `auth[:6]`. Those are developers doing it right. The shipped
+version descends only through nodes that FORMAT a value — f-strings, `%`, `+`,
+tuples, keyword args — and stops at any other call. It therefore claims "the
+credential itself reaches the log", which is defensible, rather than "something
+computed from the credential reaches the log", which is false precisely when
+the code is correct.
+
+The header list is short for the same reason: a bare `token` is a device token
+or a CSRF token far more often than a credential, and including it was measured
+firing on an FCM-registration shape.
+
+### `py-weak-prng-secret` — 31 TP
+
+```python
+import random
+code = "".join(random.choice(alphabet) for _ in range(length))
+```
+
+`random` is the Mersenne Twister: observe a few outputs, predict all the rest.
+Fine for a dice roll, fatal for a password-reset code.
+
+**The `.join(` requirement is the whole safety margin.** A value BUILT
+character by character is a generated secret; a single draw is a *pick*. Without
+it the rule fires on `key = random.choice(list(keys))` (sampling a dict),
+`partition_key = random.randint(0, n)` (sharding), and on CPython's own
+`email/generator.py`, which does `token = random.randrange(...)` — meaning it
+would have fired in every Python installation on earth.
+
+`secrets.*`, `os.urandom`, `uuid4` and `get_random_string` are excluded **by
+construction** rather than by a deny-list, because the trigger requires a
+module-qualified `random.` draw. `random.SystemRandom` — the one CSPRNG in the
+module — is explicitly excluded.
+
+### Killed: `py-mass-assignment`
+
+```python
+change_set = json.loads(request.body.decode("utf-8") or "{}")
+workset = {"role": "viewer", "is_admin": False, "credit_limit": 5000}
+workset.update(change_set)
+return JsonResponse(workset)
+```
+
+Designed, implemented, and measured at exactly the 31 true positives claimed —
+every number the designer gave was true. It was killed anyway, on the
+adversary's reasoning:
+
+> The rule is missing the second half of a data flow: it proves untrusted data
+> ARRIVES in a dict, never that the dict is a DANGEROUS DESTINATION.
+> `dict.update()` is not a sink.
+
+It fired on NetBox's `component_data.update(data)`, on Saleor's
+`ALLOWED_MIME_TYPES.update(json.loads(os.environ.get(...)))`, and on the
+ordinary Django template-context merge. The narrowing that would make it a real
+sink — requiring the dict to reach `Model(**recv)` or a `setattr` loop — kills
+all 31, because every seeded case merely *returns* the dict. Nothing is
+persisted, so nothing is actually assignable.
+
+**A rule can be perfectly implemented, score exactly what was promised, and
+still be wrong.** That is the whole argument for measuring the destination and
+not just the arrival.
+
+### One bug worth recording
+
+`py-credential-logged` fired correctly in the plugin and scored **zero** in the
+harness. The rule set `requiresTaint: true` but never attached the evidence,
+and `classifySinks` drops exactly that combination — correctly. The rule was
+invisible for one measurement cycle. Anything with `requiresTaint` must carry
+its `taint`, or it silently does not exist.

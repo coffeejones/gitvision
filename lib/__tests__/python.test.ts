@@ -1723,3 +1723,92 @@ describe("pythonPlugin — redirect, XXE, CORS and env-default secrets", () => {
     expect(ids('import os\nJWT_SECRET = os.environ["JWT_SECRET"]\n')).toEqual([]);
   });
 });
+
+// The two data-flow rules from §4y. A third — mass assignment — was designed,
+// implemented and killed: `dict.update(tainted)` proves untrusted data ARRIVES
+// somewhere, never that the destination is dangerous, and every seeded case
+// merely returned the dict. See §4y.
+describe("pythonPlugin — credentials written to a log", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const ids = (content: string) => {
+    const file: SourceFile = { rel: "views.py", ext: "py", content };
+    return (parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? []).map((s) => s.ruleId);
+  };
+  const log = (expr: string) =>
+    ids(`import logging\nlogger = logging.getLogger(__name__)\ndef v(request):\n    logger.warning("x=%s", ${expr})\n`);
+
+  it("flags an Authorization header written straight to the log", () => {
+    expect(log('request.headers.get("authorization")')).toEqual(["py-credential-logged"]);
+  });
+
+  it("flags it through an f-string", () => {
+    expect(
+      ids(
+        'import logging\nlogger = logging.getLogger(__name__)\ndef v(request):\n' +
+          '    logger.info(f"auth={request.headers.get(\'cookie\')}")\n'
+      )
+    ).toEqual(["py-credential-logged"]);
+  });
+
+  // ---- the derivation guard. Each of these is a developer doing it RIGHT,
+  // and each one fired before the guard existed. ----
+  it("does NOT flag a redacted credential", () => {
+    expect(log('redact(request.headers.get("authorization"))')).toEqual([]);
+  });
+
+  it("does NOT flag a hash of the credential", () => {
+    // The correlation-id idiom — and the same md5-for-gravatar shape that got
+    // the original weak-hash rule deleted.
+    expect(log('hashlib.sha256(request.headers.get("authorization").encode()).hexdigest()')).toEqual([]);
+  });
+
+  it("does NOT flag a boolean, a length or a prefix", () => {
+    expect(log('bool(request.headers.get("authorization"))')).toEqual([]);
+    expect(log('len(request.headers.get("authorization") or "")')).toEqual([]);
+    expect(log('request.headers.get("authorization", "")[:6]')).toEqual([]);
+  });
+
+  it("does NOT flag a non-credential header, or a device token", () => {
+    expect(log('request.headers.get("user-agent")')).toEqual([]);
+    expect(log('payload.get("token")')).toEqual([]);
+  });
+});
+
+describe("pythonPlugin — secrets from a predictable PRNG", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const ids = (content: string) => {
+    const file: SourceFile = { rel: "auth.py", ext: "py", content };
+    return (parseFile(pythonPlugin, file, makeIndex([file])).sinks ?? []).map((s) => s.ruleId);
+  };
+
+  it("flags a reset code built character by character from random", () => {
+    expect(
+      ids('import random\ndef v():\n    code = "".join(random.choice("abc123") for _ in range(24))\n')
+    ).toEqual(["py-weak-prng-secret"]);
+  });
+
+  // ---- the .join requirement is the whole safety margin ----
+  it("does NOT flag a single draw — that is a pick, not a generated secret", () => {
+    // `key = random.choice(list(keys))` samples a dict; CPython's own
+    // email/generator.py does `token = random.randrange(...)`.
+    expect(ids("import random\ndef v(keys):\n    key = random.choice(list(keys))\n")).toEqual([]);
+    expect(ids("import random\ndef v(n):\n    partition_key = random.randint(0, n - 1)\n")).toEqual([]);
+  });
+
+  it("does NOT flag a non-secret slot", () => {
+    expect(
+      ids('import random\ndef v():\n    status_code = "".join(random.choice("123") for _ in range(3))\n')
+    ).toEqual([]);
+  });
+
+  it("does NOT flag a proper CSPRNG", () => {
+    expect(ids('import secrets\ndef v():\n    token = "".join(secrets.choice("abc") for _ in range(24))\n')).toEqual([]);
+    expect(
+      ids('import random\ndef v():\n    r = random.SystemRandom()\n    token = "".join(r.choice("abc") for _ in range(24))\n')
+    ).toEqual([]);
+  });
+});

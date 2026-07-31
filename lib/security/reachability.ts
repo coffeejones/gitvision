@@ -319,6 +319,8 @@ export const SINK_RULE_LABELS: Record<string, string> = {
   "py-template-safe-filter": "Template output escaping disabled (| safe)",
   "py-template-autoescape-off": "Template auto-escaping turned off",
   "py-cors-origin-reflected": "CORS origin reflected from the request",
+  "py-credential-logged": "Request credential written to a log",
+  "py-weak-prng-secret": "Secret generated with a predictable PRNG",
   "py-xxe": "XML parsed with external entities enabled",
   "py-open-redirect": "Redirect destination comes from the request",
   "py-ssti": "Template built and rendered at runtime",
