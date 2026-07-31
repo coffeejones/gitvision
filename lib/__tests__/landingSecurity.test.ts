@@ -65,7 +65,16 @@ describe("the shot mounts the product, it does not redraw it", () => {
 describe("the pinned sweep is a real one", () => {
   it("records how it was derived", () => {
     expect(LANDING_SECURITY_PROVENANCE).toMatch(/analyzeRepo/);
-    expect(LANDING_SECURITY_PROVENANCE).toMatch(/2026-07-27/);
+    // A date, not one specific date. The first version pinned 2026-07-27 and
+    // then failed the moment the fixture was legitimately re-swept — a guard
+    // that fires on the correct action is worse than none, because the fix is
+    // to edit the test.
+    expect(LANDING_SECURITY_PROVENANCE).toMatch(/\b20\d{2}-\d{2}-\d{2}\b/);
+    // The snapshot must be from the sweep the provenance names, not a mixture:
+    // re-pinning only the new field while leaving last week's star count is
+    // exactly the drift this file warns about.
+    const [date] = LANDING_SECURITY_PROVENANCE.match(/\b20\d{2}-\d{2}-\d{2}\b/)!;
+    expect(SNAP.fetchedAt.startsWith(date), "fixture mixes two sweeps").toBe(true);
   });
 
   it("shows Incidents clean because the check RAN, not because it was empty", () => {
@@ -99,6 +108,60 @@ describe("the pinned sweep is a real one", () => {
     expect(SNAP.secretFindings).toBeDefined();
     expect(SNAP.secretFindings!.findings).toEqual([]);
     expect(SNAP.secretFindings!.filesScanned).toBeGreaterThan(0);
+  });
+
+  it("has no scanner in the not-scanned state at all", () => {
+    // The test above pinned that property for ONE field, and the failure it
+    // describes then happened to a different one: the reachability engine
+    // shipped, this fixture predated it, sinkFindings was absent, and
+    // SecurityPanel put "code paths not scanned" at the top of the landing's
+    // security shot — the flagship scanner advertised as one that never ran.
+    //
+    // So assert the class, not the instance. SecurityPanel maps `undefined` to
+    // "not-scanned" for each of these, and this list is every field it reads
+    // that way. Add a scanner and the shot must be re-swept, or this fails.
+    const scanners: [string, unknown][] = [
+      ["secrets", SNAP.secretFindings],
+      ["patterns", SNAP.riskyPatternFindings],
+      ["code paths", SNAP.sinkFindings],
+    ];
+    const notScanned = scanners.filter(([, v]) => v === undefined).map(([n]) => n);
+    expect(notScanned, "the landing shot advertises a scanner as not run").toEqual([]);
+
+    // And the panel must still read every one of them, or the assertion above
+    // is checking fields nothing renders.
+    const panel = read("components", "views", "security", "SecurityPanel.tsx");
+    for (const field of ["secretFindings", "riskyPatternFindings", "sinkFindings"]) {
+      expect(panel, `${field} is no longer read by the panel`).toContain(field);
+    }
+  });
+
+  it("keeps the engine's own reachability verdict, unsoftened", () => {
+    // Four tainted sinks and NONE reachable is the honest answer for a
+    // framework with no application routes of its own. A fixture edited to
+    // show a reachable finding would be the fake version of the one panel
+    // whose claim is that reachability is computed rather than assumed.
+    const r = SNAP.sinkFindings!;
+    expect(r.total).toBe(r.findings.length);
+    expect(r.tainted).toBe(r.findings.filter((f) => f.taint).length);
+    expect(r.counts.reachable).toBe(0);
+    expect(r.findings.every((f) => f.reachability !== "reachable")).toBe(true);
+  });
+
+  it("shows a real interprocedural flow, not a bare line number", () => {
+    // The whole difference between this engine and the pattern scanner it sits
+    // beside: os.environ reaches exec() through from_envvar -> from_pyfile.
+    // Losing the hops would quietly turn the shot back into "there is an exec
+    // on line 209".
+    const withHops = SNAP.sinkFindings!.findings.filter(
+      (f) => (f.taint?.hops?.length ?? 0) > 0,
+    );
+    expect(withHops.length).toBeGreaterThan(0);
+    expect(withHops[0].taint!.source).toBe("os.environ");
+    expect(withHops[0].taint!.hops!.map((h) => h.name)).toEqual([
+      "from_envvar",
+      "from_pyfile",
+    ]);
   });
 
   it("carries the two patterns the sweep actually found", () => {

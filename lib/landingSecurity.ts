@@ -4,7 +4,7 @@
 // two fed data to landing components that RE-DREW the product; the redraws
 // drifted, and lib/__tests__/landingTokens.test.ts exists because of it. Here
 // the landing mounts the product's OWN component — <SecurityPanel> — and this
-// file is only its input. Nothing is redrawn, so nothing can drift: the three
+// file is only its input. Nothing is redrawn, so nothing can drift: the four
 // scanner states, their count labels, the "N curated supply-chain attacks"
 // subtitle, the severity sort and the rollup arithmetic are all still
 // SecurityPanel's, computed at render time from the snapshot below.
@@ -19,10 +19,17 @@
 // stranger recognises it, and it is the same repo the landing's demo cards
 // already link to.
 //
-// Not chosen: every number. This is the verbatim output of a sweep run on
-// 2026-07-27 through the product's own analyzeRepo() — see `provenance`. Two
-// risky patterns, no secrets, no incident matches. Re-derive after any change
-// to the scanners; do not edit a finding to look better or worse.
+// Not chosen: every number. This is the verbatim output of a sweep run through
+// the product's own analyzeRepo() — see `provenance`. Four taint-confirmed
+// sinks (none reachable), two risky patterns, no secrets, no incident matches.
+// Re-derive after any change to the scanners; do not edit a finding to look
+// better or worse.
+//
+// RE-DERIVE WHEN A SCANNER IS ADDED, not only when one changes. This fixture
+// predated the reachability engine, so `sinkFindings` was simply absent — and
+// SecurityPanel reads absent as "not scanned", which put "code paths not
+// scanned" at the top of the landing's security shot for the whole week the
+// engine shipped. The test now fails if any scanner lands in that state.
 //
 // The dependency list matters more than it looks. findIncidentMatches() reads
 // outdated + vulnerable + deprecated and checks each against KNOWN_INCIDENTS,
@@ -38,7 +45,7 @@ import type { AnalysisSnapshot } from "./types";
 export const LANDING_SECURITY_SESSION_ID = "2W8VJwPfzl";
 
 export const LANDING_SECURITY_PROVENANCE =
-  "analyzeRepo('pallets', 'flask') run 2026-07-27, transcribed verbatim: 2 risky patterns, 0 secrets across 95 files scanned, 23 dependency versions checked against all 10 KNOWN_INCIDENTS with no match.";
+  "analyzeRepo('pallets', 'flask') run 2026-07-31 on ANALYZER_VERSION 7, transcribed verbatim: 4 taint-confirmed sinks (0 reachable), 2 risky patterns, 0 secrets across 95 files scanned, 23 dependency versions checked against all 10 KNOWN_INCIDENTS with no match.";
 
 const SRC = ["examples/celery/requirements.txt"];
 
@@ -85,20 +92,20 @@ const VULNERABLE = [
  *  invented; SecurityPanel touches only secretFindings, riskyPatternFindings
  *  and the dependency lists. */
 export const LANDING_SECURITY_SNAPSHOT: AnalysisSnapshot = {
-  fetchedAt: "2026-07-27T22:51:32.000Z",
+  fetchedAt: "2026-07-31T23:19:44.980Z",
   repo: {
     owner: "pallets",
     name: "flask",
     fullName: "pallets/flask",
     description: "The Python micro framework for building web applications.",
-    stars: 72022,
-    forks: 16924,
-    watchers: 2087,
-    openIssues: 10,
+    stars: 72013,
+    forks: 16922,
+    watchers: 2090,
+    openIssues: 7,
     defaultBranch: "main",
     createdAt: "2010-04-06T11:11:59Z",
-    updatedAt: "2026-07-27T15:35:49Z",
-    pushedAt: "2026-06-10T18:03:29Z",
+    updatedAt: "2026-07-31T23:12:51Z",
+    pushedAt: "2026-07-30T17:29:53Z",
     language: "Python",
     license: "BSD-3-Clause",
     homepage: "https://flask.palletsprojects.com",
@@ -138,6 +145,117 @@ export const LANDING_SECURITY_SNAPSHOT: AnalysisSnapshot = {
     ],
   },
 
+
+  // The reachability engine's own output for this sweep (v0.82+). Absent until
+  // now, which made SecurityPanel render "code paths not scanned" at the top of
+  // the landing's security shot — the flagship scanner advertised as one that
+  // had not run, because this fixture was pinned before the engine existed.
+  //
+  // Four sinks, all tainted, NONE reachable. That last part is left exactly as
+  // the engine returned it: two "unknown" and two "unreachable" is the honest
+  // answer for a framework with no application routes of its own, and softening
+  // it would be the fake version of the one panel whose whole claim is that
+  // reachability is computed rather than assumed.
+  //
+  // The two config.py findings are a real interprocedural flow: os.environ at
+  // line 124 reaches exec() through from_envvar -> from_pyfile, which is what
+  // Flask's from_envvar does by design. The engine shows the hops.
+  sinkFindings: {
+    findings: [
+      {
+        filePath: "src/flask/config.py",
+        ruleId: "py-path-traversal",
+        severity: "high",
+        line: 208,
+        inFunction: "from_pyfile",
+        inContainerType: "Config",
+        snippet: "with open(filename, mode=\"rb\") as config_file:",
+        taintedByParam: "filename",
+        requiresTaint: true,
+        taint: {
+          source: "os.environ",
+          line: 124,
+          via: "filename",
+          hops: [
+            {
+              filePath: "src/flask/config.py",
+              name: "from_envvar"
+            },
+            {
+              filePath: "src/flask/config.py",
+              name: "from_pyfile"
+            }
+          ]
+        },
+        reachability: "unknown"
+      },
+      {
+        filePath: "src/flask/config.py",
+        ruleId: "py-exec",
+        severity: "high",
+        line: 209,
+        inFunction: "from_pyfile",
+        inContainerType: "Config",
+        snippet: "exec(compile(config_file.read(), filename, \"exec\"), d.__dict__)",
+        taintedByParam: "filename",
+        taint: {
+          source: "os.environ",
+          line: 124,
+          via: "filename",
+          hops: [
+            {
+              filePath: "src/flask/config.py",
+              name: "from_envvar"
+            },
+            {
+              filePath: "src/flask/config.py",
+              name: "from_pyfile"
+            }
+          ]
+        },
+        reachability: "unknown"
+      },
+      {
+        filePath: "src/flask/cli.py",
+        ruleId: "py-path-traversal",
+        severity: "high",
+        line: 1022,
+        inFunction: "shell_command",
+        snippet: "with open(startup) as f:",
+        taint: {
+          source: "os.environ",
+          line: 1020,
+          via: "startup"
+        },
+        requiresTaint: true,
+        reachability: "unreachable"
+      },
+      {
+        filePath: "src/flask/cli.py",
+        ruleId: "py-eval",
+        severity: "high",
+        line: 1023,
+        inFunction: "shell_command",
+        snippet: "eval(compile(f.read(), startup, \"exec\"), ctx)",
+        taint: {
+          source: "os.environ",
+          line: 1020,
+          via: "startup"
+        },
+        reachability: "unreachable"
+      }
+    ],
+    counts: {
+      reachable: 0,
+      unknown: 2,
+      unreachable: 2,
+      "module-scope": 0
+    },
+    total: 4,
+    tainted: 4,
+    entryPoints: 50
+  },
+
   dependencyHealths: [
     {
       ecosystem: "pypi",
@@ -148,7 +266,7 @@ export const LANDING_SECURITY_SNAPSHOT: AnalysisSnapshot = {
       vulnerable: VULNERABLE,
       deprecated: [],
       components: [],
-      analyzedAt: "2026-07-27T22:51:32.000Z",
+      analyzedAt: "2026-07-31T23:19:44.980Z",
     },
   ],
 };
