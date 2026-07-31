@@ -1520,3 +1520,65 @@ harness. The rule set `requiresTaint: true` but never attached the evidence,
 and `classifySinks` drops exactly that combination — correctly. The rule was
 invisible for one measurement cycle. Anything with `requiresTaint` must carry
 its `taint`, or it silently does not exist.
+
+## §4z — End-to-end through the product, not the harness
+
+Every number in §4a–§4y came from `.scratch/rvEmit.ts`. The product renders
+through `analyzeDirectory → classifySinks → buildUnifiedFindings →
+FindingsList`, and nobody had looked at it since the rule set was a sixth of its
+current size. Two things came out of actually looking.
+
+**The engine path is the same one.** `analyzeDirectory` is the product's own
+entry point, not a harness convenience, so the benchmark numbers describe the
+shipped pipeline. All 28 emitted rule ids have labels, and the disclosure layer
+resolves them through `sinkRuleLabel()` rather than a table of its own, so the
+ten rules added in §4v–§4y appeared in the UI with no wiring. Rendered on three
+repos (a held-out app, pygoat, NetBox): zero missing labels, zero missing
+reachability words, zero duplicate finding keys, and ordering correct —
+demonstrated findings above unproven ones.
+
+### `request.user` is not untrusted input
+
+NetBox surfaced `redirect(notification.object.get_absolute_url())` as an open
+redirect, with taint attributed to `request.user.notifications`. But
+`request.user` is populated by Django's auth middleware from a verified session,
+`request.session` is a server-side store the app itself wrote, and `request.id`
+and `request.resolver_match` are set during dispatch. The source regex matched
+`request.*` blindly and claimed an attacker controls values they cannot reach.
+
+Excluding those whole segments — `request.user_input` is still untrusted, and a
+test pins that:
+
+| | before | after |
+|---|---:|---:|
+| held-out TP | 375 | **375** |
+| held-out FP | 50 | **42** |
+| held-out precision | 0.882 | **0.899** |
+| production surfaced | 72 | **68** |
+| production open-redirect | 5 | **1** |
+
+Zero true positives lost. **This was invisible to the benchmark** — NetBox has
+no ground truth, so the finding scored as nothing at all. It was only visible by
+reading what the panel would show a person.
+
+### The rollup said 25, the list said 40
+
+The tally strip counts proven reach only, deliberately, with the reasoning in
+the code: *"inflating the headline with it would undo the filtering."* The list
+below shows everything with its evidence tier attached. Both are right. But they
+sit adjacent, and "21 high · 2 medium · 2 informational" directly above
+"Findings 40" reads as an arithmetic error.
+
+On the one page whose entire promise is an audit trail, an apparent
+contradiction costs more than the filtering saves. The strip now names the gap —
+*"counts proven reach only · 15 more listed below without a traced path"* — and
+the arithmetic closes: 25 counted + 15 unproven = 40 listed.
+
+### What this pass is for
+
+Neither finding was reachable from the benchmark. One was a precision bug on a
+repo with no ground truth; the other was not a bug at all, just two true numbers
+that read as a lie when placed together. Both are the class of thing that only
+appears when you look at the product the way a user does — the same way the
+`evidenceTier` ordering bug was found, and the reason it is worth doing before
+building further.

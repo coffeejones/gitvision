@@ -94,6 +94,14 @@ export function SecurityPanel({ snapshot, sessionId }: Props) {
   const sinkMedium = sinkFindings.filter(
     (f) => f.reachability === "reachable" && f.severity === "medium",
   ).length;
+  // Sinks we found but could not prove a path to. They are in the list below,
+  // deliberately NOT in the tally above — but the two numbers sit next to each
+  // other, and "21 high" above "Findings 40" reads as an arithmetic error
+  // unless we say which is which. Naming the gap is cheaper than losing trust
+  // on the one page whose whole promise is an audit trail.
+  const unproven = sinkFindings.filter(
+    (f) => f.reachability !== "reachable",
+  ).length;
   const notScanned = [
     sinksState === "not-scanned" ? "code paths" : null,
     secretsState === "not-scanned" ? "secrets" : null,
@@ -110,9 +118,14 @@ export function SecurityPanel({ snapshot, sessionId }: Props) {
         ]}
         emptyLabel="No findings across any scanner"
         trailing={
-          notScanned.length > 0
-            ? `${notScanned.join(" + ")} not scanned`
-            : undefined
+          [
+            notScanned.length > 0 ? `${notScanned.join(" + ")} not scanned` : null,
+            unproven > 0
+              ? `counts proven reach only · ${unproven} more listed below without a traced path`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined
         }
       />
       <AnchorGlow>
