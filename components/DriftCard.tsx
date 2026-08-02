@@ -7,7 +7,7 @@
 // accumulated snapshots. Renders at exact pixel dimensions for a
 // publishing-ready PNG.
 
-import type { AnalysisSnapshot } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { driftRows, type DriftReport, type DriftTrend } from "@/lib/driftMetrics";
 import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
 
@@ -56,7 +56,7 @@ function spanDays(report: DriftReport): number {
 }
 
 interface Props {
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
   report: DriftReport;
   variant: DriftCardVariant;
 }

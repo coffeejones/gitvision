@@ -119,8 +119,20 @@ function estimateNodeHeight(cls: ClassDef): number {
 /** Build the ReactFlow data + run Dagre layout in one pass. Pure
  *  function — no DOM, no I/O. Caller plugs the result into a
  *  <ReactFlow nodes={...} edges={...} /> instance. */
+/** The slice of a CodeGraph a class diagram needs.
+ *
+ *  Narrowed deliberately. /architecture used to hand ArchitecturePanel — a
+ *  client component — the WHOLE graph, so a signed-in user (or any visitor on a
+ *  demo session) downloaded 7,154,155 bytes to draw a class diagram. `calls` is
+ *  89.8% of the zod graph, 5.02 MB of 5.59 MB, and nothing here reads it: this
+ *  function touches `cg.classes` and nothing else.
+ *
+ *  Typing the parameter this way is what keeps it honest — widening it back to
+ *  CodeGraph would compile, but adding a read of `cg.calls` will not. */
+export type ClassCanvasGraph = Pick<CodeGraph, "classes">;
+
 export function buildClassCanvas(
-  cg: CodeGraph,
+  cg: ClassCanvasGraph,
   opts: ClassCanvasOptions = {}
 ): ClassCanvasResult {
   const allClasses = cg.classes ?? [];

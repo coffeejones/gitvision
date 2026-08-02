@@ -15,14 +15,15 @@
 // the right trade. It also freed the session layout of any need for snapshot[0].
 
 import { useEffect, useRef, useState } from "react";
-import type { AnalysisSnapshot } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import type { DriftReport } from "@/lib/driftMetrics";
 import { downloadCardPng } from "@/lib/shareCardImage";
 import { TOK } from "@/lib/sessionTheme";
+import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { DriftCard, DRIFT_CARD_DIMS, type DriftCardVariant } from "./DriftCard";
 
 interface Props {
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
   sessionId: string;
   sessionName: string;
   open: boolean;
@@ -59,7 +60,17 @@ export function DriftCardModal({
     if (!open || report) return;
     const ac = new AbortController();
     setLoadError(null);
-    fetch(`/api/sessions/${sessionId}/drift`, { signal: ac.signal })
+    // Send the legacy owner id. requireSessionReadAccessFromRequest reads only
+    // the X-Owner-Id HEADER, while the page that renders this dialog accepts the
+    // gv_owner_id COOKIE as well — so a private session on the legacy ladder
+    // (ownerId, no userId) renders fine and then 404s here. Every other client
+    // fetch in the app already sends it (SessionToolbar, SessionNameEditor,
+    // RefineScope); these two share-card dialogs were the exceptions.
+    const ownerId = getOrCreateOwnerId();
+    fetch(`/api/sessions/${sessionId}/drift`, {
+      signal: ac.signal,
+      headers: ownerId ? { [OWNER_ID_HEADER]: ownerId } : {},
+    })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Could not load drift"))))
       .then((r: DriftReport) => setReport(r))
       .catch((e: unknown) => {

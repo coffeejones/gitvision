@@ -51,7 +51,11 @@ import {
   Truck,
   Zap,
 } from "lucide-react";
-import type { AnalysisSnapshot } from "@/lib/types";
+import type {
+  ClientSnapshot,
+  PaletteIndex,
+  ShellGraphCounts,
+} from "@/lib/clientSnapshot";
 import { STYLE, TOK } from "@/lib/sessionTheme";
 import { CH_FOCUS } from "@/components/chambers/theme";
 import { CommandPalette } from "./CommandPalette";
@@ -59,7 +63,13 @@ import { WorkspaceMotion } from "./views/WorkspaceMotion";
 
 interface Props {
   sessionId: string;
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
+  /** Derived server-side — see lib/clientSnapshot.ts. The sidebar needs five
+   *  scalars off the two graphs, not the graphs. */
+  graphCounts: ShellGraphCounts;
+  /** The palette's searchable index, capped and flattened on the server.
+   *  Null when the snapshot has no code graph. */
+  paletteIndex: PaletteIndex | null;
   children: React.ReactNode;
 }
 
@@ -98,7 +108,13 @@ interface Department {
   items: NavItem[];
 }
 
-export function SessionShell({ sessionId, snapshot, children }: Props) {
+export function SessionShell({
+  sessionId,
+  snapshot,
+  graphCounts,
+  paletteIndex,
+  children,
+}: Props) {
   const pathname = usePathname();
   const base = `/session/${sessionId}`;
 
@@ -192,11 +208,8 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
   // Counts that drive the sidebar badges. Same logic as the v0.3 tab
   // bar — preserved here so users still see "Code · 22,041" at a
   // glance without having to click in.
-  const hasGraph = !!snapshot.fileGraph;
-  const hasCodeGraph = !!snapshot.codeGraph;
-  const depCount = snapshot.fileGraph?.nodes.length ?? 0;
-  const codeFunctionCount = snapshot.codeGraph?.functions.length ?? 0;
-  const classCount = snapshot.codeGraph?.classes?.length ?? 0;
+  const { hasGraph, hasCodeGraph, depCount, codeFunctionCount, classCount } =
+    graphCounts;
   const prCount = snapshot.pullRequests?.length ?? 0;
   const healths =
     snapshot.dependencyHealths ??
@@ -686,7 +699,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
 
       <CommandPalette
         sessionId={sessionId}
-        snapshot={snapshot}
+        index={paletteIndex}
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
       />

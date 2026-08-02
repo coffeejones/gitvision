@@ -21,7 +21,6 @@
 
 import { useState } from "react";
 import { Boxes, Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
-import type { CodeGraph } from "@/lib/types";
 import type {
   ClassDiagramResult,
   ScopeOption,
@@ -31,10 +30,11 @@ import { ArchitectureScope } from "./ArchitectureScope";
 import { ClassCanvas } from "./ClassCanvas";
 import { HelpHint } from "@/components/HelpHint";
 import { EmptyPanel } from "@/components/EmptyPanel";
+import type { ClassCanvasGraph } from "@/lib/intelligence/classCanvas";
 
 interface Props {
   diagram: ClassDiagramResult | null;
-  codeGraph?: CodeGraph;
+  codeGraph?: ClassCanvasGraph;
   codeGraphSkipReason?: string;
   /** Folders sorted by class-count for the scope dropdown. Server-
    *  computed via computeScopeOptions(cg). Empty when there are no

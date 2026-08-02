@@ -21,7 +21,8 @@ import {
 import * as d3 from "d3";
 import { Activity, History, Pause, Play, Users } from "lucide-react";
 import { TermInfo } from "@/components/TermInfo";
-import type { AnalysisSnapshot, FileHotspot, CoChangeEdge } from "@/lib/types";
+import type { FileHotspot, CoChangeEdge } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { TOK } from "@/lib/sessionTheme";
 import {
   MUTED,
@@ -451,7 +452,7 @@ function packByFolder(
 // ------------------- Constellation -------------------
 
 interface Props {
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
 }
 
 // Author color palette — the muted categorical hues (lib/vizPalette); authors

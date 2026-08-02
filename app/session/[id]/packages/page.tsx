@@ -2,6 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { getSessionCached } from "@/lib/sessionCache";
+import { toClientSnapshot } from "@/lib/clientSnapshot";
 import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
 import { isDemoSession } from "@/lib/demoSessions";
@@ -22,6 +23,7 @@ export default async function PackagesRoute({
   const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
+  const clientSnapshot = toClientSnapshot(current);
 
   // SBOM export (Arc 4) — Pro-only; demo sessions bypass to showcase it.
   const authSession = await getAuthSession();
@@ -59,7 +61,7 @@ export default async function PackagesRoute({
         </p>
       </header>
       <div id="screenshot-target" className="flex flex-col gap-6">
-        <PackagesPanel snapshot={current} />
+        <PackagesPanel snapshot={clientSnapshot} />
         {/* CI-hardening (Arc 4) — the supply chain doesn't stop at manifests;
          *  the workflows that build + publish are attack surface too. Hidden
          *  when the repo has no workflows / pre-dates the check. */}

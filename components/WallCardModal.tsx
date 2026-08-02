@@ -1,38 +1,51 @@
 "use client";
 
 // Modal that previews the load-bearing walls share card and downloads a PNG.
-// Mirrors ShareCardModal; the only difference is the content — it computes the
-// refactor-safety report from the snapshot's code graph and renders WallCard.
+// Mirrors ShareCardModal and DriftCardModal; the content is a refactor-safety
+// report over the snapshot's code graph.
+//
+// THE REPORT IS FETCHED WHEN THIS OPENS, not derived from a prop. This modal
+// was the ONLY client component that needed snapshot.codeGraph, and because it
+// is mounted (closed) on every session route, that one useMemo was why the
+// entire graph rode along in the flight payload of every tab in the workspace —
+// 5.59 MB of the zod session's 6.34 MB, on a page about pull requests.
+//
+// The compute was already deferred to first open, which was the right instinct;
+// the DATA still travelled eagerly, and the data was the expensive part. Opening
+// a share-card dialog is a deliberate act, so paying a roundtrip here is the
+// right trade — and the report is counts plus a bounded file list, so what comes
+// back is kilobytes.
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { AnalysisSnapshot } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
+import type { RefactorSafetyReport } from "@/lib/refactorSafety";
 import { downloadCardPng } from "@/lib/shareCardImage";
 import { TOK } from "@/lib/sessionTheme";
-import { computeRefactorSafety } from "@/lib/refactorSafety";
+import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { WallCard, WALL_CARD_DIMS, type WallCardVariant } from "./WallCard";
 
 interface Props {
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
+  sessionId: string;
   sessionName: string;
   open: boolean;
   onClose: () => void;
 }
 
-export function WallCardModal({ snapshot, sessionName, open, onClose }: Props) {
+export function WallCardModal({
+  snapshot,
+  sessionId,
+  sessionName,
+  open,
+  onClose,
+}: Props) {
   const [variant, setVariant] = useState<WallCardVariant>("landscape");
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<RefactorSafetyReport | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-
-  // Gated on `open`: this modal is mounted (closed) on every session route, so
-  // computing the full refactor-safety pass at mount would waste a graph walk
-  // on every page load for the majority of visits that never open the card.
-  // Deferred to first open; still memoized across re-renders (variant flip,
-  // download state).
-  const report = useMemo(
-    () => (open && snapshot.codeGraph ? computeRefactorSafety(snapshot.codeGraph) : null),
-    [open, snapshot.codeGraph]
-  );
 
   useEffect(() => {
     if (!open) return;
@@ -43,6 +56,37 @@ export function WallCardModal({ snapshot, sessionName, open, onClose }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  // Fetch once per visit, and keep the result — reopening should not re-walk the
+  // graph. The guard is `loaded`, not `report`: a snapshot with no code graph
+  // answers `{ report: null }`, which is a real answer, and guarding on the
+  // report itself would re-request it on every open forever.
+  useEffect(() => {
+    if (!open || loaded) return;
+    const ac = new AbortController();
+    setLoadError(null);
+    // Send the legacy owner id. requireSessionReadAccessFromRequest reads only
+    // the X-Owner-Id HEADER, while the page that renders this dialog accepts the
+    // gv_owner_id COOKIE as well — so a private session on the legacy ladder
+    // (ownerId, no userId) renders fine and then 404s here. Every other client
+    // fetch in the app already sends it (SessionToolbar, SessionNameEditor,
+    // RefineScope); these two share-card dialogs were the exceptions.
+    const ownerId = getOrCreateOwnerId();
+    fetch(`/api/sessions/${sessionId}/refactor-safety`, {
+      signal: ac.signal,
+      headers: ownerId ? { [OWNER_ID_HEADER]: ownerId } : {},
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Could not load the report"))))
+      .then((body: { report: RefactorSafetyReport | null }) => {
+        setReport(body.report);
+        setLoaded(true);
+      })
+      .catch((e: unknown) => {
+        if (e instanceof Error && e.name === "AbortError") return;
+        setLoadError(e instanceof Error ? e.message : "Could not load the report");
+      });
+    return () => ac.abort();
+  }, [open, loaded, sessionId]);
 
   if (!open) return null;
 
@@ -132,6 +176,18 @@ export function WallCardModal({ snapshot, sessionName, open, onClose }: Props) {
                 <WallCard snapshot={snapshot} report={report!} variant={variant} />
               </div>
             </div>
+          ) : loadError ? (
+            <p className="text-sm text-center max-w-sm" style={{ color: TOK.rose }}>
+              {loadError}
+            </p>
+          ) : !loaded ? (
+            // The fetch, not the verdict. Distinct from the message below, which
+            // is a real answer about the repo rather than a wait — showing "no
+            // load-bearing walls" while the request is still in flight would
+            // state a finding we do not have yet.
+            <p className="text-sm text-center max-w-sm" style={{ color: TOK.textMuted }}>
+              Measuring the walls…
+            </p>
           ) : (
             <p className="text-sm text-center max-w-sm" style={{ color: TOK.textMuted }}>
               No load-bearing walls to show — this repo&rsquo;s files are

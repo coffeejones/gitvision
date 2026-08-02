@@ -4,7 +4,7 @@
 // lets the user flip variant (landscape / square), and downloads a PNG.
 
 import { useEffect, useRef, useState } from "react";
-import type { AnalysisSnapshot } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { downloadCardPng } from "@/lib/shareCardImage";
 import { TOK } from "@/lib/sessionTheme";
 import {
@@ -14,7 +14,7 @@ import {
 } from "./ShareCard";
 
 interface Props {
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
   sessionName: string;
   open: boolean;
   onClose: () => void;

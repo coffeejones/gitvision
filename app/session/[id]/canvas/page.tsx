@@ -2,6 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { getSessionCached } from "@/lib/sessionCache";
+import { toClientSnapshot } from "@/lib/clientSnapshot";
 import { TOK } from "@/lib/sessionTheme";
 import { Constellation } from "@/components/views/Constellation";
 import { TermInfo } from "@/components/TermInfo";
@@ -17,6 +18,7 @@ export default async function CanvasPage({
   const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
+  const clientSnapshot = toClientSnapshot(current);
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-8 max-w-7xl mx-auto w-full">
@@ -53,7 +55,7 @@ export default async function CanvasPage({
         </p>
       </header>
       <div id="screenshot-target" className="flex flex-col gap-4">
-        <Constellation snapshot={current} />
+        <Constellation snapshot={clientSnapshot} />
       </div>
     </main>
   );

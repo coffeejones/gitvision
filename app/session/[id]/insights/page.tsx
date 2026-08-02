@@ -17,6 +17,7 @@
 
 import { notFound } from "next/navigation";
 import { getSessionCached } from "@/lib/sessionCache";
+import { toClientSnapshot } from "@/lib/clientSnapshot";
 import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
 import { isDemoSession } from "@/lib/demoSessions";
@@ -38,6 +39,7 @@ export default async function InsightsRoute({
   const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
+  const clientSnapshot = toClientSnapshot(current);
 
   // Tier gate: AI Insights is unlocked from Plus tier up. Free
   // users land on the upgrade prompt instead of the panels — we
@@ -113,12 +115,12 @@ export default async function InsightsRoute({
           <>
             <AiSummaryPanel
               sessionId={session.id}
-              snapshot={current}
+              snapshot={clientSnapshot}
               readOnly={isDemo}
             />
             <HealthPanel
               sessionId={session.id}
-              snapshot={current}
+              snapshot={clientSnapshot}
               readOnly={isDemo}
             />
           </>

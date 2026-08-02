@@ -13,7 +13,7 @@
 // HIGH-severity findings on top regardless of which scanner emitted
 // them. Matches the pattern Snyk + GitHub Dependabot use.
 
-import type { AnalysisSnapshot } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { findIncidentMatches } from "@/lib/security/knownIncidents";
 import { KNOWN_INCIDENTS } from "@/lib/security/knownIncidents";
 import { TOK } from "@/lib/sessionTheme";
@@ -23,7 +23,7 @@ import { StatusGrid } from "./StatusGrid";
 import { FindingsList } from "./FindingsList";
 
 interface Props {
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
   sessionId: string;
 }
 

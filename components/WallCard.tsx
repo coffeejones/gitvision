@@ -6,7 +6,7 @@
 // that ripple the widest with the thinnest test net, the ones nobody dares
 // touch. Renders at exact pixel dimensions for a publishing-ready PNG.
 
-import type { AnalysisSnapshot } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import type { RefactorSafetyReport, SafetyTier } from "@/lib/refactorSafety";
 import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
 
@@ -35,7 +35,7 @@ function dirName(p: string): string {
 }
 
 interface Props {
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
   report: RefactorSafetyReport;
   variant: WallCardVariant;
 }

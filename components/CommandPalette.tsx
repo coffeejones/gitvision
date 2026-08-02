@@ -19,11 +19,15 @@
 //     Source were in the sidebar with no way to reach them by Cmd+K.
 //     lib/__tests__/sessionNavLockstep.test.ts now fails when the two
 //     lists disagree, so the next tab cannot be added to only one.
-//   - Files in the snapshot's file-complexity index (Code tab data) —
-//     top 200 to keep the search index small; substring match on path
-//   - Functions from the codeGraph — top 200 by complexity; substring
+//   - Files from the code graph's file-complexity index — top 200 to keep
+//     the search index small; substring match on path
+//   - Functions from the code graph — top 200 by complexity; substring
 //     match on name OR `${containerType}.${name}` so "Blueprint.add"
 //     finds Blueprint.add_url_rule
+//
+//     Both lists arrive prebuilt from the server (lib/clientSnapshot.ts).
+//     Sorting and slicing them HERE meant the whole code graph had to be
+//     serialized to the browser to pick 400 items out of it.
 //
 // Picking a file navigates to /code?file=<path>; picking a function
 // navigates to /code?file=<path>&fn=<name>&container=<type>. Both
@@ -59,12 +63,16 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import type { AnalysisSnapshot } from "@/lib/types";
+import type { PaletteIndex } from "@/lib/clientSnapshot";
 import { STYLE, TOK } from "@/lib/sessionTheme";
 
 interface Props {
   sessionId: string;
-  snapshot: AnalysisSnapshot;
+  /** Prebuilt on the server (lib/clientSnapshot.ts) — already sorted and capped.
+   *  Null when the snapshot has no code graph, in which case only pages are
+   *  searchable. Taking an index rather than a snapshot is what keeps the graph
+   *  off the wire. */
+  index: PaletteIndex | null;
   /** Controlled by the parent. The shell owns the open state so a
    *  separate "Search…" trigger button in the sidebar can open the
    *  palette without poking at internal state. */
@@ -83,11 +91,9 @@ interface PaletteItem {
   href: string;
 }
 
-const MAX_FILES = 200;
-const MAX_FUNCTIONS = 200;
 const VISIBLE_PER_GROUP = 6;
 
-export function CommandPalette({ sessionId, snapshot, open, onClose }: Props) {
+export function CommandPalette({ sessionId, index, open, onClose }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
@@ -122,42 +128,36 @@ export function CommandPalette({ sessionId, snapshot, open, onClose }: Props) {
       { id: "p:verdict", group: "pages", label: "Final grade", icon: <Gauge size={13} />, href: `${base}/verdict` },
     ];
 
-    const cg = snapshot.codeGraph;
-    if (!cg) return pages;
+    if (!index) return pages;
 
-    // Top files by complexity. Capped at MAX_FILES so monorepos like
-    // golang/go don't make every keystroke filter through 6000 paths.
-    const files: PaletteItem[] = Object.entries(cg.fileComplexity)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, MAX_FILES)
-      .map(([file, complexity]) => ({
-        id: `f:${file}`,
-        group: "files",
-        label: file,
-        hint: `complexity ${complexity}`,
-        icon: <FileCode size={13} />,
-        href: `${base}/code?file=${encodeURIComponent(file)}`,
-      }));
+    // The sort and the caps moved to lib/clientSnapshot.ts, because doing them
+    // here meant shipping the whole code graph to the browser to pick 400 items
+    // out of it. What arrives is already ordered and already sliced.
+    const files: PaletteItem[] = index.files.map(({ path, complexity }) => ({
+      id: `f:${path}`,
+      group: "files",
+      label: path,
+      hint: `complexity ${complexity}`,
+      icon: <FileCode size={13} />,
+      href: `${base}/code?file=${encodeURIComponent(path)}`,
+    }));
 
-    const functions: PaletteItem[] = [...cg.functions]
-      .sort((a, b) => b.complexity - a.complexity)
-      .slice(0, MAX_FUNCTIONS)
-      .map((fn) => {
-        const display = fn.containerType ? `${fn.containerType}.${fn.name}` : fn.name;
-        const params = new URLSearchParams({ file: fn.filePath, fn: fn.name });
-        if (fn.containerType) params.set("container", fn.containerType);
-        return {
-          id: `fn:${fn.filePath}:${fn.containerType ?? ""}:${fn.name}`,
-          group: "functions",
-          label: display,
-          hint: `${fn.filePath} · complexity ${fn.complexity}`,
-          icon: <Hash size={13} />,
-          href: `${base}/code?${params.toString()}`,
-        };
-      });
+    const functions: PaletteItem[] = index.functions.map((fn) => {
+      const display = fn.containerType ? `${fn.containerType}.${fn.name}` : fn.name;
+      const params = new URLSearchParams({ file: fn.filePath, fn: fn.name });
+      if (fn.containerType) params.set("container", fn.containerType);
+      return {
+        id: `fn:${fn.filePath}:${fn.containerType ?? ""}:${fn.name}`,
+        group: "functions",
+        label: display,
+        hint: `${fn.filePath} · complexity ${fn.complexity}`,
+        icon: <Hash size={13} />,
+        href: `${base}/code?${params.toString()}`,
+      };
+    });
 
     return [...pages, ...files, ...functions];
-  }, [sessionId, snapshot]);
+  }, [sessionId, index]);
 
   // Filter against the query — case-insensitive substring match
   // against label + hint. Reasonable for alpha; fuzzy ranking

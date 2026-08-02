@@ -58,6 +58,16 @@ export default async function ArchitectureRoute({
 
   const codeGraph = current.codeGraph;
 
+  // ArchitecturePanel is a CLIENT component, so whatever it receives is
+  // serialized into this page's flight payload. Handing it the whole graph made
+  // /architecture 7,154,155 bytes on the zod session — 34,687 occurrences of
+  // `toFile` — to draw a class diagram. buildClassCanvas reads `classes` and
+  // nothing else, and `calls` alone is 89.8% of that graph.
+  //
+  // Everything else on this page (computeScopeOptions, generateClassDiagram)
+  // runs HERE, on the server, and keeps the full graph.
+  const canvasGraph = codeGraph ? { classes: codeGraph.classes } : undefined;
+
   // Scope handling — empty / missing param falls through to "all
   // classes". Validate the folder still exists in the current
   // CodeGraph before applying — stale URLs (e.g. shared after a
@@ -124,7 +134,7 @@ export default async function ArchitectureRoute({
         {hasArchitecture ? (
           <ArchitecturePanel
             diagram={diagram}
-            codeGraph={codeGraph}
+            codeGraph={canvasGraph}
             codeGraphSkipReason={current.codeGraphSkipReason}
             scopeOptions={scopeOptions}
             currentScope={currentScope}

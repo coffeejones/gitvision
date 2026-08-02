@@ -30,6 +30,11 @@
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import { getSessionCached } from "@/lib/sessionCache";
+import {
+  toClientSnapshot,
+  computeShellGraphCounts,
+  buildPaletteIndex,
+} from "@/lib/clientSnapshot";
 import { requireSessionReadAccess } from "@/lib/ownership";
 import { SessionToolbar } from "@/components/SessionToolbar";
 import { SessionShell } from "@/components/SessionShell";
@@ -95,6 +100,22 @@ export default async function SessionLayout({
   const current = session.snapshots[session.snapshots.length - 1];
   if (!current) notFound();
 
+  // NO CODE GRAPH ON THE CLIENT PROPS. SessionToolbar and SessionShell are both
+  // client components, so everything reachable from these props is serialized
+  // into the flight payload of EVERY tab. codeGraph is 88% of a snapshot — the
+  // zod session served 7,092,975 bytes on /prs against a 178,684-byte graph-free
+  // floor, with 34,687 occurrences of `toFile` in the HTML of a page about pull
+  // requests. Gzip hid most of it on the wire; the browser still inflated and
+  // parsed all of it before painting.
+  //
+  // What the client actually needed off the graph was five scalars and two
+  // capped lists, both derived here. The one real consumer, WallCardModal's
+  // refactor-safety pass, now fetches /api/sessions/[id]/refactor-safety when
+  // its dialog opens.
+  const clientSnapshot = toClientSnapshot(current);
+  const graphCounts = computeShellGraphCounts(current);
+  const paletteIndex = buildPaletteIndex(current);
+
   // NO DRIFT REPORT HERE ANY MORE. This layout used to compute it for the
   // toolbar's share card, which meant all seventeen tabs paid for it on every
   // navigation — and computeDriftTrends compares the OLDEST and NEWEST
@@ -115,14 +136,19 @@ export default async function SessionLayout({
         <SessionToolbar
           sessionId={session.id}
           sessionName={session.name}
-          snapshot={current}
+          snapshot={clientSnapshot}
           targetId="screenshot-target"
           updatedAtISO={session.updatedAt}
           snapshotCount={session.snapshots.length}
         />
       </HideOnMarketing>
 
-      <SessionShell sessionId={session.id} snapshot={current}>
+      <SessionShell
+        sessionId={session.id}
+        snapshot={clientSnapshot}
+        graphCounts={graphCounts}
+        paletteIndex={paletteIndex}
+      >
         {children}
       </SessionShell>
     </div>

@@ -44,7 +44,21 @@ export type OwnershipDecision = "allowed" | "denied";
  *  the `private` field — those are all from public-repo analyses
  *  done before per-user OAuth landed, so the default is safe. */
 export function isSessionPrivate(session: Session): boolean {
-  const latest = session.snapshots[session.snapshots.length - 1];
+  // `snapshots` is typed non-optional, so tsc never questioned this — but a
+  // partial or truncated write produces a session object without it, and
+  // `session.snapshots.length` then throws inside the access gate. Observed as
+  // a 500 from /api/sessions/[id]/source, /drift and /refactor-safety.
+  //
+  // It fails CLOSED (the request dies before any data is returned), so this is
+  // an availability bug rather than a leak. app/session/[id]/layout.tsx already
+  // treats a snapshot-less session as not-found for exactly this reason; the
+  // gate simply never got the same guard.
+  //
+  // Answering `false` here is the same fallback the doc comment describes: a
+  // session with no snapshots has no analyzed repo, so there is nothing to
+  // protect, and every caller still has to cope with the missing snapshot.
+  const snapshots = session.snapshots ?? [];
+  const latest = snapshots[snapshots.length - 1];
   return latest?.repo?.private === true;
 }
 

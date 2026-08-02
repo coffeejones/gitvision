@@ -7,7 +7,8 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCw, Stethoscope } from "lucide-react";
-import type { AnalysisSnapshot, HealthSignal } from "@/lib/types";
+import type { HealthSignal } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { TOK } from "@/lib/sessionTheme";
 
 /** The three anchor IDs the HealthSummary tiles deep-link to. Kept
@@ -87,7 +88,7 @@ function useAnchorFlash() {
 
 interface Props {
   sessionId: string;
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
   /** Read-only display: cached health check, no generate / regenerate
    *  control. Used on the public demo sessions (pre-baked, anonymous). */
   readOnly?: boolean;

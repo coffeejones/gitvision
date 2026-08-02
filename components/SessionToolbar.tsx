@@ -39,7 +39,7 @@ import {
   Trash2,
   TrendingUp,
 } from "lucide-react";
-import type { AnalysisSnapshot } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { pollJob } from "@/lib/jobsClient";
 import { getOrCreateOwnerId, OWNER_ID_HEADER } from "@/lib/ownerId";
 import { TOK } from "@/lib/sessionTheme";
@@ -56,7 +56,7 @@ import { Logo } from "./Logo";
 interface Props {
   sessionId: string;
   sessionName: string;
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
   targetId: string;
   // Delivered from the parent session page so we know what to show in the top strip
   updatedAtISO: string;
@@ -461,6 +461,7 @@ export function SessionToolbar({
       />
       <WallCardModal
         snapshot={snapshot}
+        sessionId={sessionId}
         sessionName={sessionName}
         open={wallOpen}
         onClose={() => setWallOpen(false)}

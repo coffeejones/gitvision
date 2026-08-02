@@ -10,7 +10,7 @@
 // captured live (html-to-image), so the CodeTrawl webfonts embed in the PNG.
 
 import Image from "next/image";
-import type { AnalysisSnapshot } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
 import { MUTED } from "@/lib/vizPalette";
 
@@ -124,7 +124,7 @@ function fileBasename(p: string): string {
 }
 
 interface Props {
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
   variant: ShareCardVariant;
 }
 

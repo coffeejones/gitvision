@@ -15,6 +15,7 @@
 
 import { notFound } from "next/navigation";
 import { getSessionCached } from "@/lib/sessionCache";
+import { toClientSnapshot } from "@/lib/clientSnapshot";
 import { SecurityPanel } from "@/components/views/security/SecurityPanel";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
 
@@ -29,6 +30,7 @@ export default async function SecurityRoute({
   const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
+  const clientSnapshot = toClientSnapshot(current);
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-5xl mx-auto w-full">
@@ -38,7 +40,7 @@ export default async function SecurityRoute({
         line="Four deterministic scanners — incidents, secrets, code paths, risky eval/exec. Every finding maps to an advisory, a known incident, or a literal match. Code-path findings also say whether anything can actually reach them: a traced path means reachable from an entry point, not that the call happens on every request."
       />
 
-      <SecurityPanel snapshot={current} sessionId={id} />
+      <SecurityPanel snapshot={clientSnapshot} sessionId={id} />
     </main>
   );
 }

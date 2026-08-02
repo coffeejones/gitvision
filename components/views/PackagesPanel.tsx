@@ -15,13 +15,8 @@ import {
   PackageX,
   ShieldAlert,
 } from "lucide-react";
-import type {
-  AnalysisSnapshot,
-  DependencyHealth,
-  DeprecatedDep,
-  OutdatedDep,
-  VulnerableDep,
-} from "@/lib/types";
+import type { DependencyHealth, DeprecatedDep, OutdatedDep, VulnerableDep } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { TOK } from "@/lib/sessionTheme";
 import { SearchInput } from "@/components/SearchInput";
 import { HelpHint } from "@/components/HelpHint";
@@ -64,7 +59,7 @@ function ecosystemLabel(eco: string): string {
 
 // ------------------- Props -------------------
 
-export function PackagesPanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
+export function PackagesPanel({ snapshot }: { snapshot: ClientSnapshot }) {
   const healths =
     snapshot.dependencyHealths ??
     (snapshot.dependencyHealth ? [snapshot.dependencyHealth] : []);

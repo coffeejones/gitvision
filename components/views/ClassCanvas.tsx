@@ -48,7 +48,6 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowUpRight, Boxes, Search, X } from "lucide-react";
-import type { CodeGraph } from "@/lib/types";
 import type { ParsedField } from "@/lib/codeAnalysis/types";
 import {
   buildClassCanvas,
@@ -61,9 +60,10 @@ import { MUTED } from "@/lib/vizPalette";
 import { EmptyPanel } from "@/components/EmptyPanel";
 import { TermInfo } from "@/components/TermInfo";
 import type { GlossaryKey } from "@/lib/glossary";
+import type { ClassCanvasGraph } from "@/lib/intelligence/classCanvas";
 
 interface Props {
-  codeGraph: CodeGraph;
+  codeGraph: ClassCanvasGraph;
   scope?:
     | { kind: "all" }
     | { kind: "file"; filePath: string }

@@ -6,13 +6,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import type { AnalysisSnapshot, Contributor } from "@/lib/types";
+import type { Contributor } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { downloadCardPng } from "@/lib/shareCardImage";
 import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
 import { TOK } from "@/lib/sessionTheme";
 
 interface Props {
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
   open: boolean;
   onClose: () => void;
 }
@@ -44,7 +45,7 @@ interface ContribStats {
   firstCommit: string | null;
 }
 
-function computeStats(snapshot: AnalysisSnapshot): ContribStats[] {
+function computeStats(snapshot: ClientSnapshot): ContribStats[] {
   // sha → { date, login, name }
   const shaMeta = new Map<
     string,

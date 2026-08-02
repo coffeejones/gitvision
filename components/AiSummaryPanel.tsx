@@ -7,13 +7,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCw, Sparkles } from "lucide-react";
-import type { AnalysisSnapshot } from "@/lib/types";
+import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { TOK } from "@/lib/sessionTheme";
 import { AnchorGlow } from "@/components/views/AnchorGlow";
 
 interface Props {
   sessionId: string;
-  snapshot: AnalysisSnapshot;
+  snapshot: ClientSnapshot;
   /** Read-only display: show the cached briefing but no generate /
    *  regenerate control. Used on the public demo sessions, whose AI output is
    *  pre-baked and whose anonymous viewers can't (and shouldn't) generate. */
