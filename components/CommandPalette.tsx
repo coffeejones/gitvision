@@ -7,10 +7,18 @@
 // name. Linear / Raycast / Sublime CmdShift+P pattern.
 //
 // What's searchable:
-//   - Workspace pages — all 10 tabs across the four departments
-//     (Health: Overview/Insights/Signals · Security · Forensics:
-//     Architecture/Canvas/Code/Imports · Supply: Packages/PRs).
-//     Listed in sidebar order so muscle memory transfers.
+//   - Workspace pages — every sidebar destination across the four
+//     departments (Health: Overview/Insights/Signals · Security ·
+//     Forensics: Flows/Refactor/Faultline/Test quality/Architecture/
+//     Canvas/Code/Source/Imports · Supply: Packages/PRs), plus the
+//     Final grade pin. Listed in sidebar order so muscle memory
+//     transfers.
+//
+//     This list is hand-maintained and drifted: it said "all 10 tabs"
+//     while Forensics had grown from 4 entries to 9, and Faultline and
+//     Source were in the sidebar with no way to reach them by Cmd+K.
+//     lib/__tests__/sessionNavLockstep.test.ts now fails when the two
+//     lists disagree, so the next tab cannot be added to only one.
 //   - Files in the snapshot's file-complexity index (Code tab data) —
 //     top 200 to keep the search index small; substring match on path
 //   - Functions from the codeGraph — top 200 by complexity; substring
@@ -35,6 +43,7 @@ import {
   Boxes,
   Code as CodeIcon,
   FileCode,
+  FileText,
   Gauge,
   GitPullRequest,
   Hash,
@@ -48,6 +57,7 @@ import {
   ShieldAlert,
   Route,
   Sparkles,
+  Zap,
 } from "lucide-react";
 import type { AnalysisSnapshot } from "@/lib/types";
 import { STYLE, TOK } from "@/lib/sessionTheme";
@@ -97,10 +107,12 @@ export function CommandPalette({ sessionId, snapshot, open, onClose }: Props) {
       // Forensics
       { id: "p:flows", group: "pages", label: "Flows", icon: <Route size={13} />, href: `${base}/flows` },
       { id: "p:refactor", group: "pages", label: "Refactor", icon: <ShieldAlert size={13} />, href: `${base}/refactor` },
+      { id: "p:faultline", group: "pages", label: "Faultline", icon: <Zap size={13} />, href: `${base}/faultline` },
       { id: "p:testquality", group: "pages", label: "Test quality", icon: <FlaskConical size={13} />, href: `${base}/testquality` },
       { id: "p:architecture", group: "pages", label: "Architecture", icon: <Boxes size={13} />, href: `${base}/architecture` },
       { id: "p:canvas", group: "pages", label: "Canvas", icon: <Network size={13} />, href: `${base}/canvas` },
       { id: "p:code", group: "pages", label: "Code", icon: <CodeIcon size={13} />, href: `${base}/code` },
+      { id: "p:source", group: "pages", label: "Source", icon: <FileText size={13} />, href: `${base}/source` },
       { id: "p:imports", group: "pages", label: "Imports", icon: <FileCode size={13} />, href: `${base}/imports` },
       // Supply
       { id: "p:packages", group: "pages", label: "Packages", icon: <Package size={13} />, href: `${base}/packages` },
