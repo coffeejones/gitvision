@@ -100,6 +100,8 @@ const HIGH_COMPLEXITY = 30; // aggregate file complexity that's genuinely hard
 const SOME_COMPLEXITY = 20;
 const SOME_UNTESTED = 3; // untested dependents that make a thin safety net
 const SAMPLE_CAP = 12;
+/** How many tests the prioritizer will name. See the note at its use site. */
+const TESTS_TO_RUN_CAP = 10;
 
 function classify(
   dependents: number,
@@ -284,7 +286,16 @@ export function computeRefactorSafety(
             b.guards - a.guards ||
             cmpStr(a.file, b.file),
         )
-        .slice(0, 6);
+        // TEN, not six. Measured against a mutation oracle on two repos
+        // (bench/README.md): six caught 0.818 of the tests that actually fail
+        // when a TypeScript file breaks and 0.229 on Python; ten catches 0.955
+        // and 0.314, for three points of precision. Recall is the property
+        // that matters — a guarding test we omit is one the developer was told
+        // they did not need to run — and beyond ten nothing improves on
+        // TypeScript, so this is the knee of the curve rather than a round
+        // number. Python keeps climbing to 0.600 at twenty, but a
+        // twenty-item list stops being advice.
+        .slice(0, TESTS_TO_RUN_CAP);
     }
 
     files.push({

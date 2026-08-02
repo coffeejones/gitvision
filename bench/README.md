@@ -265,10 +265,22 @@ Security benchmark unchanged throughout (tuned 193/18, held-out 375/42, traps
 262/262, production 68) — the resolver is shared, so that was the thing to
 watch.
 
-### Open decision, not taken
+### The cap: raised to ten
 
-**Raise the cap?** The accuracy case is now quantified on both languages:
-cap 10 buys TypeScript 0.818 → 0.955 and Python 0.229 → 0.314; cap 20 takes
-Python to 0.600 and does nothing more for TypeScript. Against that, a
-twenty-item "tests worth running" list is arguably not advice at all. That is a
-product judgement, so it is left alone.
+Ten is the knee of the measured curve, not a round number.
+
+| cap | TypeScript recall | Python recall | TS precision |
+|---:|---:|---:|---:|
+| 6 (was) | 0.818 | 0.229 | 0.214 |
+| **10 (now)** | **0.955** | **0.314** | 0.183 |
+| 20 | 0.955 | 0.600 | 0.135 |
+
+Four more slots buy TypeScript 14 points of recall for 3 of precision, and
+beyond ten nothing improves there at all. Python keeps climbing to 0.600 at
+twenty — but a twenty-item "tests worth running" list stops being advice, and
+the density argument is weaker than it looks anyway: the refactor page renders
+one compact row per file and the test list lives in a drill-down, so the cap
+does not affect the page a reader scans.
+
+Low precision remains deliberate. Naming ten tests when three would do costs
+seconds; omitting a guarding test is a break shipped.

@@ -209,12 +209,15 @@ describe("computeRefactorSafety — which tests to run, in what order", () => {
     expect(listed).toContain("lib/__tests__/storageDeleteByInstallation.test.ts");
   });
 
-  it("still caps the list — six is the budget, not a suggestion", () => {
-    const cg = crowded("lib/core.ts", Array.from({ length: 12 }, (_, i) =>
-      `lib/__tests__/t${i}.test.ts`));
+  it("still caps the list — ten is the budget, not a suggestion", () => {
+    // Ten is the knee of the measured curve, not a round number: six recovers
+    // 0.818 of the tests that actually catch a break on this repo, ten
+    // recovers 0.955, and twenty adds nothing further.
+    const cg = crowded("lib/core.ts", Array.from({ length: 25 }, (_, i) =>
+      `lib/__tests__/t${String(i).padStart(2, "0")}.test.ts`));
     const f = computeRefactorSafety(cg, { withTests: true })
       .files.find((x) => x.file === "lib/core.ts");
-    expect(f?.testsToRun?.length).toBe(6);
+    expect(f?.testsToRun?.length).toBe(10);
   });
 });
 
