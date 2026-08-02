@@ -12,6 +12,7 @@ import {
   Truck,
 } from "lucide-react";
 import { CH, CH_FOCUS } from "./theme";
+import { VERDICT_SIGNAL_COUNT } from "@/lib/intelligence/verdict";
 
 const STEPS: { n: number; title: string; body: string }[] = [
   {
@@ -22,7 +23,7 @@ const STEPS: { n: number; title: string; body: string }[] = [
   {
     n: 2,
     title: "Four lenses examine it",
-    body: "Health, Security, Forensics and Supply each score the repo using ~20 deterministic signals drawn from git history, dependency manifests and the parsed code graph.",
+    body: `Health, Security, Forensics and Supply each score the repo using ${VERDICT_SIGNAL_COUNT} deterministic signals drawn from git history, dependency manifests and the parsed code graph.`,
   },
   {
     n: 3,

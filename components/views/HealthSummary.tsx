@@ -28,6 +28,7 @@ import type {
   DimensionSummary,
   DimensionTrend,
 } from "@/lib/intelligence/healthSummary";
+import { HEALTH_SIGNAL_COUNT } from "@/lib/intelligence/healthSummary";
 import { STYLE, TOK } from "@/lib/sessionTheme";
 import { TermInfo } from "@/components/TermInfo";
 import type { GlossaryKey } from "@/lib/glossary";
@@ -143,7 +144,7 @@ export function HealthSummary({
           <span
             className="text-xs"
             style={{ color: TOK.textMuted }}
-            title="These tiles are computed from 20 deterministic rule-based signals — no AI involved. The /insights page adds Claude's plain-English commentary on the same signals."
+            title={`These tiles are computed from ${HEALTH_SIGNAL_COUNT} deterministic rule-based signals — no AI involved. The /insights page adds Claude's plain-English commentary on the same signals.`}
           >
             · rule-based signals · no AI required
           </span>

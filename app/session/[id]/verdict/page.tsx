@@ -30,7 +30,7 @@ import { canAccess } from "@/lib/billing/gates";
 import { isDemoSession } from "@/lib/demoSessions";
 import { checkSessionOwnership } from "@/lib/ownership";
 import { consumeAiBudget } from "@/lib/aiBudget";
-import { computeVerdict } from "@/lib/intelligence/verdict";
+import { computeVerdict, VERDICT_SIGNAL_COUNT } from "@/lib/intelligence/verdict";
 import { computeAdoptionRead } from "@/lib/intelligence/adoptionRead";
 import { generateRecommendations } from "@/lib/recommendations";
 import { generateRecommendationNarrative } from "@/lib/intelligence/recommendationNarrative";
@@ -157,7 +157,7 @@ export default async function VerdictRoute({
           className="text-sm sm:text-base max-w-2xl leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          Each lens scores the codebase using the same 20 deterministic
+          Each lens scores the codebase using the same {VERDICT_SIGNAL_COUNT} deterministic
           signals you see across the workspace. The combined grade is the
           bottom line. Every claim below is anchored to a signal you can
           drill into.

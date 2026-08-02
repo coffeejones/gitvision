@@ -1,6 +1,6 @@
 // Traffic-light health summary for the session Overview (v0.59 / A3).
 //
-// Maps the 21 deterministic signals from extractHealthSignals() into 6
+// Maps the deterministic signals from extractHealthSignals() into 6
 // dimensions with one of 4 statuses each:
 //
 //   critical  red    high-severity needsWork in this dimension
@@ -119,6 +119,23 @@ const DIMENSION_SIGNAL_IDS: Record<DimensionId, readonly string[]> = {
     "ci-hardened",
   ],
 };
+
+/** How many distinct deterministic signals feed the six tiles.
+ *
+ *  DERIVED, never typed. The product told users "20 deterministic signals" in
+ *  five places and "21" in a sixth, while the real answer was 34 — a number
+ *  nobody had recounted since the map grew. On a product whose whole claim is
+ *  that the tiles are computed rather than guessed, a count that is wrong by
+ *  fourteen is the worst possible place to be sloppy.
+ *
+ *  Note this is NOT the same number as VERDICT_SIGNAL_COUNT: the verdict's four
+ *  lenses read a 30-id subset of these 34 (they skip the three CI-hardening
+ *  signals and concentrated-ownership). One number for both surfaces would be
+ *  wrong on one of them, which is probably how the drift started. */
+export const HEALTH_SIGNAL_IDS: ReadonlySet<string> = new Set(
+  Object.values(DIMENSION_SIGNAL_IDS).flat(),
+);
+export const HEALTH_SIGNAL_COUNT = HEALTH_SIGNAL_IDS.size;
 
 const DIMENSION_LABELS: Record<DimensionId, string> = {
   activity: "Activity",

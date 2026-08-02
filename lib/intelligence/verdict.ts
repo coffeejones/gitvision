@@ -163,6 +163,14 @@ const DEPARTMENT_SIGNAL_IDS: Record<DepartmentId, readonly string[]> = {
   ],
 };
 
+/** How many distinct signals the four lenses read. Derived — see the note on
+ *  HEALTH_SIGNAL_COUNT in lib/intelligence/healthSummary.ts. This is a SUBSET
+ *  of that count, so the two must not be used interchangeably in copy. */
+export const VERDICT_SIGNAL_IDS: ReadonlySet<string> = new Set(
+  Object.values(DEPARTMENT_SIGNAL_IDS).flat(),
+);
+export const VERDICT_SIGNAL_COUNT = VERDICT_SIGNAL_IDS.size;
+
 // Display titles for the four lenses. The DepartmentId type values stay
 // (health/security/forensics/supply) — these are the CodeTrawl-voiced labels.
 const DEPARTMENT_TITLES: Record<DepartmentId, string> = {

@@ -245,7 +245,7 @@ export function SessionShell({ sessionId, snapshot, children }: Props) {
           icon: <Sparkles size={14} />,
         },
         {
-          // The data behind Health at a Glance — all 20 deterministic
+          // The data behind Health at a Glance — all HEALTH_SIGNAL_COUNT deterministic
           // signals (working / needsWork / questions) so devs can drill
           // into specific evidence beyond the 6 aggregated tiles.
           label: "Signals",

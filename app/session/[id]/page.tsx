@@ -92,6 +92,7 @@ import { CommitActivity } from "@/components/views/CommitActivity";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
 import { RollupBar } from "@/components/views/RollupBar";
 import { AnchorGlow } from "@/components/views/AnchorGlow";
+import { HEALTH_SIGNAL_COUNT } from "@/lib/intelligence/healthSummary";
 
 export const dynamic = "force-dynamic";
 
@@ -514,7 +515,7 @@ export default async function OverviewPage({
               icon={<Sparkles size={15} />}
               label="Insights"
               stat="AI summary + health grade"
-              description="Grounded in 20 deterministic signals · zero hallucination"
+              description={`Grounded in ${HEALTH_SIGNAL_COUNT} deterministic signals · zero hallucination`}
             />
           </div>
         </section>
