@@ -104,3 +104,76 @@ CWEs do not align), not evidence it finds nothing.
 
 **Do not put "beats Semgrep/Snyk/SonarQube" in public copy on this evidence.**
 That needs a corpus neither party built.
+
+---
+
+# Blast radius: is "the tests worth running" true?
+
+`lib/changeBlast` promises, for a changed file, *"which tests guard it"* — a
+falsifiable claim that had never been checked. Unlike the security corpus, the
+ground truth here is free, unlimited, and generated from the repo itself.
+
+```bash
+bench/testOracle.sh /tmp/cov                    # coverage: which tests EXECUTE each file
+npx tsx bench/pickTargets.ts > /tmp/targets.txt # the files testsToRun claims about
+MUTANTS=3 npx tsx bench/mutationOracle.ts $(cat /tmp/targets.txt) > /tmp/mutation.json
+npx tsx bench/blastScoreMutation.ts /tmp/mutation.json
+```
+
+## Use the mutation oracle, not coverage
+
+Coverage answers *"which tests load this file"*, which over-counts badly —
+27 test files "cover" `deterministicSort.ts` and none of them test sorting.
+Scored against coverage, `testsToRun` looked like recall **0.291**. Scored
+against tests that actually *fail* when the file is broken, the same code
+scored **0.727**. The first number is not a finding, it is a bad denominator.
+
+`mutationOracle.ts` flips one token per mutant (`===`→`!==`, `true`→`false`)
+and only on lines the coverage run proved are executed — a mutation on dead
+code measures nothing, which the first version of this did, reporting zero
+guards for a file with 17 real tests. Mutations are chosen to keep the file
+type-correct; a compile error would fail the whole suite and measure nothing.
+
+## What it found
+
+**Not a graph problem — a ranking problem.** Of the 6 guarding tests missing
+from `testsToRun`, **5 were already in the candidate set** and had been sorted
+below `.slice(0, 6)`. Only one was genuinely absent from the graph.
+
+The metric was `guards` — how many of the affected files a test happens to
+reach. That is *breadth*, and breadth is the wrong thing to put in the top
+slots. The clearest case: `testCoverage.test.ts` was ranked out of the top 6
+for `testCoverage.ts`. The test named after the file, beaten by broader tests
+that catch nothing.
+
+Ranking now goes: reaches the changed file itself → named after it (exact, then
+prefix) → breadth → path. Both counter-cases are pinned in
+`lib/__tests__/refactorSafety.test.ts`.
+
+| | before | after |
+|---|---:|---:|
+| recall (mutation oracle) | 0.727 | **0.864** |
+| precision | 0.190 | 0.226 |
+| files where every guarding test was listed | 11/15 | 13/15 |
+
+Low precision is deliberate and cheap — listing six tests when two would do
+costs seconds. **Recall is the safety property**: a guarding test we omit is
+one a developer was told they did not need to run.
+
+## Known limits
+
+- **The cap of 6 is a lottery when the field is undifferentiated.**
+  `storage.ts` has 20 candidates that all import it directly, so direct-reach
+  cannot discriminate and order falls back to alphabetical. The prefix rung
+  rescues one; `sessionCompaction.test.ts` has no name relation to `storage.ts`
+  and is still missed.
+- **`signals.ts` is caught by 6 tests and the cap is 6** — no room for a single
+  ranking error.
+- One miss was a real graph gap (`evidencePack.test.ts` → `signals.ts`), not a
+  ranking failure.
+- Measured on this repo only, which is TypeScript. Blast radius also runs on
+  Python and five other languages where the graph's edges are weaker, and that
+  is unmeasured.
+- 5 of 20 sampled files had **no mutant caught by any test** — they have
+  coverage but nothing that notices a behaviour change. That is a finding about
+  the repo, not about the tool.

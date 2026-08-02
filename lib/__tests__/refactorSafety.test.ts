@@ -151,3 +151,69 @@ describe("computeRefactorSafety", () => {
     expect(report.totalFiles).toBe(report.files.length);
   });
 });
+
+// The Test Prioritizer's ranking. Measured against a mutation oracle
+// (bench/mutationOracle.ts, 20 files x 3 mutants): ranking on `guards` alone
+// put 5 of the 6 tests that ACTUALLY caught a break below the cap of 6.
+// Recall against that oracle went 0.727 -> 0.864 when these two rungs were
+// added. Both counter-cases below are real files from this repo.
+describe("computeRefactorSafety — which tests to run, in what order", () => {
+  /** A file with enough fan-in and complexity to reach a high tier, plus a
+   *  crowd of test files that all import it directly. */
+  function crowded(target: string, tests: string[]): CodeGraph {
+    const imports = [
+      // Eight non-test dependents: enough fan-in for the high tier.
+      ...Array.from({ length: 8 }, (_, i) => ({
+        from: `src/dep${i}.ts`, to: target, kind: "import" as const,
+      })),
+      ...tests.map((t) => ({ from: t, to: target, kind: "import" as const })),
+    ];
+    return graph({ imports, fileComplexity: { [target]: 40 } });
+  }
+
+  it("puts the test named after the file first, not the broadest one", () => {
+    // testCoverage.test.ts was ranked OUT of the top 6 for testCoverage.ts —
+    // the most obvious guarding test there is, beaten by tests that touch more
+    // files and catch nothing.
+    const cg = crowded("lib/testCoverage.ts", [
+      "lib/__tests__/aaa.test.ts",
+      "lib/__tests__/bbb.test.ts",
+      "lib/__tests__/ccc.test.ts",
+      "lib/__tests__/ddd.test.ts",
+      "lib/__tests__/eee.test.ts",
+      "lib/__tests__/fff.test.ts",
+      "lib/__tests__/testCoverage.test.ts",
+    ]);
+    const f = computeRefactorSafety(cg, { withTests: true })
+      .files.find((x) => x.file === "lib/testCoverage.ts");
+    expect(f?.testsToRun?.[0]?.file).toBe("lib/__tests__/testCoverage.test.ts");
+  });
+
+  it("keeps a prefix-named test when the field is alphabetically stacked against it", () => {
+    // storage.ts: 20 candidates all importing it directly, so direct-reach
+    // cannot discriminate and the order fell back to alphabetical — badgeRoute,
+    // demoHighlights, evidenceRoute won on their first letter while
+    // storageDeleteByInstallation sat below the cut. It was 0 of 2.
+    const cg = crowded("lib/storage.ts", [
+      "lib/__tests__/badgeRoute.test.ts",
+      "lib/__tests__/demoHighlights.test.ts",
+      "lib/__tests__/evidenceRoute.test.ts",
+      "lib/__tests__/explainRoute.test.ts",
+      "lib/__tests__/sbomRoute.test.ts",
+      "lib/__tests__/sourceRoute.test.ts",
+      "lib/__tests__/storageDeleteByInstallation.test.ts",
+    ]);
+    const listed = computeRefactorSafety(cg, { withTests: true })
+      .files.find((x) => x.file === "lib/storage.ts")
+      ?.testsToRun?.map((t) => t.file) ?? [];
+    expect(listed).toContain("lib/__tests__/storageDeleteByInstallation.test.ts");
+  });
+
+  it("still caps the list — six is the budget, not a suggestion", () => {
+    const cg = crowded("lib/core.ts", Array.from({ length: 12 }, (_, i) =>
+      `lib/__tests__/t${i}.test.ts`));
+    const f = computeRefactorSafety(cg, { withTests: true })
+      .files.find((x) => x.file === "lib/core.ts");
+    expect(f?.testsToRun?.length).toBe(6);
+  });
+});

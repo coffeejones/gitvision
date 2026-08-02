@@ -213,9 +213,39 @@ export function computeRefactorSafety(
         const ts = testsByProd.get(a);
         if (ts) for (const t of ts) guardCounts.set(t, (guardCounts.get(t) ?? 0) + 1);
       }
+      // Ranking, in priority order. `guards` alone is BREADTH — how many of
+      // the affected files a test happens to touch — and breadth is the wrong
+      // thing to put in the top slots. Measured against a mutation oracle
+      // (bench/mutationOracle.ts): 5 of 6 tests that actually caught a break
+      // were in this candidate set and got sorted below the cut, including
+      // `testCoverage.test.ts` for `testCoverage.ts` — the test named after the
+      // file, ranked out by broader tests that catch nothing.
+      //
+      //  1. reaches the CHANGED FILE itself, not merely something downstream
+      //  2. named after it (foo.test.ts guards foo.ts)
+      //  3. then breadth, then path, for a stable order
+      const directTests = testsByProd.get(file);
+      const base = file.slice(file.lastIndexOf("/") + 1).replace(/\.[^.]+$/, "");
+      // Exact name beats a prefix beats nothing. The prefix rung matters more
+      // than it looks: with 20 candidates all importing `storage.ts` directly,
+      // the direct-reach test cannot discriminate and the order collapses to
+      // alphabetical — `badgeRoute`, `demoHighlights`, `evidenceRoute` win on
+      // their first letter while `storageDeleteByInstallation` sits below the
+      // cut. Measured: that one file was 0 of 2 before this rung.
+      const affinity = (t: string) => {
+        const tb = t.slice(t.lastIndexOf("/") + 1).replace(/\.(test|spec)\.[^.]+$/, "");
+        if (tb === base) return 2;
+        return tb.toLowerCase().startsWith(base.toLowerCase()) ? 1 : 0;
+      };
       testsToRun = [...guardCounts.entries()]
         .map(([f, guards]) => ({ file: f, guards }))
-        .sort((a, b) => b.guards - a.guards || cmpStr(a.file, b.file))
+        .sort(
+          (a, b) =>
+            Number(directTests?.has(b.file) ?? false) - Number(directTests?.has(a.file) ?? false) ||
+            affinity(b.file) - affinity(a.file) ||
+            b.guards - a.guards ||
+            cmpStr(a.file, b.file),
+        )
         .slice(0, 6);
     }
 
