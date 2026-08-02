@@ -230,9 +230,45 @@ the candidate set for `signals.ts` and pushed a real guard off the end of a
 six-item list. A new test file anywhere in the repo can silently remove a real
 guard from an unrelated file's advice.
 
-### Open decisions, not yet taken
+### The Python resolver, fixed
 
-- **Raise the cap to 10?** Strong evidence on TypeScript (0.818 → 0.955), almost
-  none on Python. It is a UI call as much as an accuracy one.
-- **Fix Python src-layout resolution.** Bigger job, and the payoff reaches far
-  beyond this surface.
+Two defects, both found by this oracle and both language-shaped:
+
+**1. Fuzzy import resolution took the first match, not the best one.**
+`resolvePythonImport` fell back to a suffix scan and returned whatever the map
+yielded first. On Flask that meant `import flask` resolved to
+`tests/test_apps/cliapp/inner1/inner2/flask.py`. Candidates are now collected
+and *ranked*: not under a test tree, then `src/` layout, then shallowest, then
+path for determinism. Mis-resolutions **38 → 6**; edges into `src/flask/*` from
+tests **27 → 60**.
+
+**2. The name-affinity rung only understood JavaScript.** It stripped a
+*trailing* `.test`/`.spec`, so `test_blueprints` never matched `blueprints` and
+the rung was dead on every Python repo. Now strips both conventions
+(`test_x.py`, `x_test.go`, `TestX.java`, `x.test.ts`).
+
+The first fix was invisible at the shipped cap and only showed up when the cap
+was lifted — a useful reminder that a metric can hide a real improvement:
+
+| cap | Python before | Python after | TypeScript |
+|---:|---:|---:|---:|
+| 6 (shipped) | 0.214 | 0.229 | 0.818 |
+| 10 | 0.243 | **0.314** | 0.955 |
+| 20 | 0.243 | **0.600** | 0.955 |
+
+Before the fix Python was flat from cap 10 — the candidate list was exhausted,
+so the right tests were nowhere to be found. It now climbs to 0.600. **Python
+was both graph-bound and cap-bound; the graph is fixed and the cap is what
+remains.**
+
+Security benchmark unchanged throughout (tuned 193/18, held-out 375/42, traps
+262/262, production 68) — the resolver is shared, so that was the thing to
+watch.
+
+### Open decision, not taken
+
+**Raise the cap?** The accuracy case is now quantified on both languages:
+cap 10 buys TypeScript 0.818 → 0.955 and Python 0.229 → 0.314; cap 20 takes
+Python to 0.600 and does nothing more for TypeScript. Against that, a
+twenty-item "tests worth running" list is arguably not advice at all. That is a
+product judgement, so it is left alone.

@@ -257,10 +257,23 @@ export function computeRefactorSafety(
       // alphabetical — `badgeRoute`, `demoHighlights`, `evidenceRoute` win on
       // their first letter while `storageDeleteByInstallation` sits below the
       // cut. Measured: that one file was 0 of 2 before this rung.
+      // Strip the test marker from BOTH conventions before comparing.
+      // JS/TS puts it last (`blueprints.test.ts`), Python and Go put it first
+      // (`test_blueprints.py`, `blueprints_test.go`). Matching only the suffix
+      // form meant the name rung never fired on a Python repo at all — measured
+      // on Flask, where test_blueprints.py lost its slot for blueprints.py.
+      const stem = (p: string) =>
+        p.slice(p.lastIndexOf("/") + 1)
+          .replace(/\.(test|spec)\.[^.]+$/, "")
+          .replace(/\.[^.]+$/, "")
+          .replace(/^test_/, "")
+          .replace(/_test$/, "")
+          .replace(/^Test/, "");
       const affinity = (t: string) => {
-        const tb = t.slice(t.lastIndexOf("/") + 1).replace(/\.(test|spec)\.[^.]+$/, "");
-        if (tb === base) return 2;
-        return tb.toLowerCase().startsWith(base.toLowerCase()) ? 1 : 0;
+        const tb = stem(t).toLowerCase();
+        const b = base.toLowerCase();
+        if (tb === b) return 2;
+        return tb.startsWith(b) || b.startsWith(tb) ? 1 : 0;
       };
       testsToRun = [...guardCounts.entries()]
         .map(([f, guards]) => ({ file: f, guards }))

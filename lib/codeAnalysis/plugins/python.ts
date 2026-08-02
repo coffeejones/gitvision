@@ -171,15 +171,48 @@ function resolvePythonImport(
   if (ix.byPath.has(pkg)) return pkg;
 
   // Fuzzy suffix match — handles src/ wrappers and other layout quirks.
-  // We check direct first (more specific), then pkg.
+  //
+  // Taking the FIRST match in either loop is what broke on Flask: `import
+  // flask` from a test resolved to
+  // `tests/test_apps/cliapp/inner1/inner2/flask.py`, a five-levels-deep
+  // fixture stub, in preference to the real `src/flask/` package. 38 test
+  // imports across that repo landed on fixture apps, and because a match was
+  // always found the resolver reported zero unresolved imports — confidently
+  // wrong, which is worse than silent.
+  //
+  // So: collect every candidate and RANK them. A module you import by a bare
+  // name is a package root; package roots live near the top of a tree, not
+  // buried under a fixtures directory.
+  const candidates: string[] = [];
   for (const key of ix.byPath.keys()) {
-    if (key.endsWith(`/${direct}`)) return key;
+    if (key.endsWith(`/${direct}`) || key.endsWith(`/${pkg}`)) candidates.push(key);
   }
-  for (const key of ix.byPath.keys()) {
-    if (key.endsWith(`/${pkg}`)) return key;
-  }
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
 
-  return null;
+  const depth = (k: string) => k.split("/").length;
+  const underTest = (k: string) => isTestPath(k);
+  // `src/<name>/...` and `<name>/...` at the root are the two standard layouts.
+  const srcLayout = (k: string) => /^src\//.test(k);
+
+  candidates.sort((a, b) => {
+    // A fixture under tests/ is never the package a source file means.
+    if (underTest(a) !== underTest(b)) return underTest(a) ? 1 : -1;
+    // Prefer the conventional src/ layout over an incidental deep match.
+    if (srcLayout(a) !== srcLayout(b)) return srcLayout(a) ? -1 : 1;
+    // Shallower wins: a package root is not buried.
+    if (depth(a) !== depth(b)) return depth(a) - depth(b);
+    // Deterministic, so two runs of the analyser agree.
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  return candidates[0];
+}
+
+/** Is this path inside a test tree? Local to the resolver — deliberately not
+ *  `isTestFile`, which also matches by filename and would treat a legitimately
+ *  named module as a test. Here only the DIRECTORY matters. */
+function isTestPath(p: string): boolean {
+  return /(^|\/)(tests?|__tests__|testdata|fixtures?)(\/|$)/.test(p);
 }
 
 // ------------------- Type extraction (Python type hints) -------------------

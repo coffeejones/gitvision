@@ -217,3 +217,40 @@ describe("computeRefactorSafety — which tests to run, in what order", () => {
     expect(f?.testsToRun?.length).toBe(6);
   });
 });
+
+describe("computeRefactorSafety — test naming conventions across languages", () => {
+  it("matches Python's test_<name>.py, not just JS's <name>.test.ts", () => {
+    // The affinity rung compared basenames after stripping a TRAILING .test /
+    // .spec, so `test_blueprints` never matched `blueprints` and the rung was
+    // dead on every Python repo. Measured on Flask.
+    const imports = [
+      ...Array.from({ length: 8 }, (_, i) => ({
+        from: `src/pkg/dep${i}.py`, to: "src/pkg/blueprints.py", kind: "import" as const,
+      })),
+      ...["aaa", "bbb", "ccc", "ddd", "eee", "fff"].map((n) => ({
+        from: `tests/test_${n}.py`, to: "src/pkg/blueprints.py", kind: "import" as const,
+      })),
+      { from: "tests/test_blueprints.py", to: "src/pkg/blueprints.py", kind: "import" as const },
+    ];
+    const cg = graph({ imports, fileComplexity: { "src/pkg/blueprints.py": 40 } });
+    const f = computeRefactorSafety(cg, { withTests: true })
+      .files.find((x) => x.file === "src/pkg/blueprints.py");
+    expect(f?.testsToRun?.[0]?.file).toBe("tests/test_blueprints.py");
+  });
+
+  it("never offers a conftest or a fixture app as a test to run", () => {
+    const imports = [
+      ...Array.from({ length: 8 }, (_, i) => ({
+        from: `src/pkg/dep${i}.py`, to: "src/pkg/core.py", kind: "import" as const,
+      })),
+      { from: "tests/conftest.py", to: "src/pkg/core.py", kind: "import" as const },
+      { from: "tests/test_apps/fixture/__init__.py", to: "src/pkg/core.py", kind: "import" as const },
+      { from: "tests/test_core.py", to: "src/pkg/core.py", kind: "import" as const },
+    ];
+    const cg = graph({ imports, fileComplexity: { "src/pkg/core.py": 40 } });
+    const listed = computeRefactorSafety(cg, { withTests: true })
+      .files.find((x) => x.file === "src/pkg/core.py")
+      ?.testsToRun?.map((t) => t.file) ?? [];
+    expect(listed).toEqual(["tests/test_core.py"]);
+  });
+});

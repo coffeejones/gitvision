@@ -1924,3 +1924,47 @@ describe("rebinding a name to an untainted value ends its flow", () => {
     ).toEqual(["py-path-traversal"]);
   });
 });
+
+describe("pythonPlugin — import resolution across project layouts", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const resolve = (spec: string, from: string, paths: string[]) => {
+    const files: SourceFile[] = paths.map((rel) => ({ rel, ext: "py", content: "" }));
+    const ix = makeIndex(files);
+    return pythonPlugin.resolveImport?.(spec, from, ix) ?? null;
+  };
+
+  it("prefers the real src-layout package over a buried fixture stub", () => {
+    // Measured on Flask: `import flask` from a test resolved to
+    // tests/test_apps/cliapp/inner1/inner2/flask.py — a five-levels-deep stub —
+    // in preference to src/flask/. 38 test imports landed on fixture apps, and
+    // because a match was always found nothing reported as unresolved.
+    expect(
+      resolve("flask", "tests/test_blueprints.py", [
+        "tests/test_apps/cliapp/inner1/inner2/flask.py",
+        "src/flask/__init__.py",
+        "src/flask/blueprints.py",
+      ]),
+    ).toBe("src/flask/__init__.py");
+  });
+
+  it("prefers a shallower module to a deeply nested same-named one", () => {
+    expect(
+      resolve("config", "app/main.py", [
+        "vendor/a/b/c/d/config.py",
+        "config.py",
+      ]),
+    ).toBe("config.py");
+  });
+
+  it("still resolves an exact path without consulting the ranking", () => {
+    expect(
+      resolve("pkg.mod", "app/main.py", ["pkg/mod.py", "other/pkg/mod.py"]),
+    ).toBe("pkg/mod.py");
+  });
+
+  it("returns null when nothing matches, rather than guessing", () => {
+    expect(resolve("nowhere", "app/main.py", ["app/main.py"])).toBeNull();
+  });
+});
