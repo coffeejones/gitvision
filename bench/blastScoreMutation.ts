@@ -11,7 +11,8 @@ import { computeRefactorSafety } from "../lib/refactorSafety";
   const oracle: Record<string, string[]> = JSON.parse(
     fs.readFileSync(process.argv[2] ?? "/tmp/mutation.json", "utf8"),
   );
-  const { codeGraph } = await analyzeDirectory(process.cwd(), ALL_PLUGINS);
+  const ROOT = process.argv[3] ?? process.cwd();
+  const { codeGraph } = await analyzeDirectory(ROOT, ALL_PLUGINS);
   const rep = computeRefactorSafety(codeGraph, { withTests: true });
   const predicted = new Map<string, string[]>();
   for (const f of rep.files) if (f.testsToRun) predicted.set(f.file, f.testsToRun.map((t) => t.file));

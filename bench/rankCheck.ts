@@ -4,8 +4,9 @@ import { analyzeDirectory } from "../lib/codeAnalysis/analyze";
 import { computeRefactorSafety, buildFanIn } from "../lib/refactorSafety";
 import { isTestFile } from "../lib/codeAnalysis/testCoverage";
 (async () => {
-  const oracle: Record<string,string[]> = JSON.parse(fs.readFileSync("/tmp/mutation.json","utf8"));
-  const { codeGraph: cg } = await analyzeDirectory(process.cwd(), ALL_PLUGINS);
+  const ROOT = process.argv[3] ?? process.cwd();
+  const oracle: Record<string,string[]> = JSON.parse(fs.readFileSync(process.argv[2] ?? "/tmp/mutation.json","utf8"));
+  const { codeGraph: cg } = await analyzeDirectory(ROOT, ALL_PLUGINS);
   const rep = computeRefactorSafety(cg, { withTests: true });
   const fanIn = buildFanIn(cg);
   const direct = new Map<string, Set<string>>();

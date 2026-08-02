@@ -72,6 +72,26 @@ export interface RefactorSafetyReport {
   totalFiles: number;
 }
 
+/** A file a developer can actually RUN and see fail.
+ *
+ *  `isTestFile` is deliberately broad — anything under `tests/` counts, which is
+ *  right for "don't score this as production code". It is wrong for "run these
+ *  before you touch X": a conftest, a typing stub, a fixture app under
+ *  `tests/test_apps/` can never be reported as a failing test. Measured on
+ *  Flask: 31% of the six-slot budget was going to files that cannot fail. */
+export function isRunnableTestFile(file: string): boolean {
+  const base = file.slice(file.lastIndexOf("/") + 1);
+  if (base === "conftest.py" || base.startsWith("__init__")) return false;
+  return (
+    /^test_.*\.py$/.test(base) ||
+    /_test\.py$/.test(base) ||
+    /\.(test|spec)\.[cm]?[jt]sx?$/.test(base) ||
+    /^Test.*\.(java|kt|cs)$/.test(base) ||
+    /_test\.(go|rb)$/.test(base) ||
+    /^test_.*\.rb$/.test(base)
+  );
+}
+
 // --- Tuning knobs. Heuristic + interpretable; evidence is always shown so a
 //     reader can audit the tier regardless of where these land. ---
 const HIGH_FANIN = 8; // "many files depend on this"
@@ -211,7 +231,12 @@ export function computeRefactorSafety(
       const guardCounts = new Map<string, number>();
       for (const a of affected) {
         const ts = testsByProd.get(a);
-        if (ts) for (const t of ts) guardCounts.set(t, (guardCounts.get(t) ?? 0) + 1);
+        if (ts) {
+          for (const t of ts) {
+            if (!isRunnableTestFile(t)) continue;
+            guardCounts.set(t, (guardCounts.get(t) ?? 0) + 1);
+          }
+        }
       }
       // Ranking, in priority order. `guards` alone is BREADTH — how many of
       // the affected files a test happens to touch — and breadth is the wrong

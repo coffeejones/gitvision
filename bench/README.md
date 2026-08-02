@@ -177,3 +177,62 @@ one a developer was told they did not need to run.
 - 5 of 20 sampled files had **no mutant caught by any test** — they have
   coverage but nothing that notices a behaviour change. That is a finding about
   the repo, not about the tool.
+
+## Python: a different failure, and a worse one
+
+Same oracles, run on Flask 2.3.3 (`bench/pyOracle.py`, 21 test files, suite runs
+in 1.6s). The result is not "the same but weaker" — it is a *different* defect.
+
+| cap | TypeScript recall | Python recall |
+|---:|---:|---:|
+| 6 (shipped) | 0.818 | 0.214 |
+| 10 | **0.955** | 0.243 |
+| 20 | 0.955 | 0.243 |
+
+**TypeScript is cap-bound.** Ceiling at cap 6 is 1.000, so the shortfall is
+ranking, and raising the cap to 10 buys 14 points of recall for 3 of precision.
+Beyond 10 nothing changes — the candidate lists are exhausted.
+
+**Python is graph-bound.** Raising the cap barely moves it, because the right
+tests are not candidates at any cap. Of the tests that catch a mutant in
+`helpers.py`, `testing.py` and `blueprints.py`, **every single miss was absent
+from the graph** rather than ranked out.
+
+### The root cause: src-layout packages resolve to the wrong file
+
+`tests/test_blueprints.py` does `import flask`, then `flask.Blueprint(...)`.
+The graph resolves that import to
+`tests/test_apps/blueprintapp/__init__.py` — a fixture app — instead of
+`src/flask/__init__.py`, and produces **no call edge at all** for
+`flask.Blueprint(...)`. The resolver reports zero unresolved imports, so nothing
+looks wrong; it is confidently wrong.
+
+Measured across Flask: **38 test imports land on a fixture app** under
+`tests/`, and only 27 of the 128 edges into `src/flask/*` come from tests.
+
+This is not a blast-radius bug. It corrupts the call graph for any Python
+project using a `src/` layout — the modern packaging standard — and it will be
+understating fan-in, reachability and test mapping everywhere it happens.
+
+### Also fixed here
+
+`isRunnableTestFile`: a conftest, a typing stub, or a fixture app under
+`tests/` can never be reported as a failing test, but `isTestFile` counted them
+and they were consuming **31% of the six-slot budget** on Flask. Filtering them
+is recall-neutral on TypeScript (0.818 both ways, verified by toggling it) and
+takes Python from 0.186 to 0.214 with precision 0.265 → 0.366.
+
+### The cap makes the advice unstable
+
+Between two runs, TypeScript recall fell 0.864 → 0.818 with no change to the
+ranking code. Cause: another session added `signalCount.test.ts`, which entered
+the candidate set for `signals.ts` and pushed a real guard off the end of a
+six-item list. A new test file anywhere in the repo can silently remove a real
+guard from an unrelated file's advice.
+
+### Open decisions, not yet taken
+
+- **Raise the cap to 10?** Strong evidence on TypeScript (0.818 → 0.955), almost
+  none on Python. It is a UI call as much as an accuracy one.
+- **Fix Python src-layout resolution.** Bigger job, and the payoff reaches far
+  beyond this surface.
