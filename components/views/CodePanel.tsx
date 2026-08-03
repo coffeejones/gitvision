@@ -66,6 +66,7 @@ import {
   type DuplicateGroup,
 } from "@/lib/codeAnalysis/duplicates";
 import { computeCallResolution } from "@/lib/codeAnalysis/callResolution";
+import { formatCount } from "@/lib/formatLocale";
 
 const INITIAL_LIST_SIZE = 10;
 const EXPANDED_LIST_SIZE = 60;
@@ -511,7 +512,7 @@ function CoverageChip({ cg }: { cg: CodeGraph }) {
         count={totalCalls}
         sublabel={
           resolution.total > 0
-            ? `${resolution.resolved.toLocaleString()} resolved · ${resolvedPct}%`
+            ? `${formatCount(resolution.resolved)} resolved · ${resolvedPct}%`
             : undefined
         }
         term="call-resolution"
@@ -592,7 +593,7 @@ function CodeStatTile({
           letterSpacing: "-0.02em",
         }}
       >
-        {count.toLocaleString()}
+        {formatCount(count)}
       </span>
       {sublabel && (
         <span

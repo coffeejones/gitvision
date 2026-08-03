@@ -23,6 +23,7 @@ import { HelpHint } from "@/components/HelpHint";
 import { TermInfo } from "@/components/TermInfo";
 import type { GlossaryKey } from "@/lib/glossary";
 import { EmptyPanel } from "@/components/EmptyPanel";
+import { formatCount } from "@/lib/formatLocale";
 
 // ------------------- Link builders -------------------
 
@@ -242,7 +243,7 @@ function StatTile({
           letterSpacing: "-0.02em",
         }}
       >
-        {count.toLocaleString()}
+        {formatCount(count)}
       </span>
       {sublabel && (
         <span

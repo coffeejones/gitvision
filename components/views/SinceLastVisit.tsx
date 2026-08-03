@@ -25,6 +25,7 @@ import type { SnapshotDiff, Headline } from "@/lib/diff";
 import { pickHeadline } from "@/lib/diff";
 import { STYLE, TOK } from "@/lib/sessionTheme";
 import { HelpHint } from "@/components/HelpHint";
+import { formatDateTimeAbs } from "@/lib/formatLocale";
 
 function formatRel(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -515,7 +516,7 @@ export function SinceLastVisit({ diff, repoFullName }: Props) {
         <span
           className="font-mono"
           style={{ color: TOK.textMuted }}
-          title={`Previous snapshot taken ${new Date(diff.from).toLocaleString()}`}
+          title={`Previous snapshot taken ${formatDateTimeAbs(diff.from)}`}
         >
           {formatRel(diff.from)} ago
         </span>

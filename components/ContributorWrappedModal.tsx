@@ -11,6 +11,7 @@ import type { ClientSnapshot } from "@/lib/clientSnapshot";
 import { downloadCardPng } from "@/lib/shareCardImage";
 import { ctDisplay, ctMono } from "@/components/landing/codetrawl/ctFonts";
 import { TOK } from "@/lib/sessionTheme";
+import { formatCount } from "@/lib/formatLocale";
 
 interface Props {
   snapshot: ClientSnapshot;
@@ -362,7 +363,7 @@ function WrappedCard({ repoFullName, stats, contributor }: CardProps) {
             lineHeight: 1,
           }}
         >
-          {stats.commits.toLocaleString()}
+          {formatCount(stats.commits)}
         </span>
         <span
           style={{

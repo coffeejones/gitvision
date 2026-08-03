@@ -23,6 +23,7 @@ import {
   needsPrivateExplainConsent,
 } from "@/lib/explainConsent";
 import type { FunctionSignals } from "@/lib/functionSignals";
+import { formatCount } from "@/lib/formatLocale";
 import type {
   FlowEntryPoint,
   FlowResolution,
@@ -370,7 +371,7 @@ export function FlowsView({
         aren&rsquo;t visible here.{" "}
         {resolution.ownTotal > 0 && (
           <>
-            Of the {resolution.ownTotal.toLocaleString()} calls we can tell point at this
+            Of the {formatCount(resolution.ownTotal)} calls we can tell point at this
             repo&rsquo;s own functions, {resolution.ownPct}% were traced to their definition. Calls
             into libraries and the language itself aren&rsquo;t drawn — there&rsquo;s nothing in
             this repo to point them at — and where several functions share a name, or a method is

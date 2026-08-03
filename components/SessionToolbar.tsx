@@ -52,6 +52,7 @@ import { BadgeModal } from "./BadgeModal";
 import { ContributorWrappedModal } from "./ContributorWrappedModal";
 import { FeedbackModal } from "./FeedbackModal";
 import { Logo } from "./Logo";
+import { formatDateAbs } from "@/lib/formatLocale";
 
 interface Props {
   sessionId: string;
@@ -72,7 +73,7 @@ function formatRel(iso: string): string {
   if (diff < hr) return `${Math.floor(diff / min)}m ago`;
   if (diff < day) return `${Math.floor(diff / hr)}h ago`;
   const days = Math.floor(diff / day);
-  return days < 30 ? `${days}d ago` : new Date(iso).toLocaleDateString();
+  return days < 30 ? `${days}d ago` : formatDateAbs(iso);
 }
 
 export function SessionToolbar({
