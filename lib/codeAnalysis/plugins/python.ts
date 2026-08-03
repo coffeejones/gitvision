@@ -2427,9 +2427,25 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           const spec = moduleNode.text;
           if (!seenImportSpecs.has(spec)) {
             seenImportSpecs.add(spec);
+            // The names this binds. `from .blueprints import Blueprint as
+            // Blueprint` is how a package root re-exports; recording the name
+            // is what lets a caller's `flask.Blueprint(...)` reach the file
+            // that DEFINES it rather than stopping at the package root.
+            const symbols: string[] = [];
+            for (const child of node.namedChildren) {
+              if (!child || child.id === moduleNode.id) continue;
+              if (child.type === "dotted_name") symbols.push(child.text);
+              else if (child.type === "aliased_import") {
+                const alias = child.childForFieldName("alias")?.text;
+                const orig = child.childForFieldName("name")?.text;
+                if (alias) symbols.push(alias);
+                else if (orig) symbols.push(orig);
+              }
+            }
             imports.push({
               rawSpec: spec,
               resolvedPath: resolvePythonImport(spec, file.rel, ix),
+              ...(symbols.length ? { symbols } : {}),
             });
           }
         }

@@ -44,6 +44,15 @@ const moduleOf = (p: string) => {
   return dot > 0 ? base.slice(0, dot) : base;
 };
 
+/** The name you import a file BY. For `pkg/__init__.py` that is `pkg`, not
+ *  `__init__` — a package is referred to by its directory. */
+const importableNameOf = (p: string) => {
+  const base = moduleOf(p);
+  if (base !== "__init__") return base;
+  const dir = p.slice(0, p.lastIndexOf("/"));
+  return dir.slice(dir.lastIndexOf("/") + 1);
+};
+
 /** Stamp `entryPoint` onto the handlers named by routing tables.
  *
  *  A table (`urls.py`) names its handler as `views.home` — a module and a
@@ -307,6 +316,25 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
     importsByFile.set(f.rel, set);
   }
 
+  // 2b. Where a name that a file EXPOSES actually comes from.
+  //
+  //   src/flask/__init__.py:  from .blueprints import Blueprint as Blueprint
+  //
+  // A caller writes `import flask` then `flask.Blueprint(...)`. Every
+  // path-based rule stops at the package root, because blueprints.py is not
+  // the file the caller imported and is not named after what they typed.
+  // Measured on Flask: 1207 of 1637 unresolved test calls name a function that
+  // exists in the graph and is reached only through a re-export like this.
+  const symbolOrigin = new Map<string, Map<string, string>>();
+  for (const f of parsedFiles) {
+    for (const i of f.imports) {
+      if (!i.resolvedPath || !i.symbols?.length) continue;
+      let m = symbolOrigin.get(f.rel);
+      if (!m) { m = new Map(); symbolOrigin.set(f.rel, m); }
+      for (const sym of i.symbols) m.set(sym, i.resolvedPath);
+    }
+  }
+
   // 3. Resolve each call, producing a CallEdge whose toFile/toFunction is
   //    populated when we can determine the target unambiguously. When the
   //    plugin gave us a calleeType (Java's type-aware extractor in v0.15),
@@ -344,12 +372,48 @@ export function buildCodeGraph(input: BuildCodeGraphInput): CodeGraph {
         }
         if (ctors.length === 1) candidates = ctors;
       }
+
+      // Languages that do not mark constructor calls. Python writes
+      // `flask.Blueprint(...)` with no `new`, so isConstructor is never set and
+      // a by-name lookup finds nothing — `Blueprint` is a containerType, not a
+      // function name. Fall back to the constructor stored under the language's
+      // own convention, and only when the plain lookup found nothing at all, so
+      // this can never outrank a real function of the same name.
+      if (candidates.length === 0) {
+        let byContainer = [
+          ...(funcsByName.get("__init__") ?? []),
+          ...(funcsByName.get("constructor") ?? []),
+        ].filter((t) => t.containerType === c.calleeName);
+        // The SAME proof the flagged-constructor path demands, and for the same
+        // measured reason: matching a class by name alone added 104 edges to
+        // zod of which 84 the import graph could not justify. A class defined
+        // here, imported here, or re-exported by something imported here.
+        if (byContainer.length > 0) {
+          const imported = importsByFile.get(f.rel);
+          const viaReExport = new Set<string>();
+          if (imported) {
+            for (const p of imported) {
+              const origin = symbolOrigin.get(p)?.get(c.calleeName);
+              if (origin) viaReExport.add(origin);
+            }
+          }
+          byContainer = byContainer.filter(
+            (t) =>
+              t.filePath === f.rel ||
+              imported?.has(t.filePath) ||
+              viaReExport.has(t.filePath),
+          );
+          if (byContainer.length === 1) candidates = byContainer;
+        }
+      }
       const target = pickCallTarget(
         f.rel,
         c.calleeType,
         c.hasReceiver ?? false,
         candidates,
-        importsByFile
+        importsByFile,
+        c.calleeName,
+        symbolOrigin
       );
       calls.push({
         fromFile: f.rel,
@@ -573,7 +637,10 @@ function pickCallTarget(
   calleeType: string | undefined,
   hasReceiver: boolean,
   candidates: FunctionDef[],
-  importsByFile: Map<string, Set<string>>
+  importsByFile: Map<string, Set<string>>,
+  calleeName?: string,
+  /** file -> (name it exposes -> file that defines it). See its construction. */
+  symbolOrigin?: Map<string, Map<string, string>>
 ): FunctionDef | null {
   if (candidates.length === 0) return null;
 
@@ -640,6 +707,29 @@ function pickCallTarget(
     //     app/__init__.py rather than to crud.py itself
     // Exactly one survivor, or we decline.
     const importedFiles = importsByFile.get(fromFile);
+
+    // 1b-i. The receiver is a PACKAGE that re-exports the name.
+    //
+    //   import flask            ->  src/flask/__init__.py
+    //   flask.Blueprint(...)    ->  defined in src/flask/blueprints.py
+    //
+    // Symbol-precise on purpose: only a name the package actually re-exports
+    // resolves, so this adds no edges for unrelated modules in the package.
+    // Widening `importsByFile` transitively instead would make every consumer
+    // of a package depend on every module inside it, which is false and would
+    // wreck the safety tiers.
+    if (importedFiles && calleeName && symbolOrigin) {
+      for (const imported of importedFiles) {
+        if (importableNameOf(imported) !== calleeType) continue;
+        const origin = symbolOrigin.get(imported)?.get(calleeName);
+        if (!origin) continue;
+        const inOrigin = candidates.filter((c) => c.filePath === origin);
+        if (inOrigin.length === 1) return inOrigin[0];
+        const topLevel = inOrigin.filter((c) => c.containerType === undefined);
+        if (topLevel.length === 1) return topLevel[0];
+      }
+    }
+
     if (importedFiles) {
       const importedDirs = new Set<string>();
       for (const p of importedFiles) importedDirs.add(p.slice(0, p.lastIndexOf("/") + 1));

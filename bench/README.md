@@ -265,6 +265,44 @@ Security benchmark unchanged throughout (tuned 193/18, held-out 375/42, traps
 262/262, production 68) — the resolver is shared, so that was the thing to
 watch.
 
+### Following re-exports
+
+Python stayed far behind TypeScript even after the cap went up, so the graph
+was still hiding the right tests. Two mechanisms were missing, both of them
+things a path-based rule cannot see.
+
+**1. A package root hides the file that defines the symbol.**
+`src/flask/__init__.py` does `from .blueprints import Blueprint`. A caller
+writes `import flask` then `flask.Blueprint(...)`. Every rule stops at the
+package root: `blueprints.py` is neither the file the caller imported nor named
+after what they typed. `ParsedImport` now carries the names an import BINDS, so
+the resolver can follow `pkg.name` to the file that defines `name`. Symbol-
+precise on purpose — widening `importsByFile` transitively instead would make
+every consumer of a package depend on every module inside it, which is false
+and would wreck the safety tiers.
+
+**2. Languages with no `new` keyword never resolved a class at all.**
+`flask.Blueprint(...)` sets no `isConstructor` flag, and `Blueprint` is a
+*containerType*, not a function name, so the candidate list was empty before
+any resolution ran. The constructor is now looked up under the language's own
+convention (`__init__`, `constructor`) — but only when the plain lookup found
+nothing, and under the same import proof the flagged path demands. That proof
+is load-bearing: matching a class by name alone once added 104 edges to zod, 84
+of which the import graph could not justify.
+
+Measured on Flask — 0 of 2428 test calls resolved before, 231 after mechanism 1:
+
+| | Python recall |
+|---|---:|
+| after the resolver + cap work | 0.314 |
+| + re-export following | 0.357 |
+| + constructor lookup | **0.529** |
+
+TypeScript unchanged at 0.955 throughout, and the security benchmark is
+byte-identical at every step — tuned 193/18, held-out 375/42, traps 262/262,
+production 68. That was the thing to watch: this changes call resolution for
+every language, not just Python.
+
 ### The cap: raised to ten
 
 Ten is the knee of the measured curve, not a round number.

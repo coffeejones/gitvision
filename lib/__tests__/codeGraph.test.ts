@@ -1528,3 +1528,94 @@ describe("buildCodeGraph — class-based view routes", () => {
     expect(g.functions).toEqual([]);
   });
 });
+
+// Following a re-export. `import pkg` then `pkg.thing()` stops at the package
+// root under every path-based rule, because the file that DEFINES `thing` is
+// neither imported nor named after what the caller typed. Measured on Flask:
+// 1207 of 1637 unresolved test calls named a function that exists in the graph
+// and is reachable only this way.
+describe("buildCodeGraph — re-exports", () => {
+  const fn = (name: string) => ({
+    name, startRow: 1, endRow: 3, complexity: 1,
+  });
+
+  it("resolves a call through a package that re-exports the name", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "src/pkg/helpers.py", functions: [fn("url_for")] }),
+        pf({
+          rel: "src/pkg/__init__.py",
+          imports: [{ rawSpec: ".helpers", resolvedPath: "src/pkg/helpers.py", symbols: ["url_for"] }],
+        }),
+        pf({
+          rel: "tests/test_pkg.py",
+          imports: [{ rawSpec: "pkg", resolvedPath: "src/pkg/__init__.py" }],
+          calls: [{ calleeName: "url_for", inFunction: "test_x", calleeType: "pkg", hasReceiver: true }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls.find((c) => c.fromFile === "tests/test_pkg.py")?.toFile)
+      .toBe("src/pkg/helpers.py");
+  });
+
+  it("does NOT resolve a name the package does not re-export", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "src/pkg/private.py", functions: [fn("internal")] }),
+        pf({
+          rel: "src/pkg/__init__.py",
+          imports: [{ rawSpec: ".helpers", resolvedPath: "src/pkg/helpers.py", symbols: ["url_for"] }],
+        }),
+        pf({
+          rel: "tests/test_pkg.py",
+          imports: [{ rawSpec: "pkg", resolvedPath: "src/pkg/__init__.py" }],
+          calls: [{ calleeName: "internal", inFunction: "t", calleeType: "pkg", hasReceiver: true }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls.find((c) => c.fromFile === "tests/test_pkg.py")?.toFile).toBeNull();
+  });
+
+  it("resolves a class instantiated without a `new` keyword", () => {
+    // Python writes `flask.Blueprint(...)`, so isConstructor is never set and
+    // `Blueprint` is a containerType rather than a function name.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "src/pkg/blueprints.py",
+          functions: [{ name: "__init__", startRow: 2, endRow: 6, complexity: 1, containerType: "Blueprint" }],
+        }),
+        pf({
+          rel: "src/pkg/__init__.py",
+          imports: [{ rawSpec: ".blueprints", resolvedPath: "src/pkg/blueprints.py", symbols: ["Blueprint"] }],
+        }),
+        pf({
+          rel: "tests/test_bp.py",
+          imports: [{ rawSpec: "pkg", resolvedPath: "src/pkg/__init__.py" }],
+          calls: [{ calleeName: "Blueprint", inFunction: "t", calleeType: "pkg", hasReceiver: true }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls.find((c) => c.fromFile === "tests/test_bp.py")?.toFile)
+      .toBe("src/pkg/blueprints.py");
+  });
+
+  it("still demands import proof for a class matched only by name", () => {
+    // The same rule the flagged-constructor path enforces: a global name match
+    // added 104 edges to zod, 84 of them unjustifiable.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({
+          rel: "far/away.py",
+          functions: [{ name: "__init__", startRow: 2, endRow: 6, complexity: 1, containerType: "Thing" }],
+        }),
+        pf({ rel: "other/use.py", calls: [{ calleeName: "Thing", inFunction: "go", calleeType: "mod", hasReceiver: true }] }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls.find((c) => c.fromFile === "other/use.py")?.toFile).toBeNull();
+  });
+});

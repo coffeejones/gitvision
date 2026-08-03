@@ -62,6 +62,12 @@ export interface ParsedImport {
   resolvedPath: string | null;
   /** Edge kind. Defaults to "import" for plugins that don't specify. */
   kind?: ImportKind;
+  /** Names this import BINDS into the importing file: `from .blueprints import
+   *  Blueprint` binds ["Blueprint"]. Lets the resolver follow a re-export —
+   *  `flask.Blueprint` is defined in blueprints.py but reached through the
+   *  package root, which no path-based rule can see. Optional; plugins that
+   *  do not populate it lose nothing. */
+  symbols?: string[];
 }
 
 /** Something the outside world triggers directly — the start of a path that
