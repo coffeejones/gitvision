@@ -8,12 +8,20 @@ import { isSessionPrivate } from "../ownership";
 
 vi.mock("../storage", () => ({ getSession: vi.fn() }));
 // computeVerdict only needs to yield {score, grade}; read them off the fake snap.
-vi.mock("../intelligence/verdict", () => ({
-  computeVerdict: (snap: { score: number; grade: string }) => ({
+// verdictFor is the real thing's shape: prefer a verdict frozen at analysis
+// time, else compute. The route reads the PREVIOUS snapshot through it, so a
+// stub that always computed would hide whether the freeze is honoured.
+vi.mock("../intelligence/verdict", () => {
+  const computeVerdict = (snap: { score: number; grade: string }) => ({
     score: snap.score,
     grade: snap.grade,
-  }),
-}));
+  });
+  return {
+    computeVerdict,
+    verdictFor: (snap: { verdict?: { score: number; grade: string }; score: number; grade: string }) =>
+      snap.verdict ?? computeVerdict(snap),
+  };
+});
 
 import { GET } from "@/app/badge/[id]/route";
 import { getSession } from "../storage";
@@ -87,6 +95,21 @@ describe("GET /badge/[id]", () => {
     );
     const { body } = await fetchBadge();
     expect(body).toContain("A- ↗");
+  });
+
+  it("trends against the frozen verdict, not a fresh recompute", async () => {
+    // The whole point of the freeze. The older snapshot's live numbers say the
+    // score held; the verdict it recorded at analysis time says it was 90. The
+    // badge must believe the recorded one, or a detector change alone moves an
+    // arrow on a repo where nothing happened.
+    mockGetSession.mockResolvedValue(
+      session([
+        { ...snap({ score: 80, grade: "B+" }), verdict: { score: 90, grade: "A-" } },
+        snap({ score: 80, grade: "B+" }),
+      ]),
+    );
+    const { body } = await fetchBadge();
+    expect(body).toContain("B+ ↘");
   });
 
   it("shows a flat arrow when the score held", async () => {

@@ -10,6 +10,8 @@
 
 import {
   computeVerdict,
+  verdictFor,
+  criticalCountFor,
   type DepartmentId,
   type Vote,
   type VerdictOutcome,
@@ -72,7 +74,7 @@ export async function getCase(
 
   const verdict = computeVerdict(latest);
   const headline = pickHeadline(latest);
-  const criticalCount = countCriticals(latest);
+  const criticalCount = criticalCountFor(latest);
 
   // "Since you last looked" — diff the latest verdict against the snapshot
   // the user last SAW (their seen baseline), advanced when they open the
@@ -86,9 +88,9 @@ export async function getCase(
       : undefined;
   if (baseline) {
     const raw = diffVerdict(
-      computeVerdict(baseline),
+      verdictFor(baseline),
       verdict,
-      countCriticals(baseline),
+      criticalCountFor(baseline),
       criticalCount,
     );
     delta = {
@@ -127,14 +129,6 @@ export async function getCase(
     })),
     delta,
   };
-}
-
-/** High-severity finding count for a snapshot — the "N critical" number
- *  on the card + the basis for the since-last-visit critical delta. */
-function countCriticals(snap: AnalysisSnapshot): number {
-  return extractHealthSignals(snap).needsWork.filter(
-    (s) => s.severity === "high",
-  ).length;
 }
 
 /** Project a list of session ids in parallel; individual failures are

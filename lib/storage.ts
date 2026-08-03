@@ -10,6 +10,7 @@ import { atomicWriteJson } from "./atomicWrite";
 import { deleteFreshness } from "./freshness";
 import type { Session, SessionSummary, AnalysisSnapshot } from "./types";
 import { cmpStr } from "./deterministicSort";
+import { computeVerdict } from "./intelligence/verdict";
 
 // Read env lazily on each storage call so tests can swap
 // REPOBARON_DATA_DIR per-test without module-import timing dances —
@@ -27,6 +28,31 @@ async function ensureDir() {
 
 function sessionPath(id: string) {
   return path.join(storeDir(), `${id}.json`);
+}
+
+/** Freeze the verdict onto a snapshot as it is persisted.
+ *
+ *  Every write path funnels through createSession/appendSnapshot — the API, the
+ *  PR bot, refresh, and Watch — so stamping here covers all of them with one
+ *  edit, the same argument the session layout makes for its access gate.
+ *
+ *  Returns a NEW object rather than mutating: callers keep using the snapshot
+ *  they built, and a caller that persists the same object twice must not get a
+ *  verdict frozen against a half-built snapshot. Already-stamped snapshots pass
+ *  through untouched, so re-persisting never re-freezes.
+ *
+ *  Best-effort: a verdict is a convenience for later comparisons, never a
+ *  precondition for storing an analysis. If computeVerdict throws on some shape
+ *  we have not seen, the snapshot is stored without one and verdictFor() falls
+ *  back to computing, exactly as it does for every snapshot written before this
+ *  existed. */
+function withFrozenVerdict(snapshot: AnalysisSnapshot): AnalysisSnapshot {
+  if (snapshot.verdict) return snapshot;
+  try {
+    return { ...snapshot, verdict: computeVerdict(snapshot) };
+  } catch {
+    return snapshot;
+  }
 }
 
 export async function createSession(params: {
@@ -65,7 +91,7 @@ export async function createSession(params: {
     prMetadata: params.prMetadata,
     createdAt: now,
     updatedAt: now,
-    snapshots: [params.initialSnapshot],
+    snapshots: [withFrozenVerdict(params.initialSnapshot)],
   };
   await atomicWriteJson(sessionPath(session.id), session, { compact: true });
   return session;
@@ -141,7 +167,7 @@ export async function appendSnapshot(
 ): Promise<Session | null> {
   const session = await getSession(id);
   if (!session) return null;
-  session.snapshots.push(snapshot);
+  session.snapshots.push(withFrozenVerdict(snapshot));
   session.updatedAt = new Date().toISOString();
   await atomicWriteJson(sessionPath(id), session, { compact: true });
   return session;

@@ -24,6 +24,7 @@ function verdict(
     score,
     rawScore: score,
     grade,
+    criticalCount: 0,
     summary: "",
     rulings: [],
   };

@@ -23,6 +23,7 @@ function mkVerdict(
     score,
     rawScore: score,
     grade,
+    criticalCount: 0,
     summary: "",
     rulings: ORDER.map((id) => ({
       id,

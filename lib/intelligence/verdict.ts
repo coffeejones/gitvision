@@ -91,11 +91,25 @@ export interface Verdict {
    *  ANTHROPIC_API_KEY is set. */
   summary: string;
   rulings: DepartmentRuling[];
+  /** High-severity needsWork signals at the time this verdict was produced.
+   *
+   *  Carried ON the verdict rather than recomputed beside it because this — not
+   *  the grade — is the number that phantom-moved. Grades and department votes
+   *  never shifted on any real session; the critical count did, and
+   *  diffVerdict's `direction` flips to "regressed" on criticalDelta > 0, so a
+   *  stale recount alone could send a Watch email announcing a critical finding
+   *  that did not exist.
+   *
+   *  computeVerdict already holds the signal sweep, so counting here is free —
+   *  and it means a frozen verdict freezes the count with it, instead of the two
+   *  drifting apart. */
+  criticalCount: number;
 }
 
 // ---------------- Department → signal map ----------------
 
-/** Each department votes on its own slice of the 20-signal catalog.
+/** Each department votes on its own slice of the signal catalog
+ *  (VERDICT_SIGNAL_COUNT of them; see the note on HEALTH_SIGNAL_COUNT).
  *  When a new detector ships in lib/signals.ts, add its ID to the
  *  department whose mandate it falls under so its evidence flows
  *  through the Verdict path automatically.
@@ -401,6 +415,29 @@ const ORDER: DepartmentId[] = ["health", "security", "forensics", "supply"];
 /** Pure function: snapshot → full Verdict. Always returns 4 rulings
  *  in canonical order so renderers can map index → position without
  *  having to sort. */
+/** The verdict for a snapshot, preferring the one frozen at analysis time.
+ *
+ *  Use this — not computeVerdict — whenever the snapshot is the OLDER side of a
+ *  comparison. computeVerdict answers "what would today's detectors say about
+ *  this data", which is the wrong question for a baseline: it makes a delta move
+ *  when nothing moved, only the detectors did.
+ *
+ *  Mirrors driftMetricsFor() in lib/driftMetrics.ts. Falls back to computing so
+ *  snapshots written before the freeze keep working unchanged. */
+export function verdictFor(snap: AnalysisSnapshot): Verdict {
+  return snap.verdict ?? computeVerdict(snap);
+}
+
+/** High-severity finding count, preferring the one frozen with the verdict.
+ *
+ *  lib/watchMonitor.ts and lib/intelligence/cases.ts each carried a private copy
+ *  of this, both recomputing live against the OLDER snapshot in a diff. That was
+ *  the phantom: two identical functions, duplicated, in the one place where
+ *  recomputing is wrong. */
+export function criticalCountFor(snap: AnalysisSnapshot): number {
+  return verdictFor(snap).criticalCount;
+}
+
 export function computeVerdict(snap: AnalysisSnapshot): Verdict {
   const signals = extractHealthSignals(snap);
 
@@ -439,5 +476,8 @@ export function computeVerdict(snap: AnalysisSnapshot): Verdict {
   const grade = scoreToGrade(score);
   const summary = composeSummary(outcome, rulings);
 
-  return { outcome, outcomeLabel, score, rawScore, grade, summary, rulings };
+  // Free: `signals` is already in hand from the sweep at the top.
+  const criticalCount = signals.needsWork.filter((x) => x.severity === "high").length;
+
+  return { outcome, outcomeLabel, score, rawScore, grade, summary, rulings, criticalCount };
 }

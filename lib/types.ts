@@ -2,6 +2,7 @@
 
 import type { CodeGraph } from "./codeAnalysis/types";
 import type { DriftMetrics } from "./driftMetrics";
+import type { Verdict } from "./intelligence/verdict";
 import type { CIHardeningReport } from "./ciHardening/types";
 import type { VerdictNarrative } from "./intelligence/verdictNarrative";
 import type { RecommendationNarrative } from "./intelligence/recommendationNarrative";
@@ -317,6 +318,27 @@ export interface AnalysisSnapshot {
    *  baseline yet". Drift can't be backfilled, so we capture from now on.
    *  Arc 3. */
   driftMetrics?: DriftMetrics;
+
+  /** The verdict as it stood when this snapshot was analyzed.
+   *
+   *  Frozen so that COMPARISONS are honest. computeVerdict() reads a snapshot
+   *  through today's signal detectors, so running it over an OLD snapshot
+   *  answers "what would we say about this data now" — not "what did we say".
+   *  Four places did exactly that on the older side of a diff, which is how a
+   *  session where nothing moved could show a "+1 critical" regression, and how
+   *  lib/watchMonitor.ts could email that a new critical finding appeared when
+   *  none had.
+   *
+   *  Optional, and never backfilled: stamping today's computation onto an old
+   *  snapshot would assert something that snapshot never said. Readers use
+   *  verdictFor(), which falls back to computing — so pre-freeze snapshots keep
+   *  behaving exactly as they do today, and the guarantee arrives per session as
+   *  each one is re-swept.
+   *
+   *  The LATEST snapshot is still read live everywhere it is displayed: freezing
+   *  it too would let /verdict disagree with /signals after any detector
+   *  improvement, which trades one inconsistency for another. */
+  verdict?: Verdict;
   /** Aggregate assertion-quality summary (Weak-Suite, Arc 1) — how many test
    *  files are hollow/thin/solid and repo-wide assertion density + smoke-only
    *  ratio. Just the aggregate (no file list / per-case detail); the full,

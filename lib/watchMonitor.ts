@@ -21,7 +21,7 @@ import { parseLayerWriter } from "./shadowGraph/persist";
 import { getGithubTokenForUser } from "./githubUserToken";
 import { getUpstreamHead } from "./freshness";
 import { appendSnapshot, getSession } from "./storage";
-import { computeVerdict } from "./intelligence/verdict";
+import { computeVerdict, verdictFor, criticalCountFor } from "./intelligence/verdict";
 import { diffVerdict, type VerdictDelta } from "./intelligence/verdictDelta";
 import { computeRiskDrift, type RiskDrift } from "./riskDrift";
 import { extractHealthSignals } from "./signals";
@@ -67,14 +67,6 @@ export interface WatchMonitorResult {
   skippedUnchanged: number;
   alerts: WatchAlert[];
   errors: { watchId: string; error: string }[];
-}
-
-/** High-severity finding count for a snapshot — same basis as the case-row
- *  critical count (lib/intelligence/cases.ts). */
-function countCriticals(snap: AnalysisSnapshot): number {
-  return extractHealthSignals(snap).needsWork.filter(
-    (s) => s.severity === "high",
-  ).length;
 }
 
 /** Decide whether a verdict move is worth an alert, and how loud. Only
@@ -192,10 +184,10 @@ async function processWatch(
 
   // 3. Diff verdicts.
   const delta = diffVerdict(
-    computeVerdict(prev),
+    verdictFor(prev),
     computeVerdict(newSnap),
-    countCriticals(prev),
-    countCriticals(newSnap),
+    criticalCountFor(prev),
+    criticalCountFor(newSnap),
   );
   // 3b. Risk drift — files whose blast reach grew (Arc 3). An independent
   //     trigger: a file quietly becoming far more load-bearing is alert-worthy

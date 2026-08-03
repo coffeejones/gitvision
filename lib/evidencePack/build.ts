@@ -7,7 +7,7 @@
 // previews. Bundling secret material would defeat the purpose.
 
 import type { AnalysisSnapshot, DependencyHealth, Session } from "../types";
-import { computeVerdict } from "../intelligence/verdict";
+import { computeVerdict, verdictFor } from "../intelligence/verdict";
 import { generateSbom } from "../sbom";
 
 export interface EvidenceFile {
@@ -114,7 +114,7 @@ export function buildEvidenceObject(session: Session): EvidenceObject {
   const reSweepTrail = snaps.map((s) => ({
     date: s.fetchedAt,
     ref: s.analyzedRef ?? null,
-    grade: computeVerdict(s).grade,
+    grade: verdictFor(s).grade,
   }));
 
   const hasSbom = generateSbom(latest, "cyclonedx") !== null;

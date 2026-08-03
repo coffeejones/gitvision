@@ -15,7 +15,7 @@
 
 import { getSession } from "@/lib/storage";
 import { isSessionPrivate } from "@/lib/ownership";
-import { computeVerdict } from "@/lib/intelligence/verdict";
+import { computeVerdict, verdictFor } from "@/lib/intelligence/verdict";
 import { gradeBadgeSvg, neutralBadgeSvg, type BadgeTrend } from "@/lib/badge";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +58,7 @@ export async function GET(
   // snapshot sessions have no baseline, so no arrow.
   let trend: BadgeTrend = "none";
   if (snaps.length > 1) {
-    const prev = computeVerdict(snaps[snaps.length - 2]);
+    const prev = verdictFor(snaps[snaps.length - 2]);
     const delta = curr.score - prev.score;
     trend = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
   }
