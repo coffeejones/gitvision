@@ -1619,3 +1619,48 @@ describe("buildCodeGraph — re-exports", () => {
     expect(g.calls.find((c) => c.fromFile === "other/use.py")?.toFile).toBeNull();
   });
 });
+
+describe("buildCodeGraph — re-exports, direct-symbol form", () => {
+  const fn = (name: string) => ({ name, startRow: 1, endRow: 3, complexity: 1 });
+
+  // `from pkg import url_for` binds the name locally, so the call is BARE — no
+  // receiver for the module rung to key on. With one definition in the repo the
+  // single-candidate path already resolved it; with two, proximity looked only
+  // at directly imported files and the defining file is never one of those.
+  //
+  // Measured impact on real corpora: one call edge on NetBox, none on Flask.
+  // Kept because a resolver that answers correctly beats one that declines, and
+  // the symbol precision bounds what it can get wrong.
+  it("resolves an ambiguous bare name through the package that re-exports it", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "src/pkg/helpers.py", functions: [fn("url_for")] }),
+        pf({ rel: "src/other/util.py", functions: [fn("url_for")] }),
+        pf({
+          rel: "src/pkg/__init__.py",
+          imports: [{ rawSpec: ".helpers", resolvedPath: "src/pkg/helpers.py", symbols: ["url_for"] }],
+        }),
+        pf({
+          rel: "tests/test_pkg.py",
+          imports: [{ rawSpec: "pkg", resolvedPath: "src/pkg/__init__.py", symbols: ["url_for"] }],
+          calls: [{ calleeName: "url_for", inFunction: "t" }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls.find((c) => c.fromFile === "tests/test_pkg.py")?.toFile)
+      .toBe("src/pkg/helpers.py");
+  });
+
+  it("stays unresolved when no imported package re-exports the name", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "src/a/util.py", functions: [fn("helper")] }),
+        pf({ rel: "src/b/util.py", functions: [fn("helper")] }),
+        pf({ rel: "tests/test_x.py", calls: [{ calleeName: "helper", inFunction: "t" }] }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.calls.find((c) => c.fromFile === "tests/test_x.py")?.toFile).toBeNull();
+  });
+});

@@ -755,6 +755,20 @@ function pickCallTarget(
         importedFiles.has(c.filePath)
       );
       if (imported) return imported;
+      // `from pkg import url_for` binds the name here, but the file that
+      // DEFINES url_for is the one pkg re-exports it from — never the file
+      // this caller imported. Without this, a bare call to a name that exists
+      // in more than one place stays unresolved even though the import says
+      // exactly which one was meant. Symbol-precise: only the name the package
+      // actually re-exports is followed.
+      if (calleeName && symbolOrigin) {
+        for (const p of importedFiles) {
+          const origin = symbolOrigin.get(p)?.get(calleeName);
+          if (!origin) continue;
+          const hit = candidates.find((c) => c.filePath === origin);
+          if (hit) return hit;
+        }
+      }
     }
     return null;
   }
