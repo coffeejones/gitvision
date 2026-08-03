@@ -364,3 +364,76 @@ does not affect the page a reader scans.
 
 Low precision remains deliberate. Naming ten tests when three would do costs
 seconds; omitting a guarding test is a break shipped.
+
+---
+
+# Entry points: does the framework agree?
+
+The rarest kind of oracle — exact, free, and produced by the system under test.
+Flask and Django both know precisely which routes they serve and which function
+each dispatches to, so `app.url_map` and `get_resolver().url_patterns` settle
+the question with no third party involved.
+
+```bash
+# Flask
+"$BENCH/pymut/flask/.venv/bin/python" bench/entrypointOracle.py flask \
+    "$BENCH/pymut/flask/examples/tutorial" \
+    "__import__('flaskr').create_app({'TESTING': True})" > /tmp/ep.json
+npx tsx bench/entrypointScore.ts /tmp/ep.json "$BENCH/pymut/flask/examples/tutorial"
+
+# Django
+(cd "$BENCH/rvrepos/realvuln-pygoat" && .venv/bin/python \
+    <repo>/bench/entrypointOracle.py django . pygoat.settings) > /tmp/ep.json
+npx tsx bench/entrypointScore.ts /tmp/ep.json "$BENCH/rvrepos/realvuln-pygoat"
+```
+
+This matters more than it looks: entry points are what reachability is computed
+from, and reachability decides which security findings surface at all. A missed
+route makes a real vulnerability invisible.
+
+## Result
+
+| | Flask (flaskr) | Django (pygoat) |
+|---|---:|---:|
+| handlers the framework serves | 8 | 74 |
+| recall | **1.000** | **0.946** |
+| genuine misses | 0 | **2** |
+
+Django's raw precision reads 0.526, and **none of the 63 "extra" detections is
+wrong**:
+
+- **44** are class-based view *methods*. Django reports the class
+  (`DoItFast`); we report `get`/`post`/`put`/`delete`. Ours is the more useful
+  answer — it names the function that actually runs.
+- **19** are `dockerized_labs/*/app.py`, separate Flask apps living inside the
+  pygoat repo. Genuinely entry points; Django simply is not the thing serving
+  them.
+
+## Distrust the oracle first
+
+Three of the four apparent Django misses were **oracle bugs, not engine bugs**,
+and the first Flask run was worse — 0.625/0.625, entirely my fault:
+
+- `inspect.getsourcefile` on a decorated view returns the *decorator's* file.
+  Three flaskr handlers were blamed on `auth.py` because `@login_required`
+  lives there. `inspect.unwrap` first, then ask.
+- A decorator that skips `functools.wraps` leaves the function named
+  `function`, so the oracle reported a handler the engine had located
+  correctly under its real name (`a10_lab2`).
+- A `.venv` inside the analysed repo made Django's own admin views look like
+  app code, adding 94 phantom "misses".
+
+## The two genuine misses, diagnosed
+
+Both are the same principle — *use the importing file's own import statement to
+resolve the reference* — and neither is built yet.
+
+1. **Module alias in a URLconf.** `pygoat/urls.py` writes
+   `path("register", v.register)` where `v` is an alias for the views module.
+   `narrow()` filters on `moduleOf(filePath) === "v"`, matches nothing, and
+   leaves two same-named candidates it then declines to choose between.
+2. **Ambiguous bare name.** `path("2021/discussion/A9/target",
+   log_function_target)` names a function defined in both `api.py` and
+   `archive.py`. The urls.py import line says exactly which
+   (`from introduction.playground.A9.api import log_function_target`) and the
+   matcher does not read it.
