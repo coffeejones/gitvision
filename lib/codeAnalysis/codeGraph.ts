@@ -116,15 +116,47 @@ function applyRouteDeclarations(
   /** Narrow a candidate set the same way for functions and classes: module
    *  qualifier first, then the table's own directory. Both steps can only
    *  remove. */
+  // What each urls.py binds, and from where. A routing table is the one place
+  // that states unambiguously which definition it means — `from a.b.api import
+  // handler` picks api.py over an identically named archive.py, and
+  // `from app import views as v` says what `v` is. Reading it is cheaper and
+  // more certain than any heuristic over paths.
+  const boundInFile = new Map<string, Map<string, string>>();
+  for (const f of parsedFiles) {
+    for (const i of f.imports) {
+      if (!i.resolvedPath || !i.symbols?.length) continue;
+      let m = boundInFile.get(f.rel);
+      if (!m) { m = new Map(); boundInFile.set(f.rel, m); }
+      for (const sym of i.symbols) m.set(sym, i.resolvedPath);
+    }
+  }
+
   const narrow = <T extends { filePath: string }>(
     candidates: T[],
     decl: RouteDeclaration,
     fromFile: string
   ): T[] => {
     let out = candidates;
+    const bound = boundInFile.get(fromFile);
     if (decl.targetModule) {
       const byModule = out.filter((f) => moduleOf(f.filePath) === decl.targetModule);
       if (byModule.length > 0) out = byModule;
+      else {
+        // `path("register", v.register)` — `v` is an alias, so no file is
+        // named after it. The urls.py import says what it stands for.
+        const aliased = bound?.get(decl.targetModule);
+        if (aliased) {
+          const byAlias = out.filter((f) => f.filePath === aliased);
+          if (byAlias.length > 0) out = byAlias;
+        }
+      }
+    } else if (new Set(out.map((f) => f.filePath)).size > 1) {
+      // A bare name with several definitions. The import line names one.
+      const direct = bound?.get(decl.targetName);
+      if (direct) {
+        const byImport = out.filter((f) => f.filePath === direct);
+        if (byImport.length > 0) out = byImport;
+      }
     }
     if (new Set(out.map((f) => f.filePath)).size > 1) {
       const sameDir = out.filter((f) => dirOf(f.filePath) === dirOf(fromFile));
@@ -232,22 +264,11 @@ function applyRouteDeclarations(
         continue;
       }
 
-      let candidates = funcsByName.get(decl.targetName) ?? [];
-      if (candidates.length === 0) continue;
-
-      if (decl.targetModule) {
-        const byModule = candidates.filter(
-          (f) => moduleOf(f.filePath) === decl.targetModule
-        );
-        if (byModule.length > 0) candidates = byModule;
-      }
-      if (candidates.length > 1) {
-        const sameDir = candidates.filter(
-          (f) => dirOf(f.filePath) === dirOf(file.rel)
-        );
-        if (sameDir.length > 0) candidates = sameDir;
-      }
-      if (candidates.length !== 1) continue; // ambiguous → decline
+      // Same narrowing as the class branch — it used to be duplicated here,
+      // which is why teaching `narrow` to read the routing table's imports
+      // improved nothing for functions until this call replaced the copy.
+      const candidates = narrow(funcsByName.get(decl.targetName) ?? [], decl, file.rel);
+      if (candidates.length !== 1) continue; // absent or ambiguous ⇒ decline
 
       const target = candidates[0];
       if (target.entryPoint) continue; // a decorator already said it better

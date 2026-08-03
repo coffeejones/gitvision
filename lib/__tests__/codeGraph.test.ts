@@ -1664,3 +1664,61 @@ describe("buildCodeGraph — re-exports, direct-symbol form", () => {
     expect(g.calls.find((c) => c.fromFile === "tests/test_x.py")?.toFile).toBeNull();
   });
 });
+
+// Routing tables name their handler in another file, and the table's own import
+// line is the one place that says unambiguously WHICH file. Both cases below
+// were real misses on pygoat, found by asking Django what it serves.
+describe("buildCodeGraph — routes resolved through the table's imports", () => {
+  const fn = (name: string) => ({ name, startRow: 1, endRow: 3, complexity: 1 });
+
+  it("resolves a module alias in a URLconf", () => {
+    // path("register", v.register) where `from introduction import views as v`.
+    // No file is named `v`, so the module filter matched nothing and left two
+    // same-named candidates it then declined to choose between.
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "introduction/views.py", functions: [fn("register")] }),
+        pf({ rel: "labs/standalone/app.py", functions: [fn("register")] }),
+        pf({
+          rel: "pygoat/urls.py",
+          imports: [{ rawSpec: "introduction.views", resolvedPath: "introduction/views.py", symbols: ["v"] }],
+          routes: [{ route: "register", targetModule: "v", targetName: "register", via: "path()" }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    const hit = g.functions.find((f) => f.filePath === "introduction/views.py" && f.name === "register");
+    expect(hit?.entryPoint?.route).toBe("register");
+    // and the unrelated same-named handler is NOT claimed by this route
+    expect(g.functions.find((f) => f.filePath === "labs/standalone/app.py")?.entryPoint).toBeUndefined();
+  });
+
+  it("disambiguates a bare handler name using the import line", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "app/a9/api.py", functions: [fn("log_target")] }),
+        pf({ rel: "app/a9/archive.py", functions: [fn("log_target")] }),
+        pf({
+          rel: "app/urls.py",
+          imports: [{ rawSpec: "app.a9.api", resolvedPath: "app/a9/api.py", symbols: ["log_target"] }],
+          routes: [{ route: "t", targetModule: null, targetName: "log_target", via: "path()" }],
+        }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.functions.find((f) => f.filePath === "app/a9/api.py")?.entryPoint?.route).toBe("t");
+    expect(g.functions.find((f) => f.filePath === "app/a9/archive.py")?.entryPoint).toBeUndefined();
+  });
+
+  it("still declines when the import line does not name either candidate", () => {
+    const g = buildCodeGraph({
+      parsedFiles: [
+        pf({ rel: "a/views.py", functions: [fn("home")] }),
+        pf({ rel: "b/views.py", functions: [fn("home")] }),
+        pf({ rel: "urls.py", routes: [{ route: "/", targetModule: null, targetName: "home", via: "path()" }] }),
+      ],
+      pluginByFile: new Map(),
+    });
+    expect(g.functions.filter((f) => f.entryPoint)).toHaveLength(0);
+  });
+});

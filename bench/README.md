@@ -423,10 +423,11 @@ and the first Flask run was worse — 0.625/0.625, entirely my fault:
 - A `.venv` inside the analysed repo made Django's own admin views look like
   app code, adding 94 phantom "misses".
 
-## The two genuine misses, diagnosed
+## The two genuine misses — fixed
 
-Both are the same principle — *use the importing file's own import statement to
-resolve the reference* — and neither is built yet.
+Both were the same principle: **read the routing table's own import line.** It
+is the one place that states unambiguously which definition a route means.
+Django recall **0.946 → 0.973**; Flask stays 1.000.
 
 1. **Module alias in a URLconf.** `pygoat/urls.py` writes
    `path("register", v.register)` where `v` is an alias for the views module.
@@ -434,6 +435,28 @@ resolve the reference* — and neither is built yet.
    leaves two same-named candidates it then declines to choose between.
 2. **Ambiguous bare name.** `path("2021/discussion/A9/target",
    log_function_target)` names a function defined in both `api.py` and
-   `archive.py`. The urls.py import line says exactly which
-   (`from introduction.playground.A9.api import log_function_target`) and the
-   matcher does not read it.
+   `archive.py`. The urls.py import line says exactly which.
+
+Two things had to be true before either fix took effect, and both cost time:
+
+- **`narrow()` was only wired to the CLASS branch.** Functions duplicated the
+  logic inline, so teaching `narrow` to read imports changed nothing until the
+  copy was replaced by a call. The duplication is now gone.
+- **`from introduction import views as v` binds a SUBMODULE.** Recording `v`
+  against the package root meant the alias resolved to `__init__.py`. The
+  binding now goes to the submodule, and only names that are *not* submodules
+  stay on the package edge.
+
+### What it cost
+
+Production surfaced findings went 68 → 70. Both new ones were read, and both
+are false positives on Zulip: a redirect to a server-built activation URL, and
+`open()` on a path assembled from a validated integration name. They are the
+same tension recorded above — a richer graph propagates taint further, so
+accuracy and quiet are not the same axis. The security benchmark itself is
+unchanged (193/18, 375/42, traps 262/262).
+
+A sanitiser for `os.listdir`/`glob` was written to remove the second one and
+**reverted**: the taint reaches the sink through `os.path.join`, not through
+the listing, so it had no measured effect. Shipping it would have been dead
+code that looked like a fix.

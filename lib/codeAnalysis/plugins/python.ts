@@ -2425,21 +2425,37 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         const moduleNode = node.childForFieldName("module_name");
         if (moduleNode) {
           const spec = moduleNode.text;
-          // The names this binds. `from .blueprints import Blueprint as
-          // Blueprint` is how a package root re-exports; recording the name is
-          // what lets a caller's `flask.Blueprint(...)` reach the file that
-          // DEFINES it rather than stopping at the package root.
-          const symbols: string[] = [];
+          // The names this binds, as (bound, original) — they differ under
+          // `as`. `from .blueprints import Blueprint as Blueprint` is how a
+          // package root re-exports; recording the bound name is what lets a
+          // caller's `flask.Blueprint(...)` reach the file that DEFINES it
+          // rather than stopping at the package root.
+          const bound: { as: string; orig: string }[] = [];
           for (const child of node.namedChildren) {
             if (!child || child.id === moduleNode.id) continue;
-            if (child.type === "dotted_name") symbols.push(child.text);
+            if (child.type === "dotted_name") bound.push({ as: child.text, orig: child.text });
             else if (child.type === "aliased_import") {
               const alias = child.childForFieldName("alias")?.text;
               const orig = child.childForFieldName("name")?.text;
-              if (alias) symbols.push(alias);
-              else if (orig) symbols.push(orig);
+              if (orig) bound.push({ as: alias ?? orig, orig });
             }
           }
+          // `from introduction import views as v` imports a SUBMODULE, not a
+          // name inside __init__.py. Resolve those first and give the binding
+          // to the submodule — measured on pygoat, where `path("register",
+          // v.register)` could not reach introduction/views.py because `v` was
+          // recorded against the package root instead.
+          const submodule = new Set<string>();
+          for (const b of bound) {
+            const sub = resolvePythonImport(`${spec}${spec.endsWith(".") ? "" : "."}${b.orig}`, file.rel, ix);
+            if (!sub || sub === file.rel) continue;
+            submodule.add(b.as);
+            const existing = imports.find((i) => i.resolvedPath === sub);
+            if (existing) existing.symbols = [...new Set([...(existing.symbols ?? []), b.as])];
+            else imports.push({ rawSpec: `${spec}.${b.orig}`, resolvedPath: sub, symbols: [b.as] });
+          }
+          // Only the names that are NOT submodules belong to the package edge.
+          const symbols = bound.map((b) => b.as).filter((n) => !submodule.has(n));
           if (!seenImportSpecs.has(spec)) {
             seenImportSpecs.add(spec);
             imports.push({
