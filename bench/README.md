@@ -303,6 +303,48 @@ byte-identical at every step — tuned 193/18, held-out 375/42, traps 262/262,
 production 68. That was the thing to watch: this changes call resolution for
 every language, not just Python.
 
+### What the receiver calls actually were
+
+`bench/receiverProbe.ts` classifies unresolved calls by cause instead of
+guessing. On Flask's tests, 1673 calls have a receiver:
+
+| n | share | cause |
+|---:|---:|---|
+| 996 | 60% | **local variable — the callee IS a method we define, but we cannot type `app`** |
+| 306 | 18% | resolved |
+| 287 | 17% | callee unknown to the graph — external, correctly declined |
+| 41 | 2% | receiver names a class we define |
+| 29 | 2% | receiver is a module we import |
+
+**Local type inference is the whole remaining story**, not import mechanics:
+`app.app_context()` where `app` came from a pytest fixture. That is a different
+kind of work from anything done here.
+
+Finding the 7% that *should* already have resolved turned up a real bug: a
+package root re-exports one name per line (`from .helpers import abort as
+abort`, thirty times), and import edges are deduped by spec — correct, one edge
+per target — but that dropped every symbol after the first. `flask.abort`
+resolved; `flask.url_for` did not. Merging the names lifted resolved receiver
+calls from 218 to 306.
+
+### A better graph made the advice worse
+
+That fix is unambiguously correct, and blast recall **fell**: 0.529 → 0.486
+(precision rose, 0.411 → 0.425). Per file, `__init__.py` was gained while
+`sessions.py` and `debughelpers.py` were lost — their guards are broad tests
+with no name relation, so the affinity rung has no signal, and a richer graph
+means more files qualify as "affected", more tests qualify as guards, and a
+fixed ten-slot budget spreads thinner.
+
+Ranking the tail by *specificity* instead of breadth was tried and is worse on
+both languages (Python 0.457, TypeScript 0.909). Breadth-first stands.
+
+The fix stays. Resolving `flask.url_for` to `helpers.py` is simply true, the
+security layer depends on graph accuracy far more than this surface does, and
+reverting a correct fix to flatter a metric is how a benchmark starts lying.
+But it is worth recording plainly: **on this surface, accuracy and advice are
+not the same axis.**
+
 ### The cap: raised to ten
 
 Ten is the knee of the measured curve, not a round number.

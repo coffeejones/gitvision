@@ -2425,28 +2425,37 @@ function parsePyDirect(file: SourceFile, ix: FileIndex): ParsedFile {
         const moduleNode = node.childForFieldName("module_name");
         if (moduleNode) {
           const spec = moduleNode.text;
+          // The names this binds. `from .blueprints import Blueprint as
+          // Blueprint` is how a package root re-exports; recording the name is
+          // what lets a caller's `flask.Blueprint(...)` reach the file that
+          // DEFINES it rather than stopping at the package root.
+          const symbols: string[] = [];
+          for (const child of node.namedChildren) {
+            if (!child || child.id === moduleNode.id) continue;
+            if (child.type === "dotted_name") symbols.push(child.text);
+            else if (child.type === "aliased_import") {
+              const alias = child.childForFieldName("alias")?.text;
+              const orig = child.childForFieldName("name")?.text;
+              if (alias) symbols.push(alias);
+              else if (orig) symbols.push(orig);
+            }
+          }
           if (!seenImportSpecs.has(spec)) {
             seenImportSpecs.add(spec);
-            // The names this binds. `from .blueprints import Blueprint as
-            // Blueprint` is how a package root re-exports; recording the name
-            // is what lets a caller's `flask.Blueprint(...)` reach the file
-            // that DEFINES it rather than stopping at the package root.
-            const symbols: string[] = [];
-            for (const child of node.namedChildren) {
-              if (!child || child.id === moduleNode.id) continue;
-              if (child.type === "dotted_name") symbols.push(child.text);
-              else if (child.type === "aliased_import") {
-                const alias = child.childForFieldName("alias")?.text;
-                const orig = child.childForFieldName("name")?.text;
-                if (alias) symbols.push(alias);
-                else if (orig) symbols.push(orig);
-              }
-            }
             imports.push({
               rawSpec: spec,
               resolvedPath: resolvePythonImport(spec, file.rel, ix),
               ...(symbols.length ? { symbols } : {}),
             });
+          } else if (symbols.length) {
+            // A package root re-exports one name per line:
+            //   from .helpers import abort as abort
+            //   from .helpers import url_for as url_for
+            // Deduping by spec is right for the EDGE — one edge per target —
+            // but it silently dropped every symbol after the first, so
+            // `flask.url_for` was unresolvable while `flask.abort` worked.
+            const prior = imports.find((i) => i.rawSpec === spec);
+            if (prior) prior.symbols = [...new Set([...(prior.symbols ?? []), ...symbols])];
           }
         }
         return;

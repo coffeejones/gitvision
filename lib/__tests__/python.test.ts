@@ -1968,3 +1968,39 @@ describe("pythonPlugin — import resolution across project layouts", () => {
     expect(resolve("nowhere", "app/main.py", ["app/main.py"])).toBeNull();
   });
 });
+
+describe("pythonPlugin — re-exported symbols on repeated import lines", () => {
+  beforeAll(async () => {
+    await pythonPlugin.load();
+  });
+  const importsOf = (content: string) => {
+    const file: SourceFile = { rel: "src/pkg/__init__.py", ext: "py", content };
+    return parseFile(pythonPlugin, file, makeIndex([file])).imports;
+  };
+
+  it("merges the names when a package re-exports one per line", () => {
+    // Flask's __init__.py is 30 lines of `from .helpers import X as X`. Import
+    // edges are deduped by spec — correct, one edge per target — but that was
+    // dropping every symbol after the first, so `flask.abort` resolved and
+    // `flask.url_for` did not. 88 more calls resolve on Flask with this.
+    const imports = importsOf(
+      "from .helpers import abort as abort\n" +
+        "from .helpers import url_for as url_for\n" +
+        "from .helpers import flash as flash\n",
+    );
+    const helpers = imports.filter((i) => i.rawSpec === ".helpers");
+    expect(helpers).toHaveLength(1); // still ONE edge
+    expect(helpers[0].symbols).toEqual(["abort", "url_for", "flash"]);
+  });
+
+  it("records several names from a single line", () => {
+    const [i] = importsOf("from .mod import a, b, c\n");
+    expect(i.symbols).toEqual(["a", "b", "c"]);
+  });
+
+  it("leaves symbols unset for a plain module import", () => {
+    const file: SourceFile = { rel: "app.py", ext: "py", content: "import os\n" };
+    const [i] = parseFile(pythonPlugin, file, makeIndex([file])).imports;
+    expect(i.symbols).toBeUndefined();
+  });
+});
