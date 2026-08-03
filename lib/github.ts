@@ -335,10 +335,27 @@ export async function fetchRepoMeta(
     license: data.license?.spdx_id ?? null,
     homepage: data.homepage,
     topics: data.topics ?? [],
-    // v0.81+: persist GitHub's visibility flag. The read-side access
-    // check on /session/[id]/* uses this to gate private-repo sessions
-    // to the owner only. Without it, anyone with the session URL could
-    // see private codebase metadata.
+    // v0.81+: persist GitHub's visibility flag. The read-side access check on
+    // /session/[id]/* uses it to gate private-repo sessions.
+    //
+    // "TO THE OWNER ONLY" IS NOT TRUE, AND THIS COMMENT USED TO SAY IT WAS.
+    // checkSessionOwnership (lib/ownership.ts:79) allows a session that has
+    // NEITHER userId NOR ownerId to every caller, private or not — and
+    // lib/githubApp/pipeline.ts creates exactly that for both sides of every
+    // PR the bot analyses, deliberately, so the link in its comment opens
+    // without a login. On a private repo that means the analysis is readable
+    // by whoever holds the URL.
+    //
+    // That is a decision, not an oversight: the id is nanoid(10) (~60 bits),
+    // /session/ is disallowed in robots.ts, and the link is posted on the
+    // private repo itself, so the audience is people who already have access.
+    // Unlisted, not gated. Gating it would mean binding PR-bot sessions to the
+    // installation and checking membership on read, which costs the one-click
+    // flow the bot exists for.
+    //
+    // The guarantee is therefore: owner-only for sessions that HAVE an owner
+    // (every session created through the API does — app/api/sessions/route.ts
+    // sets userId); unlisted for the ownerless ones the bot makes.
     private: data.private,
   };
 }

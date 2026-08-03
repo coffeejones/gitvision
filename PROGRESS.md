@@ -8,6 +8,34 @@
 
 ## Recent work (2026-07, on `feat/codetrawl-landing`)
 
+### Decided 2026-08-03: the session file will NOT be split
+
+Recorded here so it is not re-derived from scratch. The idea was to move
+`codeGraph` out of `.gitvision/sessions/<id>.json` into sidecars so pages stop
+parsing graph data they do not need. Investigated properly (four verification
+passes, three designs, two judge lenses) and **closed**.
+
+- **The win is real but sits entirely in the tail.** The median session parses in
+  6.7 ms; the split takes it to 0.2 ms — under 5% of a 128 ms TTFB, invisible. 15
+  of 21 sessions already parse in under 11 ms. One 33.8 MB zod session drives
+  nearly every headline number.
+- **The corpus was never production.** Every measurement came from a local dev
+  store that is re-sweep history — zod twice, flask twice, gitvision three times.
+  No production volume figure was ever obtained.
+- **The risk is not hypothetical.** Stripping graphs collapses drift on 12 of 12
+  multi-snapshot sessions (only 2 of 57 carry a `driftMetrics` fingerprint), and
+  the same class of stale recomputation was what made Watch able to email about a
+  critical finding that did not exist.
+- **If disk ever does become the problem, a retention policy is the answer** —
+  pruning graphs older than N sweeps gets most of the space back with no sidecar
+  lifecycle, no lazy loader, no rollback hazard. All three designs assumed every
+  graph must be kept forever, so nobody costed it. Cost that first.
+
+What shipped instead, from the same investigation: the **client payload** fix
+(the graph was being serialized to the browser on every workspace tab — 7.09 MB
+on /prs, 7.15 MB on /architecture) and the **verdict freeze** (the stale-recompute
+class the split would have made worse).
+
 - **Interactive impact analysis** — the Imports tab gained a "what breaks if I change this?" workbench: a risk-tiered blast list (untested → cross-module → same-module) beside a **focus-mode dependency canvas** (click a file → prune to its N-hop neighborhood; selecting in the panel prunes too — nothing is dimmed). Split-pane so panel + canvas are co-visible; cold-boot leads with an invitation, not a wall. Sidebar gained a **focus-mode toggle** (hide the nav for a wider canvas).
 - **Call-graph accuracy fix** — five plugins (js, python, go, java, csharp, php) never set `hasReceiver` on method calls, so `.matches()`/`.find()`/`.get()` false-matched unique unrelated functions → false cross-module edges (parse.ts "depended on" a React view + a test file). Fixed to mirror the Ruby plugin; verified parse.ts's resolved out-edges drop 15 → 3 (self only).
 - **Arc 1 "Can I touch this?"** (Refactor tab, per `ROADMAP.md`) — the action layer:

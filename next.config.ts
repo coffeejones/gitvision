@@ -25,6 +25,28 @@ const nextConfig: NextConfig = {
       "node_modules/@vscode/tree-sitter-wasm/wasm/*.wasm",
     ],
   },
+  // A session URL is a capability: an ownerless analysis (every PR-bot run) is
+  // readable by whoever holds the link, so the path must not travel to third
+  // parties. Sessions link out to osv.dev, mermaid.live and advisory pages.
+  //
+  // BE PRECISE ABOUT WHAT THIS FIXES. Measured before adding it — a real
+  // cross-origin navigation out of /session/<id>/architecture sent
+  // `Referer: http://localhost:3011/`, origin only. Every current browser
+  // already defaults to strict-origin-when-cross-origin, nothing in the app
+  // overrides it, and no page loads a third-party script, image or beacon. So
+  // this closes no open leak; it removes the RELIANCE on a default, for old
+  // browsers and embedded webviews (the GitHub mobile app's in-app browser is
+  // the realistic one) that predate it.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
