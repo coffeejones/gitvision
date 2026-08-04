@@ -33,13 +33,13 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://codetrawl.com"
   ),
-  title: "CodeTrawl — get to know any codebase",
+  title: "CodeTrawl — evidence for every code change",
   description:
-    "Paste a GitHub repo and read it like a manual — what every part does, how it all connects, and what breaks if you touch it. One sweep, about a minute, nothing to install.",
+    "Deterministic repository intelligence for change impact, security posture and system understanding. Start with one GitHub repository with evidence attached to every finding.",
   openGraph: {
-    title: "CodeTrawl — get to know any codebase",
+    title: "CodeTrawl — evidence for every code change",
     description:
-      "Paste a GitHub repo and read it like a manual — what every part does, how it all connects, and what breaks if you touch it. One sweep, about a minute, nothing to install.",
+      "Deterministic repository intelligence for change impact, security posture and system understanding.",
     type: "website",
     siteName: "CodeTrawl",
     // Auto-discovered by Next.js: app/opengraph-image.tsx generates
@@ -47,9 +47,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "CodeTrawl — get to know any codebase",
+    title: "CodeTrawl — evidence for every code change",
     description:
-      "Paste a GitHub repo and read it like a manual — what every part does, how it all connects, and what breaks if you touch it.",
+      "Deterministic repository intelligence for change impact, security posture and system understanding.",
     // No app/twitter-image.tsx: when an OG image exists and twitter.images
     // is unset, Next.js reuses app/opengraph-image.tsx for twitter:image, so
     // the summary_large_image card still renders the CodeTrawl share image.

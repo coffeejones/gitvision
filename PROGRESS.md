@@ -8,6 +8,55 @@
 
 ## Recent work (2026-07, on `feat/codetrawl-landing`)
 
+### Shipped 2026-08-03: product-led evidence-first landing
+
+The public `/` landing was rebuilt around the product's strongest differentiator:
+CodeTrawl helps teams make software decisions from repository evidence, not
+from an AI-generated impression. Two early card-heavy/control-room directions
+were rejected. A live reference audit of micro1.ai and raycast.com led to a
+calmer visual language, while subsequent browser iterations corrected an
+overly editorial scroll-film treatment into a clearer product-led journey.
+
+- The compact hero now shows the real product in the first viewport, followed
+  immediately by a four-item proof rail instead of a long cinematic transition.
+- A sticky guided tour keeps one large product window in view while four work
+  questions scroll beside it: orientation, change impact, security and supply.
+  The screenshots cross-fade only when the active chapter changes.
+- Mobile replaces the sticky treatment with four linear screenshot chapters,
+  preserving the story without relying on desktop scroll behavior.
+- The page now flows from promise → proof → product tour → deterministic method
+  → trust model → open reports → FAQ → CTA. Giant editorial statements,
+  decorative graphs, overlays and autoplaying motion were removed.
+- Final polish sharpened the promise to “Understand the system. Change it with
+  confidence”, shortened the tour by roughly 20%, added explicit active/completed
+  chapter states, compacted trust copy and turned the closing action into a
+  bordered conversion panel with traceability assurances.
+- A restrained interaction pass added pointer-driven depth and a one-time light
+  sweep to the hero product, chapter-triggered camera drift in the sticky tour,
+  animated proof reveals, richer report-row feedback and CTA focus treatment.
+  Every continuous effect is user-triggered and disabled by reduced-motion.
+- The latest stability pass crops the captured desktop edge from every product
+  view at presentation time, replaces intersection-ratio switching with a fixed
+  viewport focal line, and uses a keyed 820 ms light mask between chapters. A
+  browser scroll sweep now progresses monotonically from 01 to 04 without bounce.
+- A spatial-depth pass now treats the product, proof rail, tour, method, trust,
+  report list and closing action as related material layers. Dark under-planes,
+  directional top light, restrained shadows and a shared transform-only viewport
+  value create depth without moving readable content or adding generic glow art.
+- **Approved landing checkpoint — Depth v1 (2026-08-04):** Jonas explicitly
+  marked this direction as good. Preserve its calm product-led hierarchy,
+  screenshot/proof overlap, dark material layers, restrained orange light and
+  deterministic tour behavior as the fallback baseline for later iterations.
+- Real CodeTrawl screenshots remain the visual proof. No invented customer
+  logos, testimonials, stock imagery or unsupported AI claims were added.
+- Updated home + global metadata and OG copy to match the positioning:
+  “evidence for every code change”.
+
+Verified with strict TypeScript, 2,521 Vitest tests and the Next.js production
+build. Depth v1 is the selected, definitive root landing. Its home metadata and
+code-rendered social card now carry the same evidence-first positioning;
+deployment remains a separate, intentional step.
+
 ### Decided 2026-08-03: the session file will NOT be split
 
 Recorded here so it is not re-derived from scratch. The idea was to move

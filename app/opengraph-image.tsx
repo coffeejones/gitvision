@@ -17,7 +17,7 @@ import { OG_ICON_DATA_URI } from "@/lib/ogIcon";
 
 export const runtime = "edge";
 
-export const alt = "CodeTrawl — get to know any codebase";
+export const alt = "CodeTrawl — understand the system and change it with confidence";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -67,57 +67,75 @@ export default function OpenGraphImage() {
           </div>
         </div>
 
-        {/* Bottom: headline + strapline */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          {/* Carries the landing's H1 verbatim, orange period included — this
-              card is the first impression for every shared session URL, so it
-              should be the same sentence a visitor lands on. Satori needs an
-              explicit display:flex on any element with more than one child,
-              hence the row rather than a nested <span>. */}
+        {/* The share card carries the selected landing's exact promise. It is
+            rendered from code and brand primitives rather than generated art,
+            so shared session URLs look like the product they open. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <div
             style={{
               display: "flex",
-              fontSize: 78,
-              fontWeight: 600,
-              lineHeight: 1.05,
-              letterSpacing: "-0.03em",
-              color: "#f2efea",
-              maxWidth: 1000,
+              alignItems: "center",
+              gap: "13px",
+              color: "#ff8a50",
+              fontSize: 17,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
             }}
           >
-            <div>Get to know any codebase</div>
-            <div style={{ color: "#ff4f00" }}>.</div>
+            <div style={{ width: 42, height: 1, background: "#ff4f00" }} />
+            Deterministic codebase intelligence
           </div>
           <div
             style={{
-              fontSize: 32,
-              lineHeight: 1.3,
-              // v0.80: pulled emerald accent in favour of off-white-on-
-              // muted as the brand pulls away from green.
-              color: "#9c968e",
-              // 700, not 950: the "computed, never generated" mark sits in the
-              // bottom-right corner, and a wider measure runs the strapline's
-              // first line underneath it.
-              maxWidth: 700,
+              display: "flex",
+              flexDirection: "column",
+              fontSize: 72,
+              fontWeight: 600,
+              lineHeight: 0.98,
+              letterSpacing: "-0.045em",
+              color: "#f2efea",
+              maxWidth: 1040,
             }}
           >
-            What every part does, how it all connects, and what breaks if you
-            touch it.
+            <div>Understand the system.</div>
+            <div style={{ color: "#aaa49c" }}>Change it with confidence.</div>
+          </div>
+          <div
+            style={{
+              fontSize: 25,
+              lineHeight: 1.35,
+              color: "#9c968e",
+              maxWidth: 850,
+            }}
+          >
+            Structure, history, security and change impact — with evidence
+            attached to every finding.
           </div>
         </div>
 
-        {/* Bottom-right corner: domain hint */}
+        {/* Bottom instrumentation rail mirrors the compact proof rail directly
+            below the landing's hero. */}
         <div
           style={{
-            position: "absolute",
-            bottom: 80,
-            right: 80,
-            fontSize: 22,
-            color: "#9c968e",
-            letterSpacing: "0.02em",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingTop: 22,
+            borderTop: "1px solid #2b2926",
+            color: "#77716b",
+            fontSize: 16,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
           }}
         >
-          computed, never generated
+          <div style={{ display: "flex", gap: "34px" }}>
+            <div>20 computed signals</div>
+            <div>File → line evidence</div>
+            <div>AI optional</div>
+          </div>
+          <div style={{ color: "#f2efea", textTransform: "lowercase" }}>
+            codetrawl.com
+          </div>
         </div>
       </div>
     ),

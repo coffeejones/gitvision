@@ -17,9 +17,9 @@ import { loadDemoHighlights } from "@/lib/demoHighlights";
 
 export const dynamic = "force-dynamic";
 
-const TITLE = "CodeTrawl — get to know any codebase";
+const TITLE = "CodeTrawl — evidence for every code change";
 const DESCRIPTION =
-  "Paste a GitHub repo and read it like a manual — what every part does, how it all connects, and what breaks if you touch it. One sweep, about a minute. Free on one repo, private repos included.";
+  "Deterministic repository intelligence for change impact, security posture and system understanding. Start with one GitHub repository — free, private repos included.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -36,10 +36,10 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/landing/og.jpg",
+        url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "CodeTrawl reading pallets/flask — a repo read like a manual",
+        alt: "CodeTrawl — understand the system and change it with confidence",
       },
     ],
   },
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: TITLE,
     description: DESCRIPTION,
-    images: ["/landing/og.jpg"],
+    images: ["/opengraph-image"],
   },
 };
 

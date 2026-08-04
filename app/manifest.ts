@@ -9,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "CodeTrawl",
     short_name: "CodeTrawl",
     description:
-      "Get to know any codebase — one deterministic sweep, computed, never generated.",
+      "Deterministic repository intelligence with evidence attached to every finding.",
     start_url: "/",
     display: "standalone",
     background_color: "#0c0b0a",

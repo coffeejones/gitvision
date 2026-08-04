@@ -25,8 +25,7 @@ import Link from "next/link";
  *  smooth-scrolls; an absolute "/#id" would route instead. Everywhere else
  *  they need the leading "/" to get back home first. */
 const SECTIONS = [
-  { hash: "how", label: "How it works" },
-  { hash: "faultline", label: "Faultline" },
+  { hash: "how", label: "Product" },
 ] as const;
 
 const PAGES = [

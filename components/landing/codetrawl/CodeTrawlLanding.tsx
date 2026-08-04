@@ -1,207 +1,205 @@
-// CodeTrawl landing — "READ THE REPO" composition (2026-07 redesign).
+// CodeTrawl landing — product-led enterprise narrative.
 //
-// Message (the founder's framing): a manual for any repo — what every part
-// does, how it all connects, what works, and what breaks if you touch it.
-// Structure adapted from Raycast's layout grammar (pill nav · huge sentence
-// hero · alternating feature sections with edge bleeds · a hairline index ·
-// thin trust strip · close), applied to the .ct design system: bitumen,
-// Schibsted Grotesk, International Orange rationed.
-//
-// THE HERO CARRIES NO SHOT. It held a full Overview screen and the promise had
-// to share the first screen with it; without it the sentence and the intake own
-// the fold, and the first thing below is CTDemoProof — three repos already
-// swept, which a visitor can open. A live report is better proof than a picture
-// of one, and it was the picture that was competing.
-//
-// Product imagery is RENDERED, not photographed — there are no screenshots left
-// in public/landing. CTCodePane and CTBlastDiagram redraw surfaces whose product
-// components are client-side; CTSecurityPane mounts the product's own
-// SecurityPanel outright. Source/Faultline are our own repo (dogfood), Security
-// is the public flask demo, and every visible number came off a real sweep.
-//
-// Motion (CTMotion + the MOTION LAYER css): Lenis smooth scroll, directional
-// spring reveals, index cascade, one deliberate loop (the intake's orbiting
-// border light). prefers-reduced-motion renders finished. The hero parallax
-// went with the hero shot.
+// The page moves from promise to proof to a guided product tour, then explains
+// the deterministic engine and lets visitors inspect open reports themselves.
 
+import Image from "next/image";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { CTSurface } from "./CTSurface";
 import { CTNav } from "./CTNav";
-import { CTDemoProof } from "./CTDemoProof";
-import { CTProof } from "./CTProof";
 import { CTFaq } from "./CTFaq";
-import { CTCodePane } from "./CTCodePane";
-import { CTBlastDiagram } from "./CTBlastDiagram";
-import { CTSecurityPane } from "./CTSecurityPane";
+import { CTProductTour } from "./CTProductTour";
 import type { DemoHighlight } from "@/lib/demoHighlights";
-import { CTScreenshot } from "./CTScreenshot";
+import { formatStars } from "@/lib/demoHighlights";
 import { CTLandingIntake } from "./CTLandingIntake";
 import { CTMotion } from "./CTMotion";
 import { CTFooter } from "./CTFooter";
 
-const CAPS = [
-  { k: "Git history", v: "Who really owns each corner — and where change keeps piling up." },
-  { k: "Structure", v: "How the pieces connect: call graphs, import chains, dead ends." },
-  { k: "Source", v: "The code with every finding drawn on it, function by function." },
-  { k: "Faultline", v: "What breaks if you change a file — before you change it." },
-  { k: "Security", v: "Secrets, risky eval, known incidents — matched to a line, not guessed." },
-  { k: "Dependencies", v: "Which packages carry CVEs or have drifted out of date." },
-  { k: "Duplicates", v: "The same function body, copy-pasted where it shouldn't be." },
-  { k: "Diagrams", v: "The type graph and architecture, drawn from the code itself." },
-];
+const PROOF = [
+  ["7", "languages parsed"],
+  ["20", "computed signals"],
+  ["File → line", "traceable evidence"],
+  ["No AI", "required for the read"],
+] as const;
 
-const STEPS = [
-  { k: "Paste a repo", v: "Any GitHub URL — public or private. Nothing to install, nothing to configure." },
-  { k: "One sweep, about a minute", v: "Full git history, AST structure, security, dependencies — computed in a single pass." },
-  { k: "Read the manual", v: "A grade to orient you, then the survey: source, Faultline, signals — every claim with its evidence." },
-];
+const METHOD = [
+  ["01", "Parse", "AST structure across seven languages"],
+  ["02", "Connect", "Calls, imports, history and ownership"],
+  ["03", "Test", "Twenty deterministic repository signals"],
+  ["04", "Prove", "Evidence at file, function, line or package"],
+] as const;
+
+const TRUST = [
+  ["Rules before prose", "Repository facts are computed before anything is explained."],
+  ["Evidence stays attached", "Every material finding points back to a file, function, line or package."],
+  ["AI never decides truth", "Narration can clarify a result. It cannot create or upgrade one."],
+] as const;
 
 export function CodeTrawlLanding({ demos }: { demos: DemoHighlight[] }) {
+  const demoHref = demos.length > 0 ? "#demos" : undefined;
+
   return (
     <CTSurface>
       <style>{CSS}</style>
       <CTMotion />
 
-      <div className="rk">
-        {/* ── NAV — shared across every public page (CTNav) ─────────────── */}
+      <div className="rk rv">
         <CTNav onLanding />
 
-        {/* ── HERO ─────────────────────────────────────────────────────── */}
-        <header className="rk-hero" id="top">
-          <h1 className="rk-h1">Get to know any codebase<span className="rk-dot">.</span></h1>
-          <p className="rk-lede">
-            Paste a GitHub repo and read it like a manual — what every part does,
-            how it all connects, and what breaks if you touch it. One sweep, about
-            a minute, nothing to install.
-          </p>
-          <CTLandingIntake resume />
-        </header>
+        <main>
+          <section className="rv-hero" id="top" data-rv-depth>
+            <div className="rv-hero-atmosphere" aria-hidden />
 
-        {/* ── PROOF — the three open sweeps, directly after the promise ─── */}
-        <CTDemoProof demos={demos} />
+            <div className="rv-hero-content">
+              <p className="rv-eyebrow">Deterministic codebase intelligence</p>
+              <h1>
+                Understand the system.
+                <span>Change it with confidence.</span>
+              </h1>
+              <p className="rv-hero-lede">
+                CodeTrawl turns structure, history, security and change impact
+                into traceable evidence before your next decision.
+              </p>
+              <div className="rv-hero-intake">
+                <CTLandingIntake resume demoHref={demoHref} />
+              </div>
+            </div>
 
-        {/* ── NUMBERS — and the way into the pages that prove them ──────── */}
-        <CTProof />
+            <div className="rv-hero-product" data-rv-depth>
+              <div className="rv-product-frame">
+                <div className="rv-product-bar">
+                  <span>CODETRAWL / PALLETS-FLASK</span>
+                  <span>ANALYSIS READY</span>
+                </div>
+                <Image
+                  src="/CT_UpdatedImages/CT_Overview.png"
+                  alt="CodeTrawl repository overview for pallets/flask"
+                  width={2940}
+                  height={1508}
+                  priority
+                />
+              </div>
+              <div className="rv-product-shadow" aria-hidden />
+            </div>
+          </section>
 
-        {/* ── HOW IT WORKS — three hairline steps ──────────────────────── */}
-        <section className="rk-how" id="how">
-          <div className="rk-how-grid" data-rv="cascade">
-            {STEPS.map((s, i) => (
-              <div className="rk-idx-row" key={s.k}>
-                <span className="rk-idx-n">{String(i + 1).padStart(2, "0")}</span>
-                <span className="rk-idx-body">
-                  <span className="rk-idx-k">{s.k}</span>
-                  <span className="rk-idx-v">{s.v}</span>
-                </span>
+          <section className="rv-proof" aria-label="CodeTrawl product facts" data-rv="cascade" data-rv-depth>
+            {PROOF.map(([value, label]) => (
+              <div key={label}>
+                <strong><em>{value}</em></strong>
+                <span>{label}</span>
               </div>
             ))}
-          </div>
-        </section>
+          </section>
 
-        {/* ── FEATURE · SOURCE — text left, shot right ─────────────────── */}
-        <section className="rk-split" id="read">
-          <div className="rk-split-grid">
-            <div className="rk-split-copy" data-rv>
-              <h2 className="rk-h2 rk-h2--left">Read the code, with the map drawn on it.</h2>
-              <p className="rk-split-sub">
-                Every function carries its computed complexity, its callers, and
-                its risk. Click one and the AI explains what it does in plain
-                language — sent on your click, never stored.
+          <section className="rv-tour-section" id="how" data-rv-depth>
+            <div className="rv-tour-head" data-rv>
+              <p className="rv-kicker">GUIDED PRODUCT TOUR</p>
+              <h2>One repository. Four decisions.</h2>
+              <p>
+                Stay in context as CodeTrawl moves from orientation to change
+                impact, security and supply-chain health.
               </p>
             </div>
-            <div className="rk-split-shot" data-rv="right">
-              {/* Rendered, not photographed — same frame as the screenshots
-                  around it, so the chrome gives nothing away. See CTCodePane. */}
-              <CTScreenshot label="codetrawl.com — source" tight>
-                <CTCodePane />
-              </CTScreenshot>
+            <div id="faultline">
+              <CTProductTour />
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* ── FEATURE · FAULTLINE — shot bleeds off the left edge ──────── */}
-        <section className="rk-bleed" id="faultline">
-          <div className="rk-bleed-grid">
-            <div className="rk-bleed-shot" data-rv="left">
-              {/* Rendered, not photographed. This is the shot that carried the
-                  unstyled React Flow panel for weeks and had to be patched by
-                  hand — there is nothing left to photograph or patch. */}
-              <CTScreenshot label="codetrawl.com — faultline" tight bleed="left" fade="right">
-                <CTBlastDiagram />
-              </CTScreenshot>
-            </div>
-            <div className="rk-bleed-copy" data-rv>
-              <h2 className="rk-h2 rk-h2--left">Know what a change breaks — before you make it.</h2>
-              <p className="rk-split-sub">
-                Pick a file and simulate deleting or changing it. The call graph
-                shows exactly which files break, and which ones have no test to
-                catch it. Understanding how a repo holds together, made literal.
+          <section className="rv-method" id="method" data-rv-depth>
+            <div className="rv-method-head" data-rv>
+              <p className="rv-kicker">HOW THE READ IS BUILT</p>
+              <h2>How CodeTrawl builds the read.</h2>
+              <p>
+                Narration is optional. The analysis remains useful with every
+                AI feature switched off.
               </p>
             </div>
-          </div>
-        </section>
+            <div className="rv-method-track" data-rv="cascade">
+              {METHOD.map(([number, title, detail]) => (
+                <article key={number}>
+                  <span>{number}</span>
+                  <h3>{title}</h3>
+                  <p>{detail}</p>
+                </article>
+              ))}
+            </div>
+          </section>
 
-        {/* ── FEATURE · SECURITY — shot bleeds off the right edge ──────── */}
-        <section className="rk-bleed rk-bleed--right" id="security">
-          <div className="rk-bleed-grid">
-            <div className="rk-bleed-copy" data-rv>
-              <h2 className="rk-h2 rk-h2--left">The dangerous code, matched to the line.</h2>
-              <p className="rk-split-sub">
-                Three deterministic scanners — secrets, dynamic-execution
-                patterns, and known supply-chain incidents. Every hit is pinned
-                to the exact line, or the exact package. Matched against the
-                record, never a guessed CVE.
+          <section className="rv-assurance" data-rv-depth>
+            <div className="rv-assurance-head" data-rv>
+              <p className="rv-kicker">TRUST MODEL</p>
+              <h2>The evidence layer stands on its own.</h2>
+              <p>
+                AI can explain a result. It cannot create one, strengthen one
+                or decide what is true.
               </p>
+              <Link href="/security" className="rv-text-link">
+                Read the security model <ArrowUpRight size={14} aria-hidden />
+              </Link>
             </div>
-            <div className="rk-bleed-shot" data-rv="right">
-              {/* Not a rebuild — the product's own SecurityPanel, rendered on a
-                  pinned sweep. See CTSecurityPane. */}
-              <CTScreenshot label="codetrawl.com — security" tight bleed="right" fade="left">
-                <CTSecurityPane />
-              </CTScreenshot>
+            <div className="rv-assurance-list" data-rv="cascade">
+              {TRUST.map(([title, detail], index) => (
+                <article key={title}>
+                  <span>0{index + 1}</span>
+                  <div>
+                    <h3>{title}</h3>
+                    <p>{detail}</p>
+                  </div>
+                </article>
+              ))}
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* ── INDEX — everything one sweep reads ───────────────────────── */}
-        <section className="rk-caps" id="caps">
-          <div className="rk-feat-head" data-rv>
-            <h2 className="rk-h2">Everything one sweep reads.</h2>
-            <p className="rk-feat-sub">
-              Eight ways of reading a codebase, computed in a single pass and
-              cross-linked — follow any thread to the evidence it came from.
-            </p>
-          </div>
-          <div className="rk-index" data-rv="cascade">
-            {CAPS.map((c, i) => (
-              <div className="rk-idx-row" key={c.k}>
-                <span className="rk-idx-n">{String(i + 1).padStart(2, "0")}</span>
-                <span className="rk-idx-body">
-                  <span className="rk-idx-k">{c.k}</span>
-                  <span className="rk-idx-v">{c.v}</span>
-                </span>
+          {demos.length > 0 && (
+            <section className="rv-demos" id="demos" data-rv-depth>
+              <div className="rv-demos-head" data-rv>
+                <p className="rv-kicker">OPEN REPORTS</p>
+                <h2>Don&apos;t watch a demo. Open the product.</h2>
+                <p>Real repositories and computed findings. No account required.</p>
               </div>
-            ))}
-          </div>
-        </section>
+              <div className="rv-demo-list" data-rv="cascade">
+                {demos.map((demo, index) => (
+                  <Link
+                    className="rv-demo"
+                    href={"/session/" + demo.sessionId}
+                    key={demo.sessionId}
+                  >
+                    <span className="rv-demo-index">0{index + 1}</span>
+                    <span className="rv-demo-repo">
+                      <strong>{demo.repo}</strong>
+                      <span>
+                        {demo.language ?? "Repository"}
+                        {demo.stars !== null ? " · " + formatStars(demo.stars) + " stars" : ""}
+                      </span>
+                    </span>
+                    <span className="rv-demo-finding">
+                      {demo.finding ?? "Open the computed report"}
+                    </span>
+                    <ArrowUpRight size={16} aria-hidden />
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
 
-        {/* ── TRUST STRIP ──────────────────────────────────────────────── */}
-        <section className="rk-trust">
-          <p className="rk-trust-line" data-rv>
-            <b>Computed, never generated.</b> Every finding is measured from the
-            real code — tree-sitter ASTs, full git history, resolved dependency
-            graphs. The AI narrates what was found; it never invents it.
-          </p>
-        </section>
+          <CTFaq />
 
-        {/* ── FAQ — the objections, answered before the last ask ───────── */}
-        <CTFaq />
-
-        {/* ── CLOSE ────────────────────────────────────────────────────── */}
-        <section className="rk-close" data-rv>
-          <h2 className="rk-h2 rk-close-h">Read your first repo now.</h2>
-          <p className="rk-close-sub">Free on one repo — private repos included. Nothing to install.</p>
-          <CTLandingIntake />
-        </section>
+          <section className="rv-close" data-rv data-rv-depth>
+            <div className="rv-close-inner">
+              <p className="rv-kicker">START WITH THE CODE</p>
+              <h2>Know what your next change can touch.</h2>
+              <p>Analyze one repository free. Private repositories included.</p>
+              <CTLandingIntake demoHref={demoHref} />
+              <div className="rv-close-proof" aria-label="Analysis assurances">
+                <span>Traceable evidence</span>
+                <span>No installation</span>
+                <span>AI optional</span>
+              </div>
+            </div>
+          </section>
+        </main>
       </div>
 
       <CTFooter />
@@ -210,471 +208,245 @@ export function CodeTrawlLanding({ demos }: { demos: DemoHighlight[] }) {
 }
 
 const CSS = `
-/* --edge is the landing's local alias for the shared gutter. It must stay
-   equal to --ct-edge or the landing's sections stop lining up with the nav and
-   the footer, so it defers rather than restating the clamp. */
-.rk { overflow-x: clip; --edge: var(--ct-edge); }
+.rv { --rv-max: 1180px; --rv-edge: var(--ct-edge); overflow: clip; }
+.rv [data-rv-depth] { --rv-depth-sm: 0px; --rv-depth-md: 0px; --rv-depth-lg: 0px; }
+.rv :is(#how, #faultline, #method, #demos) { scroll-margin-top: 96px; }
+.rv :is(h1, h2, h3, p) { text-wrap: balance; }
+.rv a { text-decoration: none; }
+.rv :is(.rv-eyebrow, .rv-kicker, .rv-product-bar, .rv-demo-index, .ct-tour-chrome, .ct-tour-step > p:first-child) { font-family: var(--ct-mono); text-transform: uppercase; letter-spacing: .13em; }
 
-/* ── SECTION CADENCE ──────────────────────────────────────────────────────
-   Section gaps mark where an ARGUMENT ends, not a fixed tick. Four sections in
-   a row used to open with the same 168px and the page read as evenly-spaced
-   slabs; a gap that never varies stops carrying information.
-   Desktop maxima, and the reason for each:
+/* Compact hero: promise, action and a real product surface in the first act. */
+.rv .rv-hero { position: relative; height: 1080px; margin-top: -70px; padding: 150px var(--rv-edge) 0; overflow: hidden; isolation: isolate; }
+.rv .rv-hero-atmosphere { position: absolute; inset: 0; z-index: -2; pointer-events: none; background: radial-gradient(ellipse 70% 38% at 50% 75%, rgba(255,79,0,.13), rgba(255,79,0,.022) 48%, transparent 74%), radial-gradient(ellipse 44% 26% at 50% 18%, rgba(242,239,234,.035), transparent 74%), linear-gradient(180deg, #0d0c0b 0%, var(--ct-bg) 78%); }
+.rv .rv-hero-atmosphere::before { content: ""; position: absolute; left: 50%; bottom: 80px; width: min(1060px,78vw); height: 430px; border: 1px solid rgba(242,239,234,.035); border-radius: 46%; background: rgba(255,255,255,.008); box-shadow: 0 -1px 0 rgba(255,255,255,.02) inset, 0 80px 130px rgba(0,0,0,.36); transform: translate3d(-50%,var(--rv-depth-lg),0) perspective(900px) rotateX(67deg); transform-origin: center bottom; }
+.rv .rv-hero-atmosphere::after { content: ""; position: absolute; left: 50%; bottom: 55px; width: min(920px,68vw); height: 90px; border-radius: 50%; background: rgba(0,0,0,.62); filter: blur(38px); transform: translate3d(-50%,var(--rv-depth-md),0); }
+.rv .rv-hero-content { position: relative; z-index: 2; max-width: 1050px; margin: 0 auto; text-align: center; }
+.rv .rv-eyebrow, .rv .rv-kicker { margin: 0 0 22px; color: var(--ct-ember); font-size: 10px; line-height: 1.35; }
+.rv .rv-hero h1 { margin: 0 auto 24px; color: var(--ct-text); font-size: clamp(56px,6.5vw,90px); font-weight: 520; letter-spacing: -.06em; line-height: .92; }
+.rv .rv-hero h1 span { display: block; color: color-mix(in srgb, var(--ct-text) 72%, transparent); }
+.rv .rv-hero-lede { max-width: 680px; margin: 0 auto; color: var(--ct-dim); font-size: clamp(18px,1.7vw,21px); line-height: 1.55; }
+.rv .rv-hero-intake { max-width: 610px; margin: 32px auto 0; text-align: left; }
+.rv .rv-hero-intake .rk-intake { max-width: none; margin: 0; }
+.rv .rv-hero-intake .rk-field-glow, .rv .rv-hero-intake .rk-field-beam { display: none; }
+.rv .rk-intake form { display: flex; gap: 9px; }
+.rv .rk-intake .rk-field { display: flex; position: relative; min-width: 0; flex: 1; }
+.rv .rk-intake input { position: relative; z-index: 1; width: 100%; min-width: 0; padding: 15px 17px; border: 1px solid rgba(242,239,234,.16); border-radius: 10px; outline: none; color: var(--ct-text); background: rgba(17,16,15,.86); backdrop-filter: blur(14px); font-family: var(--ct-mono); font-size: 13px; transition: border-color .2s ease, background .2s ease; }
+.rv .rk-intake input:focus { border-color: var(--ct-ember); background: rgba(22,20,18,.96); }
+.rv .rk-intake input::placeholder { color: var(--ct-ghost); }
+.rv .rk-intake button { padding: 15px 20px; border: 0; border-radius: 10px; color: #140a02; background: var(--ct-orange); cursor: pointer; font: 600 14px var(--ct-display); white-space: nowrap; transition: background .16s ease, transform .16s ease; }
+.rv .rk-intake button:hover:not(:disabled) { background: var(--ct-ember); transform: translateY(-1px); }
+.rv .rk-intake button:disabled { cursor: default; opacity: .65; }
+.rv .rk-intake-err { min-height: 20px; margin: 9px 0 0; color: var(--ct-ember); font: 12px var(--ct-mono); }
+.rv .rk-intake-note { margin: 9px 0 0; color: var(--ct-faint); font-size: 13px; line-height: 1.45; }
+.rv .rk-intake-note a { color: var(--ct-text); text-decoration: underline; text-underline-offset: 3px; }
+.rv .rv-hero-product { --rv-tilt-x: 0deg; --rv-tilt-y: 0deg; position: relative; z-index: 1; width: min(1120px,calc(100vw - 48px)); margin: 48px auto 0; perspective: 1500px; isolation: isolate; animation: rv-product-arrive 1.05s cubic-bezier(.22,1,.36,1) .12s both; }
+.rv .rv-hero-product::before, .rv .rv-hero-product::after { content: ""; position: absolute; pointer-events: none; border: 1px solid rgba(242,239,234,.085); border-radius: 16px; background: #0b0a09; transform-origin: center top; }
+.rv .rv-hero-product::before { z-index: -1; inset: 10px 22px -14px; opacity: .78; box-shadow: 0 26px 55px rgba(0,0,0,.36); transform: translate3d(0,calc(8px + var(--rv-depth-md)),-20px) scale(.982); }
+.rv .rv-hero-product::after { z-index: -2; inset: 18px 45px -26px; opacity: .42; transform: translate3d(0,calc(14px + var(--rv-depth-lg)),-40px) scale(.958); }
+@keyframes rv-product-arrive { from { opacity: 0; transform: translateY(24px) scale(.985); } to { opacity: 1; transform: none; } }
+.rv .rv-product-frame { position: relative; overflow: hidden; border: 1px solid rgba(242,239,234,.17); border-radius: 16px; background: #0b0a09; box-shadow: 0 1px 0 rgba(255,255,255,.045) inset, 0 38px 100px rgba(0,0,0,.54), 0 0 80px rgba(255,79,0,.03); transform: translateZ(28px) rotateX(var(--rv-tilt-x)) rotateY(var(--rv-tilt-y)); transform-style: preserve-3d; transition: transform .22s ease-out, border-color .22s ease, box-shadow .22s ease; }
+.rv .rv-hero-product:hover .rv-product-frame { border-color: rgba(242,239,234,.23); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 42px 110px rgba(0,0,0,.55), 0 0 92px rgba(255,79,0,.055); }
+.rv .rv-product-frame::before { content: ""; position: absolute; z-index: 3; top: 0; left: 12%; width: 76%; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,138,80,.58), transparent); opacity: .72; }
+.rv .rv-product-frame::after { content: ""; position: absolute; z-index: 4; top: -28%; bottom: -28%; left: -30%; width: 17%; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(255,239,225,.13), transparent); filter: blur(5px); opacity: 0; transform: skewX(-16deg); animation: rv-product-sweep 1.8s cubic-bezier(.22,1,.36,1) .75s 1 both; }
+@keyframes rv-product-sweep { 0% { opacity: 0; transform: translateX(0) skewX(-16deg); } 18% { opacity: .5; } 72% { opacity: .22; } 100% { opacity: 0; transform: translateX(780%) skewX(-16deg); } }
+.rv .rv-product-bar { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 15px; border-bottom: 1px solid var(--ct-line); color: var(--ct-ghost); background: rgba(12,11,10,.96); font-size: 9px; }
+.rv .rv-product-bar span:last-child { color: var(--ct-ember); }
+.rv .rv-product-frame > img { display: block; width: calc(100% + 14px); max-width: none; height: auto; }
+.rv .rv-product-shadow { position: absolute; z-index: -3; inset: 18% 9% -10%; border-radius: 50%; background: rgba(255,79,0,.13); filter: blur(85px); opacity: .6; transform: translateY(var(--rv-depth-lg)); }
 
-     hero    120   the promise
-     proof    92   its evidence — same beat as the hero, so: tighter
-     stats    64   still that beat, tighter again
-     how     160   NEW ARGUMENT (how it works) — the page's widest break
-     split   144   the feature group opens
-     bleed   112   inside the group
-     bleed   112   inside the group
-     caps    144   the group's summary
-     trust   160   (margin) the turn
-     faq     128   objections
-     close   176   the ask, and it needs the air
+/* A compact proof rail bridges the promise and the walkthrough. */
+.rv .rv-proof { position: relative; z-index: 3; display: grid; grid-template-columns: repeat(4,1fr); max-width: var(--rv-max); margin: -26px auto 0; overflow: hidden; border: 1px solid rgba(242,239,234,.115); border-radius: 14px; background: rgba(17,16,15,.84); box-shadow: 0 1px 0 rgba(255,255,255,.025) inset, 0 22px 62px rgba(0,0,0,.28); backdrop-filter: blur(18px); transform: translateY(var(--rv-depth-sm)); }
+.rv .rv-proof > div { display: flex; min-height: 102px; flex-direction: column; justify-content: center; gap: 5px; padding: 18px 24px; border-right: 1px solid var(--ct-line); }
+.rv .rv-proof > div:last-child { border-right: 0; }
+.rv .rv-proof strong { display: block; overflow: hidden; color: var(--ct-text); font-size: 19px; font-weight: 520; letter-spacing: -.025em; }
+.rv .rv-proof strong em { display: block; opacity: 0; font-style: normal; transform: translateY(105%); transition: opacity .5s ease, transform .7s cubic-bezier(.22,1,.36,1); }
+.rv .rv-proof.in strong em { opacity: 1; transform: none; }
+.rv .rv-proof span { color: var(--ct-ghost); font: 9px var(--ct-mono); text-transform: uppercase; letter-spacing: .11em; }
 
-   If a section is added, decide which beat it belongs to and match that beat's
-   value — do not average it into the middle. */
+/* Sticky product tour: one visual, four work questions. */
+.rv .rv-tour-section { position: relative; max-width: 1320px; margin: 0 auto; padding: clamp(130px,14vw,190px) var(--rv-edge) clamp(150px,17vw,220px); isolation: isolate; }
+.rv .rv-tour-section::before { content: ""; position: absolute; z-index: -2; top: 500px; right: 10px; bottom: 150px; left: 10px; border: 1px solid rgba(242,239,234,.06); border-radius: 32px; background: linear-gradient(145deg, rgba(242,239,234,.024), rgba(242,239,234,.007) 38%, rgba(0,0,0,.08)); box-shadow: 0 1px 0 rgba(255,255,255,.018) inset, 0 48px 110px rgba(0,0,0,.18); transform: translateY(var(--rv-depth-md)); }
+.rv .rv-tour-section::after { content: ""; position: absolute; z-index: -1; top: 499px; left: 11%; width: 42%; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,138,80,.22), transparent); opacity: .7; transform: translateY(var(--rv-depth-md)); }
+.rv .rv-tour-head { max-width: 710px; margin: 0 0 72px; }
+.rv .rv-tour-head h2, .rv .rv-method-head h2, .rv .rv-assurance-head h2, .rv .rv-demos-head h2, .rv .rv-close h2 { margin: 0 0 18px; color: var(--ct-text); font-size: clamp(40px,5vw,66px); font-weight: 530; letter-spacing: -.052em; line-height: .98; }
+.rv .rv-tour-head > p:last-child, .rv .rv-method-head > p:last-child, .rv .rv-demos-head > p:last-child { max-width: 610px; margin: 0; color: var(--ct-dim); font-size: 18px; line-height: 1.58; }
+.rv .ct-tour { display: grid; grid-template-columns: minmax(0,1.65fr) minmax(300px,.68fr); gap: clamp(34px,5vw,72px); align-items: start; }
+.rv .ct-tour-visual { position: sticky; top: 104px; min-width: 0; isolation: isolate; }
+.rv .ct-tour-visual::before { content: ""; position: absolute; z-index: -1; inset: 13% 9% 9%; border-radius: 50%; background: rgba(255,79,0,.12); filter: blur(72px); opacity: .48; }
+.rv .ct-tour-visual::after { content: ""; position: absolute; z-index: -1; inset: 10px 18px -15px; border: 1px solid rgba(242,239,234,.075); border-radius: 15px; background: #0a0908; box-shadow: 0 28px 54px rgba(0,0,0,.26); transform: translateY(var(--rv-depth-lg)) scale(.975); transform-origin: center top; }
+.rv .ct-tour-window { position: relative; overflow: hidden; border: 1px solid rgba(242,239,234,.16); border-radius: 15px; background: #0b0a09; box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 30px 82px rgba(0,0,0,.42), 0 0 70px rgba(255,79,0,.022); transform: translateY(var(--rv-depth-sm)); }
+.rv .ct-tour-chrome { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 14px; border-bottom: 1px solid var(--ct-line); color: var(--ct-ghost); font-size: 8px; }
+.rv .ct-tour-chrome span:last-child { color: var(--ct-ember); }
+.rv .ct-tour-images { position: relative; aspect-ratio: 2940 / 1508; overflow: hidden; }
+.rv .ct-tour-image { position: absolute; top: 0; left: 0; width: calc(100% + 14px); max-width: none; height: auto; opacity: 0; transform: scale(1.02); transform-origin: left top; transition: opacity .42s ease; }
+.rv .ct-tour-image.active { opacity: 1; animation: rv-tour-camera-a 4.2s cubic-bezier(.22,1,.36,1) both; }
+.rv .ct-tour-image:nth-child(even).active { animation-name: rv-tour-camera-b; }
+@keyframes rv-tour-camera-a { from { transform: scale(1.025) translate3d(-.35%,.15%,0); } to { transform: scale(1.008) translate3d(.12%,0,0); } }
+@keyframes rv-tour-camera-b { from { transform: scale(1.025) translate3d(.35%,-.12%,0); } to { transform: scale(1.008) translate3d(-.12%,0,0); } }
+.rv .ct-tour-transition-light { position: absolute; z-index: 5; inset: -22%; pointer-events: none; background: linear-gradient(108deg, transparent 35%, rgba(255,222,201,.12) 49%, rgba(255,79,0,.07) 52%, transparent 66%); mix-blend-mode: screen; transform: translateX(-72%); animation: rv-tour-light .82s cubic-bezier(.22,1,.36,1) both; }
+@keyframes rv-tour-light { 0% { opacity: 0; transform: translateX(-72%); } 20% { opacity: .72; } 100% { opacity: 0; transform: translateX(72%); } }
+.rv .ct-tour-progress { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-top: 14px; }
+.rv .ct-tour-progress span { position: relative; height: 2px; overflow: hidden; background: var(--ct-line); transition: background .25s ease; }
+.rv .ct-tour-progress span::after { content: ""; position: absolute; inset: 0; background: var(--ct-ember); transform: scaleX(0); transform-origin: left; }
+.rv .ct-tour-progress span.complete { background: rgba(255,138,80,.3); }
+.rv .ct-tour-progress span.active::after { animation: rv-tour-progress-in .48s cubic-bezier(.22,1,.36,1) forwards; }
+@keyframes rv-tour-progress-in { to { transform: scaleX(1); } }
+.rv .ct-tour-steps { min-width: 0; }
+.rv .ct-tour-step { position: relative; display: flex; min-height: 52vh; flex-direction: column; justify-content: center; padding: 44px 0 44px 23px; border-top: 1px solid var(--ct-line); opacity: .42; transition: opacity .32s ease; }
+.rv .ct-tour-step::before { content: ""; position: absolute; left: 0; top: 44px; bottom: 44px; width: 1px; background: var(--ct-ember); transform: scaleY(0); transform-origin: top; transition: transform .32s cubic-bezier(.22,1,.36,1); }
+.rv .ct-tour-step:last-child { border-bottom: 1px solid var(--ct-line); }
+.rv .ct-tour-step.active { opacity: 1; }
+.rv .ct-tour-step.active::before { transform: scaleY(1); }
+.rv .ct-tour-step > p:first-child { margin: 0 0 20px; color: var(--ct-ember); font-size: 9px; }
+.rv .ct-tour-step h3 { margin: 0 0 17px; color: var(--ct-text); font-size: clamp(29px,3vw,42px); font-weight: 520; letter-spacing: -.045em; line-height: 1; }
+.rv .ct-tour-step > p:nth-of-type(2) { margin: 0; color: var(--ct-dim); font-size: 16px; line-height: 1.58; }
+.rv .ct-tour-step ul { display: grid; gap: 9px; margin: 24px 0 0; padding: 0; list-style: none; }
+.rv .ct-tour-step li { position: relative; padding-left: 17px; color: var(--ct-faint); font: 10px var(--ct-mono); line-height: 1.45; }
+.rv .ct-tour-step li::before { content: ""; position: absolute; left: 0; top: .55em; width: 6px; height: 1px; background: var(--ct-ember); }
+.rv .ct-tour-mobile-window { display: none; overflow: hidden; margin-top: 28px; border: 1px solid var(--ct-line); border-radius: 11px; }
+.rv .ct-tour-mobile-window img { display: block; width: calc(100% + 10px); max-width: none; height: auto; }
 
-/* The nav lives in codetrawl.css as .ct-nav* — it is shared with every other
-   public page now (CTNav), so it can't stay in this page's private stylesheet. */
+/* Engine steps keep the product promise grounded. */
+.rv .rv-method { position: relative; max-width: var(--rv-max); margin: 0 auto; padding: clamp(68px,7vw,88px) var(--rv-edge) clamp(100px,10vw,140px); isolation: isolate; }
+.rv .rv-method::before { content: ""; position: absolute; z-index: -1; inset: 0 0 28px; border: 1px solid rgba(242,239,234,.085); border-radius: 27px; background: linear-gradient(155deg, rgba(242,239,234,.027), rgba(242,239,234,.008) 58%, rgba(255,79,0,.012)); box-shadow: 0 1px 0 rgba(255,255,255,.025) inset, 0 36px 90px rgba(0,0,0,.2); transform: translateY(var(--rv-depth-md)); }
+.rv .rv-method-head { display: grid; grid-template-columns: .9fr 1.1fr; gap: 52px; align-items: end; margin-bottom: 54px; }
+.rv .rv-method-head .rv-kicker { grid-column: 1/-1; margin-bottom: -28px; }
+.rv .rv-method-head h2 { max-width: 540px; margin: 0; font-size: clamp(36px,4.2vw,54px); }
+.rv .rv-method-head > p:last-child { margin: 0; padding-bottom: 3px; }
+.rv .rv-method-track { display: grid; grid-template-columns: repeat(4,1fr); border-top: 1px solid var(--ct-line); }
+.rv .rv-method-track article { position: relative; min-height: 214px; padding: 25px 20px 24px 0; border-right: 1px solid var(--ct-line); border-bottom: 1px solid var(--ct-line); background: linear-gradient(180deg, rgba(242,239,234,.012), transparent 62%); transition: background .25s ease, transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s ease; }
+.rv .rv-method-track article:not(:first-child) { padding-left: 20px; }
+.rv .rv-method-track article:last-child { border-right: 0; }
+.rv .rv-method-track article:hover { z-index: 1; background: rgba(242,239,234,.024); box-shadow: 0 18px 36px rgba(0,0,0,.18); transform: translateY(-4px); }
+.rv .rv-method-track article > span { color: var(--ct-ember); font: 9px var(--ct-mono); }
+.rv .rv-method-track h3 { margin: 40px 0 10px; color: var(--ct-text); font-size: 23px; font-weight: 520; letter-spacing: -.03em; }
+.rv .rv-method-track p { max-width: 210px; margin: 0; color: var(--ct-dim); font-size: 14px; line-height: 1.55; }
 
-/* ── HERO ────────────────────────────────────────────────────────────── */
-.rk .rk-hero { max-width: 1180px; margin: 0 auto; padding: clamp(56px, 9vw, 120px) var(--edge) clamp(28px, 5vw, 64px); text-align: center; }
-/* 92, down from 104. The "huge sentence hero" is deliberate — it is the
-   Raycast grammar this page is built on — so this is a trim, not a retreat to
-   the 56-64px the SaaS default lands at. What 104 cost was the relationship to
-   everything under it: against a 54px h2 it read 1.93:1, close enough to two
-   full steps that the h2 stopped registering as a heading at all. 92:54 is
-   1.7 — still emphatic, and the rest of the page can be heard. */
-.rk .rk-h1 {
-  margin: 0 auto 26px; max-width: 14ch;
-  font-size: clamp(46px, 7.2vw, 92px); font-weight: 600;
-  letter-spacing: -0.045em; line-height: 0.98; text-wrap: balance;
-}
-.rk .rk-dot { color: var(--ct-orange); }
-.rk .rk-lede {
-  max-width: 600px; margin: 0 auto 36px;
-  color: var(--ct-dim); font-size: clamp(17px, 1.7vw, 20px); line-height: 1.5;
-}
+/* Trust comes after the mechanics, before asking for a demo click. */
+.rv .rv-assurance { position: relative; display: grid; grid-template-columns: minmax(0,.92fr) minmax(0,1.08fr); gap: clamp(50px,7vw,90px); max-width: var(--rv-max); margin: 0 auto; padding: clamp(76px,8vw,104px) var(--rv-edge); isolation: isolate; }
+.rv .rv-assurance::before { content: ""; position: absolute; z-index: -1; inset: 12px 0 -12px; border: 1px solid rgba(242,239,234,.075); border-radius: 27px; background: #0c0b0a; box-shadow: 0 1px 0 rgba(255,255,255,.02) inset, 0 34px 85px rgba(0,0,0,.24); transform: translateY(var(--rv-depth-md)); }
+.rv .rv-assurance-head h2 { max-width: 520px; font-size: clamp(37px,4vw,51px); }
+.rv .rv-assurance-head > p:not(.rv-kicker) { max-width: 480px; margin: 0 0 24px; color: var(--ct-dim); font-size: 17px; line-height: 1.58; }
+.rv .rv-text-link { display: inline-flex; align-items: center; gap: 7px; color: var(--ct-text); font-size: 12px; font-weight: 600; }
+.rv .rv-text-link:hover { color: var(--ct-ember); }
+.rv .rv-assurance-list { border-top: 1px solid var(--ct-line); }
+.rv .rv-assurance-list article { display: grid; grid-template-columns: 34px 1fr; gap: 17px; margin: 0 -15px; padding: 24px 15px; border-bottom: 1px solid var(--ct-line); transition: background .22s ease, transform .22s ease; }
+.rv .rv-assurance-list article:hover { background: rgba(242,239,234,.018); transform: translateX(4px); }
+.rv .rv-assurance-list article > span { padding-top: 3px; color: var(--ct-ember); font: 9px var(--ct-mono); }
+.rv .rv-assurance-list h3 { margin: 0 0 7px; color: var(--ct-text); font-size: 18px; font-weight: 520; letter-spacing: -.02em; }
+.rv .rv-assurance-list p { margin: 0; color: var(--ct-dim); font-size: 14px; line-height: 1.55; }
 
-/* intake */
-.rk .rk-intake { max-width: 560px; margin: 0 auto; }
-.rk .rk-intake form { display: flex; gap: 10px; }
-/* the field wraps the input: a soft ambient halo behind it + a light that
-   orbits the outline clockwise (rotating conic arc; the input's opaque body
-   covers the middle, so only the rim shows) */
-.rk .rk-field { position: relative; flex: 1; min-width: 0; display: flex; }
-.rk .rk-field-glow {
-  position: absolute; inset: -10px;
-  border-radius: 16px;
-  background: radial-gradient(ellipse 70% 90% at 50% 50%,
-    color-mix(in srgb, var(--ct-orange) 26%, transparent), transparent 72%);
-  filter: blur(14px);
-  opacity: 0.28;
-  pointer-events: none;
-}
-/* the beam: a clipped rim whose gradient is painted ONCE and rotated with
-   transform (composited — animating the gradient angle itself leaves stale
-   paint-tile streaks in Chromium when combined with blur) */
-.rk .rk-field-beam {
-  position: absolute; inset: -1.5px;
-  border-radius: 12px;
-  overflow: hidden;
-  opacity: 0.8;
-  pointer-events: none;
-}
-.rk .rk-field-beam::before {
-  content: "";
-  position: absolute; left: 50%; top: 50%;
-  width: 150%; aspect-ratio: 1;
-  background: conic-gradient(
-    transparent 0%, transparent 78%,
-    color-mix(in srgb, var(--ct-ember) 70%, transparent) 89%,
-    var(--ct-orange) 95%,
-    transparent 100%);
-  filter: blur(1.5px);
-  transform: translate(-50%, -50%) rotate(0deg);
-  animation: rk-orbit 5.5s linear infinite;
-}
-@keyframes rk-orbit { to { transform: translate(-50%, -50%) rotate(360deg); } }
-/* focus: the halo holds brighter; the beam keeps orbiting */
-.rk .rk-field:focus-within .rk-field-glow { opacity: 0.6; }
+/* Open reports, objections and the final action. */
+.rv .rv-demos { max-width: var(--rv-max); margin: 0 auto; padding: clamp(135px,15vw,200px) var(--rv-edge); }
+.rv .rv-demos-head { max-width: 700px; margin-bottom: 48px; }
+.rv .rv-demo-list { overflow: hidden; border: 1px solid rgba(242,239,234,.095); border-radius: 16px; background: rgba(242,239,234,.008); box-shadow: 0 24px 70px rgba(0,0,0,.18); transform: translateY(var(--rv-depth-sm)); }
+.rv .rv-demo { position: relative; display: grid; grid-template-columns: 46px minmax(160px,.7fr) minmax(0,1.3fr) 20px; gap: 17px; align-items: center; min-height: 96px; overflow: hidden; padding: 0 18px; border-bottom: 1px solid var(--ct-line); transition: padding .22s ease, background .22s ease, transform .22s ease; }
+.rv .rv-demo::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(255,79,0,.055), rgba(242,239,234,.018) 42%, transparent 76%); opacity: 0; transform: scaleX(.72); transform-origin: left; transition: opacity .24s ease, transform .4s cubic-bezier(.22,1,.36,1); }
+.rv .rv-demo > * { position: relative; z-index: 1; }
+.rv .rv-demo:last-child { border-bottom: 0; }
+.rv .rv-demo:hover, .rv .rv-demo:focus-visible { padding: 0 22px; background: rgba(242,239,234,.022); transform: translateY(-1px); }
+.rv .rv-demo:hover::before, .rv .rv-demo:focus-visible::before { opacity: 1; transform: scaleX(1); }
+.rv .rv-demo-index { color: var(--ct-ghost); font-size: 9px; }
+.rv .rv-demo-repo { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.rv .rv-demo-repo strong { overflow: hidden; color: var(--ct-text); font: 400 13px var(--ct-mono); text-overflow: ellipsis; white-space: nowrap; }
+.rv .rv-demo-repo span { color: var(--ct-ghost); font: 10px var(--ct-mono); }
+.rv .rv-demo-finding { overflow: hidden; color: var(--ct-dim); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.rv .rv-demo > svg { color: var(--ct-ghost); transition: color .2s ease, transform .2s ease; }
+.rv .rv-demo:hover > svg { color: var(--ct-ember); transform: translate(2px,-2px); }
+.rv .rk-faq { max-width: 820px; margin: 0 auto; padding: 0 var(--rv-edge); }
+.rv .rk-faq-head { margin-bottom: 34px; }
+.rv .rk-faq .rk-h2 { margin: 0; color: var(--ct-text); font-size: clamp(34px,4.2vw,52px); font-weight: 530; letter-spacing: -.05em; line-height: 1; }
+.rv .rk-faq-list { border-top: 1px solid var(--ct-line); }
+.rv .rk-faq-item { border-bottom: 1px solid var(--ct-line); }
+.rv .rk-faq-q { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 20px 2px; color: var(--ct-text); cursor: pointer; font-size: 15px; font-weight: 540; list-style: none; }
+.rv .rk-faq-q::-webkit-details-marker { display: none; }
+.rv .rk-faq-q:hover { color: var(--ct-ember); }
+.rv .rk-faq-icon { flex: none; color: var(--ct-ghost); transition: color .18s ease, transform .18s ease; }
+.rv .rk-faq-item[open] .rk-faq-icon { color: var(--ct-ember); transform: rotate(45deg); }
+.rv .rk-faq-a { max-width: 650px; padding: 0 37px 23px 2px; color: var(--ct-dim); font-size: 15px; line-height: 1.6; }
+.rv .rk-faq-a a { color: var(--ct-text); text-decoration: underline; text-underline-offset: 3px; }
+.rv .rv-close { max-width: var(--rv-max); margin: 0 auto; padding: clamp(125px,14vw,185px) var(--rv-edge) clamp(90px,11vw,140px); text-align: center; }
+.rv .rv-close-inner { position: relative; overflow: hidden; padding: clamp(72px,8vw,100px) clamp(24px,7vw,90px); border: 1px solid rgba(242,239,234,.13); border-radius: 22px; outline: 1px solid rgba(242,239,234,.04); outline-offset: 10px; background: radial-gradient(ellipse 64% 70% at 50% 112%, rgba(255,79,0,.14), transparent 70%), rgba(242,239,234,.018); box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 42px 110px rgba(0,0,0,.28); transform: translateY(var(--rv-depth-sm)); transition: border-color .3s ease, box-shadow .35s ease, background-color .3s ease; }
+.rv .rv-close-inner:hover { border-color: rgba(242,239,234,.19); }
+.rv .rv-close-inner:focus-within { border-color: rgba(255,138,80,.34); box-shadow: 0 34px 100px rgba(255,79,0,.08); background-color: rgba(255,79,0,.012); }
+.rv .rv-close-inner::before { content: ""; position: absolute; left: 14%; right: 14%; top: -1px; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,138,80,.55), transparent); }
+.rv .rv-close h2 { max-width: 780px; margin-right: auto; margin-left: auto; }
+.rv .rv-close-inner > p:not(.rv-kicker) { margin: 0 0 32px; color: var(--ct-dim); font-size: 18px; }
+.rv .rv-close .rk-intake { max-width: 650px; margin: 0 auto; text-align: left; }
+.rv .rv-close-proof { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 26px; margin-top: 26px; color: var(--ct-ghost); font: 9px var(--ct-mono); text-transform: uppercase; letter-spacing: .1em; }
+.rv .rv-close-proof span { position: relative; }
+.rv .rv-close-proof span:not(:first-child)::before { content: ""; position: absolute; left: -14px; top: 50%; width: 2px; height: 2px; border-radius: 50%; background: var(--ct-ember); }
+
+/* Restrained one-shot reveals; the tour owns the continuous motion. */
+.rv [data-rv] { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.22,1,.36,1); }
+.rv [data-rv].in { opacity: 1; transform: none; }
+.rv [data-rv="cascade"] > * { opacity: 0; transform: translateY(14px); transition: opacity .55s ease, transform .55s ease; }
+.rv [data-rv="cascade"].in > * { opacity: 1; transform: none; }
+.rv [data-rv="cascade"].in > *:nth-child(2) { transition-delay: 70ms; }
+.rv [data-rv="cascade"].in > *:nth-child(3) { transition-delay: 140ms; }
+.rv [data-rv="cascade"].in > *:nth-child(4) { transition-delay: 210ms; }
+
 @media (prefers-reduced-motion: reduce) {
-  .rk .rk-field-beam { display: none; }
-  .rk .rk-field-glow { opacity: 0.3; }
-}
-.rk .rk-intake input {
-  position: relative; z-index: 1;
-  width: 100%; min-width: 0; font-family: var(--ct-mono); font-size: 14px;
-  color: var(--ct-text); background: var(--ct-surface);
-  border: 1px solid var(--ct-line); border-radius: 12px; padding: 15px 18px; outline: none;
-  transition: border-color 0.25s ease;
-}
-.rk .rk-intake input:focus { border-color: color-mix(in srgb, var(--ct-ember) 55%, transparent); }
-.rk .rk-intake input::placeholder { color: var(--ct-ghost); }
-.rk .rk-intake input:disabled { opacity: 0.6; }
-.rk .rk-intake button {
-  font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
-  background: var(--ct-orange); color: #140a02; border: 0; border-radius: 12px; padding: 15px 22px; white-space: nowrap;
-}
-.rk .rk-intake button:hover { background: var(--ct-ember); }
-.rk .rk-intake button:disabled { opacity: 0.7; cursor: default; }
-.rk .rk-intake-err {
-  min-height: 20px; margin: 10px 0 0;
-  font-family: var(--ct-mono); font-size: 12px; color: var(--ct-ember);
-}
-/* The note under the intake. 14px on --ct-dim (6.7:1), not 12.5px on
-   --ct-ghost (3.2:1, below AA) — it is load-bearing information about what the
-   button is about to do, and the old line put exactly that on the token
-   reserved for ink that conveys nothing. */
-.rk .rk-intake-note {
-  margin: 10px 0 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--ct-dim);
-}
-.rk .rk-intake-note a {
-  color: var(--ct-text);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  transition: text-underline-offset 0.15s ease;
-}
-.rk .rk-intake-note a:hover { text-underline-offset: 5px; }
-
-/* ── PROOF — the three open sweeps ───────────────────────────────────────
-   Denser than the sections around it on purpose. Everything else on this page
-   is a claim with air around it; this is the one place a visitor can check the
-   claims themselves, so it reads as a set of results rather than a pitch. */
-.rk .rk-proof { max-width: 1180px; margin: 0 auto; padding: clamp(52px, 6vw, 92px) var(--edge) 0; }
-.rk .rk-proof-head { max-width: 640px; margin: 0 0 clamp(28px, 3.5vw, 40px); }
-.rk .rk-proof-head .rk-h2 { font-size: clamp(27px, 3.3vw, 40px); }
-.rk .rk-proof-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(14px, 1.6vw, 20px);
-}
-.rk .rk-proof-card {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  min-height: 178px;
-  padding: 20px;
-  border: 1px solid var(--ct-line);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--ct-surface) 60%, transparent);
-  text-decoration: none;
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
-}
-.rk .rk-proof-card--bare { min-height: 0; }
-.rk .rk-proof-card:hover {
-  border-color: color-mix(in srgb, var(--ct-ember) 40%, transparent);
-  background: var(--ct-surface);
-  transform: translateY(-2px);
-}
-.rk .rk-proof-repo {
-  font-family: var(--ct-mono);
-  font-size: 13px;
-  color: var(--ct-text);
-}
-.rk .rk-proof-meta {
-  font-family: var(--ct-mono);
-  font-size: 12px;
-  color: var(--ct-faint);
-}
-/* The computed finding is the reason the card exists, so it is the largest
-   thing on it. */
-.rk .rk-proof-finding {
-  margin-top: 4px;
-  font-size: 16px;
-  line-height: 1.42;
-  letter-spacing: -0.005em;
-  color: var(--ct-text);
-  text-wrap: pretty;
-}
-.rk .rk-proof-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: auto;
-  padding-top: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ct-ember);
-}
-.rk .rk-proof-card:hover .rk-proof-cta { color: var(--ct-orange); }
-
-/* ── NUMBERS — four figures, each a door ─────────────────────────────────
-   Tighter than the sections around it. A stat that has to be scrolled past
-   isn't a stat, it's a paragraph with a big number in it. */
-.rk .rk-stats { max-width: 1180px; margin: 0 auto; padding: clamp(40px, 4.5vw, 64px) var(--edge) 0; }
-.rk .rk-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  background: var(--ct-line);
-  border: 1px solid var(--ct-line);
-  border-radius: 14px;
-  overflow: hidden;
-}
-/* The 1px grid gap IS the rule between cells — cheaper than per-cell borders
-   and it never doubles up at the seams. */
-.rk .rk-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 22px 20px 20px;
-  background: var(--ct-bg);
-  text-decoration: none;
-  transition: background 0.2s ease;
-}
-.rk .rk-stat:hover { background: var(--ct-surface); }
-.rk .rk-stat-figure {
-  font-size: 38px;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  color: var(--ct-text);
-}
-.rk .rk-stat-label {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--ct-text);
-}
-.rk .rk-stat-arrow { flex: none; color: var(--ct-ghost); transition: color 0.2s ease, transform 0.2s ease; }
-.rk .rk-stat:hover .rk-stat-arrow { color: var(--ct-ember); transform: translate(1px, -1px); }
-.rk .rk-stat-detail { font-size: 13px; line-height: 1.5; color: var(--ct-dim); }
-
-/* ── FAQ — native <details>, no accordion machinery ──────────────────── */
-.rk .rk-faq { max-width: 820px; margin: 0 auto; padding: clamp(72px, 9vw, 128px) var(--edge) 0; }
-.rk .rk-faq-head { margin: 0 0 clamp(20px, 2.5vw, 30px); }
-.rk .rk-faq-head .rk-h2 { font-size: clamp(27px, 3.3vw, 40px); margin: 0; }
-.rk .rk-faq-list { border-top: 1px solid var(--ct-line); }
-.rk .rk-faq-item { border-bottom: 1px solid var(--ct-line); }
-.rk .rk-faq-q {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px 2px;
-  font-size: 16.5px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--ct-text);
-  cursor: pointer;
-  list-style: none;
-  transition: color 0.15s ease;
-}
-.rk .rk-faq-q::-webkit-details-marker { display: none; }
-.rk .rk-faq-q:hover { color: var(--ct-ember); }
-.rk .rk-faq-icon { flex: none; color: var(--ct-ghost); transition: transform 0.2s ease, color 0.2s ease; }
-.rk .rk-faq-item[open] .rk-faq-icon { transform: rotate(45deg); color: var(--ct-ember); }
-.rk .rk-faq-a {
-  padding: 0 2px 22px;
-  max-width: 68ch;
-  font-size: 15px;
-  line-height: 1.65;
-  color: var(--ct-dim);
-}
-.rk .rk-faq-a a {
-  color: var(--ct-text);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  transition: text-underline-offset 0.15s ease;
-}
-.rk .rk-faq-a a:hover { text-underline-offset: 5px; }
-
-/* ── HOW IT WORKS — three hairline steps ─────────────────────────────── */
-.rk .rk-how { max-width: 1180px; margin: 0 auto; padding: clamp(88px, 11vw, 160px) var(--edge) 0; }
-.rk .rk-how-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  column-gap: clamp(36px, 5vw, 80px);
-  border-top: 1px solid var(--ct-line);
+  .rv [data-rv], .rv [data-rv="cascade"] > *, .rv .ct-tour-image, .rv .ct-tour-step, .rv .rv-product-frame, .rv .rv-hero-product, .rv .rv-proof strong em { opacity: 1; transform: none; transition: none; animation: none; }
+  .rv .rv-product-frame::after, .rv .ct-tour-progress span::after, .rv .ct-tour-transition-light { display: none; animation: none; }
 }
 
-/* ── SECTION HEADS ───────────────────────────────────────────────────── */
-.rk .rk-feat-head { max-width: 720px; margin: 0 auto clamp(40px, 5vw, 64px); text-align: center; }
-.rk .rk-h2 { margin: 0 0 18px; font-size: clamp(30px, 4.2vw, 54px); font-weight: 600; letter-spacing: -0.035em; line-height: 1.05; text-wrap: balance; }
-.rk .rk-h2--left { text-wrap: pretty; }
-.rk .rk-feat-sub { margin: 0; color: var(--ct-dim); font-size: clamp(16px, 1.6vw, 19px); line-height: 1.55; }
-
-/* ── SPLIT FEATURE — asymmetric 2-col ────────────────────────────────── */
-/* Wider than the 1180 the text sections use — the same move the hero shot
-   makes. Taking the width out of the copy column instead starved it to 38
-   characters a line, which reads as fragments rather than prose. */
-.rk .rk-split { max-width: 1400px; margin: 0 auto; padding: clamp(80px, 10vw, 144px) var(--edge) 0; }
-/* The shot column is deliberately dominant. It holds a rendered code pane, and
-   a wider pane is also a SHORTER one — the reading's prose wraps into fewer
-   lines — so widening fixes the proportion from both directions at once. The
-   copy beside it stays above 44 characters a line, which is the floor before a
-   narrow column starts reading as a list of fragments. */
-.rk .rk-split-grid { display: grid; grid-template-columns: 0.84fr 1.46fr; gap: clamp(28px, 4vw, 64px); align-items: center; }
-.rk .rk-split-copy { max-width: 440px; }
-.rk .rk-split-sub { margin: 0; color: var(--ct-dim); font-size: clamp(16px, 1.6vw, 18px); line-height: 1.55; }
-.rk .rk-split-shot { min-width: 0; }
-
-/* ── BLEED FEATURE — shot runs flush off a viewport edge ─────────────── */
-.rk .rk-bleed { padding: clamp(64px, 8vw, 112px) 0 0; }
-.rk .rk-bleed-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) min(380px, 34vw);
-  gap: clamp(28px, 4vw, 64px);
-  align-items: center;
-  padding-right: max(var(--edge), calc((100vw - 1180px) / 2 + var(--edge)));
-}
-.rk .rk-bleed-shot { min-width: 0; }
-.rk .rk-bleed-copy { max-width: 380px; }
-/* The blast shot has two shapes: the graph on wide screens, a list on narrow
-   ones. Exactly one is ever displayed — see the 900px query below. */
-.rk .ct-blast-list { display: none; }
-.rk .rk-bleed--right .rk-bleed-grid {
-  grid-template-columns: min(380px, 34vw) minmax(0, 1fr);
-  padding-right: 0;
-  padding-left: max(var(--edge), calc((100vw - 1180px) / 2 + var(--edge)));
+@media (max-width: 1000px) {
+  .rv .ct-tour { grid-template-columns: minmax(0,1.35fr) minmax(280px,.65fr); gap: 34px; }
+  .rv .ct-tour-step { min-height: 48vh; }
 }
 
-/* ── INDEX — hairline rows, mono numbers, no cards ───────────────────── */
-.rk .rk-caps { max-width: 1180px; margin: 0 auto; padding: clamp(80px, 10vw, 144px) var(--edge) 0; }
-.rk .rk-index {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(4, 1fr);
-  column-gap: clamp(36px, 5vw, 80px);
-  border-top: 1px solid var(--ct-line);
+@media (max-width: 800px) {
+  .rv .rv-hero { height: auto; min-height: 980px; padding-bottom: 90px; }
+  .rv .rv-proof { grid-template-columns: 1fr 1fr; margin-right: var(--rv-edge); margin-left: var(--rv-edge); }
+  .rv .rv-proof > div:nth-child(2) { border-right: 0; }
+  .rv .rv-proof > div:nth-child(-n+2) { border-bottom: 1px solid var(--ct-line); }
+  .rv .ct-tour { display: block; }
+  .rv .ct-tour-visual { display: none; }
+  .rv .ct-tour-step { min-height: 0; padding: 65px 0; opacity: 1; }
+  .rv .ct-tour-step::before { display: none; }
+  .rv .ct-tour-mobile-window { display: block; }
+  .rv .rv-method-head { grid-template-columns: 1fr; gap: 12px; }
+  .rv .rv-method-head .rv-kicker { grid-column: auto; margin-bottom: 10px; }
+  .rv .rv-method-head > p:last-child { margin: 0; }
+  .rv .rv-method-track { grid-template-columns: 1fr 1fr; }
+  .rv .rv-method-track article:nth-child(2) { border-right: 0; }
+  .rv .rv-assurance { grid-template-columns: 1fr; }
 }
-.rk .rk-idx-row {
-  display: flex; gap: 16px; align-items: baseline;
-  padding: clamp(18px, 2vw, 24px) 2px;
-  border-bottom: 1px solid var(--ct-line);
-}
-.rk .rk-idx-n { flex: none; min-width: 22px; font-family: var(--ct-mono); font-size: 12px; color: var(--ct-ghost); }
-.rk .rk-idx-body { display: flex; flex-direction: column; gap: 5px; }
-.rk .rk-idx-k { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
-.rk .rk-idx-v { color: var(--ct-dim); font-size: 14px; line-height: 1.5; }
 
-/* ── TRUST STRIP ─────────────────────────────────────────────────────── */
-.rk .rk-trust { max-width: 820px; margin: clamp(88px, 12vw, 160px) auto 0; padding: 0 var(--edge); }
-.rk .rk-trust-line { margin: 0; padding: clamp(32px, 4vw, 44px) 0; border-top: 1px solid var(--ct-line); border-bottom: 1px solid var(--ct-line); text-align: center; font-size: clamp(17px, 1.8vw, 21px); line-height: 1.55; color: var(--ct-dim); }
-.rk .rk-trust-line b { color: var(--ct-text); }
-
-/* ── CLOSE ───────────────────────────────────────────────────────────── */
-.rk .rk-close { max-width: 720px; margin: 0 auto; padding: clamp(96px, 12vw, 176px) var(--edge) clamp(56px, 8vw, 96px); text-align: center; }
-.rk .rk-close-h { margin: 0 0 16px; }
-/* The same clamp as .rk-lede: both are the sentence under a big heading,
-   so they are one role and should be one size. A flat 18 sat half a step
-   from the lede's 17-20 range and read as a third body size for no reason. */
-.rk .rk-close-sub { margin: 0 0 34px; color: var(--ct-dim); font-size: clamp(17px, 1.7vw, 20px); }
-.rk .rk-close .rk-demos { text-align: center; }
-
-@media (max-width: 900px) {
-  .rk .rk-intake form { flex-direction: column; }
-  .rk .rk-proof-grid { grid-template-columns: 1fr; }
-  .rk .rk-proof-card { min-height: 0; }
-  .rk .rk-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .rk .rk-how-grid { grid-template-columns: 1fr; }
-  .rk .rk-split-grid { grid-template-columns: 1fr; gap: clamp(20px, 4vw, 36px); }
-  .rk .rk-split-copy { max-width: 560px; }
-  .rk .rk-bleed { padding-left: 0; padding-right: 0; }
-  .rk .rk-bleed-grid,
-  .rk .rk-bleed--right .rk-bleed-grid { grid-template-columns: 1fr; gap: clamp(20px, 4vw, 36px); padding-right: 0; padding-left: 0; }
-  .rk .rk-bleed-copy { order: 1; max-width: 560px; padding: 0 var(--edge); }
-  .rk .rk-bleed-shot { order: 2; }
-  /* Below this width the bleed grid stacks and the shot column collapses to
-     roughly the viewport, which scales the blast graph's 1020-unit viewBox to
-     about a third and its smallest label to 4px. Swap in the list — see
-     CTBlastDiagram. */
+@media (max-width: 640px) {
+  .rk .ct-blast-list { display: none; }
   .rk .ct-blast-graph { display: none; }
   .rk .ct-blast-list { display: block; }
-}
-@media (max-width: 640px) {
-  .rk .rk-index { grid-auto-flow: row; grid-template-rows: none; grid-template-columns: 1fr; }
-  .rk .rk-stats-grid { grid-template-columns: 1fr; }
-  .rk .rk-faq-q { font-size: 15px; padding: 18px 2px; }
-}
-
-/* ═══ MOTION LAYER ═══════════════════════════════════════════════════════
-   Restraint-first: small distances, spring physics, directional, one-shot.
-   Nothing loops except the intake beam; reduced-motion renders finished. */
-
-/* lenis base (smooth scroll) */
-html.lenis, html.lenis body { height: auto; }
-.lenis.lenis-smooth { scroll-behavior: auto !important; }
-
-/* ── reveals — CSS owns the transition; JS only adds .in ─────────────── */
-.rk [data-rv] {
-  opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 0.65s ease, transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
-  /* damped spring — peaks at ~3.5% overshoot */
-  transition-timing-function: ease, linear(0, 0.0059 0.9%, 0.0234 1.9%, 0.0894 4%, 0.2005 6.5%, 0.4084 10.4%, 0.7233 16.4%, 0.8221 19%, 0.9022 21.7%, 0.9634 24.6%, 1.0064 27.7%, 1.0294 31%, 1.0355 34.6%, 1.0327 39.1%, 1.0221 46.4%, 1.0056 58.7%, 0.9992 69.8%, 0.9998 92%, 1);
-  will-change: opacity, transform;
-}
-.rk [data-rv="left"] { transform: translateX(-32px); }
-.rk [data-rv="right"] { transform: translateX(32px); }
-.rk [data-rv].in { opacity: 1; transform: none; }
-
-/* cascade: the container is static; its rows stagger (child n and n+4 share
-   a delay so the index's two columns cascade together; the 3-step
-   how-it-works simply staggers 1-2-3) */
-.rk [data-rv="cascade"] { opacity: 1; transform: none; }
-.rk [data-rv="cascade"] .rk-idx-row,
-.rk [data-rv="cascade"] .rk-proof-card {
-  opacity: 0;
-  transform: translateY(14px);
-  transition: opacity 0.55s ease, transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.rk [data-rv="cascade"].in .rk-idx-row,
-.rk [data-rv="cascade"].in .rk-proof-card { opacity: 1; transform: none; }
-.rk [data-rv="cascade"].in .rk-idx-row:nth-child(2),
-.rk [data-rv="cascade"].in .rk-idx-row:nth-child(6),
-.rk [data-rv="cascade"].in .rk-proof-card:nth-child(2) { transition-delay: 70ms; }
-.rk [data-rv="cascade"].in .rk-idx-row:nth-child(3),
-.rk [data-rv="cascade"].in .rk-idx-row:nth-child(7),
-.rk [data-rv="cascade"].in .rk-proof-card:nth-child(3) { transition-delay: 140ms; }
-.rk [data-rv="cascade"].in .rk-idx-row:nth-child(4),
-.rk [data-rv="cascade"].in .rk-idx-row:nth-child(8) { transition-delay: 210ms; }
-
-/* ── hero load choreography — animates children, never the parallax el ── */
-@keyframes rk-rise {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes rk-surface {
-  from { opacity: 0; transform: translateY(30px) scale(0.988); }
-  to { opacity: 1; transform: none; }
-}
-.rk .rk-h1 { animation: rk-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.05s backwards; }
-.rk .rk-lede { animation: rk-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.14s backwards; }
-.rk .rk-hero .rk-intake { animation: rk-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.23s backwards; }
-
-
-/* the nav's scrolled state and its hover transitions moved to codetrawl.css
-   with the rest of .ct-nav* — CTMotion still toggles .scrolled on .ct-navwrap */
-
-/* ── hover micro-interactions ────────────────────────────────────────── */
-.rk .rk-intake button {
-  transition: background 0.16s ease, transform 0.16s ease;
-}
-.rk .rk-intake button:hover { transform: translateY(-1px); }
-.rk .rk-intake button:active { transform: translateY(0) scale(0.985); }
-.rk .rk-demos a {
-  transition: color 0.15s ease, text-underline-offset 0.15s ease;
-}
-.rk .rk-demos a:hover { text-underline-offset: 5px; }
-.rk .rk-idx-row { transition: background 0.2s ease; }
-.rk .rk-idx-row:hover { background: color-mix(in srgb, var(--ct-surface) 55%, transparent); }
-.rk .rk-idx-n { transition: color 0.2s ease; }
-.rk .rk-idx-row:hover .rk-idx-n { color: var(--ct-ember); }
-
-/* ── reduced motion: render finished, no choreography ────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  .rk [data-rv],
-  .rk [data-rv="cascade"] .rk-idx-row,
-  .rk [data-rv="cascade"] .rk-proof-card { opacity: 1; transform: none; transition: none; }
-  .rk .rk-h1, .rk .rk-lede, .rk .rk-hero .rk-intake { animation: none; }
+  .rv .rv-hero { min-height: 900px; margin-top: -70px; padding: 138px 10px 72px; }
+  .rv .rv-hero-content { padding: 0 10px; }
+  .rv .rv-hero h1 { font-size: clamp(49px,13.5vw,67px); }
+  .rv .rv-hero-lede { font-size: 17px; }
+  .rv .rk-intake form { flex-direction: column; }
+  .rv .rk-intake button { width: 100%; }
+  .rv .rv-hero-product { width: calc(100vw - 20px); margin-top: 40px; }
+  .rv .rv-product-frame { border-radius: 12px; }
+  .rv .rv-product-bar { height: 34px; padding: 0 10px; font-size: 7px; }
+  .rv .rv-proof { margin-right: 10px; margin-left: 10px; }
+  .rv .rv-proof > div { min-height: 88px; padding: 14px; }
+  .rv .rv-proof strong { font-size: 16px; }
+  .rv .rv-tour-section { padding-right: 20px; padding-left: 20px; }
+  .rv .rv-tour-head { margin-bottom: 36px; }
+  .rv .rv-tour-head h2, .rv .rv-method-head h2, .rv .rv-assurance-head h2, .rv .rv-demos-head h2, .rv .rv-close h2 { font-size: 40px; }
+  .rv .ct-tour-step { padding: 50px 0; }
+  .rv .ct-tour-step h3 { font-size: 33px; }
+  .rv .rv-method-track article { min-height: 190px; padding: 22px 13px 20px 0; }
+  .rv .rv-method-track article:not(:first-child) { padding-left: 13px; }
+  .rv .rv-method-track h3 { margin-top: 34px; font-size: 20px; }
+  .rv .rv-method-track p { font-size: 12px; }
+  .rv .rv-assurance { gap: 55px; padding-right: 20px; padding-left: 20px; }
+  .rv .rv-demo { grid-template-columns: 28px minmax(0,1fr) 18px; gap: 10px; padding: 16px 14px; }
+  .rv .rv-demo-finding { grid-column: 2/3; grid-row: 2; white-space: normal; }
+  .rv .rv-demo > svg { grid-column: 3; grid-row: 1; }
+  .rv .rk-faq-q { font-size: 14px; }
+  .rv .rv-close { padding-top: 120px; }
+  .rv .rv-close-inner { border-radius: 16px; }
+  .rv .rv-close-proof { gap: 9px 18px; }
+  .rv .rv-close-proof span:not(:first-child)::before { left: -10px; }
 }
 `;

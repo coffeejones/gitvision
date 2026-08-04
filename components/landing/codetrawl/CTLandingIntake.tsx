@@ -27,7 +27,14 @@ export function normalizeRepo(raw: string): string {
   return raw.trim().replace(/^https?:\/\//, "").replace(/^github\.com\//, "");
 }
 
-export function CTLandingIntake({ resume = false }: { resume?: boolean }) {
+export function CTLandingIntake({
+  resume = false,
+  demoHref,
+}: {
+  resume?: boolean;
+  /** Prefer the in-page report list when it actually rendered. */
+  demoHref?: string;
+}) {
   const router = useRouter();
   const { data: session } = authClient.useSession();
   const loggedIn = !!session?.user;
@@ -42,7 +49,9 @@ export function CTLandingIntake({ resume = false }: { resume?: boolean }) {
   // scrolling back up to the cards beats a cold link into one repo. Falls back
   // to the first configured demo session if the section is ever removed.
   const firstDemo = DEMO_SESSIONS.find((d) => d.sessionId);
-  const firstDemoHref = firstDemo ? "#demos" : "/signup?next=/cases";
+  const firstDemoHref = demoHref ?? (
+    firstDemo ? `/session/${firstDemo.sessionId}` : "/signup?next=/cases"
+  );
 
   function runAnalysis(normalized: string) {
     setError(null);
@@ -151,13 +160,17 @@ export function CTLandingIntake({ resume = false }: { resume?: boolean }) {
             onChange={(e) => setValue(e.target.value)}
             disabled={pending}
             placeholder="github.com/pallets/flask"
+            autoComplete="url"
+            autoCapitalize="none"
+            spellCheck={false}
+            inputMode="url"
             aria-label="Repository URL"
             aria-invalid={!!error}
             aria-describedby={error ? errId : undefined}
           />
         </span>
         <button type="submit" disabled={pending}>
-          {pending ? "Reading…" : "Read the repo"}
+          {pending ? "Analyzing…" : "Analyze repository"}
         </button>
       </form>
       {/* Polite live region: announces errors and the ~60s pending state. */}
