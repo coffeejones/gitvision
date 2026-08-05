@@ -1,7 +1,7 @@
 // Coverage for the refactor-safety data layer (lib/refactorSafety.ts).
 
 import { describe, it, expect } from "vitest";
-import { computeRefactorSafety } from "../refactorSafety";
+import { computeRefactorSafety, isRunnableTestFile } from "../refactorSafety";
 import type { CodeGraph } from "../codeAnalysis/types";
 
 function graph(partial: Partial<CodeGraph>): CodeGraph {
@@ -255,5 +255,82 @@ describe("computeRefactorSafety — test naming conventions across languages", (
       .files.find((x) => x.file === "src/pkg/core.py")
       ?.testsToRun?.map((t) => t.file) ?? [];
     expect(listed).toEqual(["tests/test_core.py"]);
+  });
+});
+
+// --- Test-file recognition -------------------------------------------------
+//
+// isRunnableTestFile decides what the test prioritizer is allowed to put in
+// "run these first". A convention it does not know is a language whose users
+// get an empty list — silently, because an empty list looks like "no tests
+// map to this change" rather than "we could not see your tests".
+//
+// The first version knew only PREFIX conventions. Measured on the real
+// rspec/rspec-core session in .gitvision/sessions: 77 *_spec.rb files, 0
+// recognised. RSpec is the Ruby convention; _test.rb is Minitest. Java and C#
+// had the same shape of gap (Test*.java is recognised, the far more common
+// *Test.java was not), and PHP — one of the seven supported plugins — had no
+// entry at all.
+
+describe("isRunnableTestFile", () => {
+  const accepts = (f: string) => expect(isRunnableTestFile(f), f).toBe(true);
+  const rejects = (f: string) => expect(isRunnableTestFile(f), f).toBe(false);
+
+  it("knows JavaScript and TypeScript", () => {
+    for (const f of ["a.test.ts", "a.spec.tsx", "a.test.mjs", "b.spec.js", "c.test.cts"]) accepts(f);
+  });
+
+  it("knows both Python conventions", () => {
+    accepts("test_widget.py");
+    accepts("widget_test.py");
+  });
+
+  it("knows Go", () => {
+    accepts("widget_test.go");
+  });
+
+  it("knows JUnit and xUnit in BOTH orders", () => {
+    // The suffix is the dominant convention and was the one missing.
+    accepts("WidgetTest.java");
+    accepts("WidgetTests.java");
+    accepts("WidgetTest.kt");
+    accepts("WidgetTests.cs");
+    accepts("WidgetTest.cs");
+    // The prefix form was already handled; keep it.
+    accepts("TestWidget.java");
+  });
+
+  it("knows RSpec, not just Minitest", () => {
+    // 77 files on rspec/rspec-core hung on this one line.
+    accepts("widget_spec.rb");
+    accepts("widget_test.rb");
+    accepts("test_widget.rb");
+  });
+
+  it("knows PHPUnit", () => {
+    // PHP is one of the seven plugins and had no entry at all.
+    accepts("WidgetTest.php");
+    accepts("WidgetTests.php");
+  });
+
+  it("still rejects the files that cannot fail", () => {
+    // The original reason this function exists: fixtures and package markers
+    // were eating the prioritizer's budget. Measured at 31% on Flask.
+    rejects("conftest.py");
+    rejects("__init__.py");
+    rejects("tests/test_apps/__init__.py");
+    rejects("widget.py");
+    rejects("widget.rb");
+    rejects("Widget.java");
+    rejects("README.md");
+  });
+
+  it("does not mistake a source file that merely mentions a convention", () => {
+    // "latest" ends in "test"; "protests.cs" ends in "tests". Neither is a
+    // test file, and a careless case-insensitive suffix rule would take both.
+    rejects("latest.java");
+    rejects("protests.cs");
+    rejects("contest.php");
+    rejects("lib/rspec/core/minitest_assertions_adapter.rb");
   });
 });

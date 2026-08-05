@@ -83,11 +83,25 @@ export function isRunnableTestFile(file: string): boolean {
   const base = file.slice(file.lastIndexOf("/") + 1);
   if (base === "conftest.py" || base.startsWith("__init__")) return false;
   return (
+    // Python: pytest takes either order.
     /^test_.*\.py$/.test(base) ||
     /_test\.py$/.test(base) ||
+    // JS/TS.
     /\.(test|spec)\.[cm]?[jt]sx?$/.test(base) ||
-    /^Test.*\.(java|kt|cs)$/.test(base) ||
-    /_test\.(go|rb)$/.test(base) ||
+    // Go.
+    /_test\.go$/.test(base) ||
+    // JUnit / xUnit / PHPUnit. BOTH orders, and the suffix is the common one —
+    // the first version knew only `Test*.java`, so `WidgetTest.java` and
+    // `WidgetTests.cs` were invisible. The capital T is load-bearing: it keeps
+    // `latest.java` and `protests.cs` out, which a case-insensitive rule would
+    // happily take.
+    /^Test.*\.(java|kt|cs|php)$/.test(base) ||
+    /[a-z0-9]Tests?\.(java|kt|cs|php)$/.test(base) ||
+    // Ruby: _spec.rb is RSpec, _test.rb is Minitest, test_ is the older form.
+    // RSpec was missing entirely, which on rspec/rspec-core meant 77 of its
+    // test files were unusable to the prioritizer.
+    /_spec\.rb$/.test(base) ||
+    /_test\.rb$/.test(base) ||
     /^test_.*\.rb$/.test(base)
   );
 }
