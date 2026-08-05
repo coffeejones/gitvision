@@ -1336,7 +1336,11 @@ function detectWeakSuite(snap: AnalysisSnapshot): {
 function detectDuplicateImplementations(snap: AnalysisSnapshot): HealthSignal[] {
   const cg = snap.codeGraph;
   if (!cg) return [];
-  const groups = findDuplicateGroups(cg, { minComplexity: 5, limit: 50 });
+  // Use the panel's own defaults so the signal and the Code tab cannot
+  // disagree. Keeping the old explicit `minComplexity: 5` here would have
+  // silently killed the signal once file-spread became a requirement: cx5 AND
+  // spread3 finds 2 groups on this repo and 0 on NetBox.
+  const groups = findDuplicateGroups(cg, { limit: 50 });
   if (groups.length < DUPLICATE_MIN_GROUPS) return [];
 
   const copies = groups.reduce((n, g) => n + g.members.length, 0);
@@ -1345,10 +1349,17 @@ function detectDuplicateImplementations(snap: AnalysisSnapshot): HealthSignal[] 
   // Severity tracks how much duplicated logic there is, not just how many
   // groups: two copies of a complexity-30 function is worse than six copies
   // of a complexity-6 one.
+  // Thresholds rescaled with the detector. The old 10/5 cuts were calibrated
+  // against a complexity-only filter that found 6-8 groups on a normal repo;
+  // the spread-aware one finds roughly twice as many REAL ones, so the same
+  // cuts would mark every repo high. These numbers are a CALIBRATION to
+  // preserve the previous meaning, not a measurement — the honest severity
+  // signal would key on how much duplicated logic there is rather than on a
+  // group count, and that is a redesign this note is not.
   const severity: HealthSignal["severity"] =
-    groups.length >= 10 || worst.maxComplexity >= 20
+    groups.length >= 20 || worst.maxComplexity >= 20
       ? "high"
-      : groups.length >= 5
+      : groups.length >= 10
         ? "medium"
         : "low";
 

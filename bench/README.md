@@ -460,3 +460,67 @@ A sanitiser for `os.listdir`/`glob` was written to remove the second one and
 **reverted**: the taint reaches the sink through `os.path.join`, not through
 the listing, so it had no measured effect. Shipping it would have been dead
 code that looked like a fix.
+
+---
+
+# Duplicate detection: what the floor was hiding
+
+The audit that flagged this said recall was **0.001** on NetBox — 1 group
+reported against 1383 "true clone pairs" — and that removing the complexity
+floor recovers 0.998. **That recommendation was wrong**, and measuring it is
+what showed why.
+
+```bash
+npx tsx bench/dupProbe.ts . ~/.codetrawl-bench/pyprobe/netbox ~/.codetrawl-bench/pymut/flask
+```
+
+## Removing the floor is not the fix
+
+At `minComplexity: 1` NetBox reports **104,244 pairs**, and the largest single
+group is **288 identical `test_name()` methods** in one Django test module.
+That is the framework's own convention; extracting a helper for it would be
+wrong. The audit's oracle counted every AST-identical pair as truth, which
+counts convention as a finding — and since the oracle and the detector share
+the same hash, the recall number was partly circular too.
+
+Pairs is also the wrong unit: a 288-member group is 41,328 "pairs" on its own.
+Groups is the honest count.
+
+## Spread is the discriminator complexity could not provide
+
+| | shipped (cx≥5) | cx≥1 | spread≥2 alone | **cx≥2 AND spread≥2** |
+|---|---:|---:|---:|---:|
+| this repo | 6 | 113 | — | **15** (panel cap) |
+| NetBox | 8 | 563 | 81, worst pile-up **278** | **15** (cap), pile-up 19 |
+| Flask | 0 | 96 | 28 | **0** |
+
+A one-liner repeated inside ONE file is that file's idiom. The same helper
+appearing once per file across eleven files is copy-paste — and at a floor of 5
+the panel could not see `fileBasename()` written eleven times in eleven files,
+`onKey()` nine times in nine, `feedbackDir()` eight times in eight.
+
+Flask staying at **0** is the property that matters most: a well-factored
+library has no cross-file structural clones, and the surface stays quiet on it.
+
+## Two, not three — a floor tightened and reverted
+
+Spread ≥3 was implemented first and gave tidier counts (15 and 10 groups). It
+was reverted after measuring what the panel actually renders: **the top 15 is
+identical at spread 2 and 3 on both repos**, because the sort
+(`groupSize × maxComplexity`) plus the 15-item cap already handle volume. The
+higher floor only trimmed the tail, and on NetBox it was trimming genuine
+two-file clones. Tightening a floor to protect a count the cap already protects
+is how a surface starts hiding true findings.
+
+It also would have cost 11 test fixtures across 6 files, all of which encode
+the reasonable assumption that two files is duplication. They were right.
+
+## The signal had to move with it
+
+`detectDuplicateImplementations` passed an explicit `minComplexity: 5`. Left
+alone it would have become cx5 AND spread2 and **silently gone quiet** — 2
+groups here, 0 on NetBox. It now uses the panel's defaults so the signal and
+the Code tab cannot disagree, and its severity cuts were rescaled 10/5 → 20/10
+to preserve their previous meaning. Those cuts are a **calibration, not a
+measurement**; the honest severity would key on how much duplicated logic there
+is rather than on a group count.

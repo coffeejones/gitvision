@@ -6,8 +6,10 @@
 // UI can recompute on every snapshot change without a server round-trip.
 //
 // Quality knobs (defaulted aggressively to keep noise out):
-//   - complexity floor: skip functions below MIN_COMPLEXITY (default 5)
+//   - complexity floor: skip functions below MIN_COMPLEXITY (default 2)
 //     so we don't surface "every getter is a duplicate" noise.
+//   - file-spread floor: a group must span MIN_FILE_SPREAD distinct files
+//     (default 3). Complexity alone was the wrong knob — measured below.
 //   - group size floor: a "group" needs ≥2 members to be a duplicate.
 //   - sort key: groupSize × maxComplexity, so the worst tech-debt
 //     finds (many copies of complex code) rise to the top.
@@ -41,9 +43,38 @@ export interface FindDuplicatesOptions {
   /** Cap the result list. Default 15 — enough for an actionable
    *  panel, short enough to scan. */
   limit?: number;
+  /** Distinct files a group must span. Default 3. Set to 1 to disable. */
+  minFileSpread?: number;
 }
 
-const DEFAULT_MIN_COMPLEXITY = 5;
+// Complexity alone cannot tell copy-paste from convention, and the two errors
+// it makes point in opposite directions. Measured on three repos:
+//
+//   floor 5 (was)          this repo 6 groups | netbox 8   | flask 0
+//   floor 1                          113      |      563   |     96
+//   spread >= 3 alone                 38      |       81   |     28
+//   floor 2 AND spread >= 2           47      |       43   |      0
+//
+// At floor 1 NetBox reports a single "group" of 288 identical `test_name()`
+// methods — Django's own test convention, not tech debt, and extracting a
+// helper for it would be wrong. At floor 5 the panel misses `fileBasename()`
+// written eleven times in eleven different files, which is exactly the thing
+// the surface exists to find.
+//
+// SPREAD is the discriminator the surface was missing: a one-liner repeated
+// inside ONE file is that file's idiom; the same helper appearing once per
+// file across eleven files is copy-paste. Spread alone is not enough either —
+// it lets NetBox's 278-member same-file pile-up straight through — so both
+// conditions are required.
+//
+// Two, not three. A helper copied into two files IS duplication, and the
+// panel's sort (groupSize x maxComplexity) plus the limit already handle
+// volume: the top 15 is IDENTICAL at spread 2 and 3 on both repos measured,
+// so a higher floor only trims the tail — and on NetBox it was trimming real
+// two-file clones. Tightening a floor to protect a count the cap already
+// protects is how a surface starts hiding true findings.
+const DEFAULT_MIN_COMPLEXITY = 2;
+const DEFAULT_MIN_FILE_SPREAD = 2;
 const DEFAULT_LIMIT = 15;
 
 /** Group functions by structural bodyHash. Returns groups with ≥2
@@ -55,6 +86,7 @@ export function findDuplicateGroups(
 ): DuplicateGroup[] {
   const minComplexity = opts.minComplexity ?? DEFAULT_MIN_COMPLEXITY;
   const limit = opts.limit ?? DEFAULT_LIMIT;
+  const minFileSpread = opts.minFileSpread ?? DEFAULT_MIN_FILE_SPREAD;
 
   // Bucket by hash. Functions without a bodyHash (legacy snapshots,
   // not-yet-instrumented plugins) are excluded — they can't be matched.
@@ -71,6 +103,9 @@ export function findDuplicateGroups(
   const groups: DuplicateGroup[] = [];
   for (const [hash, members] of buckets) {
     if (members.length < 2) continue;
+    // Copy-paste crosses file boundaries; an idiom repeated inside one file
+    // does not. See the note on DEFAULT_MIN_FILE_SPREAD.
+    if (new Set(members.map((m) => m.filePath)).size < minFileSpread) continue;
     let maxComplexity = 0;
     for (const m of members) {
       if (m.complexity > maxComplexity) maxComplexity = m.complexity;
