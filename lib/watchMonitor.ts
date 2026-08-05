@@ -26,9 +26,10 @@ import { diffVerdict, type VerdictDelta } from "./intelligence/verdictDelta";
 import { computeRiskDrift, type RiskDrift } from "./riskDrift";
 import { extractHealthSignals } from "./signals";
 import {
+  deleteWatchesForSession,
   listActiveWatches,
-  updateWatchState,
   type Watch,
+  updateWatchState,
 } from "./watches";
 import { eq } from "drizzle-orm";
 import { db, schema } from "./db";
@@ -133,7 +134,32 @@ async function processWatch(
 ): Promise<{ swept: boolean; skipped: boolean; alert: WatchAlert | null }> {
   const session = await getSession(watch.sessionId);
   if (!session) {
-    // The session was deleted out from under the watch — nothing to do.
+    // The session was deleted out from under the watch. This used to just skip,
+    // which meant the row lived forever: reported as skippedUnchanged (the same
+    // bucket as "no new commits"), invisible in every log, and still counted by
+    // countWatchesForUser against the owner's Plus quota — with no UI able to
+    // release it, since WatchToggle only exists on the deleted session's page.
+    //
+    // Deleting HERE rather than only at the delete routes is what makes this
+    // complete: the routes cover the two direct paths, but the GitHub App's
+    // installation.deleted sweep unlinks session files without going through
+    // them, and any future deletion path would leak the same way. The monitor
+    // is the one place that observes the orphan, so it is the one place that
+    // cannot miss it.
+    //
+    // dryRun must not mutate — it exists to preview a sweep.
+    if (!dryRun) {
+      try {
+        const gone = await deleteWatchesForSession(watch.sessionId);
+        if (gone > 0) {
+          console.log(
+            `[watch] removed ${gone} orphaned watch(es) for missing session ${watch.sessionId}`,
+          );
+        }
+      } catch (err) {
+        console.error(`[watch] orphan cleanup failed for ${watch.sessionId}:`, err);
+      }
+    }
     return { swept: false, skipped: true, alert: null };
   }
   const prev = session.snapshots[session.snapshots.length - 1];

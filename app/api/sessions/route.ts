@@ -20,6 +20,7 @@ import {
   getClientIp,
 } from "@/lib/rateLimit";
 import { deleteSession, listSessions } from "@/lib/storage";
+import { deleteWatchesForSession } from "@/lib/watches";
 
 const CreateSchema = z.object({
   repoUrl: z.string().min(1),
@@ -213,6 +214,12 @@ export async function POST(req: Request) {
       );
       for (const s of toDelete) {
         await deleteSession(s.id);
+        // Same reason as the DELETE route: the watch row outlives the session.
+        try {
+          await deleteWatchesForSession(s.id);
+        } catch (err) {
+          console.error(`[sessions] watch cleanup failed for ${s.id}:`, err);
+        }
       }
     }
   }

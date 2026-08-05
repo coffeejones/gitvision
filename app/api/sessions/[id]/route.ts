@@ -14,6 +14,7 @@ import {
   requireSessionReadAccessFromRequest,
 } from "@/lib/ownership";
 import { getSession, deleteSession, renameSession } from "@/lib/storage";
+import { deleteWatchesForSession } from "@/lib/watches";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -38,6 +39,18 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const denied = await requireSessionOwnership(session, req);
   if (denied) return denied;
   await deleteSession(id);
+  // The watch row does NOT belong to the session file, so deleteSession cannot
+  // reach it — storage.ts is pure filesystem and the watch lives in Postgres.
+  // Left behind it is invisible rather than noisy: the monitor reports the
+  // orphan as skippedUnchanged, and the row keeps consuming one of the owner's
+  // Plus watch slots with no UI able to release it, because WatchToggle lives
+  // on the page just deleted. Best-effort — a failed cleanup must not fail the
+  // delete the user asked for; the monitor sweeps the remainder.
+  try {
+    await deleteWatchesForSession(id);
+  } catch (err) {
+    console.error(`[sessions] watch cleanup failed for ${id}:`, err);
+  }
   return NextResponse.json({ ok: true });
 }
 

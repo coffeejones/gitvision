@@ -83,6 +83,26 @@ export async function countWatchesForUser(userId: string): Promise<number> {
   return rows.length;
 }
 
+/** Remove EVERY watch on a session, whoever owns it. Idempotent.
+ *
+ *  For when the session itself is gone. A watch outlives its session today:
+ *  deleteSession only unlinks files and the freshness record, so the row
+ *  survives with nothing to point at. The monitor then skips it and reports it
+ *  as `skippedUnchanged` — indistinguishable from "no new commits" — so it is
+ *  not noisy, it is INVISIBLE, and it permanently consumes one of the owner's
+ *  Plus watch slots with no UI able to release it: WatchToggle lives on the
+ *  session page that was just deleted.
+ *
+ *  Not scoped to a user, unlike deleteWatchForSession: the session is gone for
+ *  everyone. Returns how many rows went, so callers can log a real number. */
+export async function deleteWatchesForSession(sessionId: string): Promise<number> {
+  const gone = await db
+    .delete(schema.watch)
+    .where(eq(schema.watch.sessionId, sessionId))
+    .returning({ id: schema.watch.id });
+  return gone.length;
+}
+
 /** Remove a watch by its session, scoped to the owner. Idempotent. */
 export async function deleteWatchForSession(
   userId: string,
