@@ -65,7 +65,7 @@ import {
   summarizeDuplicates,
   type DuplicateGroup,
 } from "@/lib/codeAnalysis/duplicates";
-import { computeCallResolution } from "@/lib/codeAnalysis/callResolution";
+import { computeOwnCallResolution } from "@/lib/codeAnalysis/callResolution";
 import { formatCount } from "@/lib/formatLocale";
 
 const INITIAL_LIST_SIZE = 10;
@@ -482,8 +482,13 @@ function CoverageChip({ cg }: { cg: CodeGraph }) {
   // rest are dynamic dispatch we can't pin statically — so the call graph (and
   // the blast radius built on it) is high-confidence but not exhaustive, and
   // lower on dynamic languages. Show it rather than imply completeness.
-  const resolution = computeCallResolution(cg);
-  const resolvedPct = Math.round(resolution.rate * 100);
+  // OWN-CALL resolution, not the raw rate. The raw resolved/total reads like an
+  // accuracy score and is not one: most call edges in any real file point at
+  // libraries and builtins, which SHOULD stay unresolved. Measured on the stored
+  // corpus, the raw rate is 13-49% while the own rate is 92-99% on application
+  // code and 54-74% on library-style code, where one method name lives on many
+  // classes and the resolver refuses to guess rather than guessing wrong.
+  const own = computeOwnCallResolution(cg);
 
   // Apple-style stat-tile grid (matches PackagesPanel summary tiles).
   // Three primary tiles always render (AST files / functions / call
@@ -511,8 +516,8 @@ function CoverageChip({ cg }: { cg: CodeGraph }) {
         label="Call sites"
         count={totalCalls}
         sublabel={
-          resolution.total > 0
-            ? `${formatCount(resolution.resolved)} resolved · ${resolvedPct}%`
+          own.ownTotal > 0
+            ? `${own.ownPct}% of calls into this repo resolved`
             : undefined
         }
         term="call-resolution"

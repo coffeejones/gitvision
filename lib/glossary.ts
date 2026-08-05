@@ -78,8 +78,8 @@ export const GLOSSARY = {
   },
   "call-resolution": {
     term: "Call resolution",
-    what: "The share of call sites we could pin to a specific target definition.",
-    why: "Dynamic dispatch can't always be resolved from static code, so the call graph is high-confidence but not exhaustive — coverage is lower on dynamic languages.",
+    what: "Of the calls naming a function this repo defines, the share we pinned to its definition.",
+    why: "Calls into libraries and language builtins are deliberately excluded — there is no function here to point them at, and counting them would judge the analysis on code it never claimed to index. Application-style repos land at 92-99%; libraries at 54-74%, where one method name lives on many classes and the resolver refuses to guess rather than guessing wrong.",
     anchor: "code-panel",
   },
   "near-duplicate": {

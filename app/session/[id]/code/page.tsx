@@ -9,7 +9,7 @@ import { getSessionCached } from "@/lib/sessionCache";
 import { CodePanel } from "@/components/views/CodePanel";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
 import { RollupCounts } from "@/components/views/RollupBar";
-import { computeCallResolution } from "@/lib/codeAnalysis/callResolution";
+import { computeOwnCallResolution } from "@/lib/codeAnalysis/callResolution";
 import {
   findDuplicateGroups,
   summarizeDuplicates,
@@ -35,7 +35,9 @@ export default async function CodeRoute({
   const cg = current.codeGraph;
   let codeRollupParts: Array<string | false | null | undefined> = [];
   if (cg) {
-    const resolvedPct = Math.round(computeCallResolution(cg).rate * 100);
+    // Own-call resolution, not the raw rate: most call edges in any file point
+    // at libraries, and judging the analyser on those undersells it ~10x.
+    const resolvedPct = computeOwnCallResolution(cg).ownPct;
     const dupGroups = summarizeDuplicates(findDuplicateGroups(cg)).totalGroups;
     const cov = computeTestCoverage(cg).totals;
     const covClause =
@@ -49,7 +51,7 @@ export default async function CodeRoute({
     codeRollupParts = [
       covClause,
       `${cg.functions.length.toLocaleString()} functions`,
-      `${resolvedPct}% of call sites resolved`,
+      `${resolvedPct}% of calls into this repo resolved`,
       `${dupGroups.toLocaleString()} duplicate group${dupGroups === 1 ? "" : "s"}`,
     ];
   }

@@ -25,6 +25,7 @@
 
 import type { CodeGraph, EntryPointInfo } from "./types";
 import { isTestFile } from "./testCoverage";
+import { computeOwnCallResolution } from "./callResolution";
 import { cmpStr } from "../deterministicSort";
 
 /** Node id: file + unit separator + function name. Container-qualified names
@@ -190,41 +191,18 @@ export function buildFlowIndex(
     if (fn.entryPoint) declaredEntries.set(id, fn.entryPoint);
   }
 
-  // Every function name this repo defines — lets us tell "we failed to resolve
-  // this" from "there was nothing here to resolve" (see FlowResolution).
-  const ownNames = new Set(cg.functions.map((f) => f.name));
-  // Classes/structs this repo defines. A receiver typed as one of these is a
-  // call at our own code; a receiver typed as anything else is a library.
-  const ownContainers = new Set<string>();
-  for (const fn of cg.functions) {
-    if (fn.containerType) ownContainers.add(fn.containerType);
-  }
+  // The own-call ratio is NOT computed here. It lives in
+  // lib/codeAnalysis/callResolution.ts so the Code tab can read it without
+  // building this whole adjacency map, and so the evidence rules exist once.
+  // Two copies of the same arithmetic is how a critical-count bug once survived
+  // in two files at the same time.
+  const own = computeOwnCallResolution(cg, { excludeTests });
 
   let resolvedEdges = 0;
-  let ownResolved = 0;
-  let ownMissed = 0;
   for (const c of cg.calls) {
-    if (!c.toFile || !c.toFunction) {
-      // Unresolved. Only counts against us if it names our own code — and only
-      // from production, since a test calling a plugin-interface method that
-      // exists once per plugin is ambiguous by construction, not a defect.
-      if (
-        c.fromFunction &&
-        ownNames.has(c.calleeName) &&
-        !(excludeTests && isTestFile(c.fromFile)) &&
-        // Evidence check — see FlowResolution.ownMissed. A bare call naming our
-        // function is ours; a receiver we typed to one of our classes is ours;
-        // an untyped receiver tells us nothing and must not be counted.
-        (!c.hasReceiver ||
-          (c.calleeType !== undefined && ownContainers.has(c.calleeType)))
-      ) {
-        ownMissed++;
-      }
-      continue;
-    }
+    if (!c.toFile || !c.toFunction) continue;
     if (!c.fromFunction) continue;
     resolvedEdges++;
-    if (!(excludeTests && isTestFile(c.fromFile))) ownResolved++;
     if (excludeTests && (isTestFile(c.fromFile) || isTestFile(c.toFile))) continue;
     const from = flowNodeId(c.fromFile, c.fromFunction);
     const to = flowNodeId(c.toFile, c.toFunction);
@@ -249,13 +227,7 @@ export function buildFlowIndex(
       resolvedEdges,
       totalEdges,
       pct: totalEdges > 0 ? Math.round((resolvedEdges / totalEdges) * 100) : 0,
-      ownResolved,
-      ownMissed,
-      ownTotal: ownResolved + ownMissed,
-      ownPct:
-        ownResolved + ownMissed > 0
-          ? Math.round((ownResolved / (ownResolved + ownMissed)) * 100)
-          : 0,
+      ...own,
     },
   };
 }
