@@ -209,3 +209,115 @@ describe("on the sessions this was written for", () => {
     expect(describeUncheckedLanguages(s)).toBeNull();
   });
 });
+
+// --- The report ------------------------------------------------------------
+//
+// One list, one order. The two rules it has to obey are easy to state and easy
+// to break: a gap must FIRE before it appears, and a limit true of every repo
+// is methodology rather than a finding. Half the audit's candidates — the 25s
+// timeout, the 5,000-file walker cap, the import cap, the manifest cap, the
+// commit cap — fired on 0 of 58 stored snapshots. If any of them ever renders
+// a reassuring green row, the rows that matter stop being read.
+
+describe("buildCoverageReport", () => {
+  it("says NOTHING about a repo we fully cover", async () => {
+    // The single most important assertion here. coffeejones/gitvision is npm +
+    // TypeScript, dependencies read, sink rules applied, under every cap. A
+    // caveat on it would be noise, and noise is how the honest ones get
+    // skipped.
+    const { buildCoverageReport } = await import("../coverage");
+    expect(buildCoverageReport(session("o5QTmaYTwE"))).toEqual([]);
+  });
+
+  it("reports the gaps a Go repo really has, and no others", async () => {
+    const { buildCoverageReport } = await import("../coverage");
+    const ids = buildCoverageReport(session("gx1lLA07kO")).map((g) => g.id);
+    expect(ids).toContain("deps-no-ecosystem");
+    expect(ids).toContain("security-no-rules");
+    // Never-fired branches must stay silent even here.
+    expect(ids).not.toContain("walker-truncated");
+    expect(ids).not.toContain("code-skipped");
+    expect(ids).not.toContain("code-not-parsed");
+  });
+
+  it("catches a repo where nothing was parsed at all", async () => {
+    // dungngminh/simutil is 95% Dart. CodePanel gates on the graph being
+    // ABSENT, not empty, so this renders as a wall of zeroes.
+    const { buildCoverageReport } = await import("../coverage");
+    const gap = buildCoverageReport(session("YnGfl-Fnwd")).find(
+      (g) => g.id === "code-not-parsed",
+    );
+    expect(gap, "an empty graph produced no gap").toBeDefined();
+    expect(gap!.kind).toBe("blocking");
+    expect(gap!.headline).toContain("Dart");
+  });
+
+  it("reports a narrowed scope only on the session that narrowed it", async () => {
+    const { buildCoverageReport } = await import("../coverage");
+    const scoped = buildCoverageReport(session("cO6VufGhLU")).map((g) => g.id);
+    const unscoped = buildCoverageReport(session("yAwwHY_ShB")).map((g) => g.id);
+    expect(scoped, "the scoped flask session lost its scope note").toContain("scope-narrowed");
+    expect(unscoped, "an unscoped session claims a scope").not.toContain("scope-narrowed");
+  });
+
+  it("gives every gap it emits a real sentence and real numbers", async () => {
+    // A gap with an empty headline is worse than no gap: it takes up the slot
+    // a real one would have used.
+    const { buildCoverageReport } = await import("../coverage");
+    for (const id of ["gx1lLA07kO", "YnGfl-Fnwd", "PGlVvQRlAh", "cO6VufGhLU"]) {
+      for (const gap of buildCoverageReport(session(id))) {
+        expect(gap.headline.length, `${id}/${gap.id} has no headline`).toBeGreaterThan(20);
+        expect(gap.headline.endsWith("."), `${id}/${gap.id} is not a sentence`).toBe(true);
+        expect(gap.headline, `${id}/${gap.id} left a placeholder`).not.toMatch(/undefined|NaN|\[object/);
+        expect(gap.detail ?? "x", `${id}/${gap.id} detail left a placeholder`).not.toMatch(/undefined|NaN/);
+      }
+    }
+  });
+
+  it("is a pure function — same snapshot, same bytes", async () => {
+    // The evidence pack and the UI read this. If it varied they would disagree,
+    // and a custody artifact that changes between reads is worthless.
+    const { buildCoverageReport } = await import("../coverage");
+    const s = session("gx1lLA07kO");
+    expect(JSON.stringify(buildCoverageReport(s))).toBe(
+      JSON.stringify(buildCoverageReport(s)),
+    );
+  });
+
+  it("does not mutate the snapshot it read", async () => {
+    const { buildCoverageReport } = await import("../coverage");
+    const s = session("gx1lLA07kO");
+    const before = JSON.stringify(s);
+    buildCoverageReport(s);
+    expect(JSON.stringify(s)).toBe(before);
+  });
+
+  it("survives a snapshot with almost nothing on it", async () => {
+    // Old sessions on disk must keep rendering (AGENTS.md invariant 2), and
+    // this runs on every one of them.
+    const { buildCoverageReport } = await import("../coverage");
+    expect(() => buildCoverageReport({} as unknown as AnalysisSnapshot)).not.toThrow();
+    expect(buildCoverageReport({} as unknown as AnalysisSnapshot)).toEqual([]);
+  });
+});
+
+describe("gapsFor", () => {
+  it("returns only the gaps that belong on that surface", async () => {
+    // A gap that only affects Security has no business on a global panel —
+    // moving it there is how it gets ignored.
+    const { gapsFor, buildCoverageReport } = await import("../coverage");
+    const s = session("gx1lLA07kO");
+    const all = buildCoverageReport(s);
+    expect(gapsFor(s, "packages").map((g) => g.id)).toEqual(["deps-no-ecosystem"]);
+    expect(gapsFor(s, "security").map((g) => g.id)).toEqual(["security-no-rules"]);
+    // Every gap lands on exactly one surface, and none goes missing.
+    const surfaces = ["packages", "security", "code", "prs", "session"] as const;
+    const routed = surfaces.flatMap((x) => gapsFor(s, x));
+    expect(routed).toHaveLength(all.length);
+  });
+
+  it("is empty for a surface with nothing to say", async () => {
+    const { gapsFor } = await import("../coverage");
+    expect(gapsFor(session("o5QTmaYTwE"), "security")).toEqual([]);
+  });
+});
