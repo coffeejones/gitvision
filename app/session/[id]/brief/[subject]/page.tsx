@@ -22,6 +22,8 @@ import { getSessionCached } from "@/lib/sessionCache";
 import { TOK } from "@/lib/sessionTheme";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
 import { buildBrief, SUBJECTS, SUBJECT_IDS, isSubjectId } from "@/lib/brief";
+import { BriefReadingPanel } from "@/components/views/BriefReadingPanel";
+import { isDemoSession } from "@/lib/demoSessions";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +89,17 @@ export default async function BriefRoute({
           );
         })}
       </div>
+
+      {/* Above the findings, never instead of them. Everything it says is
+          visible underneath in evidenced form — that arrangement is the only
+          reason a generated paragraph belongs on this product at all. */}
+      <BriefReadingPanel
+        sessionId={id}
+        subject={subject}
+        initial={current.briefReadings?.[subject] ?? null}
+        available={Boolean(process.env.ANTHROPIC_API_KEY)}
+        readOnly={isDemoSession(id)}
+      />
 
       {/* The honest empty state. `clean` is false whenever a blocking gap is
           present, so a repo we could not check never reads as one we did. */}

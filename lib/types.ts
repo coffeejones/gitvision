@@ -266,6 +266,15 @@ export interface AnalysisSnapshot {
   };
   // Rule-based + AI health check. Lazy-populated — generated on button click.
   healthAnalysis?: HealthAnalysis;
+
+  /** Per-subject plain-English readings of the briefs (lib/brief/reading.ts).
+   *
+   *  Keyed by subject so the three questions cache independently — a reader who
+   *  only ever asks one should not pay for three. Optional, like every field
+   *  added since v0.9: an old snapshot renders the deterministic brief exactly
+   *  as it does today, which is the whole reason the reading sits ON TOP of it
+   *  rather than underneath. */
+  briefReadings?: Record<string, import("./brief/reading").BriefReading>;
   // AI bench statement for the verdict page. Read-through cached here on first
   // generation (the narrative is a stable function of the snapshot), so paid
   // users don't re-spend on repeat views and the public demo sessions can
