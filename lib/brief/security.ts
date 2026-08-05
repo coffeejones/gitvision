@@ -20,7 +20,8 @@
 import type { AnalysisSnapshot } from "../types";
 import { getDependencyHealths } from "../signals";
 import { findIncidentMatches } from "../security/knownIncidents";
-import { buildCoverageReport, type CoverageGap } from "../coverage";
+import { buildCoverageReport } from "../coverage";
+import { assemble, type Brief, type BriefItem } from "./types";
 
 /** Where an item sits in the answer.
  *
@@ -28,39 +29,16 @@ import { buildCoverageReport, type CoverageGap } from "../coverage";
  *  advisory, a literal secret match. `investigate` is for what we found but
  *  cannot corroborate. The split is the product's whole claim, so nothing may
  *  cross it for emphasis. */
-export type BriefTier = "fix" | "investigate" | "hygiene";
+type BriefTier = "fix" | "investigate" | "hygiene";
 
-export interface BriefItem {
-  /** Stable id, for keys and for tests that pin ordering. */
-  id: string;
-  tier: BriefTier;
-  title: string;
-  /** The concrete fact behind the title. Never a paraphrase. */
-  evidence: string;
-  /** Deep link to the surface that owns this finding. */
-  href: string;
-}
-
-export interface SecurityBrief {
-  items: BriefItem[];
-  /** The recorded blind spots that bear on this question. */
-  gaps: CoverageGap[];
-  /** True only when we found nothing AND nothing stopped us looking. With any
-   *  blocking gap present this stays false, because "clean" would be a claim we
-   *  did not earn. */
-  clean: boolean;
-}
-
-function tierOf(items: BriefItem[], tier: BriefTier): BriefItem[] {
-  return items.filter((i) => i.tier === tier);
-}
+type TieredItem = BriefItem & { tier: BriefTier };
 
 export function buildSecurityBrief(
   snap: AnalysisSnapshot,
   sessionId: string,
-): SecurityBrief {
+): Brief {
   const base = `/session/${sessionId}`;
-  const items: BriefItem[] = [];
+  const items: TieredItem[] = [];
 
   // --- fix first: findings with an external corroborator -----------------
 
@@ -179,13 +157,36 @@ export function buildSecurityBrief(
     (g) => g.surface === "security" || g.surface === "packages" || g.surface === "session",
   );
 
-  return {
-    items,
-    gaps,
-    // Not "no items". A blocking gap means something was never checked, and
-    // calling that clean is the exact overclaim this whole arc exists to stop.
-    clean: items.length === 0 && !gaps.some((g) => g.kind === "blocking"),
-  };
-}
+  const tier = (t: BriefTier) => items.filter((i) => i.tier === t).map(({ tier: _t, ...rest }) => rest);
 
-export { tierOf };
+  return assemble(
+    "security",
+    "Composed from the Security, Packages and Signals tabs — nothing here is computed for this page. What CodeTrawl could not check is part of the answer rather than a footnote.",
+    [
+      {
+        id: "fix",
+        label: "Fix first",
+        note: "Each of these has a named corroborator — an advisory, an incident, or a literal match.",
+        items: tier("fix"),
+      },
+      {
+        id: "investigate",
+        label: "Worth a look",
+        note: "Found, but not corroborated. A pattern match is a question, not a verdict.",
+        items: tier("investigate"),
+      },
+      {
+        id: "hygiene",
+        label: "Dependency hygiene",
+        note: "Real, and not a security finding.",
+        items: tier("hygiene"),
+      },
+    ],
+    gaps,
+    {
+      headline: "Nothing outstanding, and nothing went unchecked.",
+      detail:
+        "Dependencies were read, dangerous-call rules ran, and no scanner was blocked. Refreshing the session re-runs all of them.",
+    },
+  );
+}

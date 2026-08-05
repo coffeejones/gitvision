@@ -472,12 +472,15 @@ export function SessionShell({
         </button>
       </div>
 
-      {/* One question, above the instruments.
+      {/* Pick a question, above the instruments.
           The workspace has sixteen destinations and the visitor has to know
-          which one answers their question. This inverts it: pick the question,
+          which one answers their question. This inverts it: choose the subject,
           get the answer composed across tabs. It sits ABOVE the departments
-          rather than inside one, because it is not a department — and it is a
-          plain link, so the back button removes it and nothing is stored. */}
+          rather than inside one, because a question is not a department — and
+          it is a plain link, so the back button removes it and nothing is
+          stored per user or has to be cleaned up when a session is deleted.
+          The three subjects live on the brief itself, so this entry does not
+          have to know them. */}
       <Link
         href={`${base}/brief/security`}
         className="flex items-center gap-2 rounded-lg px-2.5 py-2 mb-2 text-[13px] transition"
@@ -488,7 +491,7 @@ export function SessionShell({
         }}
       >
         <HelpCircle size={14} />
-        <span>Is this safe to depend on?</span>
+        <span>Choose a subject</span>
       </Link>
 
       <nav className="flex flex-col gap-1">

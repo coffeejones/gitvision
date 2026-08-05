@@ -189,7 +189,10 @@ export type GapId =
   | "walker-truncated"
   | "security-no-rules"
   | "scope-narrowed"
-  | "pr-window";
+  | "pr-window"
+  /** Emitted by the understand brief rather than the report: it is a floor on
+   *  reach claims, and only meaningful next to one. */
+  | "call-resolution";
 
 /** Where the gap belongs. A gap that only affects Security has no business on
  *  a global panel — moving it there is how it gets ignored. */

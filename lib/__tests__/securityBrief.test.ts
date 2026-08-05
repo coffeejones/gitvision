@@ -28,8 +28,14 @@ const session = (id: string): AnalysisSnapshot =>
     readFileSync(path.join(process.cwd(), ".gitvision", "sessions", `${id}.json`), "utf-8"),
   ).snapshots.at(-1);
 
+/** Items in one section. Sections with no items are dropped by assemble(), so
+ *  an absent section and an empty one are the same thing here. */
 const tier = (b: ReturnType<typeof buildSecurityBrief>, t: string) =>
-  b.items.filter((i) => i.tier === t);
+  b.sections.find((s) => s.id === t)?.items ?? [];
+
+/** Every item across every section. */
+const allItems = (b: ReturnType<typeof buildSecurityBrief>) =>
+  b.sections.flatMap((s) => s.items);
 
 describe("what counts as 'fix first'", () => {
   it("puts a CVE-bearing package there, with the advisory ids", () => {
@@ -104,21 +110,21 @@ describe("clean means we looked", () => {
   it("is false on a repo where nothing could be checked", () => {
     // gin-gonic/gin: 0 findings, 2 blocking gaps. The whole point.
     const b = buildSecurityBrief(session("gx1lLA07kO"), "s1");
-    expect(b.items).toEqual([]);
+    expect(allItems(b)).toEqual([]);
     expect(b.gaps.filter((g) => g.kind === "blocking").length).toBeGreaterThan(0);
     expect(b.clean, "a repo we could not check reported as clean").toBe(false);
   });
 
   it("is true only when there is nothing found AND nothing blocked", () => {
     const b = buildSecurityBrief(session("o5QTmaYTwE"), "s1");
-    expect(b.items).toEqual([]);
+    expect(allItems(b)).toEqual([]);
     expect(b.gaps).toEqual([]);
     expect(b.clean).toBe(true);
   });
 
   it("is false as soon as there is a finding, gaps or not", () => {
     const b = buildSecurityBrief(session("yAwwHY_ShB"), "s1");
-    expect(b.items.length).toBeGreaterThan(0);
+    expect(allItems(b).length).toBeGreaterThan(0);
     expect(b.clean).toBe(false);
   });
 });
@@ -133,7 +139,7 @@ describe("it composes rather than computes", () => {
 
   it("gives every item somewhere to verify it", () => {
     for (const id of ["yAwwHY_ShB", "o5QTmaYTwE", "DBtU3d_Gfk"]) {
-      for (const item of buildSecurityBrief(session(id), "s1").items) {
+      for (const item of allItems(buildSecurityBrief(session(id), "s1"))) {
         expect(item.href, `${id}/${item.id}`).toMatch(/^\/session\/s1\/(security|packages)$/);
         expect(item.title.length, `${id}/${item.id} has no title`).toBeGreaterThan(5);
         expect(item.evidence, `${id}/${item.id} left a placeholder`).not.toMatch(
@@ -154,7 +160,7 @@ describe("it composes rather than computes", () => {
     // Two secrets on the same line of the same file would collide, and React
     // would silently render one. Cheap to assert, annoying to debug.
     for (const id of ["yAwwHY_ShB", "6xw0IjzqRh", "DBtU3d_Gfk"]) {
-      const ids = buildSecurityBrief(session(id), "s1").items.map((i) => i.id);
+      const ids = allItems(buildSecurityBrief(session(id), "s1")).map((i) => i.id);
       expect(new Set(ids).size, `${id} has duplicate item ids`).toBe(ids.length);
     }
   });
@@ -163,22 +169,20 @@ describe("it composes rather than computes", () => {
     // Old sessions on disk must keep rendering (AGENTS.md invariant 2).
     const empty = {} as unknown as AnalysisSnapshot;
     expect(() => buildSecurityBrief(empty, "s1")).not.toThrow();
-    expect(buildSecurityBrief(empty, "s1").items).toEqual([]);
+    expect(allItems(buildSecurityBrief(empty, "s1"))).toEqual([]);
   });
 });
 
 describe("the route only serves subjects that exist", () => {
-  it("has exactly one subject, and it composes across tabs", () => {
-    // A subject earns a slot by crossing surfaces. "Refactor" and "Tests" each
-    // map to a single existing tab, so they would be a menu entry pointing at
-    // a menu entry — that is the problem this is meant to solve, not repeat.
+  it("validates against the registry rather than its own list", async () => {
+    // The page used to carry its own SUBJECTS literal, which is how the second
+    // and third questions could exist in lib/ and be unreachable from the UI.
     const src = readFileSync(
       path.join(process.cwd(), "app", "session", "[id]", "brief", "[subject]", "page.tsx"),
       "utf-8",
     );
-    const block = src.slice(src.indexOf("const SUBJECTS = {"), src.indexOf("} as const;"));
-    const subjects = [...block.matchAll(/(\w+):\s*"/g)].map((m) => m[1]);
-    expect(subjects).toEqual(["security"]);
+    expect(src, "the page keeps a private subject list again").not.toContain("const SUBJECTS = {");
+    expect(src).toContain("isSubjectId(subject)");
     expect(src, "an unknown subject must 404").toContain("notFound()");
   });
 });

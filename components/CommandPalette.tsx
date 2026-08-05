@@ -106,7 +106,7 @@ export function CommandPalette({ sessionId, index, open, onClose }: Props) {
     const base = `/session/${sessionId}`;
     const pages: PaletteItem[] = [
       // Health
-      { id: "p:brief", group: "pages", label: "Is this safe to depend on?", icon: <HelpCircle size={13} />, href: `${base}/brief/security` },
+      { id: "p:brief", group: "pages", label: "Choose a subject", icon: <HelpCircle size={13} />, href: `${base}/brief/security` },
       { id: "p:overview", group: "pages", label: "Overview", icon: <Home size={13} />, href: base },
       { id: "p:insights", group: "pages", label: "Insights", icon: <Sparkles size={13} />, href: `${base}/insights` },
       { id: "p:signals", group: "pages", label: "Signals", icon: <ListChecks size={13} />, href: `${base}/signals` },
