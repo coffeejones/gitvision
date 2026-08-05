@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { DependencyHealth, DeprecatedDep, OutdatedDep, VulnerableDep } from "@/lib/types";
 import type { ClientSnapshot } from "@/lib/clientSnapshot";
+import type { UnreadEcosystem } from "@/lib/coverage";
 import { TOK } from "@/lib/sessionTheme";
 import { SearchInput } from "@/components/SearchInput";
 import { HelpHint } from "@/components/HelpHint";
@@ -60,7 +61,17 @@ function ecosystemLabel(eco: string): string {
 
 // ------------------- Props -------------------
 
-export function PackagesPanel({ snapshot }: { snapshot: ClientSnapshot }) {
+export function PackagesPanel({
+  snapshot,
+  unread,
+}: {
+  snapshot: ClientSnapshot;
+  /** Why the panel is empty, computed server-side. Undefined when dependencies
+   *  WERE read, or when nothing concrete could be said. Passed in rather than
+   *  derived here because the check reads codeGraph.fileComplexity, which
+   *  ClientSnapshot deliberately does not carry. */
+  unread?: UnreadEcosystem | null;
+}) {
   const healths =
     snapshot.dependencyHealths ??
     (snapshot.dependencyHealth ? [snapshot.dependencyHealth] : []);
@@ -81,19 +92,58 @@ export function PackagesPanel({ snapshot }: { snapshot: ClientSnapshot }) {
   }, [healths]);
 
   if (healths.length === 0) {
+    // "DETECTED" WAS THE WRONG WORD. This said "No package manifests detected
+    // in this repo" on 11 of the 22 stored sessions — 7 of 10 distinct repos —
+    // every one of which declares its dependencies in a file the walker saw and
+    // no plugin reads. A coverage limit was being reported as a finding about
+    // the repo, and an empty panel reads as a clean bill of health.
+    const reads = (
+      <>
+        CodeTrawl reads <code className="font-mono">package.json</code>,{" "}
+        <code className="font-mono">Cargo.toml</code>,{" "}
+        <code className="font-mono">pyproject.toml</code> and{" "}
+        <code className="font-mono">requirements*.txt</code>.
+      </>
+    );
+    if (unread) {
+      const what =
+        unread.manifests.length > 0 ? (
+          <>
+            this repo declares its dependencies in{" "}
+            <code className="font-mono">{unread.manifests[0]}</code>
+            {unread.ecosystem ? ` (${unread.ecosystem})` : ""}
+          </>
+        ) : (
+          <>
+            this repo is mostly {unread.language}, and no manifest CodeTrawl
+            reads was found in it
+          </>
+        );
+      return (
+        <EmptyPanel
+          icon={<PackageX size={22} />}
+          title="Not checked — no reader for this ecosystem"
+          body={
+            <>
+              {reads} But {what}, so nothing here was compared against a
+              registry, against OSV, or against the known-incident list.
+              <br />
+              <br />
+              This is not a clean bill of health. Treat the Supply score as
+              unmeasured rather than passing.
+            </>
+          }
+        />
+      );
+    }
     return (
       <EmptyPanel
         icon={<PackageX size={22} />}
-        title="No package manifests detected in this repo"
+        title="No dependency manifest found"
         body={
           <>
-            CodeTrawl reads{" "}
-            <code className="font-mono">package.json</code>,{" "}
-            <code className="font-mono">Cargo.toml</code>,{" "}
-            <code className="font-mono">pyproject.toml</code>, and{" "}
-            <code className="font-mono">requirements*.txt</code>. Try a
-            JavaScript, Rust, or Python project to see vulnerable /
-            outdated / deprecated dependencies surfaced here.
+            {reads} Nothing matching those was found here, and no manifest from
+            another ecosystem surfaced either — so there was nothing to check.
           </>
         }
       />

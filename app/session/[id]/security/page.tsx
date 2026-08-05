@@ -18,6 +18,7 @@ import { getSessionCached } from "@/lib/sessionCache";
 import { toClientSnapshot } from "@/lib/clientSnapshot";
 import { SecurityPanel } from "@/components/views/security/SecurityPanel";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
+import { describeUncheckedLanguages } from "@/lib/coverage";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,11 @@ export default async function SecurityRoute({
         line="Four deterministic scanners — incidents, secrets, code paths, risky eval/exec. Every finding maps to an advisory, a known incident, or a literal match. Code-path findings also say whether anything can actually reach them: a traced path means reachable from an entry point, not that the call happens on every request."
       />
 
-      <SecurityPanel snapshot={clientSnapshot} sessionId={id} />
+      <SecurityPanel
+        snapshot={clientSnapshot}
+        sessionId={id}
+        unchecked={describeUncheckedLanguages(current)}
+      />
     </main>
   );
 }

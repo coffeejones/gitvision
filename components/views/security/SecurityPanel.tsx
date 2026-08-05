@@ -21,13 +21,20 @@ import { RollupBar } from "@/components/views/RollupBar";
 import { AnchorGlow } from "@/components/views/AnchorGlow";
 import { StatusGrid } from "./StatusGrid";
 import { FindingsList } from "./FindingsList";
+import type { UncheckedLanguages } from "@/lib/coverage";
 
 interface Props {
   snapshot: ClientSnapshot;
   sessionId: string;
+  /** Languages parsed WITHOUT any dangerous-call rules applied, computed
+   *  server-side. Sink rules exist in two plugins; a Java, Go, C#, Ruby or PHP
+   *  repo is parsed for structure and then examined by nothing, and its zero
+   *  findings read as zero problems. Optional so the landing's mounted copy and
+   *  older callers keep working. */
+  unchecked?: UncheckedLanguages | null;
 }
 
-export function SecurityPanel({ snapshot, sessionId }: Props) {
+export function SecurityPanel({ snapshot, sessionId, unchecked }: Props) {
   const incidentMatches = findIncidentMatches(snapshot);
   const secretFindings = snapshot.secretFindings?.findings ?? [];
   const patternFindings = snapshot.riskyPatternFindings?.findings ?? [];
@@ -119,6 +126,16 @@ export function SecurityPanel({ snapshot, sessionId }: Props) {
         emptyLabel="No findings across any scanner"
         trailing={
           [
+            // The distinction this whole page rests on: a scanner that did not
+            // run, versus rules that do not exist for this language. Both
+            // produce zero findings and only one of them is about the repo.
+            unchecked
+              ? `${unchecked.plugins.join(" + ")} parsed, ${
+                  unchecked.none ? "no" : "no additional"
+                } dangerous-call rules for ${
+                  unchecked.plugins.length === 1 ? "it" : "them"
+                }`
+              : null,
             notScanned.length > 0 ? `${notScanned.join(" + ")} not scanned` : null,
             unproven > 0
               ? `counts proven reach only · ${unproven} more listed below without a traced path`
@@ -185,6 +202,7 @@ export function SecurityPanel({ snapshot, sessionId }: Props) {
           patternFindings={patternFindings}
           sinkFindings={sinkFindings}
           sessionId={sessionId}
+          unchecked={unchecked}
           repoPrivate={snapshot.repo.private === true}
         />
       </div>

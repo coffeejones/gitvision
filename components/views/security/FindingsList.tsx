@@ -30,6 +30,7 @@ import { findingKeyOf } from "@/lib/security/disclosure";
 import { DisclosureButton } from "./DisclosureButton";
 import type { RiskyPatternFinding } from "@/lib/security/riskyPatterns";
 import type { SecretFinding } from "@/lib/security/types";
+import type { UncheckedLanguages } from "@/lib/coverage";
 import {
   buildUnifiedFindings,
   type UnifiedFinding,
@@ -44,9 +45,14 @@ interface Props {
   /** Whether the analyzed repo is private — threads to the disclosure action's
    *  one-time consent, since the flagged line is private source. */
   repoPrivate?: boolean;
+  /** Languages parsed with NO dangerous-call rules applied. When set, the empty
+   *  state must not claim the scanners ran — on a Go or Java repo they did not,
+   *  and this card was the loudest false statement on the page. */
+  unchecked?: UncheckedLanguages | null;
 }
 
 export function FindingsList({
+  unchecked,
   incidentMatches,
   secretFindings,
   patternFindings,
@@ -62,7 +68,7 @@ export function FindingsList({
   );
 
   if (all.length === 0) {
-    return <CleanListState />;
+    return <CleanListState unchecked={unchecked} />;
   }
 
   return (
@@ -352,7 +358,7 @@ function PatternRowContent({
 
 // ─── Clean state ─────────────────────────────────────────────────
 
-function CleanListState() {
+function CleanListState({ unchecked }: { unchecked?: UncheckedLanguages | null }) {
   return (
     <div
       className="flex items-center gap-3 px-4 py-6 rounded-lg"
@@ -370,12 +376,25 @@ function CleanListState() {
           className="text-sm font-semibold"
           style={{ color: TOK.textPrimary }}
         >
-          No findings across any scanner.
+          {unchecked?.none
+            ? "No findings — and no rules ran on this language."
+            : "No findings across any scanner."}
         </p>
         <p className="text-xs" style={{ color: TOK.textMuted }}>
-          The three deterministic scanners ran on this snapshot and
-          surfaced nothing actionable. Refreshing the session re-runs
-          all of them.
+          {unchecked?.none ? (
+            <>
+              {unchecked.plugins.join(" + ")} was parsed for structure —
+              functions, calls, complexity — but CodeTrawl&rsquo;s
+              dangerous-call rules exist for Python and JavaScript/TypeScript
+              only. Nothing here was examined for injection, deserialisation
+              or path traversal.
+            </>
+          ) : (
+            <>
+              The deterministic scanners ran on this snapshot and surfaced
+              nothing actionable. Refreshing the session re-runs all of them.
+            </>
+          )}
         </p>
       </div>
     </div>

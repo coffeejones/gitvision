@@ -11,6 +11,7 @@ import { TOK } from "@/lib/sessionTheme";
 import { PackagesPanel } from "@/components/views/PackagesPanel";
 import { CIHardeningPanel } from "@/components/views/CIHardeningPanel";
 import { SbomPanel } from "@/components/views/SbomPanel";
+import { describeUnreadEcosystem } from "@/lib/coverage";
 
 export const dynamic = "force-dynamic";
 
@@ -55,13 +56,16 @@ export default async function PackagesRoute({
           className="text-sm sm:text-base max-w-2xl leading-relaxed"
           style={{ color: TOK.textSecondary }}
         >
-          Vulnerable, outdated, and deprecated packages across every
-          manifest CodeTrawl detected. Click any CVE for the full
+          Vulnerable, outdated, and deprecated packages, for the npm, Cargo
+          and PyPI manifests CodeTrawl reads. Click any CVE for the full
           advisory, any package name for its registry page.
         </p>
       </header>
       <div id="screenshot-target" className="flex flex-col gap-6">
-        <PackagesPanel snapshot={clientSnapshot} />
+        <PackagesPanel
+          snapshot={clientSnapshot}
+          unread={describeUnreadEcosystem(current)}
+        />
         {/* CI-hardening (Arc 4) — the supply chain doesn't stop at manifests;
          *  the workflows that build + publish are attack surface too. Hidden
          *  when the repo has no workflows / pre-dates the check. */}
