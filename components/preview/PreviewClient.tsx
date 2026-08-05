@@ -91,6 +91,12 @@ export function PreviewClient() {
         setPhase("done");
         return;
       }
+      // `poll` references itself to schedule the next tick. The rule sees the
+      // name used inside its own initializer and calls it a TDZ access, but the
+      // reference resolves when the TIMEOUT fires, by which point the const is
+      // assigned. The empty dep array makes useCallback return one stable
+      // function, so every closure sees the same binding.
+      // eslint-disable-next-line react-hooks/immutability
       timer.current = setTimeout(() => poll(jobId), 3000);
     } catch (e) {
       if (activeJob.current !== jobId) return;

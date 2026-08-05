@@ -103,6 +103,11 @@ export default function GlobalError({
             >
               Try again
             </button>
+            {/* A plain <a> is correct HERE and only here. This is the global
+                error boundary: React has already failed, so client routing is
+                exactly the thing not to trust. A full document load is the
+                recovery, not a regression. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
               style={{

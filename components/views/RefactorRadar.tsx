@@ -275,7 +275,7 @@ function FileRow({
                 </div>
               ) : (
                 <span className="text-[12px]" style={{ color: TOK.textMuted }}>
-                  No test file reaches the affected code — there's nothing to run
+                  No test file reaches the affected code — there&apos;s nothing to run
                   first.
                 </span>
               )}

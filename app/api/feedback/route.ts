@@ -82,7 +82,6 @@ export async function POST(req: Request): Promise<NextResponse> {
   } catch (err) {
     // Disk write failed — most likely Railway volume is full or
     // write-protected. Surface a generic 500; logs will show details.
-    // eslint-disable-next-line no-console
     console.error("[feedback] submitFeedback failed:", err);
     return NextResponse.json(
       {

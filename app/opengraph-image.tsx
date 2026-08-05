@@ -48,7 +48,6 @@ export default function OpenGraphImage() {
           {/* next/og (Satori) needs numeric dimensions via style — string
               width/height attributes ("80") are rejected ("Invalid value")
               and the mark silently drops out of the card. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={OG_ICON_DATA_URI}
             width={80}

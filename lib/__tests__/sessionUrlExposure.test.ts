@@ -19,7 +19,7 @@
 //      an open leak, and this file should not imply otherwise.
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 import { checkSessionReadAccess } from "../ownership";
@@ -118,7 +118,6 @@ describe("the session URL does not travel", () => {
 });
 
 function listFiles(dir: string, ext: string): string[] {
-  const { readdirSync } = require("node:fs") as typeof import("node:fs");
   const out: string[] = [];
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, e.name);

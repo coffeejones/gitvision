@@ -1,10 +1,19 @@
 name: CI
 
 # Dogfooding the pitch: a product that sells verifiable, deterministic gates
-# runs its own checks on every push and PR. Type check → the 1800+ test suite
-# (incl. the determinism guard) → production build. Lint is intentionally not
-# here yet — the eslint config is unscoped and currently reports thousands of
-# problems on generated/vendored files; wire it in once that's fixed.
+# runs its own checks on every push and PR. Lint → type check → the full test
+# suite (incl. the determinism guard) → production build.
+#
+# Lint is enforced on ERRORS ONLY, deliberately. A bare `eslint .` used to
+# report 48,314 problems, 96.5% of them from git worktrees and generated
+# bundles, which is why this step did not exist. Scoping the config
+# (eslint.config.mjs) took that to 95 problems, all warnings.
+#
+# Warnings are not gated because the largest group — react-hooks'
+# set-state-in-effect, 35 hits across 20 components — is a performance hint
+# that would need a twenty-file refactor to clear. Gating errors stops NEW
+# breakage today without holding CI hostage to that. If the warning count is
+# ever driven to zero, add --max-warnings 0 here and it stays there.
 
 on:
   push:
@@ -21,6 +30,8 @@ jobs:
           node-version: "20"
           cache: "npm"
       - run: npm ci
+      - name: Lint (errors gate the build; warnings are reported)
+        run: npx eslint .
       - name: Type check
         run: npx tsc --noEmit
       - name: Tests

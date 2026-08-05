@@ -381,7 +381,7 @@ export function BillingPanel({
                   <strong style={{ color: TOK.textPrimary }}>
                     {tierConfig.name}
                   </strong>
-                  ? You'll keep access until{" "}
+                  ? You&apos;ll keep access until{" "}
                   {currentPeriodEnd
                     ? formatDate(currentPeriodEnd)
                     : "the period ends"}
