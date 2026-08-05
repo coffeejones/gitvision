@@ -22,7 +22,7 @@
 //   blast_radius        File or function-level reach
 //   find_duplicates     Structurally identical functions (refactor signal)
 //   untested_hotspots   Production fns with no test caller
-//   signals             Full 17-signal health verdict + dimension rollup
+//   signals             Full rule-based health verdict + dimension rollup
 //
 // Each tool is implemented in mcp/tools/<name>.ts; this file is just
 // the wiring. buildServer() lives in buildServer.ts so the test suite

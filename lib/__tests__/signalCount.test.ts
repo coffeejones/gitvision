@@ -99,42 +99,122 @@ describe("the two counts are two counts on purpose", () => {
   });
 });
 
-describe("no surface hardcodes the count", () => {
-  // The eight sites that drifted, plus the modules that own the numbers. A
-  // literal here is the exact defect this arc fixed.
-  const SURFACES = [
+/** Anything that states how many signals the product computes.
+ *
+ *  THREE FORMS, because the first version of this guard knew only one and the
+ *  rebuilt landing walked straight through it with all three:
+ *    "20 deterministic signals"   the phrasing the original sweep fixed
+ *    "20 computed signals"        the landing's proof strip and the OG card
+ *    "Twenty deterministic ..."   spelled out, which no digit regex can see
+ *
+ *  Matching the NOUN rather than one adjective is the point. A slice size
+ *  ("top 3 signals", "the first 5") is legitimate and must stay allowed, so the
+ *  number has to be adjacent to a whole-catalog word. */
+const WORD_NUMBERS =
+  "ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty";
+const NUM = String.raw`(?:~?\d+|\b(?:${WORD_NUMBERS})\b)`;
+const COUNT_CLAIM = new RegExp(
+  [
+    // "20 deterministic signals" · "Twenty deterministic repository signals" ·
+    // and the tuple form ["20", "computed signals"], where the number and the
+    // noun live in SEPARATE string literals — which is how the landing's proof
+    // strip slipped past the first version of this guard.
+    String.raw`${NUM}[\s\-",]{1,4}(?:deterministic|computed|rule-based)[\s\-]*(?:repository[\s\-]+)?signals?\b`,
+    // "the full 17-signal health verdict" — hyphenated, singular, no adjective.
+    String.raw`\b\d+-signals?\b`,
+    // "the 20 signals already computed". The definite article is what makes it
+    // a claim about the WHOLE catalog; "the top 3 signals" is a slice and stays
+    // legal, which is why the number must follow "the" directly.
+    String.raw`\bthe\s+${NUM}\s+signals?\b`,
+  ].join("|"),
+  "gi",
+);
+
+/** Strip line comments so a file may EXPLAIN the defect it guards against. */
+function code(src: string): string {
+  return src
+    .split("\n")
+    .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    .join("\n");
+}
+
+describe("nothing states a signal count it did not derive", () => {
+  // Every surface that has ever carried this number, in-app AND outward-facing.
+  // The rebuilt landing proved the in-app-only list was the weakness: it said
+  // "20 computed signals" twice while the engine computed 34, and the OG card
+  // put the same number on every social share of codetrawl.com.
+  const SURFACES: string[][] = [
+    // in-app
     ["app", "(workspace)", "how-it-works", "page.tsx"],
     ["app", "session", "[id]", "page.tsx"],
     ["app", "session", "[id]", "signals", "page.tsx"],
     ["app", "session", "[id]", "verdict", "page.tsx"],
+    ["app", "session", "[id]", "insights", "page.tsx"],
     ["components", "SessionShell.tsx"],
+    ["components", "HealthPanel.tsx"],
     ["components", "chambers", "HowItWorksView.tsx"],
     ["components", "views", "HealthSummary.tsx"],
+    ["components", "views", "SignalsPanel.tsx"],
     ["lib", "intelligence", "healthSummary.ts"],
     ["lib", "intelligence", "verdict.ts"],
+    // outward-facing — the gap the landing rebuild walked through
+    ["components", "landing", "codetrawl", "CodeTrawlLanding.tsx"],
+    ["components", "landing", "codetrawl", "CTProductTour.tsx"],
+    ["app", "opengraph-image.tsx"],
+    ["app", "page.tsx"],
+    // distribution — a published npm README cannot be corrected as fast as the
+    // engine changes, so it must not carry a count at all
+    ["scripts", "build-mcp-package.mjs"],
+    ["mcp", "server.ts"],
+    ["mcp", "buildServer.ts"],
+    ["mcp", "tools", "signals.ts"],
   ];
 
-  it.each(SURFACES)("%s/%s quotes the count from the map", (...parts) => {
-    // Comments are stripped: this file's own header quotes the strings it
-    // rejects, and explaining the defect must not trip the guard against it.
-    const src = read(...parts)
-      .split("\n")
-      .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
-      .join("\n");
-    // Deliberately narrow. "top 3 signals" is a legitimate slice size; only
-    // "N deterministic ..." claims the size of the whole signal set, which is
-    // the claim that drifted. Every one of the eight sites used that phrase.
-    const literal = src.match(/~?\d+\s+deterministic[^\n]*/g) ?? [];
+  it.each(SURFACES.map((p) => [p.join("/"), p] as const))("%s", (_label, parts) => {
+    const claims = code(read(...parts)).match(COUNT_CLAIM) ?? [];
     expect(
-      literal,
-      "hardcoded signal count — interpolate HEALTH_SIGNAL_COUNT or VERDICT_SIGNAL_COUNT instead",
+      claims,
+      "states a signal count — interpolate HEALTH_SIGNAL_COUNT / VERDICT_SIGNAL_COUNT, or drop the number",
     ).toEqual([]);
   });
 
-  it("would have caught the original drift", () => {
-    // The guard above only earns trust if it fails on the string it exists to
-    // reject. Run it against what the code actually said before this fix.
-    const before = 'description="Grounded in 20 deterministic signals · zero hallucination"';
-    expect(before.match(/~?\d+\s+deterministic[^\n]*/g)).not.toBeNull();
+  it("covers every file that mentions the counts, not a list that rots", () => {
+    // The list above is hand-written, which is how the landing escaped. This
+    // asserts the list still spans the places the constants are actually used,
+    // so adding a consumer without adding it here fails.
+    const consumers = SURFACES.map((p) => p.join("/"));
+    for (const must of [
+      "components/landing/codetrawl/CodeTrawlLanding.tsx",
+      "app/opengraph-image.tsx",
+      "scripts/build-mcp-package.mjs",
+    ]) {
+      expect(consumers, `${must} dropped out of the guard`).toContain(must);
+    }
+  });
+
+  it("rejects every form that actually shipped", () => {
+    // Each of these was live in the repo. A guard that cannot see them is the
+    // guard that let the landing regress.
+    for (const shipped of [
+      'description="Grounded in 20 deterministic signals · zero hallucination"',
+      '["20", "computed signals"],',
+      '["03", "Test", "Twenty deterministic repository signals"],',
+      "Claude reads the 20 signals already computed for the Overview strip",
+      "- `signals` — the full 17-signal health verdict + dimension rollup",
+    ]) {
+      expect(shipped.match(COUNT_CLAIM), shipped).not.toBeNull();
+    }
+  });
+
+  it("leaves legitimate slice sizes alone", () => {
+    // If this over-matches, the fix is to delete the guard, so pin it.
+    for (const fine of [
+      "the top 3 signals that drove this department's vote",
+      "3 signals for the per-department evidence list.",
+      "signals.needsWork.filter((x) => x.severity === \"high\")",
+      "const signals = extractHealthSignals(snap);",
+    ]) {
+      expect(fine.match(COUNT_CLAIM), fine).toBeNull();
+    }
   });
 });

@@ -15,10 +15,16 @@ import { formatStars } from "@/lib/demoHighlights";
 import { CTLandingIntake } from "./CTLandingIntake";
 import { CTMotion } from "./CTMotion";
 import { CTFooter } from "./CTFooter";
+import { HEALTH_SIGNAL_COUNT } from "@/lib/intelligence/healthSummary";
 
+// COUNTS ARE DERIVED, NEVER TYPED. This strip said "20" and the product
+// computed 34 — a re-introduction of the exact defect lib/__tests__/
+// signalCount.test.ts was written to stop, which it missed because its
+// surface list covered in-app pages and not the landing. This file is a
+// SERVER component, so importing the real constant costs the client nothing.
 const PROOF = [
   ["7", "languages parsed"],
-  ["20", "computed signals"],
+  [String(HEALTH_SIGNAL_COUNT), "computed signals"],
   ["File → line", "traceable evidence"],
   ["No AI", "required for the read"],
 ] as const;
@@ -26,7 +32,7 @@ const PROOF = [
 const METHOD = [
   ["01", "Parse", "AST structure across seven languages"],
   ["02", "Connect", "Calls, imports, history and ownership"],
-  ["03", "Test", "Twenty deterministic repository signals"],
+  ["03", "Test", `${HEALTH_SIGNAL_COUNT} deterministic repository signals`],
   ["04", "Prove", "Evidence at file, function, line or package"],
 ] as const;
 

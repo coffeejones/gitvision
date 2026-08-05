@@ -14,6 +14,7 @@
 
 import { ImageResponse } from "next/og";
 import { OG_ICON_DATA_URI } from "@/lib/ogIcon";
+import { HEALTH_SIGNAL_COUNT } from "@/lib/intelligence/healthSummary";
 
 export const runtime = "edge";
 
@@ -129,7 +130,13 @@ export default function OpenGraphImage() {
           }}
         >
           <div style={{ display: "flex", gap: "34px" }}>
-            <div>20 computed signals</div>
+            {/* ONE child, not two. Satori (which renders this card) rejects a
+                div with more than one child unless it declares an explicit
+                display, and `{N} computed signals` is two children — the number
+                and the text. Interpolating into a single template literal keeps
+                it one text node. Caught by the route returning nothing at all;
+                a broken OG card is invisible until someone shares a link. */}
+            <div>{`${HEALTH_SIGNAL_COUNT} computed signals`}</div>
             <div>File → line evidence</div>
             <div>AI optional</div>
           </div>

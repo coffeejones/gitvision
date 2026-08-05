@@ -21,6 +21,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
+// CTProof.tsx is NO LONGER RENDERED — the product-led rebuild replaced it and
+// this file is the only importer left. The assertions below still pin real
+// invariants (the /agents tool count, the no-AI-in-analysis claim), so they are
+// kept; but the LANDING-facing checks moved to liveProof() above, which reads
+// the array the page actually ships.
 import { PROOF_STATS } from "../../components/landing/codetrawl/CTProof";
 import { ALL_PLUGINS } from "../codeAnalysis/plugins/all";
 import { KNOWN_INCIDENTS } from "../security/knownIncidents";
@@ -31,6 +36,56 @@ function figureFor(href: string): number {
   if (!stat) throw new Error(`no landing stat links to ${href}`);
   return Number(stat.figure);
 }
+
+/** The proof strip the landing ACTUALLY renders.
+ *
+ *  PROOF_STATS above belongs to CTProof.tsx, which the product-led rebuild
+ *  stopped rendering — nothing but this test file imports it any more. Every
+ *  assertion built on it therefore guards a component no visitor sees, which is
+ *  how "20 computed signals" reached production against an engine computing 34.
+ *
+ *  So read the live array out of CodeTrawlLanding.tsx. Parsing source rather
+ *  than importing it keeps this test in node (the component pulls the whole
+ *  session theme), and it is the same technique the other landing guards use. */
+function liveProof(): { figure: string; label: string }[] {
+  const src = readFileSync(
+    path.join(process.cwd(), "components", "landing", "codetrawl", "CodeTrawlLanding.tsx"),
+    "utf-8",
+  );
+  const start = src.indexOf("const PROOF = [");
+  expect(start, "the landing's PROOF array was renamed or removed").toBeGreaterThan(-1);
+  const block = src.slice(start, src.indexOf("] as const;", start));
+  return [...block.matchAll(/\[\s*(?:"([^"]*)"|([A-Za-z_$][\w.$()]*))\s*,\s*"([^"]*)"\s*\]/g)].map(
+    (m) => ({ figure: m[1] ?? m[2], label: m[3] }),
+  );
+}
+
+describe("the guard reads what the page renders", () => {
+  it("finds the live proof strip", () => {
+    const rows = liveProof();
+    expect(rows.length, "no rows parsed — the array's shape changed").toBeGreaterThan(2);
+    expect(rows.map((r) => r.label)).toContain("languages parsed");
+  });
+
+  it("claims exactly as many languages as have a real call graph", () => {
+    // The regex fallback yields imports only; counting it would overstate the
+    // page. This is the live equivalent of the CTProof-based test below.
+    const withCallGraph = ALL_PLUGINS.filter((p) => p.name !== "regex-fallback");
+    const row = liveProof().find((r) => r.label === "languages parsed")!;
+    expect(Number(row.figure)).toBe(withCallGraph.length);
+  });
+
+  it("does not state the signal count as a literal", () => {
+    // The one that regressed. Any digit here is a number somebody typed;
+    // it must be an identifier the compiler resolves.
+    const row = liveProof().find((r) => r.label === "computed signals");
+    expect(row, "the proof strip no longer states a signal count").toBeDefined();
+    expect(
+      /^\d+$/.test(row!.figure),
+      `proof strip hardcodes "${row!.figure}" — interpolate HEALTH_SIGNAL_COUNT`,
+    ).toBe(false);
+  });
+});
 
 describe("landing proof strip stays true", () => {
   it("claims exactly as many languages as have a real call graph", () => {

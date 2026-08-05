@@ -116,7 +116,7 @@ function packageReadme() {
 
 Deterministic code analysis as [Model Context Protocol](https://modelcontextprotocol.io)
 tools, so AI coding agents can ask **computed** questions about a GitHub repo —
-blast radius, untested hotspots, structural duplicates, a 17-signal health
+blast radius, untested hotspots, structural duplicates, a rule-based health
 verdict, and "what does this change break?" simulation — instead of grepping and
 guessing.
 
@@ -146,7 +146,7 @@ unauthenticated limit to 5000/hour.
 - \`blast_radius\` — what a file or function change reaches
 - \`untested_hotspots\` — complex production functions with no test caller
 - \`find_duplicates\` — structurally identical functions across the repo
-- \`signals\` — the full 17-signal health verdict + dimension rollup
+- \`signals\` — the full rule-based health verdict + dimension rollup
 - \`compare_sessions\` — structural diff between two analyses
 - \`analyze_diff\` / \`review_changes\` — change-aware review
 - \`simulate_change\` — the Conscience: the deterministic blast + gate on a

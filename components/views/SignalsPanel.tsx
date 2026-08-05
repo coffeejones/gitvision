@@ -84,7 +84,7 @@ export function SignalsPanel({ signals }: Props) {
 
   // Apply filters. Memoize per (query, activeSeverities, signals)
   // so re-renders triggered by other state (e.g. focus) don't redo
-  // the work. With ~25 signals it's cheap regardless, but the
+  // the work. At this catalog size it's cheap regardless, but the
   // explicit useMemo also documents the dependency.
   const filtered = useMemo(() => {
     const lowerQuery = query.trim().toLowerCase();

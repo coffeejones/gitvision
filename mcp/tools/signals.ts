@@ -1,4 +1,8 @@
-// `signals` MCP tool — full 17-signal health verdict.
+// `signals` MCP tool — full rule-based health verdict.
+//
+// No count in the description, deliberately: mcp/buildServer.ts made the same
+// call for the runtime tool text after it said 17 while the engine emitted more.
+// A published npm package cannot be corrected as fast as the engine changes.
 //
 // The deterministic signal layer that powers the workspace UI's
 // Health-at-a-glance strip (and Claude's prose verdict on the

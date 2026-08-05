@@ -5,7 +5,8 @@
 // answers "what" — this page answers "why, in plain English". Two
 // panels:
 //   1. AI Briefing — what the repo is, in 150-200 words.
-//   2. Health Check — the three-column verdict grounded in 20 signals.
+//   2. Health Check — the three-column verdict, grounded in the same
+//      deterministic signals as the Overview strip (HEALTH_SIGNAL_COUNT).
 //
 // v0.60 trim: the page header used to repeat what the panel headers
 // already say. Dropped the 4-line intro paragraph in favor of a single
@@ -27,6 +28,7 @@ import { HealthPanel } from "@/components/HealthPanel";
 import { SignInToUnlock } from "@/components/billing/SignInToUnlock";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
 import { RollupBar } from "@/components/views/RollupBar";
+import { HEALTH_SIGNAL_COUNT } from "@/lib/intelligence/healthSummary";
 
 export const dynamic = "force-dynamic";
 
@@ -119,6 +121,7 @@ export default async function InsightsRoute({
               readOnly={isDemo}
             />
             <HealthPanel
+              signalCount={HEALTH_SIGNAL_COUNT}
               sessionId={session.id}
               snapshot={clientSnapshot}
               readOnly={isDemo}

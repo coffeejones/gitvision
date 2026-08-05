@@ -89,6 +89,13 @@ function useAnchorFlash() {
 interface Props {
   sessionId: string;
   snapshot: ClientSnapshot;
+  /** How many deterministic signals the Overview strip computed.
+   *
+   *  Passed in rather than imported: this is a CLIENT component, and the
+   *  constant lives beside extractHealthSignals, so importing it would drag
+   *  the whole signal engine into the browser bundle. The copy below used to
+   *  say "20" while the product computed 34.  */
+  signalCount: number;
   /** Read-only display: cached health check, no generate / regenerate
    *  control. Used on the public demo sessions (pre-baked, anonymous). */
   readOnly?: boolean;
@@ -97,6 +104,7 @@ interface Props {
 export function HealthPanel({
   sessionId,
   snapshot,
+  signalCount,
   readOnly = false,
 }: Props) {
   const router = useRouter();
@@ -199,7 +207,7 @@ export function HealthPanel({
 
       {!readOnly && !analysis && !pending && (
         <p className="text-xs" style={{ color: TOK.textMuted }}>
-          Claude reads the 20 signals already computed for the Overview strip
+          Claude reads the {signalCount} signals already computed for the Overview strip
           and writes a verdict you can act on — what works, where to dig
           deeper, and what needs human judgment.
         </p>
