@@ -58,6 +58,15 @@ function sidebarSlugs(): string[] {
   const slugs = [...block.matchAll(/href: `\$\{base\}\/([a-z]+)`/g)].map((m) => m[1]);
   if (/href: base,/.test(block)) slugs.push("overview");
 
+  // Nested destinations live OUTSIDE the departments array — the brief sits
+  // above them because it is a question, not a department. They are matched
+  // separately and on their FIRST segment, which is the palette's key too.
+  // Without this the test would pass while a nav entry was unreachable by
+  // Cmd+K, which is the exact drift it exists to catch.
+  for (const m of src.matchAll(/href=\{`\$\{base\}\/([a-z]+)\/[a-z]+`\}/g)) {
+    slugs.push(m[1]);
+  }
+
   const pin = src.match(/const href = `\$\{base\}\/([a-z]+)`/);
   expect(pin, "the Final grade pin's href moved — it would silently drop out").not.toBeNull();
   slugs.push(pin![1]);
@@ -91,8 +100,21 @@ describe("the sidebar and the palette stay in lockstep", () => {
     // session.prMetadata.baseSessionId, and is entered from the PR-bot check-run
     // deep link. Absent from both lists on purpose, so it is not required here —
     // this assertion only runs the other way.
+    // A nested route (brief/[subject]) has no page.tsx directly under its own
+    // folder, so accept either shape rather than pretending it does not exist.
+    const nested = readdirSync(ROUTES_DIR, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .filter((d) =>
+        readdirSync(path.join(ROUTES_DIR, d.name), { withFileTypes: true }).some(
+          (c) => c.isDirectory() && readdirSync(path.join(ROUTES_DIR, d.name, c.name)).includes("page.tsx"),
+        ),
+      )
+      .map((d) => d.name);
     for (const slug of new Set([...sidebarSlugs(), ...paletteSlugs()])) {
-      expect(routes, `nav points at /${slug}, which has no page.tsx`).toContain(slug);
+      expect(
+        [...routes, ...nested],
+        `nav points at /${slug}, which has no page.tsx`,
+      ).toContain(slug);
     }
   });
 

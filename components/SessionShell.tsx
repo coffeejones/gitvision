@@ -32,6 +32,7 @@ import {
   Fingerprint,
   Gauge,
   GitPullRequest,
+  HelpCircle,
   Home,
   ListChecks,
   Menu,
@@ -470,6 +471,25 @@ export function SessionShell({
           </span>
         </button>
       </div>
+
+      {/* One question, above the instruments.
+          The workspace has sixteen destinations and the visitor has to know
+          which one answers their question. This inverts it: pick the question,
+          get the answer composed across tabs. It sits ABOVE the departments
+          rather than inside one, because it is not a department — and it is a
+          plain link, so the back button removes it and nothing is stored. */}
+      <Link
+        href={`${base}/brief/security`}
+        className="flex items-center gap-2 rounded-lg px-2.5 py-2 mb-2 text-[13px] transition"
+        style={{
+          border: `1px solid ${pathname.startsWith(`${base}/brief`) ? TOK.accent : TOK.border}`,
+          background: pathname.startsWith(`${base}/brief`) ? TOK.surfaceElevated : "transparent",
+          color: pathname.startsWith(`${base}/brief`) ? TOK.textPrimary : TOK.textSecondary,
+        }}
+      >
+        <HelpCircle size={14} />
+        <span>Is this safe to depend on?</span>
+      </Link>
 
       <nav className="flex flex-col gap-1">
         {departments.map((dept, di) => {
