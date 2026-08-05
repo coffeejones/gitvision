@@ -186,3 +186,79 @@ describe("computeChangeBlast", () => {
     expect(same.changedFiles).toEqual([]);
   });
 });
+
+// --- Function counts -------------------------------------------------------
+//
+// `functionsAdded` and `functionsRemoved` counted CHANGED FILES, not functions:
+// they filtered diffChangedFiles(), whose entries are one-per-file. Two things
+// followed, and the second is worse than the first.
+//
+//   1. An added file holding six functions reported 1.
+//   2. A diff that only EDITS existing files reported 0 and 0 no matter how
+//      many functions it added or deleted — and that is the shape of almost
+//      every real agent diff.
+//
+// These fields go out over MCP (mcp/tools/simulateChange.ts), so an agent asked
+// "what does this change do" was told a deterministic number that was wrong.
+// Neither field had any test at all.
+
+describe("computeChangeBlast · function counts", () => {
+  it("counts functions in an added file, not the file", () => {
+    const b = mkGraph({ "src/keep.ts": { fns: [["keep", "K"]] } });
+    const h = mkGraph({
+      "src/keep.ts": { fns: [["keep", "K"]] },
+      "src/new.ts": { fns: [["one", "A"], ["two", "B"], ["three", "C"]] },
+    });
+    const r = computeChangeBlast(snap(b), snap(h));
+    expect(r.functionsAdded, "one file, three functions").toBe(3);
+    expect(r.functionsRemoved).toBe(0);
+  });
+
+  it("sees functions added inside a MODIFIED file", () => {
+    // The case that reported a hard 0. Nothing is added or removed at file
+    // level; the file gains two functions and loses one.
+    const b = mkGraph({ "src/core.ts": { fns: [["a", "A"], ["gone", "G"]] } });
+    const h = mkGraph({ "src/core.ts": { fns: [["a", "A"], ["fresh1", "F1"], ["fresh2", "F2"]] } });
+    const r = computeChangeBlast(snap(b), snap(h));
+    expect(r.functionsAdded).toBe(2);
+    expect(r.functionsRemoved).toBe(1);
+  });
+
+  it("counts functions in a removed file", () => {
+    const b = mkGraph({
+      "src/keep.ts": { fns: [["keep", "K"]] },
+      "src/old.ts": { fns: [["x", "X"], ["y", "Y"]] },
+    });
+    const h = mkGraph({ "src/keep.ts": { fns: [["keep", "K"]] } });
+    const r = computeChangeBlast(snap(b), snap(h));
+    expect(r.functionsAdded).toBe(0);
+    expect(r.functionsRemoved).toBe(2);
+  });
+
+  it("does not count a body edit as add plus remove", () => {
+    // Identity is name + container + file. A changed BODY is the same function,
+    // so a signature-based diff would wrongly report 1 added and 1 removed.
+    const b = mkGraph({ "src/core.ts": { fns: [["same", "V1", 4]] } });
+    const h = mkGraph({ "src/core.ts": { fns: [["same", "V2", 9]] } });
+    const r = computeChangeBlast(snap(b), snap(h));
+    expect(r.functionsAdded).toBe(0);
+    expect(r.functionsRemoved).toBe(0);
+  });
+
+  it("treats a move between files as one removal and one addition", () => {
+    // filePath is part of the identity, so this is honest: the function is gone
+    // from where callers expected it.
+    const b = mkGraph({ "src/from.ts": { fns: [["moved", "M"]] } });
+    const h = mkGraph({ "src/to.ts": { fns: [["moved", "M"]] } });
+    const r = computeChangeBlast(snap(b), snap(h));
+    expect(r.functionsAdded).toBe(1);
+    expect(r.functionsRemoved).toBe(1);
+  });
+
+  it("reports zero on an identical pair", () => {
+    const g = mkGraph({ "src/core.ts": { fns: [["a", "A"], ["b", "B"]] } });
+    const r = computeChangeBlast(snap(g), snap(g));
+    expect(r.functionsAdded).toBe(0);
+    expect(r.functionsRemoved).toBe(0);
+  });
+});

@@ -52,6 +52,21 @@ function fileSignatures(cg: CodeGraph): Map<string, string> {
   return out;
 }
 
+/** A function's IDENTITY for add/remove purposes: where it lives, what contains
+ *  it, what it is called.
+ *
+ *  Deliberately EXCLUDES the body, unlike fileSignatures() above. An edited
+ *  function is the same function — reporting it as one removed plus one added
+ *  would make every refactor look like a rewrite. A function moved between
+ *  files IS both, and honestly so: it is gone from where callers expected it. */
+function fnIdentity(fn: {
+  filePath: string;
+  name: string;
+  containerType?: string;
+}): string {
+  return `${fn.filePath}\x1F${fn.containerType ?? ""}\x1F${fn.name}`;
+}
+
 /** The complete set of files whose content changed between base and head —
  *  not the capped display lists structuralDiff produces. */
 function diffChangedFiles(
@@ -162,8 +177,17 @@ export function computeChangeBlast(
   const testsToRun = [...new Set(prod.flatMap((f) => f.testsToRun))];
   const mappedTestsUpdated = testsToRun.filter((t) => changedFileSet.has(t)).length;
 
-  const functionsAdded = changed.filter((c) => c.kind === "added").length;
-  const functionsRemoved = changed.filter((c) => c.kind === "removed").length;
+  // COUNT FUNCTIONS, NOT FILES. These filtered `changed`, whose entries are one
+  // per FILE — so an added file holding six functions reported 1, and a diff
+  // that only EDITED files reported 0 and 0 however many functions it added or
+  // deleted. That second case is the shape of nearly every agent diff, and
+  // these two numbers go out over MCP as a deterministic answer.
+  const baseFns = new Set(baseCg.functions.map(fnIdentity));
+  const headFns = new Set(headCg.functions.map(fnIdentity));
+  let functionsAdded = 0;
+  for (const k of headFns) if (!baseFns.has(k)) functionsAdded++;
+  let functionsRemoved = 0;
+  for (const k of baseFns) if (!headFns.has(k)) functionsRemoved++;
 
   // Verdict: touching a load-bearing wall while NONE of the tests that actually
   // guard the changed files were updated is high-risk. `mappedTestsUpdated`
