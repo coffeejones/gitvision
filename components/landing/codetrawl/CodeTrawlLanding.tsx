@@ -267,7 +267,12 @@ const CSS = `
 .rv .rv-proof strong { display: block; overflow: hidden; color: var(--ct-text); font-size: 19px; font-weight: 520; letter-spacing: -.025em; }
 .rv .rv-proof strong em { display: block; opacity: 0; font-style: normal; transform: translateY(105%); transition: opacity .5s ease, transform .7s cubic-bezier(.22,1,.36,1); }
 .rv .rv-proof.in strong em { opacity: 1; transform: none; }
-.rv .rv-proof span { color: var(--ct-ghost); font: 9px var(--ct-mono); text-transform: uppercase; letter-spacing: .11em; }
+/* --ct-dim, not --ct-ghost: measured on the panel background, ghost lands at
+   3.10:1 and this is 9px body text, where WCAG AA wants 4.5:1. --ct-dim is
+   6.49:1 and already in the palette, so nothing new is invented. These labels
+   carry the page's load-bearing claims ('COMPUTED SIGNALS'), which is the worst
+   place to be hard to read. */
+.rv .rv-proof span { color: var(--ct-dim); font: 9px var(--ct-mono); text-transform: uppercase; letter-spacing: .11em; }
 
 /* Sticky product tour: one visual, four work questions. */
 .rv .rv-tour-section { position: relative; max-width: 1320px; margin: 0 auto; padding: clamp(130px,14vw,190px) var(--rv-edge) clamp(150px,17vw,220px); isolation: isolate; }
@@ -393,7 +398,19 @@ const CSS = `
 .rv [data-rv="cascade"].in > *:nth-child(4) { transition-delay: 210ms; }
 
 @media (prefers-reduced-motion: reduce) {
-  .rv [data-rv], .rv [data-rv="cascade"] > *, .rv .ct-tour-image, .rv .ct-tour-step, .rv .rv-product-frame, .rv .rv-hero-product, .rv .rv-proof strong em { opacity: 1; transform: none; transition: none; animation: none; }
+  .rv [data-rv], .rv [data-rv="cascade"] > *, .rv .ct-tour-step, .rv .rv-product-frame, .rv .rv-hero-product, .rv .rv-proof strong em { opacity: 1; transform: none; transition: none; animation: none; }
+  /* The tour images are ABSOLUTELY POSITIONED AND STACKED, so they are the one
+     thing here that must NOT be blanket-revealed. '.ct-tour-image' used to sit
+     in the list above, which set opacity:1 on all four — the last in DOM order
+     then painted over every chapter and the tour showed one frozen, wrong
+     screenshot for its whole length.
+     Keep the .active gating; remove only the movement. */
+  .rv .ct-tour-image { transition: none; animation: none; }
+  /* And .active must be named explicitly: it carries two classes to the rule
+     above's one, so its 'animation: rv-tour-camera-* 4.2s' outranked the
+     blanket 'animation: none' and the Ken Burns pan kept running for anyone
+     who asked for no motion. */
+  .rv .ct-tour-image.active { opacity: 1; transform: none; animation: none; }
   .rv .rv-product-frame::after, .rv .ct-tour-progress span::after, .rv .ct-tour-transition-light { display: none; animation: none; }
 }
 

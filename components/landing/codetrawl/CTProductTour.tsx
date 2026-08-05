@@ -43,8 +43,8 @@ const STEPS = [
     label: "Supply",
     title: "Keep dependency drift visible.",
     detail:
-      "Find vulnerable, outdated and deprecated packages across every detected ecosystem without losing registry context.",
-    evidence: ["CVE-aware package health", "Multi-ecosystem analysis"],
+      "Find vulnerable, outdated and deprecated packages across npm, PyPI and Cargo without losing registry context.",
+    evidence: ["CVE-aware package health", "npm · PyPI · Cargo"],
     src: "/CT_UpdatedImages/CT_Packages.png",
     alt: "CodeTrawl dependency health analysis",
   },
@@ -116,6 +116,12 @@ export function CTProductTour() {
                 alt=""
                 width={2940}
                 height={1508}
+                // Without `sizes`, next/image builds a srcset from the 2940px
+                // width prop, so a 375px phone downloads the largest variant for
+                // an element the stylesheet renders at ~100% of a half-width
+                // column. The tour visual is hidden below 800px (the mobile
+                // window below takes over), hence the two-branch value.
+                sizes="(max-width: 800px) 100vw, 45vw"
               />
             ))}
             <span key={STEPS[active].key} className="ct-tour-transition-light" aria-hidden />
@@ -146,7 +152,13 @@ export function CTProductTour() {
               {step.evidence.map((item) => <li key={item}>{item}</li>)}
             </ul>
             <div className="ct-tour-mobile-window">
-              <Image src={step.src} alt={step.alt} width={2940} height={1508} />
+              <Image
+                src={step.src}
+                alt={step.alt}
+                width={2940}
+                height={1508}
+                sizes="100vw"
+              />
             </div>
           </article>
         ))}

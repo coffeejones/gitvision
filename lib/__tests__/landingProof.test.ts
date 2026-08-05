@@ -87,6 +87,34 @@ describe("the guard reads what the page renders", () => {
   });
 });
 
+describe("the tour names what the product actually supports", () => {
+  it("lists the dependency ecosystems instead of implying all of them", async () => {
+    // It said "across every detected ecosystem". There are three plugins, while
+    // the CODE analysis covers seven languages — so a Java or Go repo gets a
+    // full call graph and no dependency health, which that sentence denied.
+    // A count is a claim; a list is checkable, which is why this names them.
+    const { readdirSync } = await import("node:fs");
+    const dir = path.join(process.cwd(), "lib", "depsHealth", "ecosystems");
+    const plugins = readdirSync(dir)
+      .filter((f) => f.endsWith(".ts") && !f.includes(".test."))
+      .map((f) => f.replace(/\.ts$/, ""));
+
+    const src = readFileSync(
+      path.join(process.cwd(), "components", "landing", "codetrawl", "CTProductTour.tsx"),
+      "utf-8",
+    );
+    expect(src, "the universal claim came back").not.toContain("every detected ecosystem");
+    for (const p of plugins) {
+      const label = p === "pypi" ? "PyPI" : p === "npm" ? "npm" : "Cargo";
+      expect(src, `${p} ships but the tour does not name it`).toContain(label);
+    }
+    // And nothing is named that does not exist.
+    for (const absent of ["Maven", "NuGet", "Go modules", "RubyGems", "Packagist"]) {
+      expect(src, `the tour names ${absent}, which has no plugin`).not.toContain(absent);
+    }
+  });
+});
+
 describe("landing proof strip stays true", () => {
   it("claims exactly as many languages as have a real call graph", () => {
     // The regex fallback yields imports only — it is not a language with a call
