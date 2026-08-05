@@ -524,3 +524,33 @@ the Code tab cannot disagree, and its severity cuts were rescaled 10/5 → 20/10
 to preserve their previous meaning. Those cuts are a **calibration, not a
 measurement**; the honest severity would key on how much duplicated logic there
 is rather than on a group count.
+
+## The cap became visible, so it had to become honest
+
+Replacing the complexity floor made the 15-item cap binding for the first time
+— this repo and NetBox both fill every slot, where they previously produced 6
+and 8 groups. `summarizeDuplicates` reports `groups.length`, so the header said
+"15 groups" when NetBox has 43. `countDuplicateGroups()` now returns the true
+figure and the header reads **"15 of 43 groups"**.
+
+That is the same failure as the security rollup saying 25 above a list of 40:
+each number defensible alone, together they read as a lie.
+
+## Diagnosed, not built: one idiom fragments into many groups
+
+The structural hash includes arity, so the same boilerplate at different sizes
+lands in different groups. Measured:
+
+| | groups | names split across >1 group | share of all groups |
+|---|---:|---:|---:|
+| this repo | 47 | 3 | 13% |
+| **NetBox** | 43 | **4** | **51%** |
+
+NetBox's `search()` splits into **7 groups** of 27, 17, 9, 4, 3, 3, 2 — 65
+copies of one Django filterset idiom, competing for seven of the panel's
+fifteen slots. Merging them would free nearly half the panel for genuinely
+distinct duplication.
+
+Not attempted here because it changes hash semantics, which `driftMetrics`
+fingerprints and `structuralDiff` both depend on — and merging by NAME alone
+would be wrong, since two unrelated `__init__` are not the same idiom.

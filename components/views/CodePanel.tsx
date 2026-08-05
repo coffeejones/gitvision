@@ -61,6 +61,7 @@ import {
   type TestCoverage,
 } from "@/lib/codeAnalysis/testCoverage";
 import {
+  countDuplicateGroups,
   findDuplicateGroups,
   summarizeDuplicates,
   type DuplicateGroup,
@@ -274,6 +275,10 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
   // v0.30: structural duplicate detection. Runs in browser; the heavy
   // lifting (AST hashing) already happened server-side at analysis time.
   const duplicateGroups = useMemo(() => findDuplicateGroups(cg), [cg]);
+  // The panel shows the worst 15. Saying "15 groups" when there are 43 tells
+  // the reader the repo has 15, which is false — and the cap only became
+  // binding once file spread replaced the complexity floor.
+  const duplicateTotal = useMemo(() => countDuplicateGroups(cg), [cg]);
 
   const fnBlast = useMemo(() => {
     if (!selected || !selectedFunction) return null;
@@ -417,6 +422,7 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
         <div ref={duplicatesRef}>
           <NearDuplicatesPanel
             groups={duplicateGroups}
+            totalGroups={duplicateTotal}
             onPick={pickFunction}
           />
         </div>
@@ -1572,9 +1578,13 @@ function UntestedHotspotsPanel({
  *  Subsequent groups are collapsed to keep the panel scannable. */
 function NearDuplicatesPanel({
   groups,
+  totalGroups,
   onPick,
 }: {
   groups: DuplicateGroup[];
+  /** Groups found before the panel's cap. Equal to groups.length unless the
+   *  list was truncated. */
+  totalGroups: number;
   onPick: (file: string, fnName: string, containerType?: string) => void;
 }) {
   const stats = summarizeDuplicates(groups);
@@ -1650,10 +1660,17 @@ function NearDuplicatesPanel({
           <span
             className="text-[11px] font-mono inline-flex items-center gap-1.5"
             style={{ color: TOK.textMuted }}
-            title={`${stats.totalDuplicateFunctions} duplicate functions across ${stats.totalGroups} groups; the largest group has ${stats.largestGroupSize} copies`}
+            title={
+              totalGroups > stats.totalGroups
+                ? `Showing the worst ${stats.totalGroups} of ${totalGroups} duplicate groups, ranked by copies × complexity. The ${stats.totalDuplicateFunctions} functions counted here are the ones shown; the largest group has ${stats.largestGroupSize} copies.`
+                : `${stats.totalDuplicateFunctions} duplicate functions across ${stats.totalGroups} groups; the largest group has ${stats.largestGroupSize} copies`
+            }
           >
-            {stats.totalGroups} groups · {stats.totalDuplicateFunctions} fns ·
-            largest ×{stats.largestGroupSize}
+            {totalGroups > stats.totalGroups
+              ? `${stats.totalGroups} of ${totalGroups} groups`
+              : `${stats.totalGroups} groups`}{" "}
+            · {stats.totalDuplicateFunctions} fns · largest ×
+            {stats.largestGroupSize}
           </span>
           <CopyLinkButton
             params={{

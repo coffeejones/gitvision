@@ -77,6 +77,20 @@ const DEFAULT_MIN_COMPLEXITY = 2;
 const DEFAULT_MIN_FILE_SPREAD = 2;
 const DEFAULT_LIMIT = 15;
 
+/** How many groups exist BEFORE the panel's cap.
+ *
+ *  The cap became binding once file spread replaced the complexity floor —
+ *  this repo and NetBox both fill all 15 slots where they previously produced
+ *  6 and 8. A list that silently stops at 15 tells the reader the repo has 15
+ *  duplicate groups, which is false. Same lesson as the security rollup: a
+ *  number the reader cannot reconcile costs more than the truncation saves. */
+export function countDuplicateGroups(
+  codeGraph: CodeGraph,
+  opts: FindDuplicatesOptions = {}
+): number {
+  return findDuplicateGroups(codeGraph, { ...opts, limit: Number.MAX_SAFE_INTEGER }).length;
+}
+
 /** Group functions by structural bodyHash. Returns groups with ≥2
  *  members where every member meets the complexity floor. Sorted by
  *  groupSize × maxComplexity descending — biggest fish first. */

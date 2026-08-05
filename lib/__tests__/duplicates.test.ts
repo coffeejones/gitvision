@@ -16,6 +16,7 @@ import {
   _fnv1a64ForTest as fnv1a64,
 } from "../codeAnalysis/astHash";
 import {
+  countDuplicateGroups,
   findDuplicateGroups,
   summarizeDuplicates,
 } from "../codeAnalysis/duplicates";
@@ -411,5 +412,28 @@ describe("findDuplicateGroups — copy-paste vs convention", () => {
     // real two-file clones out of the tail.
     const two = ["a", "b"].map((f) => fn("helper", `src/${f}.ts`, "H"));
     expect(findDuplicateGroups(graph(two))).toHaveLength(1);
+  });
+});
+
+describe("countDuplicateGroups", () => {
+  const fn = (name: string, filePath: string, hash: string) => ({
+    name, filePath, bodyHash: hash, complexity: 3, startRow: 1, endRow: 5,
+  });
+  const graph = (functions: unknown[]) =>
+    ({ functions, calls: [], imports: [], fileComplexity: {}, filesByExt: {}, byPlugin: {}, generatedAt: "" }) as never;
+
+  it("counts past the panel cap so the header can say 'N of M'", () => {
+    // 20 distinct groups, each a helper copied into two files.
+    const fns = Array.from({ length: 20 }, (_, i) => [
+      fn(`h${i}`, `src/a${i}.ts`, `H${i}`),
+      fn(`h${i}`, `src/b${i}.ts`, `H${i}`),
+    ]).flat();
+    expect(findDuplicateGroups(graph(fns))).toHaveLength(15); // capped
+    expect(countDuplicateGroups(graph(fns))).toBe(20);        // the truth
+  });
+
+  it("agrees with the list when nothing was truncated", () => {
+    const fns = [fn("h", "src/a.ts", "H"), fn("h", "src/b.ts", "H")];
+    expect(countDuplicateGroups(graph(fns))).toBe(findDuplicateGroups(graph(fns)).length);
   });
 });
