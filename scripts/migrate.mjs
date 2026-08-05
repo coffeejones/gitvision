@@ -1,10 +1,17 @@
 // Standalone migration runner for prod startup (Railway).
 //
-// Uses drizzle-orm/better-sqlite3/migrator (in production dependencies)
-// instead of drizzle-kit (devDependency, omitted from prod install with
-// `--omit=dev` — which is what Railway runs). This lets `npm start`
-// chain migrations before `next start` so the database is always at
-// the latest schema before the app accepts requests.
+// Uses drizzle-orm/better-sqlite3/migrator instead of the drizzle-kit CLI,
+// so `npm start` can chain migrations before `next start` and the database is
+// always at the latest schema before the app accepts requests.
+//
+// This comment used to say drizzle-kit is "omitted from prod install with
+// --omit=dev". That is FALSE, checked in a clean `npm ci --omit=dev` tree:
+// better-auth depends on drizzle-kit, so it is a production transitive and
+// ships regardless of our devDependencies block. The reason to use the
+// migrator here is that it is a library call rather than a CLI — not that
+// the CLI is absent. (It is also why the four remaining npm-audit findings
+// are drizzle-kit's esbuild chain: they arrive through better-auth, and we
+// do not get to choose their versions.)
 //
 // Idempotent — drizzle's migrator tracks applied migrations in its own
 // __drizzle_migrations table and skips anything already applied. Safe
