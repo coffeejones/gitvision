@@ -8,15 +8,21 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+
+import { hasSessions, loadSnapshot } from "./helpers/sessionFixture";
 import path from "node:path";
 
 import type { AnalysisSnapshot } from "../types";
 import { buildBrief, SUBJECTS, SUBJECT_IDS, isSubjectId, type Brief } from "../brief";
 
-const session = (id: string): AnalysisSnapshot =>
-  JSON.parse(
-    readFileSync(path.join(process.cwd(), ".gitvision", "sessions", `${id}.json`), "utf-8"),
-  ).snapshots.at(-1);
+// Resolved through the shared helper: cwd first, then the main checkout, so
+// this works from a git worktree. See helpers/sessionFixture.ts.
+
+// These assert against REAL captured analyses — a synthetic graph would
+// defeat the point — and the four total 61 MB, far too much to commit. A
+// machine without them reports skipped rather than broken.
+const HAVE = hasSessions("gx1lLA07kO", "yAwwHY_ShB", "o5QTmaYTwE", "DBtU3d_Gfk");
+const session = (id: string): AnalysisSnapshot => loadSnapshot<AnalysisSnapshot>(id);
 
 const items = (b: Brief) => b.sections.flatMap((s) => s.items);
 
@@ -71,7 +77,7 @@ describe("the registry is the only list of subjects", () => {
   });
 });
 
-describe("every subject answers on a real repo", () => {
+describe.skipIf(!HAVE)("every subject answers on a real repo", () => {
   it.each(
     SUBJECT_IDS.flatMap((s) => REPOS.map(([id, name]) => [s, id, name] as const)),
   )("%s on %s", (subject, id) => {
@@ -114,7 +120,7 @@ describe("every subject answers on a real repo", () => {
   });
 });
 
-describe("clean is earned, on every subject", () => {
+describe.skipIf(!HAVE)("clean is earned, on every subject", () => {
   it.each(SUBJECT_IDS)("%s never calls an unchecked repo clean", (subject) => {
     // gin-gonic/gin: no dependency reader, no dangerous-call rules. Whatever a
     // subject finds there, it may not report the absence as safety.

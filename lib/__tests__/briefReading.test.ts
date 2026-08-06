@@ -18,23 +18,29 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+
+import { hasSessions, loadSnapshot } from "./helpers/sessionFixture";
 import path from "node:path";
 
 import type { AnalysisSnapshot } from "../types";
 import { buildBrief, SUBJECT_IDS } from "../brief";
 import { buildReadingInput } from "../brief/reading";
 
-const session = (id: string): AnalysisSnapshot =>
-  JSON.parse(
-    readFileSync(path.join(process.cwd(), ".gitvision", "sessions", `${id}.json`), "utf-8"),
-  ).snapshots.at(-1);
+// Resolved through the shared helper: cwd first, then the main checkout, so
+// this works from a git worktree. See helpers/sessionFixture.ts.
+
+// These assert against REAL captured analyses — a synthetic graph would
+// defeat the point — and the four total 61 MB, far too much to commit. A
+// machine without them reports skipped rather than broken.
+const HAVE = hasSessions("gx1lLA07kO", "yAwwHY_ShB", "o5QTmaYTwE", "DBtU3d_Gfk");
+const session = (id: string): AnalysisSnapshot => loadSnapshot<AnalysisSnapshot>(id);
 
 const readingSrc = readFileSync(
   path.join(process.cwd(), "lib", "brief", "reading.ts"),
   "utf-8",
 );
 
-describe("the model is told what could not be checked", () => {
+describe.skipIf(!HAVE)("the model is told what could not be checked", () => {
   it("puts the gaps in the payload, not just in the prompt", () => {
     // gin-gonic/gin: no dependency reader, no dangerous-call rules, no
     // findings. If the gaps do not travel, the model sees an empty brief and
@@ -203,7 +209,7 @@ describe("the points survive a bad response without breaking the page", () => {
   });
 });
 
-describe("it stays an enhancement", () => {
+describe.skipIf(!HAVE)("it stays an enhancement", () => {
   it("returns null with no API key, rather than throwing", async () => {
     // The brief must be fully usable for self-hosters and demos. A reading that
     // threw here would take the page down with it.

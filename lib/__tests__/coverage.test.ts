@@ -17,6 +17,8 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
+
+import { hasSessions, loadSnapshot } from "./helpers/sessionFixture";
 import path from "node:path";
 
 import type { AnalysisSnapshot } from "../types";
@@ -26,10 +28,14 @@ import {
   SINK_RULE_PLUGINS,
 } from "../coverage";
 
-const session = (id: string): AnalysisSnapshot =>
-  JSON.parse(
-    readFileSync(path.join(process.cwd(), ".gitvision", "sessions", `${id}.json`), "utf-8"),
-  ).snapshots.at(-1);
+// Resolved through the shared helper: cwd first, then the main checkout, so
+// this works from a git worktree. See helpers/sessionFixture.ts.
+
+// These assert against REAL captured analyses — a synthetic graph would
+// defeat the point — and the four total 61 MB, far too much to commit. A
+// machine without them reports skipped rather than broken.
+const HAVE = hasSessions("gx1lLA07kO", "yAwwHY_ShB", "o5QTmaYTwE", "DBtU3d_Gfk");
+const session = (id: string): AnalysisSnapshot => loadSnapshot<AnalysisSnapshot>(id);
 
 function snap(over: Partial<AnalysisSnapshot> = {}): AnalysisSnapshot {
   return {
@@ -183,7 +189,7 @@ describe("SINK_RULE_PLUGINS matches the plugins that define sinks", () => {
   });
 });
 
-describe("on the sessions this was written for", () => {
+describe.skipIf(!HAVE)("on the sessions this was written for", () => {
   it.each([
     ["gx1lLA07kO", "gin-gonic/gin", "Go modules", "go"],
     ["PGlVvQRlAh", "spring-petclinic", "Maven", "java"],
@@ -219,7 +225,7 @@ describe("on the sessions this was written for", () => {
 // commit cap — fired on 0 of 58 stored snapshots. If any of them ever renders
 // a reassuring green row, the rows that matter stop being read.
 
-describe("buildCoverageReport", () => {
+describe.skipIf(!HAVE)("buildCoverageReport", () => {
   it("says NOTHING about a repo we fully cover", async () => {
     // The single most important assertion here. coffeejones/gitvision is npm +
     // TypeScript, dependencies read, sink rules applied, under every cap. A
@@ -301,7 +307,7 @@ describe("buildCoverageReport", () => {
   });
 });
 
-describe("gapsFor", () => {
+describe.skipIf(!HAVE)("gapsFor", () => {
   it("returns only the gaps that belong on that surface", async () => {
     // A gap that only affects Security has no business on a global panel —
     // moving it there is how it gets ignored.

@@ -24,6 +24,7 @@
 // refuse.
 
 import { describe, it, expect } from "vitest";
+import { hasSessions } from "./helpers/sessionFixture";
 
 import type { CodeGraph } from "../codeAnalysis/types";
 import {
@@ -193,11 +194,12 @@ describe("one implementation, two callers", () => {
     expect(viaIndex.ownPct).toBe(standalone.ownPct);
   });
 
-  it("agrees on a real session, not just a fixture", async () => {
-    const { readFileSync } = await import("node:fs");
+  it.skipIf(!hasSessions("yAwwHY_ShB"))("agrees on a real session, not just a fixture", async () => {
     const { buildFlowIndex } = await import("../codeAnalysis/flowTrace");
-    const d = JSON.parse(readFileSync(".gitvision/sessions/yAwwHY_ShB.json", "utf-8"));
-    const cg = d.snapshots.at(-1).codeGraph as CodeGraph;
+    const { loadSnapshot } = await import("./helpers/sessionFixture");
+    // Resolved through the shared helper — a relative path here only worked
+    // when the suite ran from the main checkout, never from a worktree.
+    const cg = loadSnapshot<{ codeGraph: CodeGraph }>("yAwwHY_ShB").codeGraph;
     expect(cg.calls.length).toBeGreaterThan(1000);
     expect(computeOwnCallResolution(cg).ownPct).toBe(buildFlowIndex(cg).resolution.ownPct);
   });

@@ -18,15 +18,21 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+
+import { hasSessions, loadSnapshot } from "./helpers/sessionFixture";
 import path from "node:path";
 
 import type { AnalysisSnapshot } from "../types";
 import { buildSecurityBrief } from "../brief/security";
 
-const session = (id: string): AnalysisSnapshot =>
-  JSON.parse(
-    readFileSync(path.join(process.cwd(), ".gitvision", "sessions", `${id}.json`), "utf-8"),
-  ).snapshots.at(-1);
+// Resolved through the shared helper: cwd first, then the main checkout, so
+// this works from a git worktree. See helpers/sessionFixture.ts.
+
+// These assert against REAL captured analyses — a synthetic graph would
+// defeat the point — and the four total 61 MB, far too much to commit. A
+// machine without them reports skipped rather than broken.
+const HAVE = hasSessions("gx1lLA07kO", "yAwwHY_ShB", "o5QTmaYTwE", "DBtU3d_Gfk");
+const session = (id: string): AnalysisSnapshot => loadSnapshot<AnalysisSnapshot>(id);
 
 /** Items in one section. Sections with no items are dropped by assemble(), so
  *  an absent section and an empty one are the same thing here. */
@@ -37,7 +43,7 @@ const tier = (b: ReturnType<typeof buildSecurityBrief>, t: string) =>
 const allItems = (b: ReturnType<typeof buildSecurityBrief>) =>
   b.sections.flatMap((s) => s.items);
 
-describe("what counts as 'fix first'", () => {
+describe.skipIf(!HAVE)("what counts as 'fix first'", () => {
   it("puts a CVE-bearing package there, with the advisory ids", () => {
     const b = buildSecurityBrief(session("yAwwHY_ShB"), "s1");
     const fix = tier(b, "fix");
@@ -114,7 +120,7 @@ describe("what counts as 'fix first'", () => {
   });
 });
 
-describe("clean means we looked", () => {
+describe.skipIf(!HAVE)("clean means we looked", () => {
   it("is false on a repo where nothing could be checked", () => {
     // gin-gonic/gin: 0 findings, 2 blocking gaps. The whole point.
     const b = buildSecurityBrief(session("gx1lLA07kO"), "s1");
@@ -137,7 +143,7 @@ describe("clean means we looked", () => {
   });
 });
 
-describe("it composes rather than computes", () => {
+describe.skipIf(!HAVE)("it composes rather than computes", () => {
   it("carries only gaps that bear on this question", () => {
     // A PR-window note is real, and belongs on the PRs tab. Dragging every gap
     // onto every brief is how the ones that matter stop being read.
