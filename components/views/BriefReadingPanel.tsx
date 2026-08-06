@@ -99,13 +99,55 @@ export function BriefReadingPanel({
       </div>
 
       {reading ? (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm leading-relaxed" style={{ color: TOK.textPrimary }}>
+        <div className="flex flex-col gap-4">
+          {/* The answer, then the reasoning broken up, then the move. Two
+              paragraphs of prose read as a wall and get skimmed to nothing;
+              headed points can be scanned first and read second. */}
+          <p className="text-[15px] leading-relaxed" style={{ color: TOK.textPrimary }}>
             {reading.answer}
           </p>
-          <p className="text-sm leading-relaxed" style={{ color: TOK.textSecondary }}>
-            {reading.next}
-          </p>
+
+          {reading.points && reading.points.length > 0 && (
+            <ul className="flex flex-col gap-3">
+              {reading.points.map((pt, i) => (
+                <li key={`${i}-${pt.heading}`} className="flex gap-3">
+                  <span
+                    className="text-[11px] font-mono shrink-0 pt-0.5"
+                    style={{ color: TOK.textMuted, minWidth: 16 }}
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-[13px] font-medium" style={{ color: TOK.textPrimary }}>
+                      {pt.heading}
+                    </span>
+                    <span
+                      className="text-[13px] leading-relaxed"
+                      style={{ color: TOK.textSecondary }}
+                    >
+                      {pt.body}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div
+            className="flex flex-col gap-1 rounded-lg px-4 py-3"
+            style={{ background: TOK.surfaceElevated }}
+          >
+            <span
+              className="text-[10px] uppercase tracking-wider"
+              style={{ color: TOK.textMuted }}
+            >
+              Where to start
+            </span>
+            <span className="text-[13px] leading-relaxed" style={{ color: TOK.textPrimary }}>
+              {reading.next}
+            </span>
+          </div>
+
           {/* Written from the findings below, and only from them. Saying so is
               cheap and it is the difference between a summary and a claim. */}
           <p className="text-[11px]" style={{ color: TOK.textMuted }}>

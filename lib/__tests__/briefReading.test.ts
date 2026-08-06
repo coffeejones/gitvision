@@ -97,9 +97,11 @@ describe("the model is told what could not be checked", () => {
 });
 
 describe("the prompt forbids the reassuring phrasings by name", () => {
-  it("requires the gaps to be stated, above brevity", () => {
+  it("requires the gaps to be stated, above every other rule", () => {
+    // Not just "above brevity" — in a longer format there are more rules to
+    // trade against, so this one has to outrank all of them.
     expect(readingSrc).toMatch(/IF "gaps" IS NON-EMPTY YOU MUST SAY SO/);
-    expect(readingSrc).toContain("This outranks brevity");
+    expect(readingSrc).toContain("This outranks everything else here");
   });
 
   it("names the exact sentences that would read as a clean bill of health", () => {
@@ -119,6 +121,69 @@ describe("the prompt forbids the reassuring phrasings by name", () => {
 
   it("refuses to invent", () => {
     expect(readingSrc).toMatch(/Never invent a finding/);
+  });
+
+  it("bans our vocabulary by name, not by asking nicely", () => {
+    // The first version said "write for someone who does not know terms like
+    // blast radius or reachability. Say what it MEANS before naming it." The
+    // model then wrote "the reachability counts are a floor" and "reduce the
+    // blast radius of future changes" — instructions to be thoughtful are not
+    // instructions. A list is. Verified: after the list, a live generation
+    // leaked none of them.
+    for (const word of [
+      "blast radius",
+      "reachability",
+      "taint",
+      "sink",
+      "fan-in",
+      "fan-out",
+      "entry point",
+      "load-bearing",
+      "hotspot",
+      "coupling",
+    ]) {
+      expect(readingSrc, `"${word}" is not on the ban list`).toContain(word);
+    }
+    expect(readingSrc, "the numbers must survive the plain-language rule").toMatch(
+      /NUMBERS stay in/,
+    );
+  });
+
+  it("asks for as many points as the input supports, and no padding", () => {
+    // A fixed count would make a two-finding repo pad and a six-finding repo
+    // compress. Measured: gitvision produced five points, gin produced two.
+    expect(readingSrc).toMatch(/AS MANY AS THE INPUT\s*SUPPORTS/);
+    expect(readingSrc).toContain("do not pad");
+  });
+
+  it("requires a point about the gaps, not just a mention in the answer", () => {
+    // In a longer format the answer can bury the caveat. One of the points has
+    // to carry it too.
+    expect(readingSrc).toMatch(/one of the points must be about it/);
+  });
+});
+
+describe("the points survive a bad response without breaking the page", () => {
+  it("drops malformed entries rather than rendering empty rows", () => {
+    // A point with no heading renders as a bullet with nothing next to it,
+    // which reads as a finding that failed to load.
+    expect(readingSrc).toMatch(/heading\.trim\(\)\.length > 0/);
+    expect(readingSrc).toMatch(/body\.trim\(\)\.length > 0/);
+  });
+
+  it("keeps points optional so older readings still render", () => {
+    // Readings cached before this existed have no points (AGENTS.md
+    // invariant 2 — old snapshots must keep working).
+    const types = readFileSync(
+      path.join(process.cwd(), "lib", "brief", "reading.ts"),
+      "utf-8",
+    );
+    expect(types).toMatch(/points\?: ReadingPoint\[\]/);
+    const panel = readFileSync(
+      path.join(process.cwd(), "components", "views", "BriefReadingPanel.tsx"),
+      "utf-8",
+    );
+    expect(panel).toMatch(/reading\.points && reading\.points\.length > 0/);
   });
 });
 

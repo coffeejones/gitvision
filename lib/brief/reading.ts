@@ -25,11 +25,25 @@ import type { AnalysisSnapshot } from "../types";
 import type { Brief } from "./types";
 
 export const BRIEF_MODEL = "claude-haiku-4-5";
-const MAX_TOKENS = 700;
+const MAX_TOKENS = 1400;
+
+export interface ReadingPoint {
+  /** A few words. Scannable on its own — the reader should be able to skim
+   *  only the headings and still know what the page is about. */
+  heading: string;
+  /** 1-3 sentences. Must trace to a finding or a gap that is on the page. */
+  body: string;
+}
 
 export interface BriefReading {
-  /** 2-4 sentences answering the subject's question directly. */
+  /** 1-2 sentences answering the subject's question directly. */
   answer: string;
+  /** The reasoning, broken up. Two paragraphs of prose read as a wall and get
+   *  skimmed to nothing; headed points can be scanned and then read.
+   *
+   *  OPTIONAL, because readings generated before this existed have none, and
+   *  an old snapshot must keep rendering (AGENTS.md invariant 2). */
+  points?: ReadingPoint[];
   /** What the reader should do next, or why there is nothing to do. */
   next: string;
   /** ISO timestamp, so a stale reading can be spotted after a re-sweep. */
@@ -44,10 +58,19 @@ You receive:
 - "gaps": things the analyzer COULD NOT CHECK on this repository, each with a headline and a detail.
 
 HARD RULES:
-- Output VALID JSON ONLY, exactly: {"answer": "...", "next": "..."}
-- "answer": 2-4 sentences, 40-80 words. "next": 1-2 sentences, 15-40 words.
+- Output VALID JSON ONLY, exactly:
+  {"answer": "...", "points": [{"heading": "...", "body": "..."}], "next": "..."}
+- "answer": 1-2 sentences, 20-45 words. The direct answer, nothing else.
+- "points": one per thing the reader needs to understand. AS MANY AS THE INPUT
+  SUPPORTS, up to five — do not pad to reach five, and do not compress two
+  separate things into one point to stay short. Each "heading" is 2-6 words and
+  scannable on its own; each "body" is 1-3 sentences.
+- Every point must trace to a specific item or gap in the input. Name the file,
+  package, count or advisory it comes from.
+- "next": 1-2 sentences, 15-40 words — the concrete first move.
 - Use ONLY what is in the input. Never invent a finding, a file, a package, a number or a CVE.
-- IF "gaps" IS NON-EMPTY YOU MUST SAY SO IN "answer", naming what was not checked. This outranks brevity.
+- IF "gaps" IS NON-EMPTY YOU MUST SAY SO IN "answer", naming what was not checked, AND one of the points must be about it. This outranks everything else here.
+- Write for someone who ships code but has never learned our vocabulary. NEVER use these words: blast radius, reachability, reachable, taint, tainted, sink, fan-in, fan-out, entry point, load-bearing, hotspot, coupling. Say the plain thing instead — "what else breaks if you change it", "a way into the app", "the files most of the project runs through". The NUMBERS stay in; only the jargon goes. Never talk down.
 - When there are no findings AND there are gaps, the answer is that the question could NOT be answered — say that plainly. Do not write "no issues found", "looks clean", "nothing concerning", or any phrasing a reader would take as reassurance.
 - When there are no findings AND no gaps, say the checks ran and found nothing, and name what ran.
 - Never call a pattern match a vulnerability. Never say code "is safe", "is secure", or "will run" — the analysis proves reachability, not execution.
@@ -107,7 +130,7 @@ export async function generateBriefReading(
     .replace(/```$/i, "")
     .trim();
 
-  let parsed: { answer?: unknown; next?: unknown };
+  let parsed: { answer?: unknown; points?: unknown; next?: unknown };
   try {
     parsed = JSON.parse(raw);
   } catch {
@@ -117,8 +140,25 @@ export async function generateBriefReading(
     return null;
   }
 
+  // Points are dropped rather than trusted loosely: a malformed entry would
+  // render as an empty row, which reads as a missing finding.
+  const points = Array.isArray(parsed.points)
+    ? (parsed.points as unknown[])
+        .filter(
+          (p): p is ReadingPoint =>
+            typeof p === "object" &&
+            p !== null &&
+            typeof (p as ReadingPoint).heading === "string" &&
+            typeof (p as ReadingPoint).body === "string" &&
+            (p as ReadingPoint).heading.trim().length > 0 &&
+            (p as ReadingPoint).body.trim().length > 0,
+        )
+        .slice(0, 5)
+    : [];
+
   return {
     answer: parsed.answer,
+    points: points.length > 0 ? points : undefined,
     next: parsed.next,
     generatedAt: new Date().toISOString(),
   };
