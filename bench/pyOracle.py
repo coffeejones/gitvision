@@ -14,7 +14,8 @@ import json, os, re, subprocess, sys
 
 REPO = os.path.abspath(sys.argv[1])
 PY = os.path.join(REPO, ".venv/bin/python")
-COV = "/tmp/pycov"
+COV = os.environ.get("PYCOV") or os.path.join(
+    os.environ.get("BENCH") or os.path.expanduser("~/.codetrawl-bench"), "oracles", "pycov")
 
 
 def test_files():

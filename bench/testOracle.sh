@@ -5,7 +5,7 @@
 # actually executes. Inverts into: for every source file, the exact set of test
 # files that exercise it — no mutation, no approximation, no third party.
 set -uo pipefail
-OUT="${1:-/tmp/cov}"; mkdir -p "$OUT"
+OUT="${1:-${BENCH:-$HOME/.codetrawl-bench}/oracles/cov}"; mkdir -p "$OUT"
 TOTAL=$(find lib components app \( -name '*.test.ts' -o -name '*.test.tsx' \) 2>/dev/null | wc -l | tr -d ' ')
 echo "test files: $TOTAL"
 i=0

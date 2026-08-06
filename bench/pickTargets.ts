@@ -1,9 +1,21 @@
 // The files testsToRun actually makes a claim about, that the suite also runs.
 import fs from "node:fs";
+import path from "node:path";
 import { ALL_PLUGINS } from "../lib/codeAnalysis/plugins/all";
 import { analyzeDirectory } from "../lib/codeAnalysis/analyze";
 import { computeRefactorSafety } from "../lib/refactorSafety";
+// A PINNED list, when one exists. The targets are chosen from refactor-safety
+// tiers, so any change to the graph moves them — and a recall number measured
+// on a different sample is not comparable to the one before it. Regenerating
+// this file is a deliberate act: delete it, re-run, and say in the commit that
+// the baseline moved.
+const PINNED = path.join(process.cwd(), "bench", "blast-targets.txt");
+
 (async () => {
+  if (fs.existsSync(PINNED) && !process.env.REPICK) {
+    process.stdout.write(fs.readFileSync(PINNED, "utf-8"));
+    return;
+  }
   const ROOT = process.argv[2] ?? process.cwd();
   const { codeGraph } = await analyzeDirectory(ROOT, ALL_PLUGINS);
   const rep = computeRefactorSafety(codeGraph, { withTests: true });

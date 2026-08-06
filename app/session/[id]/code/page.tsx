@@ -11,8 +11,7 @@ import { OrientationStrip } from "@/components/views/OrientationStrip";
 import { RollupCounts } from "@/components/views/RollupBar";
 import { computeOwnCallResolution } from "@/lib/codeAnalysis/callResolution";
 import {
-  findDuplicateGroups,
-  summarizeDuplicates,
+  countDuplicateGroups,
 } from "@/lib/codeAnalysis/duplicates";
 import { computeTestCoverage } from "@/lib/codeAnalysis/testCoverage";
 
@@ -38,7 +37,9 @@ export default async function CodeRoute({
     // Own-call resolution, not the raw rate: most call edges in any file point
     // at libraries, and judging the analyser on those undersells it ~10x.
     const resolvedPct = computeOwnCallResolution(cg).ownPct;
-    const dupGroups = summarizeDuplicates(findDuplicateGroups(cg)).totalGroups;
+    // Uncapped. findDuplicateGroups returns the panel's top 15, so counting
+    // its length told the reader NetBox has 15 duplicate groups when it has 43.
+    const dupGroups = countDuplicateGroups(cg);
     const cov = computeTestCoverage(cg).totals;
     const covClause =
       cov.testFiles > 0 && cov.prodFunctions > 0

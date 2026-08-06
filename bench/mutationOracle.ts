@@ -27,7 +27,7 @@ const FLIPS: [RegExp, string][] = [
  *  that and reported zero guards for a file with 17 real tests. */
 function executedLines(file: string): Set<number> {
   const hit = new Set<number>();
-  const dir = process.env.COV ?? "/tmp/cov";
+  const dir = process.env.COV ?? `${process.env.BENCH ?? `${process.env.HOME}/.codetrawl-bench`}/oracles/cov`;
   if (!fs.existsSync(dir)) return hit;
   const abs = `${process.cwd()}/${file}`;
   for (const f of fs.readdirSync(dir)) {

@@ -114,11 +114,21 @@ falsifiable claim that had never been checked. Unlike the security corpus, the
 ground truth here is free, unlimited, and generated from the repo itself.
 
 ```bash
-bench/testOracle.sh /tmp/cov                    # coverage: which tests EXECUTE each file
-npx tsx bench/pickTargets.ts > /tmp/targets.txt # the files testsToRun claims about
-MUTANTS=3 npx tsx bench/mutationOracle.ts $(cat /tmp/targets.txt) > /tmp/mutation.json
-npx tsx bench/blastScoreMutation.ts /tmp/mutation.json
+bench/testOracle.sh                                   # coverage: which tests EXECUTE each file
+MUTANTS=3 npx tsx bench/mutationOracle.ts \
+  $(npx tsx bench/pickTargets.ts) > "$BENCH/oracles/mutation.json"
+npx tsx bench/blastScoreMutation.ts "$BENCH/oracles/mutation.json"
 ```
+
+Output goes to `$BENCH/oracles/`, not `/tmp` — it takes ten minutes to compute
+and `/tmp` had already erased it once.
+
+**The targets are pinned** in `bench/blast-targets.txt`. They are chosen from
+refactor-safety tiers, so any change to the graph moves them, and a recall
+number measured on a different sample is not comparable to the one before it.
+Regenerating the oracle from scratch once produced 0.750 against a previously
+recorded 0.955 — not a regression, a different set of 12 files instead of 15.
+Re-pick deliberately (`REPICK=1`) and say in the commit that the baseline moved.
 
 ## Use the mutation oracle, not coverage
 
