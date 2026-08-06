@@ -72,6 +72,27 @@ export interface PaletteIndex {
 export const MAX_PALETTE_FILES = 200;
 export const MAX_PALETTE_FUNCTIONS = 200;
 
+/** The Code tab is the one page that genuinely needs the graph in the browser:
+ *  it recomputes duplicates and blast radius as the reader picks files, so the
+ *  ClientSnapshot boundary above cannot apply to it.
+ *
+ *  What it does NOT need is the unresolved call edges. Blast radius skips them
+ *  explicitly (`if (c.toFile === null) continue`), test coverage only reads
+ *  edges with a toFile, and the one consumer that does need them — the
+ *  own-call-resolution percentage — is already computed server-side.
+ *
+ *  Measured on NetBox: 81,013 call edges, of which 8,230 resolve. `calls` is
+ *  17 MB of the graph's 23 MB, and dropping the unresolved ones takes it to
+ *  about 2 MB — the page from 26 MB to roughly 11. */
+export function toCodeTabSnapshot(snapshot: AnalysisSnapshot): AnalysisSnapshot {
+  const cg = snapshot.codeGraph;
+  if (!cg) return snapshot;
+  return {
+    ...snapshot,
+    codeGraph: { ...cg, calls: cg.calls.filter((c) => c.toFile !== null && c.toFile !== undefined) },
+  };
+}
+
 export function toClientSnapshot(snapshot: AnalysisSnapshot): ClientSnapshot {
   // Destructure rather than delete: `rest` is a fresh object, so the original
   // snapshot (which server components on the same request still use, via the

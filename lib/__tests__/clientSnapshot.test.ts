@@ -30,6 +30,7 @@ import {
   buildPaletteIndex,
   MAX_PALETTE_FILES,
   MAX_PALETTE_FUNCTIONS,
+  toCodeTabSnapshot,
 } from "../clientSnapshot";
 
 const ROOT = process.cwd();
@@ -283,5 +284,40 @@ describe("the refactor-safety route survives a partial session", () => {
     const partial = { id: "x", name: "x" } as unknown as Parameters<typeof isSessionPrivate>[0];
     expect(() => isSessionPrivate(partial)).not.toThrow();
     expect(isSessionPrivate(partial)).toBe(false);
+  });
+});
+
+describe("toCodeTabSnapshot", () => {
+  const cg = (calls: unknown[], extra: Record<string, unknown> = {}): CodeGraph =>
+    ({
+      functions: [], imports: [], calls, fileComplexity: {}, filesByExt: {},
+      byPlugin: {}, generatedAt: "", ...extra,
+    }) as unknown as CodeGraph;
+  const snap = (graph: CodeGraph): AnalysisSnapshot =>
+    ({ codeGraph: graph }) as unknown as AnalysisSnapshot;
+
+  it("drops the unresolved call edges", () => {
+    // Measured on NetBox: 81,013 edges, 8,230 resolved. `calls` is 17 MB of the
+    // graph's 23 MB, and the Code tab is the one page that needs the graph
+    // client-side at all.
+    const out = toCodeTabSnapshot(
+      snap(cg([
+        { fromFile: "a.ts", toFile: "b.ts", calleeName: "f" },
+        { fromFile: "a.ts", toFile: null, calleeName: "console.log" },
+        { fromFile: "a.ts", calleeName: "parseInt" },
+      ])),
+    );
+    expect(out.codeGraph!.calls).toHaveLength(1);
+    expect(out.codeGraph!.calls[0].toFile).toBe("b.ts");
+  });
+
+  it("keeps everything else on the graph", () => {
+    const out = toCodeTabSnapshot(snap(cg([], { fileComplexity: { "a.ts": 9 } })));
+    expect(out.codeGraph!.fileComplexity).toEqual({ "a.ts": 9 });
+  });
+
+  it("passes a graph-free snapshot through untouched", () => {
+    const s = { repo: "x" } as unknown as AnalysisSnapshot;
+    expect(toCodeTabSnapshot(s)).toBe(s);
   });
 });

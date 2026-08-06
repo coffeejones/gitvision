@@ -66,7 +66,7 @@ import {
   summarizeDuplicates,
   type DuplicateGroup,
 } from "@/lib/codeAnalysis/duplicates";
-import { computeOwnCallResolution } from "@/lib/codeAnalysis/callResolution";
+import type { OwnCallResolution } from "@/lib/codeAnalysis/callResolution";
 import { formatCount } from "@/lib/formatLocale";
 
 const INITIAL_LIST_SIZE = 10;
@@ -109,15 +109,32 @@ function usePanelExpansion(
   return [isExpanded, toggle];
 }
 
-export function CodePanel({ snapshot }: { snapshot: AnalysisSnapshot }) {
+export function CodePanel({
+  snapshot,
+  ownResolution,
+}: {
+  /** Trimmed by toCodeTabSnapshot: resolved call edges only. Anything needing
+   *  the unresolved ones is computed on the server and passed in below. */
+  snapshot: AnalysisSnapshot;
+  /** Computed server-side: it needs the unresolved edges the trim removes.
+   *  The call-sites TILE is unaffected — it sums cg.byPlugin stats, which are
+   *  recorded at analysis time. */
+  ownResolution: OwnCallResolution | null;
+}) {
   const cg = snapshot.codeGraph;
   if (!cg) return <EmptyState reason={snapshot.codeGraphSkipReason} />;
-  return <CodePanelInner cg={cg} />;
+  return <CodePanelInner cg={cg} ownResolution={ownResolution} />;
 }
 
 // ------------------- Inner panel -------------------
 
-function CodePanelInner({ cg }: { cg: CodeGraph }) {
+function CodePanelInner({
+  cg,
+  ownResolution,
+}: {
+  cg: CodeGraph;
+  ownResolution: OwnCallResolution | null;
+}) {
   const searchParams = useSearchParams();
 
   // Files sorted by fileComplexity desc — the "real heavy" filter.
@@ -353,7 +370,7 @@ function CodePanelInner({ cg }: { cg: CodeGraph }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <CoverageChip cg={cg} />
+      <CoverageChip cg={cg} ownResolution={ownResolution} />
 
       {/* Hero: selected file + blast radius (file mode or function mode).
        *  Material card recipe (diagonal gradient + 1px ambient shadow)
@@ -459,7 +476,15 @@ const AST_PLUGIN_LABELS: Record<string, string> = {
   csharp: "C#",
 };
 
-function CoverageChip({ cg }: { cg: CodeGraph }) {
+function CoverageChip({
+  cg,
+  ownResolution,
+}: {
+  cg: CodeGraph;
+  /** Server-computed: the percentage needs the unresolved call edges, which
+   *  toCodeTabSnapshot strips before the graph reaches the browser. */
+  ownResolution: OwnCallResolution | null;
+}) {
   // Sum stats across every plugin that produced output. Pre-v0.21 this was
   // hardcoded to read javascript-only; that was correct when JS/TS was the
   // only AST plugin, but a 100% C# / Java / Go / Python repo showed
@@ -494,7 +519,9 @@ function CoverageChip({ cg }: { cg: CodeGraph }) {
   // corpus, the raw rate is 13-49% while the own rate is 92-99% on application
   // code and 54-74% on library-style code, where one method name lives on many
   // classes and the resolver refuses to guess rather than guessing wrong.
-  const own = computeOwnCallResolution(cg);
+  // Computed on the server: it needs the unresolved edges, which are stripped
+  // from the graph before it reaches the browser.
+  const own = ownResolution ?? { ownPct: 0, ownTotal: 0, ownResolved: 0, ownMissed: 0 };
 
   // Apple-style stat-tile grid (matches PackagesPanel summary tiles).
   // Three primary tiles always render (AST files / functions / call

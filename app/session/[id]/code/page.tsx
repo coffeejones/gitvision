@@ -10,6 +10,7 @@ import { CodePanel } from "@/components/views/CodePanel";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
 import { RollupCounts } from "@/components/views/RollupBar";
 import { computeOwnCallResolution } from "@/lib/codeAnalysis/callResolution";
+import { toCodeTabSnapshot } from "@/lib/clientSnapshot";
 import {
   countDuplicateGroups,
 } from "@/lib/codeAnalysis/duplicates";
@@ -68,7 +69,10 @@ export default async function CodeRoute({
         }
       />
       <div id="screenshot-target" className="flex flex-col gap-4">
-        <CodePanel snapshot={current} />
+        <CodePanel
+          snapshot={toCodeTabSnapshot(current)}
+          ownResolution={cg ? computeOwnCallResolution(cg) : null}
+        />
       </div>
     </main>
   );
