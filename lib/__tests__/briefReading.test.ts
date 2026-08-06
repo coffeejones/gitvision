@@ -156,6 +156,22 @@ describe("the prompt forbids the reassuring phrasings by name", () => {
     expect(readingSrc).toContain("do not pad");
   });
 
+  it("binds the next step to the input too, tool names included", () => {
+    // The findings were always bound; "next" was not. On gin-gonic/gin it wrote
+    // "use a Go-aware tool like nancy or go-audit" — neither name appears
+    // anywhere in the payload, and go-audit reads auditd logs rather than
+    // scanning dependencies. Advice is still allowed; naming a tool we did not
+    // put in front of the model is not, because "next" is the one line the
+    // reader is meant to act on.
+    expect(readingSrc).toMatch(/NEVER name a third-party tool/);
+    expect(readingSrc, "an example is still an invention").toContain(
+      "not even as an example",
+    );
+    // And the global do-not-invent list has to carry it, or the rule only
+    // covers the line where we happened to notice it first.
+    expect(readingSrc).toMatch(/Never invent a finding[^`]*the name of a tool/);
+  });
+
   it("requires a point about the gaps, not just a mention in the answer", () => {
     // In a longer format the answer can bury the caveat. One of the points has
     // to carry it too.

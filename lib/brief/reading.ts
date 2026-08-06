@@ -15,6 +15,16 @@
 // So the gaps go in with the findings, and the prompt requires the model to
 // state them. An unchecked repo must come back sounding unchecked.
 //
+// The "next" line was the one place that leaked. Everything else is bound to
+// the input by rule, but "the concrete first move" invited the model to reach
+// outside it for advice — on gin it wrote "use a Go-aware tool like nancy or
+// go-audit", and go-audit reads auditd logs, it does not scan dependencies.
+// Neither name was in the input. On a product whose claim is "nothing is
+// invented", a made-up tool name on the one line the reader is meant to ACT on
+// is worse than a vague one, so the prompt now names tools, services and
+// commands in the do-not-invent list and tells "next" to say what KIND of tool
+// to reach for rather than which.
+//
 // Returns null without ANTHROPIC_API_KEY, so the brief renders exactly as it
 // does today for self-hosters and demos. The reading sits on top of the
 // deterministic page; it is never the foundation.
@@ -67,8 +77,8 @@ HARD RULES:
   scannable on its own; each "body" is 1-3 sentences.
 - Every point must trace to a specific item or gap in the input. Name the file,
   package, count or advisory it comes from.
-- "next": 1-2 sentences, 15-40 words — the concrete first move.
-- Use ONLY what is in the input. Never invent a finding, a file, a package, a number or a CVE.
+- "next": 1-2 sentences, 15-40 words — the concrete first move, built from the input like everything else. NEVER name a third-party tool, library, service or command that is not in the input — not even as an example. If the move is to run something we did not run, say what KIND of thing it is ("a Go-aware dependency scanner"), never which one.
+- Use ONLY what is in the input. Never invent a finding, a file, a package, a number, a CVE, or the name of a tool, service or command.
 - IF "gaps" IS NON-EMPTY YOU MUST SAY SO IN "answer", naming what was not checked, AND one of the points must be about it. This outranks everything else here.
 - Write for someone who ships code but has never learned our vocabulary. NEVER use these words: blast radius, reachability, reachable, taint, tainted, sink, fan-in, fan-out, entry point, load-bearing, hotspot, coupling. Say the plain thing instead — "what else breaks if you change it", "a way into the app", "the files most of the project runs through". The NUMBERS stay in; only the jargon goes. Never talk down.
 - When there are no findings AND there are gaps, the answer is that the question could NOT be answered — say that plainly. Do not write "no issues found", "looks clean", "nothing concerning", or any phrasing a reader would take as reassurance.
