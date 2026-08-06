@@ -53,38 +53,37 @@ export default async function BriefRoute({
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-5xl mx-auto w-full">
+      {/* THE ANSWER IS THE HEADING. It used to be the question, with an intro
+          about which of OUR tabs the data came from — so the first screen said
+          nothing at all about the reader's repo and they had to scroll and
+          synthesise. The brief already knew the answer; it just never said it. */}
       <OrientationStrip
-        eyebrow="Brief"
-        title={brief.question}
-        line={brief.intro}
+        eyebrow={brief.question}
+        title={brief.answer}
+        line={brief.howToRead}
       />
 
       {/* The chooser. Every question is one click away, and the current one is
           marked rather than hidden — a reader has to be able to see that the
           other two exist, or this is just a security page with a long name. */}
-      <div className="flex flex-wrap gap-2">
+      {/* A grid, not flex-wrap: three equal columns rather than two on one row
+          and a narrower third below. And no blurb — the chosen question is
+          already the label above, so repeating it here was noise. */}
+      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
         {SUBJECT_IDS.map((sid) => {
           const active = sid === subject;
           return (
             <Link
               key={sid}
               href={`${base}/brief/${sid}`}
-              className="flex flex-col gap-0.5 rounded-xl px-4 py-3 transition"
+              className="rounded-lg px-3 py-2 text-[12px] text-center transition"
               style={{
                 border: `1px solid ${active ? TOK.accent : TOK.border}`,
-                background: active ? TOK.surfaceElevated : TOK.surface,
-                minWidth: 200,
+                background: active ? TOK.surfaceElevated : "transparent",
+                color: active ? TOK.textPrimary : TOK.textSecondary,
               }}
             >
-              <span
-                className="text-[13px] font-medium"
-                style={{ color: active ? TOK.textPrimary : TOK.textSecondary }}
-              >
-                {SUBJECTS[sid].question}
-              </span>
-              <span className="text-[11px]" style={{ color: TOK.textMuted }}>
-                {SUBJECTS[sid].blurb}
-              </span>
+              {SUBJECTS[sid].question}
             </Link>
           );
         })}
@@ -122,6 +121,14 @@ export default async function BriefRoute({
 
       {brief.sections.map((section) => {
         const items = section.items;
+        // When every item in a section means the same thing — three vulnerable
+        // packages all mean "update it" — repeating the sentence per row turns
+        // the page into a chant and pushes the thing that actually differs (the
+        // package name) into small print. Say it once, above them.
+        const shared =
+          items.length > 1 && items.every((i) => i.soWhat === items[0].soWhat)
+            ? items[0].soWhat
+            : null;
         return (
           <section key={section.id} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">
@@ -131,9 +138,14 @@ export default async function BriefRoute({
                   {items.length}
                 </span>
               </h2>
-              <p className="text-xs" style={{ color: TOK.textMuted }}>
-                {section.note}
+              <p className="text-sm" style={{ color: TOK.textSecondary }}>
+                {shared ?? section.note}
               </p>
+              {shared && (
+                <p className="text-xs" style={{ color: TOK.textMuted }}>
+                  {section.note}
+                </p>
+              )}
             </div>
             <ul className="flex flex-col gap-2">
               {items.map((item) => (
@@ -143,11 +155,23 @@ export default async function BriefRoute({
                     className="flex items-start justify-between gap-4 rounded-xl px-5 py-4 transition"
                     style={{ border: `1px solid ${TOK.border}`, background: TOK.surface }}
                   >
-                    <span className="flex flex-col gap-1">
-                      <span className="text-sm font-medium" style={{ color: TOK.textPrimary }}>
+                    {/* Consequence, then subject, then measurement. Someone
+                        who does not have the vocabulary reads line one and
+                        stops; someone who does skips to line three. Neither is
+                        talked down to. */}
+                    <span className="flex flex-col gap-1.5">
+                      {!shared && (
+                        <span className="text-sm font-medium" style={{ color: TOK.textPrimary }}>
+                          {item.soWhat}
+                        </span>
+                      )}
+                      <span
+                        className={shared ? "text-sm font-medium font-mono" : "text-xs font-mono"}
+                        style={{ color: shared ? TOK.textPrimary : TOK.textSecondary }}
+                      >
                         {item.title}
                       </span>
-                      <span className="text-xs leading-relaxed" style={{ color: TOK.textSecondary }}>
+                      <span className="text-xs leading-relaxed" style={{ color: TOK.textMuted }}>
                         {item.evidence}
                       </span>
                     </span>

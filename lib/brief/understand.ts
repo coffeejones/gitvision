@@ -40,9 +40,11 @@ export function buildUnderstandBrief(
     for (const [i, e] of entries.entries()) {
       doors.push({
         id: `entry:${i}:${e.id}`,
+        soWhat: `When something outside calls this project, this is one of the places it lands.`,
         title: `${e.name} — ${e.filePath}`,
-        evidence: `Declared ${e.kind}. Reaches ${e.fanOut} function${e.fanOut === 1 ? "" : "s"} in this repo.`,
+        evidence: `A declared ${e.kind} — the code says so, we did not guess it. From here you can follow ${e.fanOut} function${e.fanOut === 1 ? "" : "s"} in this repo.`,
         href: `${base}/flows`,
+        term: "fan-out",
       });
     }
 
@@ -54,9 +56,11 @@ export function buildUnderstandBrief(
     for (const [i, f] of loadBearing.entries()) {
       leaned.push({
         id: `wall:${i}:${f.file}`,
+        soWhat: `A lot of the project runs through here, so it is worth understanding before you change anything.`,
         title: f.file,
-        evidence: `${f.dependents} file${f.dependents === 1 ? "" : "s"} depend on it${f.untestedDependents > 0 ? `, ${f.untestedDependents} of them with no test reaching them` : ""}. Complexity ${f.complexity}.`,
+        evidence: `${f.dependents} file${f.dependents === 1 ? "" : "s"} import or call it${f.untestedDependents > 0 ? `, and ${f.untestedDependents} of those have no tests` : ""}.`,
         href: `${base}/refactor`,
+        term: "load-bearing",
       });
     }
 
@@ -66,9 +70,11 @@ export function buildUnderstandBrief(
     for (const [i, [file, complexity]] of byComplexity.entries()) {
       heavy.push({
         id: `heavy:${i}:${file}`,
+        soWhat: `The most to read in one file. Being big is not a problem — it just takes longer.`,
         title: file,
-        evidence: `Aggregate complexity ${complexity} — the densest reading in the repo.`,
+        evidence: `Complexity ${complexity}: a count of the branches and loops inside, added up.`,
         href: `${base}/code?file=${encodeURIComponent(file)}`,
+        term: "file-complexity",
       });
     }
   }
@@ -121,7 +127,17 @@ export function buildUnderstandBrief(
     {
       headline: "Nothing to orient around yet.",
       detail:
-        "No entry points were declared and no file stands out as load-bearing. On a small or a library-shaped repo that is a real answer, not a gap.",
+        "Nothing declares itself as a way in, and no single file carries much more than the others. On a small or library-shaped repo that is a real answer, not a gap.",
+    },
+    {
+      answer:
+        doors.length + leaned.length === 0
+          ? "There is no obvious place to start."
+          : doors.length > 0
+            ? `Start at ${doors.length} way${doors.length === 1 ? "" : "s"} into this project, then read the ${leaned.length} file${leaned.length === 1 ? "" : "s"} everything else runs through.`
+            : `Nothing declares itself as a way in, so start with the ${leaned.length} file${leaned.length === 1 ? "" : "s"} everything else runs through.`,
+      howToRead:
+        "Read top to bottom — ways in first, then the files most of the project depends on, then the longest ones. Each row opens the map behind it.",
     },
   );
 }

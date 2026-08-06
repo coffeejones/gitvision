@@ -41,9 +41,13 @@ export function buildImproveBrief(
     for (const [i, f] of exposed.entries()) {
       risky.push({
         id: `exposed:${i}:${f.file}`,
+        // Conditional, because it is conditional: a change only breaks things
+        // if it breaks things. What is certain is that nothing would catch it.
+        soWhat: `Change this and ${f.dependents} other file${f.dependents === 1 ? "" : "s"} could break with nothing to catch it.`,
         title: f.file,
-        evidence: `No test reaches it, and ${f.dependents} file${f.dependents === 1 ? "" : "s"} depend on it${f.untestedDependents > 0 ? ` — ${f.untestedDependents} of those are untested too` : ""}.`,
+        evidence: `No test file imports or calls it, and ${f.dependents} file${f.dependents === 1 ? "" : "s"} depend on it${f.untestedDependents > 0 ? ` — ${f.untestedDependents} of those have no tests either` : ""}.`,
         href: `${base}/testquality`,
+        term: "untested-hotspot",
       });
     }
 
@@ -54,9 +58,11 @@ export function buildImproveBrief(
         const files = [...new Set(g.members.map((f) => f.filePath))];
         duplicated.push({
           id: `dup:${i}:${g.members[0]?.name ?? i}`,
-          title: `${g.members[0]?.name ?? "Duplicated body"} — ${g.members.length} copies`,
-          evidence: `Structurally identical across ${files.slice(0, 3).join(", ")}${files.length > 3 ? ` and ${files.length - 3} more` : ""}. A fix in one copy does not reach the others.`,
+          soWhat: `Fix a bug here and you have to remember to fix it ${g.members.length - 1} more time${g.members.length === 2 ? "" : "s"}.`,
+          title: `${g.members[0]?.name ?? "Duplicated code"} — ${g.members.length} copies`,
+          evidence: `The same code appears in ${files.slice(0, 3).join(", ")}${files.length > 3 ? ` and ${files.length - 3} more` : ""}. Editing one copy leaves the others as they were.`,
           href: `${base}/code`,
+          term: "near-duplicate",
         });
       }
     }
@@ -71,10 +77,12 @@ export function buildImproveBrief(
     if (hollow > 0) {
       weak.push({
         id: "weak:hollow",
+        soWhat: `${hollow} of your test file${hollow === 1 ? "" : "s"} would pass even if the code were broken.`,
         title: `${hollow} test file${hollow === 1 ? "" : "s"} assert almost nothing`,
         evidence:
-          "They run, and they pass whatever the code does — no assertions, or no oracle worth failing on. Coverage counts them; a regression does not.",
+          "They run and they finish green, but they make no meaningful check on the result. A coverage number counts them; a regression walks past them.",
         href: `${base}/testquality`,
+        term: "hollow-test",
       });
     }
   }
@@ -110,7 +118,40 @@ export function buildImproveBrief(
     {
       headline: "Nothing stands out as worth cleaning up.",
       detail:
-        "No untested file has dependents, no duplicated bodies were found, and no test file asserts nothing. That is a real answer on a small or well-covered repo.",
+        "No untested file has anything depending on it, no code is duplicated, and every test suite checks something. On a small or well-covered repo that is a real answer.",
     },
+    answerFor(risky.length, duplicated.length, weak.length, gaps),
   );
+}
+
+/** The answer, from the same counts the sections were built from. */
+function answerFor(
+  risky: number,
+  duplicated: number,
+  weak: number,
+  gaps: { kind: string }[],
+): { answer: string; howToRead: string } {
+  const blocked = gaps.some((g) => g.kind === "blocking");
+  if (blocked && risky + duplicated + weak === 0) {
+    return {
+      answer: "We could not answer this one.",
+      howToRead:
+        "Nothing was found, but the analysis was blocked before it could look. What stopped it is at the bottom of the page.",
+    };
+  }
+  const parts: string[] = [];
+  if (risky > 0) parts.push(`${risky} file${risky === 1 ? " is" : "s are"} depended on with no test to catch a break`);
+  if (duplicated > 0) parts.push(`${duplicated} piece${duplicated === 1 ? "" : "s"} of code exist${duplicated === 1 ? "s" : ""} in more than one place`);
+  if (weak > 0) parts.push("some tests would pass even if the code were broken");
+  if (parts.length === 0) {
+    return {
+      answer: "Nothing here is urgent.",
+      howToRead: "No untested file has anything depending on it, and nothing is duplicated.",
+    };
+  }
+  return {
+    answer: `${parts[0][0].toUpperCase()}${parts.slice(0, 2).join(", and ").slice(1)}.`,
+    howToRead:
+      "Start at the top — that is the one where a mistake costs most. Each row links to the file and the numbers behind it.",
+  };
 }

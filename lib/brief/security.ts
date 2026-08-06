@@ -51,8 +51,9 @@ export function buildSecurityBrief(
     items.push({
       id: `secret:${i}:${f.filePath}:${f.line}`,
       tier: "fix",
+      soWhat: `A password or key is written directly in your code, where anyone with the repo can read it.`,
       title: `${f.patternLabel} in ${f.filePath}`,
-      evidence: `Line ${f.line}, matched as ${f.preview}. Rotate it before anything else — the value is in git history whatever you do to the file now.`,
+      evidence: `Line ${f.line}, matched as ${f.preview}. Deleting the line is not enough — it stays in git history, so the key has to be replaced at the service that issued it.`,
       href: `${base}/security`,
     });
   }
@@ -62,8 +63,9 @@ export function buildSecurityBrief(
       items.push({
         id: `vuln:${health.ecosystem}:${v.name}`,
         tier: "fix",
-        title: `${v.name} ${v.current} has ${v.cves.length === 1 ? "an advisory" : `${v.cves.length} advisories`}`,
-        evidence: `${v.cves.join(", ")} — ${health.ecosystem}${v.scope ? `, ${v.scope} scope` : ""}.`,
+        soWhat: `A package you install has a publicly known security flaw. Updating it is usually the whole fix.`,
+        title: `${v.name} ${v.current}`,
+        evidence: `${v.cves.length} published security ${v.cves.length === 1 ? "advisory" : "advisories"} for this exact version: ${v.cves.join(", ")}. From ${health.ecosystem}${v.scope ? `, ${v.scope} dependency` : ""}.`,
         href: `${base}/packages`,
       });
     }
@@ -73,8 +75,9 @@ export function buildSecurityBrief(
     items.push({
       id: `incident:${m.incident.id}`,
       tier: "fix",
+      soWhat: `You may be using a version of a package that was tampered with in a known attack.`,
       title: `Possible match — ${m.incident.name}`,
-      evidence: `${m.matchedPackages.join(", ")}. Verify against the advisory before treating it as a confirmed compromise.`,
+      evidence: `${m.matchedPackages.join(", ")} match versions from that incident. Check the linked advisory before assuming the worst — a version match is not proof.`,
       href: `${base}/security`,
     });
   }
@@ -86,7 +89,8 @@ export function buildSecurityBrief(
     items.push({
       id: `sink:${i}:${s.filePath}:${s.line}`,
       tier: "fix",
-      title: `${s.ruleId} reachable in ${s.filePath}`,
+      soWhat: `Something outside your app can reach a line that runs commands or code. Worth reading closely.`,
+      title: `${s.ruleId} in ${s.filePath}`,
       evidence: s.path
         ? `Traced from ${s.path.entry.name}${s.path.hops.length > 1 ? ` through ${s.path.hops.length - 1} more` : ""} to line ${s.line}. Reachable from an entry point — not proof it runs on every request.`
         : `Line ${s.line}, reachable from an entry point.`,
@@ -103,8 +107,9 @@ export function buildSecurityBrief(
     items.push({
       id: `pattern:${i}:${f.filePath}:${f.line}`,
       tier: "investigate",
+      soWhat: `This line runs text as code. That is fine if the text is yours, and a problem if a user can influence it.`,
       title: `${f.patternName} in ${f.filePath}`,
-      evidence: `Line ${f.line}: ${f.snippet}. A pattern match, not a vulnerability — CodeTrawl does not track whether the argument is attacker-controlled.`,
+      evidence: `Line ${f.line}: ${f.snippet}. We found the pattern; we did not check where the text comes from — so this is a question, not a finding.`,
       href: `${base}/security`,
     });
   }
@@ -116,9 +121,10 @@ export function buildSecurityBrief(
     items.push({
       id: "sinks:unproven",
       tier: "investigate",
-      title: `${unproven.length} dangerous ${unproven.length === 1 ? "call" : "calls"} with no traced path`,
+      soWhat: `Lines that run commands or code, where we could not work out whether anything outside can reach them.`,
+      title: `${unproven.length} risky ${unproven.length === 1 ? "line" : "lines"} we could not trace`,
       evidence:
-        "Found, but no route from an entry point was proven. Unproven is not the same as unreachable — it usually means the path runs through code the resolver could not follow.",
+        "We could not follow a route to them from any way into the app. That is not the same as saying nothing can get there — usually the route runs through code we cannot follow.",
       href: `${base}/security`,
     });
   }
@@ -130,7 +136,8 @@ export function buildSecurityBrief(
       items.push({
         id: `deprecated:${health.ecosystem}`,
         tier: "hygiene",
-        title: `${health.deprecated.length} deprecated ${health.deprecated.length === 1 ? "package" : "packages"} (${health.ecosystem})`,
+        soWhat: `The people who made these packages have stopped maintaining them. Nothing breaks today; nothing gets fixed either.`,
+        title: `${health.deprecated.length} abandoned ${health.deprecated.length === 1 ? "package" : "packages"} (${health.ecosystem})`,
         evidence: health.deprecated
           .slice(0, 3)
           .map((d) => d.name)
@@ -143,8 +150,9 @@ export function buildSecurityBrief(
       items.push({
         id: `outdated:${health.ecosystem}`,
         tier: "hygiene",
+        soWhat: `Behind on updates. Not dangerous by itself, but the longer you leave it the harder the eventual upgrade.`,
         title: `${health.outdated.length} outdated ${health.outdated.length === 1 ? "package" : "packages"} (${health.ecosystem})`,
-        evidence: `Oldest is ${worst.name} at ${worst.ageMonths} months behind ${worst.latest}.`,
+        evidence: `The furthest behind is ${worst.name}, ${worst.ageMonths} months older than the current ${worst.latest}.`,
         href: `${base}/packages`,
       });
     }
@@ -186,7 +194,44 @@ export function buildSecurityBrief(
     {
       headline: "Nothing outstanding, and nothing went unchecked.",
       detail:
-        "Dependencies were read, dangerous-call rules ran, and no scanner was blocked. Refreshing the session re-runs all of them.",
+        "Your packages were checked against the public advisory databases, your code was scanned for keys and for lines that run commands, and nothing was blocked. Refresh the session to run it all again.",
     },
+    answerFor(tier("fix").length, tier("investigate").length, gaps),
   );
+}
+
+/** The answer, from the same counts the sections were built from. */
+function answerFor(
+  fix: number,
+  investigate: number,
+  gaps: { kind: string }[],
+): { answer: string; howToRead: string } {
+  if (fix + investigate === 0 && gaps.some((g) => g.kind === "blocking")) {
+    return {
+      // The one that matters most. Nothing was found AND nothing looked, and
+      // those must never read the same.
+      answer: "We could not answer this one.",
+      howToRead:
+        "Nothing was found — but the checks that would have found it never ran. What stopped them is at the bottom of the page.",
+    };
+  }
+  if (fix > 0) {
+    return {
+      answer: `${fix} thing${fix === 1 ? "" : "s"} here ${fix === 1 ? "has" : "have"} a known, published problem.`,
+      howToRead:
+        "Start at the top. Everything under \u201CFix first\u201D was matched against a public advisory or found literally in your code — it is not a guess. Each row links to the evidence.",
+    };
+  }
+  if (investigate > 0) {
+    return {
+      answer: "Nothing confirmed, but a few things are worth a look.",
+      howToRead:
+        "Nothing matched a known vulnerability. What is below is code we noticed but cannot judge for you — mostly lines that run text as code, which is fine until a user can influence the text.",
+    };
+  }
+  return {
+    answer: "Nothing outstanding.",
+    howToRead:
+      "Your packages were checked against the public advisory databases and your code was scanned for keys and risky calls.",
+  };
 }

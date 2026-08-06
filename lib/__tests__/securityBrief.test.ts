@@ -61,8 +61,14 @@ describe("what counts as 'fix first'", () => {
     } as unknown as AnalysisSnapshot;
     const b = buildSecurityBrief(snap, "s1");
     expect(tier(b, "fix")).toEqual([]);
+    const inv = tier(b, "investigate")[0];
     expect(tier(b, "investigate")).toHaveLength(1);
-    expect(tier(b, "investigate")[0].evidence).toContain("not a vulnerability");
+    // The line has to hold in BOTH sentences now. soWhat is the one a reader
+    // without the vocabulary actually reads, so it is the easier one to cross:
+    // "this line runs text as code" is true, "this is a vulnerability" is not.
+    expect(inv.evidence).toContain("not a finding");
+    expect(inv.soWhat).toMatch(/fine if|problem if/);
+    expect(inv.soWhat.toLowerCase()).not.toContain("vulnerab");
   });
 
   it("keeps an unproven code path out of it too", () => {
@@ -80,8 +86,10 @@ describe("what counts as 'fix first'", () => {
     expect(tier(b, "fix")).toEqual([]);
     const inv = tier(b, "investigate");
     expect(inv).toHaveLength(1);
-    expect(inv[0].title).toContain("2 dangerous calls");
-    expect(inv[0].evidence).toContain("not the same as unreachable");
+    expect(inv[0].title).toContain("2 risky lines");
+    expect(inv[0].evidence).toContain("not the same as saying nothing can get there");
+    // And it must not promise safety in the plain sentence either.
+    expect(inv[0].soWhat).toContain("could not work out");
   });
 
   it("promotes a sink only when a path was traced", () => {

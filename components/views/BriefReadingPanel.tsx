@@ -67,16 +67,20 @@ export function BriefReadingPanel({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-xl px-5 py-4"
+      className={`flex flex-col rounded-xl px-5 ${reading ? "gap-3 py-4" : "py-2.5"}`}
       style={{ border: `1px solid ${TOK.border}`, background: TOK.surface }}
     >
+      {/* One row until there is something to show. Before the reading exists
+          this was a 100px card explaining that the findings work without it —
+          a lot of space to spend on a disclaimer about an optional feature, on
+          a page whose whole complaint was that it was hard to take in. */}
       <div className="flex items-center justify-between gap-4">
         <span
           className="flex items-center gap-2 text-[11px] uppercase tracking-wider"
           style={{ color: TOK.textMuted }}
         >
           <Sparkles size={13} />
-          In plain English
+          {reading ? "In plain English" : "Want this as a paragraph?"}
         </span>
         {!readOnly && (
           <button
@@ -109,12 +113,7 @@ export function BriefReadingPanel({
             checked. Nothing here is computed by the model.
           </p>
         </div>
-      ) : (
-        <p className="text-xs" style={{ color: TOK.textMuted }}>
-          The findings below are complete on their own. This turns them into a
-          couple of sentences, using only what is already there.
-        </p>
-      )}
+      ) : null}
 
       {error && (
         <p className="text-xs" style={{ color: TOK.rose }}>
