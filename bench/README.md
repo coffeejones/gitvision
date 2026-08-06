@@ -554,3 +554,37 @@ distinct duplication.
 Not attempted here because it changes hash semantics, which `driftMetrics`
 fingerprints and `structuralDiff` both depend on — and merging by NAME alone
 would be wrong, since two unrelated `__init__` are not the same idiom.
+
+---
+
+# Test fixtures: the sessions the brief tests read
+
+```bash
+npx tsx bench/makeSessionFixtures.ts     # refresh after the graph changes shape
+```
+
+Five test files assert against **real captured analyses** — "agrees on a real
+session, not just a fixture", "every subject actually produces something on a
+real repo". They read `.gitvision/sessions/<id>.json`, which is gitignored, so
+CI had no data and 45 tests failed.
+
+The ten sessions they name are 80 MB live and **2.4 MB gzipped** — a code graph
+is mostly repeated key names and compresses about 20:1. They are committed
+under `lib/__tests__/fixtures/sessions/` and the helper prefers them, so CI runs
+all 93 assertions instead of skipping them.
+
+Two things were tried first and are worth not repeating:
+
+- **A hand-kept list of "fields the tests need"** saved 600 KB and immediately
+  broke eight assertions that reach snapshot fields through helpers rather than
+  directly. A field list rots every time someone adds a test.
+- **Excluding `o5QTmaYTwE`** (this repo) to avoid a self-referential fixture
+  made assertions FAIL rather than skip. At 80 KB it is included; a green suite
+  is worth more than that tidiness.
+
+**These freeze an analysis.** The engine changed eight times in the session that
+built them, so they will drift from what the analyser produces today and the
+tests will keep passing while measuring something historical. Re-run the script
+when the graph changes shape. `helpers/sessionFixture.ts` still falls back to a
+live session when no fixture exists, and resolves it through
+`git rev-parse --git-common-dir` so it works from a worktree.

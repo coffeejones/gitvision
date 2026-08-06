@@ -35,6 +35,11 @@ const REPOS = [
   ["DBtU3d_Gfk", "colinhacks/zod"],
 ] as const;
 
+// o5QTmaYTwE is this repo and ships no fixture — see helpers/sessionFixture.ts.
+// Drop what this machine cannot load instead of skipping the whole file: three
+// real repos of different shapes still answer the question these tests ask.
+const AVAILABLE = REPOS.filter(([id]) => hasSessions(id));
+
 describe("the registry is the only list of subjects", () => {
   it("names three, and each crosses more than one tab", () => {
     // A subject earns a slot by composing across surfaces. "Refactor" and
@@ -79,7 +84,7 @@ describe("the registry is the only list of subjects", () => {
 
 describe.skipIf(!HAVE)("every subject answers on a real repo", () => {
   it.each(
-    SUBJECT_IDS.flatMap((s) => REPOS.map(([id, name]) => [s, id, name] as const)),
+    SUBJECT_IDS.flatMap((s) => AVAILABLE.map(([id, name]) => [s, id, name] as const)),
   )("%s on %s", (subject, id) => {
     const brief = buildBrief(subject, session(id), "s1");
 
@@ -114,7 +119,7 @@ describe.skipIf(!HAVE)("every subject answers on a real repo", () => {
     // Guards against a composer that silently returns nothing everywhere —
     // which would render as a permanent "nothing found" and look intentional.
     for (const subject of SUBJECT_IDS) {
-      const any = REPOS.some(([id]) => items(buildBrief(subject, session(id), "s1")).length > 0);
+      const any = AVAILABLE.some(([id]) => items(buildBrief(subject, session(id), "s1")).length > 0);
       expect(any, `${subject} produced no items on any real repo`).toBe(true);
     }
   });

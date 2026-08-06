@@ -15,6 +15,12 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
+
+/** Committed, trimmed, gzipped snapshots — the same real analyses, ~300 KB for
+ *  all three, so CI runs the same assertions instead of skipping them.
+ *  Regenerate with `npx tsx bench/makeSessionFixtures.ts`. */
+const FIXTURE_DIR = path.join(__dirname, "..", "fixtures", "sessions");
 
 function sessionDirs(): string[] {
   const candidates: string[] = [path.join(process.cwd(), ".gitvision", "sessions")];
@@ -37,7 +43,12 @@ function sessionDirs(): string[] {
 
 const DIRS = sessionDirs();
 
-function findFile(id: string): string | null {
+function fixtureFile(id: string): string | null {
+  const f = path.join(FIXTURE_DIR, `${id}.json.gz`);
+  return fs.existsSync(f) ? f : null;
+}
+
+function liveFile(id: string): string | null {
   for (const d of DIRS) {
     const f = path.join(d, `${id}.json`);
     if (fs.existsSync(f)) return f;
@@ -48,17 +59,23 @@ function findFile(id: string): string | null {
 /** True when every id is on disk. Tests gate on this rather than failing, so a
  *  machine without the captured sessions reports "skipped", not "broken". */
 export function hasSessions(...ids: string[]): boolean {
-  return ids.every((id) => findFile(id) !== null);
+  return ids.every((id) => fixtureFile(id) !== null || liveFile(id) !== null);
 }
 
 /** The latest snapshot of a stored session. Throws with the reason rather than
  *  an ENOENT, so a failure says what to do about it. */
 export function loadSnapshot<T>(id: string): T {
-  const file = findFile(id);
+  // Fixture first: it is the same data, present everywhere, and does not
+  // depend on which checkout the suite happens to run from.
+  const fx = fixtureFile(id);
+  if (fx) return JSON.parse(zlib.gunzipSync(fs.readFileSync(fx)).toString("utf-8")) as T;
+
+  const file = liveFile(id);
   if (!file) {
     throw new Error(
-      `Session ${id} not found. Looked in: ${DIRS.join(", ") || "(no .gitvision/sessions anywhere)"}. ` +
-        "Analyse the matching repo in the app to capture it.",
+      `Session ${id} has no fixture in ${FIXTURE_DIR} and is not in ` +
+        `${DIRS.join(", ") || "(no .gitvision/sessions anywhere)"}. Analyse the ` +
+        "matching repo to capture it, then `npx tsx bench/makeSessionFixtures.ts`.",
     );
   }
   return JSON.parse(fs.readFileSync(file, "utf-8")).snapshots.at(-1) as T;
