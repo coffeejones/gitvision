@@ -7,7 +7,11 @@
 // security posture?" in 2 seconds without scrolling.
 //
 // Three states per card mirror the data layer:
-//   "clean"        — scanner ran, zero findings. Show "✓ Clean" pill.
+//   "clean"        — scanner ran, zero findings. Shows WHAT WAS CHECKED and
+//                    came back empty ("0 of 10 matched"), never "Clean".
+//                    A tick answers "am I safe?", which is not the question
+//                    any of these scanners asked; the count answers the one
+//                    they did ask, and carries its own denominator.
 //   "findings"     — scanner ran, findings present. Show count pill.
 //   "not scanned"  — pre-v0.81 snapshot or scan failed. Muted pill.
 
@@ -18,6 +22,10 @@ interface StatusCardProps {
   subtitle: string;
   state: "clean" | "findings" | "not-scanned";
   countLabel?: string;
+  /** What the scanner looked for and did not find, stated as a fact — "0 of 10
+   *  matched", "no matches in source or config". Required for `clean`: the
+   *  word alone is a verdict on the repo rather than a result from a check. */
+  cleanLabel?: string;
 }
 
 interface Props {
@@ -42,11 +50,11 @@ export function StatusGrid({ incidents, secrets, patterns, sinks }: Props) {
   );
 }
 
-function StatusCard({ title, subtitle, state, countLabel }: StatusCardProps) {
+function StatusCard({ title, subtitle, state, countLabel, cleanLabel }: StatusCardProps) {
   const palette = paletteFor(state);
   const pillText =
     state === "clean"
-      ? "Clean"
+      ? (cleanLabel ?? "No matches")
       : state === "findings"
         ? (countLabel ?? "Findings")
         : "Not scanned";
@@ -74,7 +82,7 @@ function StatusCard({ title, subtitle, state, countLabel }: StatusCardProps) {
             border: `1px solid ${palette.border}`,
           }}
         >
-          {state === "clean" ? "✓" : ""} {pillText}
+          {pillText}
         </span>
       </div>
       <p

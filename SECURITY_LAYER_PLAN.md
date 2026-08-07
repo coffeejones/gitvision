@@ -1582,3 +1582,57 @@ that read as a lie when placed together. Both are the class of thing that only
 appears when you look at the product the way a user does — the same way the
 `evidenceTier` ordering bug was found, and the reason it is worth doing before
 building further.
+
+## §5 — The completeness a green tick implies
+
+Raised by a reviewer on another session: *"A user who sees a security panel
+assumes completeness. Nobody reads the scope statement. This is the one place
+the zero-hallucination brand can be spent without a single hallucination — via
+implication rather than assertion."*
+
+The substance is right. One number in it was stale — recall is 0.623 in-scope
+and **0.320 over everything a reviewer would look for**, not the 0.115 from
+§4w, which predates the engine work in §4x. The direction of the argument
+survives the correction: we find under a third of what is there.
+
+### It was one word, and it was on a tile
+
+The scope was already stated — *"10 curated supply-chain attacks"* sat under
+every card. It was subordinate to an emerald **✓ Clean** pill. The tick is the
+message; the qualifier is the footnote. And a tick answers *"am I safe?"*,
+which is a question none of these four scanners asked.
+
+So the fix is not a longer disclaimer. It is to stop publishing a verdict:
+
+| | before | after |
+|---|---|---|
+| Incidents | ✓ Clean | **0 of 10 matched** |
+| Secrets | ✓ Clean | **no matches** |
+| Code paths | ✓ Clean | **none reachable** |
+| Patterns | ✓ Clean | **none found** |
+
+A count carries its own denominator. "0 of 10" cannot be read as "no
+supply-chain risk" the way a tick can.
+
+### And the gap is named where the reader is looking
+
+`ScopeLimits` sits **between the grid and the findings**, not in the paragraph
+above them, because an empty grid is exactly when a reader most needs to know
+what was never checked. It names them: access control and IDOR, rate limiting,
+user enumeration, file upload, session and cookie configuration, business
+logic — and states the measured ratio rather than hedging, since findings in
+those untouched classes outnumber the ones we report roughly two to one.
+
+A generic "not exhaustive" line is the thing everyone has learned to skip.
+
+### One thing the build taught
+
+The first attempt put the qualification *in* the pill —
+`no reachable calls in the rules we run` — which clipped to
+**"NO MATCHES IN SOURCE OR C…"** on the Secrets card. Caught by rendering it,
+not by review. A pill cannot carry a caveat; it can only avoid claiming one.
+
+**The surface stays.** 375 true findings on unseen code at 0.899 precision with
+262/262 traps clean is real value, and the findings it does make are
+reachability-proven and taint-traced. What had to go was the claim we were
+making by omission.
