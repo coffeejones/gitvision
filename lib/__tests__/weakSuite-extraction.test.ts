@@ -207,3 +207,58 @@ describe("Weak-Suite extraction — real-world idioms", () => {
     expect(m.get("ns assert")).toMatchObject({ assertions: 1, trivialAssertions: 0, hasMeaningfulOracle: true });
   });
 });
+
+// Assertions reached through a local helper. This is not a cosmetic count:
+// `hollow-tests-added` sits in the conscience gate's BLOCKING_KINDS, and the
+// agent prompt says to "remove the hollow assertion" and treat the gate as a
+// stop — so a false hollow verdict is an instruction to delete real coverage.
+// Measured on this repo: 24 cases scored as asserting nothing did assert,
+// every one of them through a helper.
+describe("weakSuite — assertions behind a helper", () => {
+  const meta = (src: string) => {
+    const file: SourceFile = { rel: "x.test.ts", ext: "ts", content: src };
+    return parseFile(javascriptPlugin, file, makeIndex([file])).testMeta;
+  };
+
+  it("counts a case that asserts only through a local helper", () => {
+    const m = meta(
+      'const expectStatus = (s, id, v) => expect(s[id]).toBe(v);\n' +
+        'it("checks a dimension", () => { expectStatus(s, "hygiene", "healthy"); });\n',
+    );
+    expect(m?.cases[0].assertions).toBe(1);
+    expect(m?.cases[0].hasMeaningfulOracle).toBe(true);
+  });
+
+  it("carries the helper's weakness through, rather than laundering it", () => {
+    // A helper whose only matcher is trivial does not become meaningful by
+    // being wrapped in a function.
+    const m = meta(
+      'const exists = (x) => expect(x).toBeDefined();\n' +
+        'it("smoke", () => { exists(thing); });\n',
+    );
+    expect(m?.cases[0].assertions).toBe(1);
+    expect(m?.cases[0].hasMeaningfulOracle).toBe(false);
+  });
+
+  it("still reports a case that genuinely asserts nothing", () => {
+    const m = meta('it("runs and hopes", () => { doTheThing(); });\n');
+    expect(m?.cases[0].assertions).toBe(0);
+    expect(m?.cases[0].hasMeaningfulOracle).toBe(false);
+  });
+
+  it("counts one assertion per helper CALL, not per assertion inside it", () => {
+    const m = meta(
+      'function checkBoth(a, b) { expect(a).toBe(1); expect(b).toBe(2); }\n' +
+        'it("one call", () => { checkBoth(x, y); });\n',
+    );
+    expect(m?.cases[0].assertions).toBe(1);
+  });
+
+  it("does not treat an ordinary function call as an assertion", () => {
+    const m = meta(
+      'const build = (n) => ({ id: n });\n' +
+        'it("no oracle", () => { const r = build(1); });\n',
+    );
+    expect(m?.cases[0].assertions).toBe(0);
+  });
+});

@@ -574,11 +574,85 @@ function stringLiteralText(node: TsNode): string {
   return "";
 }
 
+/** Named functions in this file whose body asserts.
+ *
+ *  Deliberately shallow: one level, same file, and a helper's character is
+ *  decided by the STRONGEST matcher it uses — a helper that ends in `toBe` is
+ *  a meaningful oracle even if it also touches `toBeDefined` on the way. It
+ *  does not follow imports; a shared helper in another module still reads as
+ *  no assertion, which is a known remaining gap rather than a solved one. */
+function collectAssertionHelpers(
+  root: TsNode
+): Map<string, { meaningful: boolean; matcher: string | null }> {
+  const out = new Map<string, { meaningful: boolean; matcher: string | null }>();
+
+  const characterise = (body: TsNode) => {
+    let meaningful = false;
+    let matcher: string | null = null;
+    const walk = (n: TsNode) => {
+      if (n.type === "call_expression") {
+        const fn = n.childForFieldName("function");
+        if (fn?.type === "member_expression") {
+          const obj = fn.childForFieldName("object");
+          if (obj && assertionKind(obj)) {
+            const m = matcherOf(n);
+            matcher ??= m;
+            if (m && !TRIVIAL_MATCHERS.has(m)) {
+              meaningful = true;
+              matcher = m;
+            }
+          }
+        }
+      }
+      for (const c of n.namedChildren) walk(c);
+    };
+    walk(body);
+    return { found: matcher !== null || meaningful, meaningful, matcher };
+  };
+
+  const visit = (node: TsNode) => {
+    let name: string | null = null;
+    let body: TsNode | null = null;
+    if (node.type === "function_declaration") {
+      name = node.childForFieldName("name")?.text ?? null;
+      body = node.childForFieldName("body");
+    } else if (node.type === "variable_declarator") {
+      const v = node.childForFieldName("value");
+      if (v && (v.type === "arrow_function" || v.type === "function_expression")) {
+        name = node.childForFieldName("name")?.text ?? null;
+        body = v.childForFieldName("body");
+      }
+    }
+    if (name && body) {
+      const c = characterise(body);
+      if (c.found) out.set(name, { meaningful: c.meaningful, matcher: c.matcher });
+    }
+    for (const child of node.namedChildren) visit(child);
+  };
+
+  visit(root);
+  return out;
+}
+
 /** Extract per-test-case assertion quality for one file. Self-contained walk
  *  over the already-parsed tree — it does NOT touch the main visit() pass.
  *  Returns undefined when no test cases are found (nothing to score). */
 function extractTestMeta(root: TsNode): TestFileMeta | undefined {
   const cases: TestCaseMeta[] = [];
+  // Assertions reached through a LOCAL HELPER.
+  //
+  //   const expectStatus = (s, id, status) =>
+  //     expect(findDimension(s, id).status).toBe(status);
+  //   it("...", () => { expectStatus(summaries, "hygiene", "healthy"); });
+  //
+  // Counting `expect` only where it appears lexically inside the case callback
+  // scored 16 of healthSummary.test.ts's 33 cases as asserting NOTHING — a file
+  // the mutation oracle confirms does catch breakage. That matters more than a
+  // wrong number: `hollow-tests-added` is in the conscience gate's
+  // BLOCKING_KINDS, and the agent prompt tells the model to "remove the hollow
+  // assertion" and treat the gate as a stop. A false hollow verdict is an
+  // instruction to delete working coverage.
+  const helpers = collectAssertionHelpers(root);
   const trivialNames = new Set<string>();
   // Inner `expect(x)` calls already attributed to an outer matcher, so a
   // chained assertion is counted exactly once (see the double-count gotcha).
@@ -652,6 +726,17 @@ function extractTestMeta(root: TsNode): TestFileMeta | undefined {
       const fn = node.childForFieldName("function");
       if (fn) {
         if (caseOpenerRoot(fn)) return;
+        // A call to a local helper that asserts. One assertion per call — not
+        // the helper's internal count, which would inflate a case that calls a
+        // three-assertion helper once.
+        if (fn.type === "identifier") {
+          const h = helpers.get(fn.text);
+          if (h) {
+            record(tc, h.matcher, !h.meaningful);
+            for (const child of node.namedChildren) scanBody(child, tc);
+            return;
+          }
+        }
         classifyAssertion(node, fn, tc);
       }
     }
