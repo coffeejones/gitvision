@@ -1636,3 +1636,80 @@ not by review. A pill cannot carry a caveat; it can only avoid claiming one.
 262/262 traps clean is real value, and the findings it does make are
 reachability-proven and taint-traced. What had to go was the claim we were
 making by omission.
+
+## §6 — The four remaining audit findings, measured
+
+An audit proposed six defects. Two were acted on (duplicate detection, the
+assertion counter). These are the other four, each re-measured here rather than
+taken on trust — the same audit was wrong about duplicates, where its
+recommendation would have taken NetBox from 1 group to 104,244 pairs.
+
+Probes are committed: `bench/hotspotProbe.ts`, `bench/layerProbe.ts`,
+`bench/suppressedProbe.ts`, `bench/determinismProbe.ts`.
+
+### 1. `untestedHotspots` — CONFIRMED, worse than claimed
+
+Of the top 10 on this repo, **9 cannot acquire a direct test caller at all**:
+
+```
+ 1. cx183  visit               lib/codeAnalysis/plugins/python.ts      nested closure
+ 2. cx 12  visit               lib/codeAnalysis/plugins/javascript.ts  nested closure
+ 3. cx126  matchSinkRule       lib/codeAnalysis/plugins/python.ts
+ 4. cx 93  visit               lib/codeAnalysis/plugins/php.ts         nested closure
+ 5. cx 90  ConstellationInner  components/views/Constellation.tsx      React component
+```
+
+Six are the parsers' own `visit` recursion — nothing can call them by name —
+and three are components that are rendered, never called. Sorting by complexity
+descending systematically selects for exactly those two shapes.
+
+And the top entry is not untested: the mutation oracle kills mutants in
+`python.ts`. "Untested" here means "no direct call edge from a test", but the
+tool is named `untestedHotspots` and `mcp/tools/untestedHotspots.ts` calls it
+"the most actionable test-debt signal: an agent can pick the top hotspot, write
+a test, repeat". Nine of ten cannot be acted on.
+
+### 2. Signal determinism — CONFIRMED, but not where the audit looked
+
+`computeLayers` (lib/graph.ts:1149) memoises through a cycle guard that returns
+0 for the edge closing a cycle. **Which** node receives that 0 depends on the
+order `paths` is walked, so on a graph with import cycles the depth is
+order-dependent. 200 orderings of one unchanged graph:
+
+| repo | files | deepest chain reported |
+|---|---:|---|
+| coffeejones/gitvision | 164 | 6, every time — acyclic |
+| pallets/flask | 105 | **14 (7×), 15 (43×), 16 (16×), 17 (87×), 18 (47×)** |
+
+The audit reported gitvision varying 7–12; it does not. Flask does, across five
+values. Severity happens not to flip on Flask because all five exceed the
+12-level threshold — a repo sitting nearer the cut would change bucket between
+identical runs.
+
+### 3. Verdict contradicting health — CONFIRMED
+
+`dungngminh/simutil`: verdict **cleared, grade A, score 100**, while
+`extractHealthSignals` returns a high-severity `ci-supply-chain-exposed` on the
+same snapshot. Not general — gitvision (C-) and Flask (F) are consistent. The
+verdict's four lenses simply do not include what produced that signal.
+
+### 4. Reachability suppression — PARTIALLY, and the example has aged out
+
+11 findings hidden as `unreachable` across Zulip, NetBox and Saleor, not 12.
+The one the audit named — `zulip zerver/views/registration.py:1508` — is not
+among them: it now *surfaces*, as one of the two new production findings the
+§4z resolver work introduced.
+
+What is real: **5 of NetBox's 9 are framework-invoked methods** —
+`render()`, `render_message()`, `render_widget()`, `__new__()`. Django calls
+these; no repo code does. That is the `unreachable`-should-be-`unknown` defect
+logged in §4v, now with named instances. Hiding them states "nothing calls it",
+which is false.
+
+### Where this leaves the four
+
+Two are about a tool telling an agent to do unactionable work (1) or hiding
+real findings (4) — the same harm class as the hollow-test gate already fixed.
+Two are about a number that is either unstable (2) or contradicted elsewhere in
+the same product (3). None was taken on trust, and one of the four had already
+been overtaken by other work.
