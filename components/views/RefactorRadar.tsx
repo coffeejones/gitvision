@@ -124,12 +124,14 @@ function EvidenceChips({ f }: { f: FileSafety }) {
 function FileRow({
   f,
   open,
+  focused,
   onToggle,
   sessionId,
   entitled,
 }: {
   f: FileSafety;
   open: boolean;
+  focused: boolean;
   onToggle: () => void;
   sessionId: string;
   entitled: boolean;
@@ -137,7 +139,15 @@ function FileRow({
   const meta = TIER_META[f.tier];
   const highTier = f.tier === "load-bearing" || f.tier === "handle-with-care";
   return (
-    <div style={{ borderBottom: `1px solid ${TOK.border}` }}>
+    <div
+      id={focused ? "selected-file" : undefined}
+      style={{
+        borderBottom: `1px solid ${TOK.border}`,
+        outline: focused ? `1px solid ${TOK.borderStrong}` : undefined,
+        outlineOffset: focused ? -1 : undefined,
+        scrollMarginTop: 128,
+      }}
+    >
       <button
         type="button"
         onClick={onToggle}
@@ -222,7 +232,10 @@ function FileRow({
                   </span>
                 ))}
                 {f.untestedDependents > f.untestedDependentSample.length && (
-                  <span className="text-[11px]" style={{ color: TOK.textMuted }}>
+                  <span
+                    className="text-[11px]"
+                    style={{ color: TOK.textMuted }}
+                  >
                     + {f.untestedDependents - f.untestedDependentSample.length}{" "}
                     more
                   </span>
@@ -244,7 +257,10 @@ function FileRow({
                 <Link
                   href={`/login?next=${encodeURIComponent(`/session/${sessionId}/refactor`)}`}
                   className="inline-flex items-center gap-1.5 text-[12px] self-start rounded px-2 py-1 transition hover:opacity-80"
-                  style={{ background: TOK.surfaceElevated, color: TOK.textSecondary }}
+                  style={{
+                    background: TOK.surfaceElevated,
+                    color: TOK.textSecondary,
+                  }}
                 >
                   <Lock size={11} /> See which tests guard this change —{" "}
                   <span style={{ color: TOK.accent }}>free, sign in</span>
@@ -269,14 +285,17 @@ function FileRow({
                       </span>
                     </div>
                   ))}
-                  <span className="text-[10px]" style={{ color: TOK.textMuted }}>
+                  <span
+                    className="text-[10px]"
+                    style={{ color: TOK.textMuted }}
+                  >
                     Static import/call mapping — not a coverage measurement.
                   </span>
                 </div>
               ) : (
                 <span className="text-[12px]" style={{ color: TOK.textMuted }}>
-                  No test file reaches the affected code — there&apos;s nothing to run
-                  first.
+                  No test file reaches the affected code — there&apos;s nothing
+                  to run first.
                 </span>
               )}
             </div>
@@ -308,21 +327,29 @@ export function RefactorRadar({
   report,
   sessionId,
   entitled,
+  initialFile,
 }: {
   report: RefactorSafetyReport;
   sessionId: string;
   /** Whether the viewer's plan unlocks the Test Prioritizer (Plus). */
   entitled: boolean;
+  /** Deep-linked evidence from a guided brief. Opens and marks the owning row. */
+  initialFile?: string;
 }) {
+  const selectedFile = report.files.find((file) => file.file === initialFile);
   // Load-bearing + handle-with-care open by default (the files that matter);
   // moderate + safe collapse to a count so the index leads with risk.
-  const [openTiers, setOpenTiers] = useState<Record<SafetyTier, boolean>>({
-    "load-bearing": true,
-    "handle-with-care": true,
-    moderate: false,
-    safe: false,
-  });
-  const [openFile, setOpenFile] = useState<string | null>(null);
+  const [openTiers, setOpenTiers] = useState<Record<SafetyTier, boolean>>(
+    () => ({
+      "load-bearing": true,
+      "handle-with-care": true,
+      moderate: selectedFile?.tier === "moderate",
+      safe: selectedFile?.tier === "safe",
+    }),
+  );
+  const [openFile, setOpenFile] = useState<string | null>(
+    selectedFile?.file ?? null,
+  );
 
   const byTier = (t: SafetyTier) => report.files.filter((f) => f.tier === t);
 
@@ -337,7 +364,10 @@ export function RefactorRadar({
             <span
               key={t}
               className="inline-flex items-center gap-1.5 text-[12px] px-2 py-1 rounded-md"
-              style={{ background: TOK.surface, border: `1px solid ${TOK.border}` }}
+              style={{
+                background: TOK.surface,
+                border: `1px solid ${TOK.border}`,
+              }}
             >
               <span
                 className="h-2 w-2 rounded-full"
@@ -361,7 +391,10 @@ export function RefactorRadar({
           <div
             key={t}
             className="rounded-xl overflow-hidden"
-            style={{ background: TOK.surface, border: `1px solid ${TOK.border}` }}
+            style={{
+              background: TOK.surface,
+              border: `1px solid ${TOK.border}`,
+            }}
           >
             <button
               type="button"
@@ -404,6 +437,7 @@ export function RefactorRadar({
                     key={f.file}
                     f={f}
                     open={openFile === f.file}
+                    focused={selectedFile?.file === f.file}
                     onToggle={() =>
                       setOpenFile((cur) => (cur === f.file ? null : f.file))
                     }

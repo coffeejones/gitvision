@@ -1,0 +1,58 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+}
+
+.stepWrap,
+.step {
+  display: inline-flex;
+  align-items: center;
+}
+
+.stepWrap {
+  gap: 7px;
+}
+
+.step {
+  gap: 6px;
+  text-decoration: none;
+}
+
+.marker {
+  width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid;
+  border-radius: 999px;
+  font-family: var(--font-ct-mono), ui-monospace, monospace;
+  font-size: 8px;
+}
+
+.label {
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.connector {
+  width: 17px;
+  height: 1px;
+}
+
+@media (max-width: 520px) {
+  .root,
+  .stepWrap {
+    gap: 5px;
+  }
+
+  .connector {
+    width: 9px;
+  }
+
+  .label {
+    font-size: 8.5px;
+  }
+}

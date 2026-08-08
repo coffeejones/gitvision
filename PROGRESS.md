@@ -8,6 +8,58 @@
 
 ## Recent work (2026-07, on `feat/codetrawl-landing`)
 
+### Implemented 2026-08-07: workspace-first guided goals
+
+The existing Overview remains the default post-analysis experience. Guided
+goals are an optional decision layer entered explicitly from “Choose a goal”,
+not a panel competing with the workspace's normal reading flow.
+
+- `/session/[id]/brief` presents four real goals after the reader chooses the
+  guided path: security and dependencies, architecture orientation, improvement
+  priorities, and safe change planning. Overview does not compose or render the
+  goal launcher.
+- The chooser is a native workspace page rather than a framed dashboard embed:
+  its header follows the same open hierarchy as Refactor, recommendation
+  evidence sits on a restrained horizontal rail, and the four directions render
+  as numbered 2×2 cards with both their purpose and snapshot-specific answer.
+- The launcher no longer has a fallback recommendation. A compact evidence
+  block appears only when a brief item explicitly crosses an attention rule;
+  otherwise all four goals stay equal and the UI says that no issue outranks the
+  reader's intent. Literal secrets and exact public-advisory matches are
+  actionable; incident ranges and traced sinks are labelled for human review.
+  Refactor evidence qualifies only for the highest-ranked untested file when it
+  has at least 10 dependents and at least half of them are also untested.
+- Every surfaced recommendation states what CodeTrawl found, the exact rule that
+  made it appear, and a bounded next step. It links both to the owning evidence
+  surface and to the focused answer, while the four goal cards retain identical
+  size, treatment and workspace access.
+- `/session/[id]/brief` is the reusable goal chooser. The first three goals use
+  the existing deterministic brief composers; change planning opens Faultline,
+  where a concrete file can be selected before impact analysis begins.
+- Brief evidence links carry their guided origin in the URL. Workspace pages
+  show a compact context strip with “Back to answer” and “Exit guided mode”, so
+  users can investigate evidence without losing the question they started from.
+- Guided answers now show an explicit Answer → Evidence → Workspace progression.
+  The former four-button goal switcher was removed as duplicate navigation; a
+  single next-step action opens the highest-ranked claim in its owning surface.
+  Continuing into the workspace removes only guided context and preserves the
+  evidence deep-link.
+- Improvement briefs now deep-link depended-upon untested files into Refactor
+  (not the unrelated Test-quality page). The requested row opens, highlights and
+  scrolls into view; the guided context stays sticky above it on desktop.
+- The persistent sidebar and command palette now link to “Choose a goal”. All
+  existing workspace pages remain directly accessible throughout the flow.
+- The session toolbar now collapses labels below the small breakpoint, removing
+  its horizontal mobile overflow without hiding any action.
+- The workspace reveal controller no longer adds `.in` classes directly to
+  streamed route nodes. That imperative mutation raced Next.js hydration during
+  client navigation back to Overview. Reveal motion now uses cancellable Web
+  Animations, which changes presentation without changing React-owned HTML
+  attributes; unsupported/reduced-motion browsers simply keep panels visible.
+
+Verified with strict TypeScript, 2,686 Vitest tests, the Next.js production
+build, and browser click-throughs for recommended, neutral and evidence states.
+
 ### Shipped 2026-08-03: product-led evidence-first landing
 
 The public `/` landing was rebuilt around the product's strongest differentiator:

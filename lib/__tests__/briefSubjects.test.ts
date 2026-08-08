@@ -11,11 +11,20 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import type { AnalysisSnapshot } from "../types";
-import { buildBrief, SUBJECTS, SUBJECT_IDS, isSubjectId, type Brief } from "../brief";
+import {
+  buildBrief,
+  SUBJECTS,
+  SUBJECT_IDS,
+  isSubjectId,
+  type Brief,
+} from "../brief";
 
 const session = (id: string): AnalysisSnapshot =>
   JSON.parse(
-    readFileSync(path.join(process.cwd(), ".gitvision", "sessions", `${id}.json`), "utf-8"),
+    readFileSync(
+      path.join(process.cwd(), ".gitvision", "sessions", `${id}.json`),
+      "utf-8",
+    ),
   ).snapshots.at(-1);
 
 const items = (b: Brief) => b.sections.flatMap((s) => s.items);
@@ -36,8 +45,25 @@ describe("the registry is the only list of subjects", () => {
     // entry pointing at a menu entry, which is the problem this solves.
     expect(SUBJECT_IDS).toEqual(["security", "understand", "improve"]);
     for (const id of SUBJECT_IDS) {
-      expect(SUBJECTS[id].question.endsWith("?"), `${id} is not phrased as a question`).toBe(true);
-      expect(SUBJECTS[id].blurb.length, `${id} has no blurb`).toBeGreaterThan(20);
+      expect(
+        SUBJECTS[id].question.endsWith("?"),
+        `${id} is not phrased as a question`,
+      ).toBe(true);
+      expect(
+        SUBJECTS[id].title.length,
+        `${id} has no goal title`,
+      ).toBeGreaterThan(20);
+      expect(
+        SUBJECTS[id].category.length,
+        `${id} has no category`,
+      ).toBeGreaterThan(5);
+      expect(SUBJECTS[id].blurb.length, `${id} has no blurb`).toBeGreaterThan(
+        20,
+      );
+      expect(
+        SUBJECTS[id].footnote.length,
+        `${id} has no footnote`,
+      ).toBeGreaterThan(5);
     }
   });
 
@@ -45,7 +71,9 @@ describe("the registry is the only list of subjects", () => {
     expect(isSubjectId("security")).toBe(true);
     expect(isSubjectId("refactor")).toBe(false);
     expect(isSubjectId("")).toBe(false);
-    expect(isSubjectId("__proto__"), "prototype keys are not subjects").toBe(false);
+    expect(isSubjectId("__proto__"), "prototype keys are not subjects").toBe(
+      false,
+    );
   });
 
   it("is reachable from the UI — the sidebar and the palette both point at it", () => {
@@ -59,21 +87,27 @@ describe("the registry is the only list of subjects", () => {
       path.join(process.cwd(), "components", "CommandPalette.tsx"),
       "utf-8",
     );
-    expect(shell).toContain("/brief/");
-    expect(palette).toContain("/brief/");
+    expect(shell).toContain("/brief");
+    expect(palette).toContain("/brief");
     // And neither may hardcode a subject's question as its label — that is what
     // made one subject look like the whole feature.
-    for (const [name, src] of [["SessionShell", shell], ["CommandPalette", palette]] as const) {
-      expect(src, `${name} labels the entry with one subject's question`).not.toContain(
-        SUBJECTS.security.question,
-      );
+    for (const [name, src] of [
+      ["SessionShell", shell],
+      ["CommandPalette", palette],
+    ] as const) {
+      expect(
+        src,
+        `${name} labels the entry with one subject's question`,
+      ).not.toContain(SUBJECTS.security.question);
     }
   });
 });
 
 describe("every subject answers on a real repo", () => {
   it.each(
-    SUBJECT_IDS.flatMap((s) => REPOS.map(([id, name]) => [s, id, name] as const)),
+    SUBJECT_IDS.flatMap((s) =>
+      REPOS.map(([id, name]) => [s, id, name] as const),
+    ),
   )("%s on %s", (subject, id) => {
     const brief = buildBrief(subject, session(id), "s1");
 
@@ -84,31 +118,45 @@ describe("every subject answers on a real repo", () => {
     // A section that survived assemble() has items; empty ones are dropped, so
     // the page never renders a heading over nothing.
     for (const s of brief.sections) {
-      expect(s.items.length, `${subject}/${id}: empty section ${s.id} survived`).toBeGreaterThan(0);
-      expect(s.note.length, `${subject}/${id}: section ${s.id} has no note`).toBeGreaterThan(15);
+      expect(
+        s.items.length,
+        `${subject}/${id}: empty section ${s.id} survived`,
+      ).toBeGreaterThan(0);
+      expect(
+        s.note.length,
+        `${subject}/${id}: section ${s.id} has no note`,
+      ).toBeGreaterThan(15);
     }
 
     for (const item of items(brief)) {
-      expect(item.title.length, `${subject}/${id}/${item.id}`).toBeGreaterThan(3);
-      expect(item.evidence, `${subject}/${id}/${item.id} left a placeholder`).not.toMatch(
-        /undefined|NaN|\[object/,
+      expect(item.title.length, `${subject}/${id}/${item.id}`).toBeGreaterThan(
+        3,
       );
-      expect(item.href, `${subject}/${id}/${item.id} has nowhere to verify it`).toMatch(
-        /^\/session\/s1\//,
-      );
+      expect(
+        item.evidence,
+        `${subject}/${id}/${item.id} left a placeholder`,
+      ).not.toMatch(/undefined|NaN|\[object/);
+      expect(
+        item.href,
+        `${subject}/${id}/${item.id} has nowhere to verify it`,
+      ).toMatch(/^\/session\/s1\//);
     }
 
     // Ids must be unique — a collision makes React drop an item silently, and
     // it happened for real on file+line keys.
     const ids = items(brief).map((i) => i.id);
-    expect(new Set(ids).size, `${subject}/${id} has duplicate ids`).toBe(ids.length);
+    expect(new Set(ids).size, `${subject}/${id} has duplicate ids`).toBe(
+      ids.length,
+    );
   });
 
   it("produces something on every subject for at least one repo", () => {
     // Guards against a composer that silently returns nothing everywhere —
     // which would render as a permanent "nothing found" and look intentional.
     for (const subject of SUBJECT_IDS) {
-      const any = REPOS.some(([id]) => items(buildBrief(subject, session(id), "s1")).length > 0);
+      const any = REPOS.some(
+        ([id]) => items(buildBrief(subject, session(id), "s1")).length > 0,
+      );
       expect(any, `${subject} produced no items on any real repo`).toBe(true);
     }
   });
@@ -128,8 +176,12 @@ describe("clean is earned, on every subject", () => {
     // "Nothing found" means something different for each question, and a shared
     // sentence would be wrong for two of the three.
     const empty = {} as unknown as AnalysisSnapshot;
-    const lines = SUBJECT_IDS.map((s) => buildBrief(s, empty, "s1").emptyHeadline);
-    expect(new Set(lines).size, "two subjects share an empty state").toBe(lines.length);
+    const lines = SUBJECT_IDS.map(
+      (s) => buildBrief(s, empty, "s1").emptyHeadline,
+    );
+    expect(new Set(lines).size, "two subjects share an empty state").toBe(
+      lines.length,
+    );
   });
 
   it("survives a snapshot with nothing on it", () => {

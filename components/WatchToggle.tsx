@@ -77,14 +77,15 @@ export function WatchToggle({ sessionId }: { sessionId: string }) {
           ? "Watching — re-sweeps daily and alerts you if the grade regresses. Click to stop."
           : "Watch — get alerted when this repo's grade regresses"
       }
-      className="h-8 px-3 rounded-md text-xs transition flex items-center gap-1.5 hover:bg-white/5 disabled:opacity-40"
+      className="h-8 px-2 sm:px-3 rounded-md text-xs transition flex items-center gap-1.5 hover:bg-white/5 disabled:opacity-40"
+      aria-label={active ? "Stop watching repository" : "Watch repository"}
       style={{
         color: active ? TOK.accent : TOK.textSecondary,
         border: `1px solid ${active ? TOK.accent : "rgba(255,255,255,0.1)"}`,
       }}
     >
       <Icon size={13} className={busy ? "animate-spin" : ""} />
-      <span>{active ? "Watching" : "Watch"}</span>
+      <span className="hidden sm:inline">{active ? "Watching" : "Watch"}</span>
     </button>
   );
 }

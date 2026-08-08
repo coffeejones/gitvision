@@ -45,13 +45,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Boxes,
+  Compass,
   Code as CodeIcon,
   FileCode,
   FileText,
   Gauge,
   GitPullRequest,
   Hash,
-  HelpCircle,
   Home,
   ListChecks,
   Network,
@@ -106,28 +106,130 @@ export function CommandPalette({ sessionId, index, open, onClose }: Props) {
     const base = `/session/${sessionId}`;
     const pages: PaletteItem[] = [
       // Health
-      { id: "p:brief", group: "pages", label: "Choose a subject", icon: <HelpCircle size={13} />, href: `${base}/brief/security` },
-      { id: "p:overview", group: "pages", label: "Overview", icon: <Home size={13} />, href: base },
-      { id: "p:insights", group: "pages", label: "Insights", icon: <Sparkles size={13} />, href: `${base}/insights` },
-      { id: "p:signals", group: "pages", label: "Signals", icon: <ListChecks size={13} />, href: `${base}/signals` },
+      {
+        id: "p:brief",
+        group: "pages",
+        label: "Choose a goal",
+        icon: <Compass size={13} />,
+        href: `${base}/brief`,
+      },
+      {
+        id: "p:overview",
+        group: "pages",
+        label: "Overview",
+        icon: <Home size={13} />,
+        href: base,
+      },
+      {
+        id: "p:insights",
+        group: "pages",
+        label: "Insights",
+        icon: <Sparkles size={13} />,
+        href: `${base}/insights`,
+      },
+      {
+        id: "p:signals",
+        group: "pages",
+        label: "Signals",
+        icon: <ListChecks size={13} />,
+        href: `${base}/signals`,
+      },
       // Security
-      { id: "p:security", group: "pages", label: "Security", icon: <Shield size={13} />, href: `${base}/security` },
+      {
+        id: "p:security",
+        group: "pages",
+        label: "Security",
+        icon: <Shield size={13} />,
+        href: `${base}/security`,
+      },
       // Forensics
-      { id: "p:flows", group: "pages", label: "Flows", icon: <Route size={13} />, href: `${base}/flows` },
-      { id: "p:refactor", group: "pages", label: "Refactor", icon: <ShieldAlert size={13} />, href: `${base}/refactor` },
-      { id: "p:faultline", group: "pages", label: "Faultline", icon: <Zap size={13} />, href: `${base}/faultline` },
-      { id: "p:testquality", group: "pages", label: "Test quality", icon: <FlaskConical size={13} />, href: `${base}/testquality` },
-      { id: "p:architecture", group: "pages", label: "Architecture", icon: <Boxes size={13} />, href: `${base}/architecture` },
-      { id: "p:canvas", group: "pages", label: "Canvas", icon: <Network size={13} />, href: `${base}/canvas` },
-      { id: "p:code", group: "pages", label: "Code", icon: <CodeIcon size={13} />, href: `${base}/code` },
-      { id: "p:source", group: "pages", label: "Source", icon: <FileText size={13} />, href: `${base}/source` },
-      { id: "p:imports", group: "pages", label: "Imports", icon: <FileCode size={13} />, href: `${base}/imports` },
+      {
+        id: "p:flows",
+        group: "pages",
+        label: "Flows",
+        icon: <Route size={13} />,
+        href: `${base}/flows`,
+      },
+      {
+        id: "p:refactor",
+        group: "pages",
+        label: "Refactor",
+        icon: <ShieldAlert size={13} />,
+        href: `${base}/refactor`,
+      },
+      {
+        id: "p:faultline",
+        group: "pages",
+        label: "Faultline",
+        icon: <Zap size={13} />,
+        href: `${base}/faultline`,
+      },
+      {
+        id: "p:testquality",
+        group: "pages",
+        label: "Test quality",
+        icon: <FlaskConical size={13} />,
+        href: `${base}/testquality`,
+      },
+      {
+        id: "p:architecture",
+        group: "pages",
+        label: "Architecture",
+        icon: <Boxes size={13} />,
+        href: `${base}/architecture`,
+      },
+      {
+        id: "p:canvas",
+        group: "pages",
+        label: "Canvas",
+        icon: <Network size={13} />,
+        href: `${base}/canvas`,
+      },
+      {
+        id: "p:code",
+        group: "pages",
+        label: "Code",
+        icon: <CodeIcon size={13} />,
+        href: `${base}/code`,
+      },
+      {
+        id: "p:source",
+        group: "pages",
+        label: "Source",
+        icon: <FileText size={13} />,
+        href: `${base}/source`,
+      },
+      {
+        id: "p:imports",
+        group: "pages",
+        label: "Imports",
+        icon: <FileCode size={13} />,
+        href: `${base}/imports`,
+      },
       // Supply
-      { id: "p:packages", group: "pages", label: "Packages", icon: <Package size={13} />, href: `${base}/packages` },
-      { id: "p:prs", group: "pages", label: "PRs", icon: <GitPullRequest size={13} />, href: `${base}/prs` },
+      {
+        id: "p:packages",
+        group: "pages",
+        label: "Packages",
+        icon: <Package size={13} />,
+        href: `${base}/packages`,
+      },
+      {
+        id: "p:prs",
+        group: "pages",
+        label: "PRs",
+        icon: <GitPullRequest size={13} />,
+        href: `${base}/prs`,
+      },
       // Final grade — climax page; lives outside the departments
       // grouping but is still a navigable workspace destination.
-      { id: "p:verdict", group: "pages", label: "Final grade", icon: <Gauge size={13} />, href: `${base}/verdict` },
+      {
+        id: "p:verdict",
+        group: "pages",
+        label: "Final grade",
+        icon: <Gauge size={13} />,
+        href: `${base}/verdict`,
+      },
     ];
 
     if (!index) return pages;
@@ -145,7 +247,9 @@ export function CommandPalette({ sessionId, index, open, onClose }: Props) {
     }));
 
     const functions: PaletteItem[] = index.functions.map((fn) => {
-      const display = fn.containerType ? `${fn.containerType}.${fn.name}` : fn.name;
+      const display = fn.containerType
+        ? `${fn.containerType}.${fn.name}`
+        : fn.name;
       const params = new URLSearchParams({ file: fn.filePath, fn: fn.name });
       if (fn.containerType) params.set("container", fn.containerType);
       return {
@@ -323,7 +427,7 @@ const GROUP_LABELS: Record<PaletteItem["group"], string> = {
 function renderGrouped(
   items: PaletteItem[],
   highlight: number,
-  activate: (item: PaletteItem) => void
+  activate: (item: PaletteItem) => void,
 ) {
   // Walk the filtered list once, emitting a group heading whenever
   // the group changes. Index across the flat list drives the highlight,
@@ -339,7 +443,7 @@ function renderGrouped(
           style={{ color: TOK.textMuted }}
         >
           {GROUP_LABELS[item.group]}
-        </div>
+        </div>,
       );
       lastGroup = item.group;
     }
@@ -349,7 +453,7 @@ function renderGrouped(
         item={item}
         active={idx === highlight}
         onClick={() => activate(item)}
-      />
+      />,
     );
   });
   return blocks;
@@ -379,9 +483,7 @@ function PaletteRow({
         color: TOK.textPrimary,
       }}
     >
-      <span
-        style={{ color: active ? TOK.accent : TOK.textMuted }}
-      >
+      <span style={{ color: active ? TOK.accent : TOK.textMuted }}>
         {item.icon}
       </span>
       <div className="flex-1 min-w-0">

@@ -16,13 +16,20 @@
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  Compass,
+  LayoutDashboard,
+  ShieldCheck,
+} from "lucide-react";
 
 import { getSessionCached } from "@/lib/sessionCache";
 import { TOK } from "@/lib/sessionTheme";
 import { OrientationStrip } from "@/components/views/OrientationStrip";
-import { buildBrief, SUBJECTS, SUBJECT_IDS, isSubjectId } from "@/lib/brief";
+import { buildBrief, SUBJECTS, isSubjectId } from "@/lib/brief";
+import { withBriefContext } from "@/lib/brief/goals";
 import { BriefReadingPanel } from "@/components/views/BriefReadingPanel";
+import { GuidedProgress } from "@/components/views/GuidedProgress";
 import { isDemoSession } from "@/lib/demoSessions";
 
 export const dynamic = "force-dynamic";
@@ -50,9 +57,57 @@ export default async function BriefRoute({
 
   const base = `/session/${id}`;
   const brief = buildBrief(subject, current, id);
+  const nextItem = brief.sections[0]?.items[0] ?? null;
 
   return (
     <main className="px-8 pt-12 pb-16 flex flex-col gap-10 max-w-5xl mx-auto w-full">
+      {/* Guided mode is a context inside the workspace, never a replacement
+          for it. The persistent sidebar stays visible; these two exits make
+          the relationship explicit for readers who entered through a goal. */}
+      <div
+        className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 rounded-lg px-4 py-3"
+        style={{ border: `1px solid ${TOK.border}`, background: TOK.surface }}
+      >
+        <span className="flex items-center gap-3 min-w-0">
+          <Compass size={15} style={{ color: TOK.accent, flexShrink: 0 }} />
+          <span className="flex flex-col gap-0.5 min-w-0">
+            <span
+              className="text-xs font-medium"
+              style={{ color: TOK.textPrimary }}
+            >
+              Guided analysis
+            </span>
+            <span
+              className="text-[10px] truncate"
+              style={{ color: TOK.textMuted }}
+            >
+              {SUBJECTS[subject].title} · focused answer
+            </span>
+          </span>
+        </span>
+        <GuidedProgress current={1} />
+        <span className="flex items-center gap-2 flex-wrap shrink-0">
+          <Link
+            href={`${base}/brief`}
+            className="rounded-md px-2.5 py-1.5 text-[11px] transition"
+            style={{
+              color: TOK.textSecondary,
+              border: `1px solid ${TOK.border}`,
+            }}
+          >
+            Change goal
+          </Link>
+          <Link
+            href={base}
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] transition"
+            style={{ color: TOK.textMuted }}
+          >
+            <LayoutDashboard size={12} />
+            Exit guided mode
+          </Link>
+        </span>
+      </div>
+
       {/* THE ANSWER IS THE HEADING. It used to be the question, with an intro
           about which of OUR tabs the data came from — so the first screen said
           nothing at all about the reader's repo and they had to scroll and
@@ -63,31 +118,44 @@ export default async function BriefRoute({
         line={brief.howToRead}
       />
 
-      {/* The chooser. Every question is one click away, and the current one is
-          marked rather than hidden — a reader has to be able to see that the
-          other two exist, or this is just a security page with a long name. */}
-      {/* A grid, not flex-wrap: three equal columns rather than two on one row
-          and a narrower third below. And no blurb — the chosen question is
-          already the label above, so repeating it here was noise. */}
-      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-        {SUBJECT_IDS.map((sid) => {
-          const active = sid === subject;
-          return (
-            <Link
-              key={sid}
-              href={`${base}/brief/${sid}`}
-              className="rounded-lg px-3 py-2 text-[12px] text-center transition"
-              style={{
-                border: `1px solid ${active ? TOK.accent : TOK.border}`,
-                background: active ? TOK.surfaceElevated : "transparent",
-                color: active ? TOK.textPrimary : TOK.textSecondary,
-              }}
+      {nextItem && (
+        <div
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl px-5 py-4"
+          style={{ border: `1px solid ${TOK.border}`, background: TOK.surface }}
+        >
+          <span className="flex flex-col gap-1 min-w-0">
+            <span
+              className="text-[9px] uppercase tracking-[0.13em]"
+              style={{ color: TOK.textMuted }}
             >
-              {SUBJECTS[sid].question}
-            </Link>
-          );
-        })}
-      </div>
+              Next · inspect the evidence
+            </span>
+            <strong
+              className="text-sm font-medium"
+              style={{ color: TOK.textPrimary }}
+            >
+              Open the highest-ranked finding in its owning workspace view.
+            </strong>
+            <span
+              className="text-[11px] font-mono truncate"
+              style={{ color: TOK.textMuted }}
+            >
+              {nextItem.title}
+            </span>
+          </span>
+          <Link
+            href={withBriefContext(nextItem.href, subject)}
+            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-[11px] shrink-0 transition"
+            style={{
+              border: `1px solid ${TOK.borderStrong}`,
+              color: TOK.textPrimary,
+              background: TOK.surfaceElevated,
+            }}
+          >
+            Inspect evidence <ArrowRight size={13} aria-hidden="true" />
+          </Link>
+        </div>
+      )}
 
       {/* Above the findings, never instead of them. Everything it says is
           visible underneath in evidenced form — that arrangement is the only
@@ -109,7 +177,10 @@ export default async function BriefRoute({
         >
           <ShieldCheck size={18} style={{ color: TOK.accent, flexShrink: 0 }} />
           <div className="flex flex-col gap-1">
-            <p className="text-sm font-semibold" style={{ color: TOK.textPrimary }}>
+            <p
+              className="text-sm font-semibold"
+              style={{ color: TOK.textPrimary }}
+            >
               {brief.emptyHeadline}
             </p>
             <p className="text-xs" style={{ color: TOK.textMuted }}>
@@ -132,9 +203,15 @@ export default async function BriefRoute({
         return (
           <section key={section.id} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-semibold" style={{ color: TOK.textPrimary }}>
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: TOK.textPrimary }}
+              >
                 {section.label}
-                <span className="ml-2 text-sm font-normal" style={{ color: TOK.textMuted }}>
+                <span
+                  className="ml-2 text-sm font-normal"
+                  style={{ color: TOK.textMuted }}
+                >
                   {items.length}
                 </span>
               </h2>
@@ -151,9 +228,12 @@ export default async function BriefRoute({
               {items.map((item) => (
                 <li key={item.id}>
                   <Link
-                    href={item.href}
+                    href={withBriefContext(item.href, subject)}
                     className="flex items-start justify-between gap-4 rounded-xl px-5 py-4 transition"
-                    style={{ border: `1px solid ${TOK.border}`, background: TOK.surface }}
+                    style={{
+                      border: `1px solid ${TOK.border}`,
+                      background: TOK.surface,
+                    }}
                   >
                     {/* Consequence, then subject, then measurement. Someone
                         who does not have the vocabulary reads line one and
@@ -161,21 +241,40 @@ export default async function BriefRoute({
                         talked down to. */}
                     <span className="flex flex-col gap-1.5">
                       {!shared && (
-                        <span className="text-sm font-medium" style={{ color: TOK.textPrimary }}>
+                        <span
+                          className="text-sm font-medium"
+                          style={{ color: TOK.textPrimary }}
+                        >
                           {item.soWhat}
                         </span>
                       )}
                       <span
-                        className={shared ? "text-sm font-medium font-mono" : "text-xs font-mono"}
-                        style={{ color: shared ? TOK.textPrimary : TOK.textSecondary }}
+                        className={
+                          shared
+                            ? "text-sm font-medium font-mono"
+                            : "text-xs font-mono"
+                        }
+                        style={{
+                          color: shared ? TOK.textPrimary : TOK.textSecondary,
+                        }}
                       >
                         {item.title}
                       </span>
-                      <span className="text-xs leading-relaxed" style={{ color: TOK.textMuted }}>
+                      <span
+                        className="text-xs leading-relaxed"
+                        style={{ color: TOK.textMuted }}
+                      >
                         {item.evidence}
                       </span>
                     </span>
-                    <ArrowRight size={15} style={{ color: TOK.textMuted, flexShrink: 0, marginTop: 2 }} />
+                    <ArrowRight
+                      size={15}
+                      style={{
+                        color: TOK.textMuted,
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
                   </Link>
                 </li>
               ))}
@@ -189,9 +288,15 @@ export default async function BriefRoute({
       {brief.gaps.length > 0 && (
         <section className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold" style={{ color: TOK.textPrimary }}>
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: TOK.textPrimary }}
+            >
               What CodeTrawl could not check
-              <span className="ml-2 text-sm font-normal" style={{ color: TOK.textMuted }}>
+              <span
+                className="ml-2 text-sm font-normal"
+                style={{ color: TOK.textMuted }}
+              >
                 {brief.gaps.length}
               </span>
             </h2>
@@ -210,11 +315,17 @@ export default async function BriefRoute({
                   background: TOK.surface,
                 }}
               >
-                <span className="text-sm font-medium" style={{ color: TOK.textPrimary }}>
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: TOK.textPrimary }}
+                >
                   {gap.headline}
                 </span>
                 {gap.detail && (
-                  <span className="text-xs leading-relaxed" style={{ color: TOK.textSecondary }}>
+                  <span
+                    className="text-xs leading-relaxed"
+                    style={{ color: TOK.textSecondary }}
+                  >
                     {gap.detail}
                   </span>
                 )}

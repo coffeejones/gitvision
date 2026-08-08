@@ -19,10 +19,13 @@ export const dynamic = "force-dynamic";
 
 export default async function RefactorPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ file?: string }>;
 }) {
   const { id } = await params;
+  const requestedFile = (await searchParams).file;
   const session = await getSessionCached(id);
   if (!session) notFound();
   const current = session.snapshots[session.snapshots.length - 1];
@@ -53,7 +56,11 @@ export default async function RefactorPage({
         </span>
         <h1
           className="text-2xl sm:text-3xl font-semibold tracking-tight"
-          style={{ color: TOK.textPrimary, letterSpacing: "-0.02em", lineHeight: 1.1 }}
+          style={{
+            color: TOK.textPrimary,
+            letterSpacing: "-0.02em",
+            lineHeight: 1.1,
+          }}
         >
           Can I touch this?
         </h1>
@@ -75,9 +82,11 @@ export default async function RefactorPage({
 
       {report && report.files.length > 0 ? (
         <RefactorRadar
+          key={requestedFile ?? "refactor-index"}
           report={report}
           sessionId={session.id}
           entitled={entitled}
+          initialFile={requestedFile}
         />
       ) : (
         <EmptyPanel
@@ -85,9 +94,10 @@ export default async function RefactorPage({
           title="No code graph to analyze yet"
           body={
             <>
-              The refactor-safety tiers are built from the code graph (functions,
-              call edges, complexity). Tiny repos, single-file projects, or
-              snapshots created before code analysis shipped will land here.
+              The refactor-safety tiers are built from the code graph
+              (functions, call edges, complexity). Tiny repos, single-file
+              projects, or snapshots created before code analysis shipped will
+              land here.
             </>
           }
           hint={

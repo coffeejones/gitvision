@@ -43,7 +43,6 @@ import { getAuthSession } from "@/lib/authSession";
 import { canAccess } from "@/lib/billing/gates";
 import { isDemoSession } from "@/lib/demoSessions";
 import {
-  ArrowRight,
   Boxes,
   Code as CodeIcon,
   ExternalLink,
@@ -54,7 +53,6 @@ import {
   Package,
   Sparkles,
 } from "lucide-react";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { getSessionCached, getDriftReport } from "@/lib/sessionCache";
 import { markSeen } from "@/lib/seen";
@@ -104,7 +102,7 @@ export default async function OverviewPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { id } = await params;
-  const sp = await searchParams as Record<string, string | undefined>;
+  const sp = (await searchParams) as Record<string, string | undefined>;
 
   // v0.37 ?tab= back-compat. Stale shared URLs redirect to their new
   // route + carry forward the v0.37 deep-link sub-params.
@@ -133,22 +131,21 @@ export default async function OverviewPage({
   // for these — they're pure functions over the snapshot.
   const codeGraph = current.codeGraph;
   const duplicateGroups = codeGraph ? findDuplicateGroups(codeGraph) : [];
-  const coverage = codeGraph
-    ? computeTestCoverage(codeGraph)
-    : null;
+  const coverage = codeGraph ? computeTestCoverage(codeGraph) : null;
   const fileGraph = current.fileGraph;
   const hotspotCount = current.hotspots?.length ?? 0;
   const prCount = current.pullRequests?.length ?? 0;
   // Top language by bytes — `languages` is { [name: string]: bytes }.
   const topLanguage =
-    Object.entries(current.languages ?? {})
-      .sort(([, a], [, b]) => b - a)[0]?.[0] ?? null;
+    Object.entries(current.languages ?? {}).sort(
+      ([, a], [, b]) => b - a,
+    )[0]?.[0] ?? null;
   const healths =
     current.dependencyHealths ??
     (current.dependencyHealth ? [current.dependencyHealth] : []);
   const packageCount = healths.reduce(
     (s, h) => s + (h.uniquePackages ?? h.total),
-    0
+    0,
   );
   // Count runtime-scope issues only, matching the Security/Supply verdict
   // (dev/test/docs deps don't drive the ruling) — so the Overview's package
@@ -156,12 +153,12 @@ export default async function OverviewPage({
   const isRuntimeDep = (d: { scope?: string }) => d.scope !== "dev";
   const packageVulnerable = healths.reduce(
     (s, h) => s + h.vulnerable.filter(isRuntimeDep).length,
-    0
+    0,
   );
   const packageOutdated = healths.reduce(
     (s, h) =>
       s + h.outdated.filter((d) => isRuntimeDep(d) && d.ageMonths >= 12).length,
-    0
+    0,
   );
   const packageIssues = packageVulnerable + packageOutdated;
 
@@ -256,7 +253,9 @@ export default async function OverviewPage({
   // and when nothing drifted beyond the noise floor.
   const driftReport = await getDriftReport(id);
   const showDrift =
-    hasStructuralDiff && driftReport.hasBaseline && driftReport.trends.length > 0;
+    hasStructuralDiff &&
+    driftReport.hasBaseline &&
+    driftReport.trends.length > 0;
 
   // Advance the viewer's Chambers "seen" baseline: opening this detail
   // page means they've now seen the latest verdict, so the case stops
@@ -366,10 +365,7 @@ export default async function OverviewPage({
 
         {/* Since last visit — only when there's a diff */}
         {diff && (
-          <SinceLastVisit
-            diff={diff}
-            repoFullName={current.repo.fullName}
-          />
+          <SinceLastVisit diff={diff} repoFullName={current.repo.fullName} />
         )}
 
         {/* Drift (Arc 3) — the most zoomed-out temporal read: multi-sweep
@@ -421,10 +417,7 @@ export default async function OverviewPage({
          *  "where the interesting work is" before clicking in. */}
         <section className="flex flex-col gap-3" data-rv>
           <div className="flex items-baseline gap-2">
-            <span
-              className={STYLE.eyebrow}
-              style={{ color: TOK.textMuted }}
-            >
+            <span className={STYLE.eyebrow} style={{ color: TOK.textMuted }}>
               Workspace
             </span>
             <span className="text-xs" style={{ color: TOK.textMuted }}>
@@ -463,12 +456,15 @@ export default async function OverviewPage({
                   ? formatCodeStat(
                       codeGraph.functions.length,
                       duplicateGroups.length,
-                      coverage
+                      coverage,
                     )
                   : "Refresh to populate"
               }
               description="Blast radius · untested hotspots · structural duplicates"
-              accent={duplicateGroups.length > 0 || !!(coverage && coverage.totals.testFiles > 0)}
+              accent={
+                duplicateGroups.length > 0 ||
+                !!(coverage && coverage.totals.testFiles > 0)
+              }
             />
             <QuickLookCard
               href={`${base}/architecture`}
@@ -492,7 +488,9 @@ export default async function OverviewPage({
               stat={
                 packageCount > 0
                   ? `${packageCount.toLocaleString()} packages${
-                      packageVulnerable > 0 ? ` · ${packageVulnerable} vulnerable` : ""
+                      packageVulnerable > 0
+                        ? ` · ${packageVulnerable} vulnerable`
+                        : ""
                     }${packageOutdated > 0 ? ` · ${packageOutdated} outdated` : ""}`
                   : "No manifests detected"
               }
@@ -530,7 +528,10 @@ export default async function OverviewPage({
          *  with the hero, not deep tools that deserve their own tab. */}
         <section className="grid lg:grid-cols-3 gap-4 items-start" data-rv>
           <div className="lg:col-span-2 flex flex-col gap-4">
-            <HotspotTreemap hotspots={current.hotspots} sessionId={session.id} />
+            <HotspotTreemap
+              hotspots={current.hotspots}
+              sessionId={session.id}
+            />
             <CommitActivity snap={current} />
           </div>
           <div className="flex flex-col gap-4">
@@ -553,8 +554,7 @@ export default async function OverviewPage({
           <div className="flex items-center gap-4">
             {current.rateLimitInfo && (
               <span className="font-mono tabular-nums">
-                Rate limit{" "}
-                {current.rateLimitInfo.remaining.toLocaleString()}/
+                Rate limit {current.rateLimitInfo.remaining.toLocaleString()}/
                 {current.rateLimitInfo.limit.toLocaleString()}
               </span>
             )}
@@ -572,15 +572,28 @@ export default async function OverviewPage({
 function formatCodeStat(
   fnCount: number,
   duplicateCount: number,
-  coverage: { totals: { prodFunctions: number; testedProdFunctions: number; testFiles: number } } | null
+  coverage: {
+    totals: {
+      prodFunctions: number;
+      testedProdFunctions: number;
+      testFiles: number;
+    };
+  } | null,
 ): string {
   const parts: string[] = [`${fnCount.toLocaleString()} fns`];
   if (duplicateCount > 0) {
-    parts.push(`${duplicateCount} duplicate group${duplicateCount === 1 ? "" : "s"}`);
+    parts.push(
+      `${duplicateCount} duplicate group${duplicateCount === 1 ? "" : "s"}`,
+    );
   }
-  if (coverage && coverage.totals.testFiles > 0 && coverage.totals.prodFunctions > 0) {
+  if (
+    coverage &&
+    coverage.totals.testFiles > 0 &&
+    coverage.totals.prodFunctions > 0
+  ) {
     const pct = Math.round(
-      (coverage.totals.testedProdFunctions / coverage.totals.prodFunctions) * 100
+      (coverage.totals.testedProdFunctions / coverage.totals.prodFunctions) *
+        100,
     );
     parts.push(`${pct}% covered`);
   }

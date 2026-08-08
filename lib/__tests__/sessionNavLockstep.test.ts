@@ -34,7 +34,9 @@ const read = (...p: string[]) => readFileSync(path.join(ROOT, ...p), "utf-8");
 function routeSlugsWithPages(): string[] {
   return readdirSync(ROUTES_DIR, { withFileTypes: true })
     .filter((e) => e.isDirectory())
-    .filter((d) => readdirSync(path.join(ROUTES_DIR, d.name)).includes("page.tsx"))
+    .filter((d) =>
+      readdirSync(path.join(ROUTES_DIR, d.name)).includes("page.tsx"),
+    )
     .map((d) => d.name)
     .sort();
 }
@@ -52,10 +54,15 @@ function paletteSlugs(): string[] {
 function sidebarSlugs(): string[] {
   const src = read("components", "SessionShell.tsx");
   const start = src.indexOf("const departments: Department[] = [");
-  expect(start, "the sidebar's departments array moved or was renamed").toBeGreaterThan(-1);
+  expect(
+    start,
+    "the sidebar's departments array moved or was renamed",
+  ).toBeGreaterThan(-1);
   const block = src.slice(start, src.indexOf("\n  ];", start));
 
-  const slugs = [...block.matchAll(/href: `\$\{base\}\/([a-z]+)`/g)].map((m) => m[1]);
+  const slugs = [...block.matchAll(/href: `\$\{base\}\/([a-z]+)`/g)].map(
+    (m) => m[1],
+  );
   if (/href: base,/.test(block)) slugs.push("overview");
 
   // Nested destinations live OUTSIDE the departments array — the brief sits
@@ -63,12 +70,17 @@ function sidebarSlugs(): string[] {
   // separately and on their FIRST segment, which is the palette's key too.
   // Without this the test would pass while a nav entry was unreachable by
   // Cmd+K, which is the exact drift it exists to catch.
-  for (const m of src.matchAll(/href=\{`\$\{base\}\/([a-z]+)\/[a-z]+`\}/g)) {
+  for (const m of src.matchAll(
+    /href=\{`\$\{base\}\/([a-z]+)(?:\/[a-z]+)?`\}/g,
+  )) {
     slugs.push(m[1]);
   }
 
   const pin = src.match(/const href = `\$\{base\}\/([a-z]+)`/);
-  expect(pin, "the Final grade pin's href moved — it would silently drop out").not.toBeNull();
+  expect(
+    pin,
+    "the Final grade pin's href moved — it would silently drop out",
+  ).not.toBeNull();
   slugs.push(pin![1]);
 
   return slugs.sort();
@@ -105,8 +117,14 @@ describe("the sidebar and the palette stay in lockstep", () => {
     const nested = readdirSync(ROUTES_DIR, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .filter((d) =>
-        readdirSync(path.join(ROUTES_DIR, d.name), { withFileTypes: true }).some(
-          (c) => c.isDirectory() && readdirSync(path.join(ROUTES_DIR, d.name, c.name)).includes("page.tsx"),
+        readdirSync(path.join(ROUTES_DIR, d.name), {
+          withFileTypes: true,
+        }).some(
+          (c) =>
+            c.isDirectory() &&
+            readdirSync(path.join(ROUTES_DIR, d.name, c.name)).includes(
+              "page.tsx",
+            ),
         ),
       )
       .map((d) => d.name);
@@ -121,7 +139,9 @@ describe("the sidebar and the palette stay in lockstep", () => {
   it("would have caught the drift it was written for", () => {
     // The guard is only worth its runtime if it fails on the state that
     // prompted it: the palette as it shipped, without Faultline or Source.
-    const shipped = paletteSlugs().filter((s) => s !== "faultline" && s !== "source");
+    const shipped = paletteSlugs().filter(
+      (s) => s !== "faultline" && s !== "source",
+    );
     const missing = sidebarSlugs().filter((s) => !shipped.includes(s));
     expect(missing).toEqual(["faultline", "source"]);
   });
