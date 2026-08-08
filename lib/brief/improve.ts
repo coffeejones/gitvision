@@ -12,11 +12,28 @@
 
 import type { AnalysisSnapshot } from "../types";
 import { computeRefactorSafety } from "../refactorSafety";
-import { findDuplicateGroups, summarizeDuplicates } from "../codeAnalysis/duplicates";
+import {
+  findDuplicateGroups,
+  summarizeDuplicates,
+} from "../codeAnalysis/duplicates";
 import { buildCoverageReport } from "../coverage";
 import { assemble, type Brief, type BriefItem } from "./types";
 
 const MAX_PER_SECTION = 5;
+export const RECOMMENDATION_DEPENDENT_MIN = 10;
+export const RECOMMENDATION_UNTESTED_SHARE = 0.5;
+
+export function qualifiesForImproveRecommendation(
+  file: { dependents: number; untestedDependents: number },
+  rank: number,
+): boolean {
+  return (
+    rank === 0 &&
+    file.dependents >= RECOMMENDATION_DEPENDENT_MIN &&
+    file.untestedDependents >=
+      Math.ceil(file.dependents * RECOMMENDATION_UNTESTED_SHARE)
+  );
+}
 
 export function buildImproveBrief(
   snap: AnalysisSnapshot,
@@ -36,9 +53,14 @@ export function buildImproveBrief(
     // is ordinary; together it is a silent break waiting for a Tuesday.
     const exposed = safety.files
       .filter((f) => !f.tested && f.dependents > 0)
-      .sort((a, b) => b.untestedDependents - a.untestedDependents || b.dependents - a.dependents)
+      .sort(
+        (a, b) =>
+          b.untestedDependents - a.untestedDependents ||
+          b.dependents - a.dependents,
+      )
       .slice(0, MAX_PER_SECTION);
     for (const [i, f] of exposed.entries()) {
+      const earnsRecommendation = qualifiesForImproveRecommendation(f, i);
       risky.push({
         id: `exposed:${i}:${f.file}`,
         // Conditional, because it is conditional: a change only breaks things
@@ -46,7 +68,15 @@ export function buildImproveBrief(
         soWhat: `Change this and ${f.dependents} other file${f.dependents === 1 ? "" : "s"} could break with nothing to catch it.`,
         title: f.file,
         evidence: `No test file imports or calls it, and ${f.dependents} file${f.dependents === 1 ? "" : "s"} depend on it${f.untestedDependents > 0 ? ` — ${f.untestedDependents} of those have no tests either` : ""}.`,
-        href: `${base}/testquality`,
+        href: `${base}/refactor?file=${encodeURIComponent(f.file)}#selected-file`,
+        recommendation: earnsRecommendation
+          ? {
+              kind: "review",
+              why: `${f.dependents} files depend on it and ${f.untestedDependents} of those have no mapped test. It is the highest-ranked file that also crosses the ${RECOMMENDATION_DEPENDENT_MIN}-dependent and ${Math.round(RECOMMENDATION_UNTESTED_SHARE * 100)}% untested threshold.`,
+              suggestedAction:
+                "Inspect its dependents and mapped tests before editing it; add a focused test first if the path you plan to change is not protected.",
+            }
+          : undefined,
         term: "untested-hotspot",
       });
     }
@@ -140,13 +170,21 @@ function answerFor(
     };
   }
   const parts: string[] = [];
-  if (risky > 0) parts.push(`${risky} file${risky === 1 ? " is" : "s are"} depended on with no test to catch a break`);
-  if (duplicated > 0) parts.push(`${duplicated} piece${duplicated === 1 ? "" : "s"} of code exist${duplicated === 1 ? "s" : ""} in more than one place`);
-  if (weak > 0) parts.push("some tests would pass even if the code were broken");
+  if (risky > 0)
+    parts.push(
+      `${risky} file${risky === 1 ? " is" : "s are"} depended on with no test to catch a break`,
+    );
+  if (duplicated > 0)
+    parts.push(
+      `${duplicated} piece${duplicated === 1 ? "" : "s"} of code exist${duplicated === 1 ? "s" : ""} in more than one place`,
+    );
+  if (weak > 0)
+    parts.push("some tests would pass even if the code were broken");
   if (parts.length === 0) {
     return {
       answer: "Nothing here is urgent.",
-      howToRead: "No untested file has anything depending on it, and nothing is duplicated.",
+      howToRead:
+        "No untested file has anything depending on it, and nothing is duplicated.",
     };
   }
   return {

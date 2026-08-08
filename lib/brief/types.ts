@@ -16,16 +16,27 @@ import type { CoverageGap } from "../coverage";
 
 export const SUBJECTS = {
   security: {
+    title: "Review security and dependencies",
+    category: "Security + supply",
     question: "Is this safe to depend on?",
     blurb: "Secrets, advisories, dangerous calls and supply-chain incidents.",
+    footnote: "Packages · code paths · secrets",
   },
   understand: {
+    title: "Understand how it fits together",
+    category: "Flows + architecture",
     question: "Where do I start?",
-    blurb: "Entry points, the files everything leans on, and the biggest pieces.",
+    blurb:
+      "Entry points, the files everything leans on, and the biggest pieces.",
+    footnote: "Ways in · central files · dense code",
   },
   improve: {
+    title: "Find what is worth improving",
+    category: "Tests + refactor",
     question: "What is worth cleaning up?",
-    blurb: "Untested load-bearing code, duplication, and tests that assert little.",
+    blurb:
+      "Untested load-bearing code, duplication, and tests that assert little.",
+    footnote: "Risk before style",
   },
 } as const;
 
@@ -69,6 +80,20 @@ export interface BriefItem {
   /** Deep link to the surface that owns it. A brief that cannot be audited is
    *  a summary, and summaries are what this replaces. */
   href: string;
+  /** Why this single item is strong enough to be surfaced before the reader
+   *  chooses a goal. Most brief items deliberately omit this: being true and
+   *  useful inside a report does not automatically earn the right to steer
+   *  the workspace entry point. */
+  recommendation?: {
+    /** `action` is reserved for a literal or externally corroborated problem.
+     *  `review` means the analysis proved where to look, but a person still
+     *  has to decide whether a change is warranted. */
+    kind: "action" | "review";
+    /** The exact deterministic rule this item crossed. */
+    why: string;
+    /** A bounded next move that does not overstate what the analysis proved. */
+    suggestedAction: string;
+  };
   /** Glossary key for the term this item turns on, so it can be explained in
    *  place rather than in a page nobody opens. lib/glossary.ts already carries
    *  23 of them and TermInfo already renders them on seven surfaces. */

@@ -33,6 +33,18 @@ type BriefTier = "fix" | "investigate" | "hygiene";
 
 type TieredItem = BriefItem & { tier: BriefTier };
 
+function withoutTier(item: TieredItem): BriefItem {
+  return {
+    id: item.id,
+    soWhat: item.soWhat,
+    title: item.title,
+    evidence: item.evidence,
+    href: item.href,
+    recommendation: item.recommendation,
+    term: item.term,
+  };
+}
+
 export function buildSecurityBrief(
   snap: AnalysisSnapshot,
   sessionId: string,
@@ -55,6 +67,12 @@ export function buildSecurityBrief(
       title: `${f.patternLabel} in ${f.filePath}`,
       evidence: `Line ${f.line}, matched as ${f.preview}. Deleting the line is not enough — it stays in git history, so the key has to be replaced at the service that issued it.`,
       href: `${base}/security`,
+      recommendation: {
+        kind: "action",
+        why: `This crosses the action rule because a literal credential pattern was matched in ${f.filePath} on line ${f.line}; it is not inferred from code structure.`,
+        suggestedAction:
+          "Revoke or replace the credential at its issuer, remove it from the code, and inspect git history before treating the exposure as closed.",
+      },
     });
   }
 
@@ -67,6 +85,12 @@ export function buildSecurityBrief(
         title: `${v.name} ${v.current}`,
         evidence: `${v.cves.length} published security ${v.cves.length === 1 ? "advisory" : "advisories"} for this exact version: ${v.cves.join(", ")}. From ${health.ecosystem}${v.scope ? `, ${v.scope} dependency` : ""}.`,
         href: `${base}/packages`,
+        recommendation: {
+          kind: "action",
+          why: `This crosses the action rule because the installed ${v.name} ${v.current} matched ${v.cves.length} named public ${v.cves.length === 1 ? "advisory" : "advisories"}. An exact advisory match is externally corroborated, not a heuristic pattern.`,
+          suggestedAction:
+            "Review the advisory and update to a version outside the affected range, then rerun the analysis to verify the match is gone.",
+        },
       });
     }
   }
@@ -79,6 +103,12 @@ export function buildSecurityBrief(
       title: `Possible match — ${m.incident.name}`,
       evidence: `${m.matchedPackages.join(", ")} match versions from that incident. Check the linked advisory before assuming the worst — a version match is not proof.`,
       href: `${base}/security`,
+      recommendation: {
+        kind: "review",
+        why: `This earns review because the installed version matched the curated range for ${m.incident.name}; a range match narrows the investigation but is not proof of compromise.`,
+        suggestedAction:
+          "Verify the package version and provenance against the incident advisory before deciding whether it must be replaced or upgraded.",
+      },
     });
   }
 
@@ -95,6 +125,12 @@ export function buildSecurityBrief(
         ? `Traced from ${s.path.entry.name}${s.path.hops.length > 1 ? ` through ${s.path.hops.length - 1} more` : ""} to line ${s.line}. Reachable from an entry point — not proof it runs on every request.`
         : `Line ${s.line}, reachable from an entry point.`,
       href: `${base}/security`,
+      recommendation: {
+        kind: "review",
+        why: `This earns review because the parser traced a path from ${s.path?.entry.name ?? "an entry point"} to this command or code-execution line; reachability is proven, exploitability is not.`,
+        suggestedAction:
+          "Inspect whether external input can control the argument, then add a guard and a regression test before changing the code.",
+      },
     });
   }
 
@@ -165,7 +201,8 @@ export function buildSecurityBrief(
     (g) => g.surface === "security" || g.surface === "packages" || g.surface === "session",
   );
 
-  const tier = (t: BriefTier) => items.filter((i) => i.tier === t).map(({ tier: _t, ...rest }) => rest);
+  const tier = (t: BriefTier) =>
+    items.filter((item) => item.tier === t).map(withoutTier);
 
   return assemble(
     "security",

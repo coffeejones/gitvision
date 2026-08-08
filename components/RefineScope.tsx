@@ -127,14 +127,17 @@ export function RefineScope({
         type="button"
         onClick={() => setOpen((v) => !v)}
         title="Refine scope — exclude folders (tests, generated, vendored) and re-sweep"
-        className="h-8 px-3 rounded-md text-xs transition flex items-center gap-1.5 hover:bg-white/5"
+        className="h-8 px-2 sm:px-3 rounded-md text-xs transition flex items-center gap-1.5 hover:bg-white/5"
+        aria-label={activeCount ? `Refine scope (${activeCount} exclusions)` : "Refine scope"}
         style={{
           color: activeCount ? TOK.accent : TOK.textSecondary,
           border: `1px solid ${activeCount ? TOK.accent : "rgba(255,255,255,0.1)"}`,
         }}
       >
         <SlidersHorizontal size={13} />
-        <span>{activeCount ? `Scope (${activeCount})` : "Scope"}</span>
+        <span className="hidden sm:inline">
+          {activeCount ? `Scope (${activeCount})` : "Scope"}
+        </span>
       </button>
 
       {open && (

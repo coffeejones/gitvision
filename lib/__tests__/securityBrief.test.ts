@@ -50,6 +50,16 @@ describe.skipIf(!HAVE)("what counts as 'fix first'", () => {
     expect(fix.length).toBeGreaterThan(0);
     // The evidence must carry the corroborator, not a paraphrase of it.
     expect(fix.some((i) => /GHSA-|CVE-/.test(i.evidence))).toBe(true);
+    const vulnerablePackage = fix.find((item) => item.id.startsWith("vuln:"));
+    expect(vulnerablePackage?.recommendation).toMatchObject({
+      kind: "action",
+    });
+    expect(vulnerablePackage?.recommendation?.why).toContain(
+      "crosses the action rule",
+    );
+    expect(vulnerablePackage?.recommendation?.suggestedAction).toContain(
+      "update",
+    );
     for (const item of fix) {
       expect(item.href, "a fix item with nowhere to verify it").toContain("/session/s1/");
     }
@@ -75,6 +85,7 @@ describe.skipIf(!HAVE)("what counts as 'fix first'", () => {
     expect(inv.evidence).toContain("not a finding");
     expect(inv.soWhat).toMatch(/fine if|problem if/);
     expect(inv.soWhat.toLowerCase()).not.toContain("vulnerab");
+    expect(inv.recommendation).toBeUndefined();
   });
 
   it("keeps an unproven code path out of it too", () => {
@@ -117,6 +128,11 @@ describe.skipIf(!HAVE)("what counts as 'fix first'", () => {
     expect(fix[0].evidence).toContain("handle_request");
     // And it must not overclaim: reachable is not "runs every time".
     expect(fix[0].evidence).toContain("not proof it runs");
+    expect(fix[0].recommendation).toMatchObject({ kind: "review" });
+    expect(fix[0].recommendation?.why).toContain(
+      "reachability is proven, exploitability is not",
+    );
+    expect(fix[0].recommendation?.suggestedAction).toContain("external input");
   });
 });
 

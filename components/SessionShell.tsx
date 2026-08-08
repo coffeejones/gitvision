@@ -21,18 +21,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
+  ArrowLeft,
   AlertCircle,
   Boxes,
   ChevronDown,
+  Compass,
   Code as CodeIcon,
   FileCode,
   FileText,
   Fingerprint,
   Gauge,
   GitPullRequest,
-  HelpCircle,
   Home,
   ListChecks,
   Menu,
@@ -61,6 +62,8 @@ import { STYLE, TOK } from "@/lib/sessionTheme";
 import { CH_FOCUS } from "@/components/chambers/theme";
 import { CommandPalette } from "./CommandPalette";
 import { WorkspaceMotion } from "./views/WorkspaceMotion";
+import { GuidedProgress } from "./views/GuidedProgress";
+import { isSubjectId, SUBJECTS } from "@/lib/brief/types";
 
 interface Props {
   sessionId: string;
@@ -117,7 +120,32 @@ export function SessionShell({
   children,
 }: Props) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const base = `/session/${sessionId}`;
+
+  // A brief's evidence links carry their origin in the URL, so the owning
+  // workspace page can offer a real return path without storing hidden client
+  // state. The change goal uses Faultline directly because it needs a target;
+  // it carries `goal=change` through the same context strip.
+  const briefSubjectParam = searchParams.get("subject");
+  const briefSubject =
+    searchParams.get("from") === "brief" &&
+    briefSubjectParam !== null &&
+    isSubjectId(briefSubjectParam)
+      ? briefSubjectParam
+      : null;
+  const changeGoal = searchParams.get("goal") === "change";
+  const guidedTitle = briefSubject
+    ? SUBJECTS[briefSubject].title
+    : changeGoal
+      ? "Plan a change safely"
+      : null;
+  const continueParams = new URLSearchParams(searchParams.toString());
+  continueParams.delete("from");
+  continueParams.delete("subject");
+  continueParams.delete("goal");
+  const continueQuery = continueParams.toString();
+  const continueHref = `${pathname}${continueQuery ? `?${continueQuery}` : ""}`;
 
   // v0.47 Cmd+K palette state lives here so the sidebar's "Search…"
   // trigger can open it without poking at internal CommandPalette
@@ -217,11 +245,11 @@ export function SessionShell({
     (snapshot.dependencyHealth ? [snapshot.dependencyHealth] : []);
   const packageCount = healths.reduce(
     (s, h) => s + (h.uniquePackages ?? h.total),
-    0
+    0,
   );
   const packageIssues = healths.reduce(
     (s, h) => s + h.vulnerable.length + h.deprecated.length,
-    0
+    0,
   );
 
   // v0.81+: red-dot indicator on the Security tab when any scanner
@@ -339,8 +367,7 @@ export function SessionShell({
           label: "Architecture",
           href: `${base}/architecture`,
           icon: <Boxes size={14} />,
-          count:
-            hasCodeGraph && classCount > 0 ? classCount : undefined,
+          count: hasCodeGraph && classCount > 0 ? classCount : undefined,
           hint: hasCodeGraph ? undefined : "refresh",
         },
         {
@@ -482,16 +509,20 @@ export function SessionShell({
           The three subjects live on the brief itself, so this entry does not
           have to know them. */}
       <Link
-        href={`${base}/brief/security`}
+        href={`${base}/brief`}
         className="flex items-center gap-2 rounded-lg px-2.5 py-2 mb-2 text-[13px] transition"
         style={{
           border: `1px solid ${pathname.startsWith(`${base}/brief`) ? TOK.accent : TOK.border}`,
-          background: pathname.startsWith(`${base}/brief`) ? TOK.surfaceElevated : "transparent",
-          color: pathname.startsWith(`${base}/brief`) ? TOK.textPrimary : TOK.textSecondary,
+          background: pathname.startsWith(`${base}/brief`)
+            ? TOK.surfaceElevated
+            : "transparent",
+          color: pathname.startsWith(`${base}/brief`)
+            ? TOK.textPrimary
+            : TOK.textSecondary,
         }}
       >
-        <HelpCircle size={14} />
-        <span>Choose a subject</span>
+        <Compass size={14} />
+        <span>Choose a goal</span>
       </Link>
 
       <nav className="flex flex-col gap-1">
@@ -502,8 +533,7 @@ export function SessionShell({
           const isActive = (item: NavItem) =>
             item.href === base
               ? pathname === base
-              : pathname === item.href ||
-                pathname.startsWith(`${item.href}/`);
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
           const deptActive = dept.items.some(isActive);
           // The active department is always open so the current tab can't
           // hide; otherwise honour the user's manual collapse.
@@ -603,8 +633,8 @@ export function SessionShell({
   return (
     <div className="ct-ws flex w-full">
       {/* Reveal engine (Phase 2 / Move D). Scoped to this .ct-ws subtree; tags
-          only take effect where a page opts in with data-rv. Renders a <style>
-          + a null observer — no layout, no scroll hijack. */}
+          only take effect where a page opts in with data-rv. Uses presentation-
+          only Web Animations, so React remains the sole owner of DOM attributes. */}
       <WorkspaceMotion />
       {/* Desktop sidebar — hidden below md (would crush the content) and
           hidden entirely in focus mode (user toggled it away). */}
@@ -681,6 +711,78 @@ export function SessionShell({
             Pages
           </button>
         </div>
+
+        {/* A focused goal never replaces the workspace. Evidence links from a
+            brief and the change-planning entry both carry URL context, so the
+            reader can return to the answer or drop back into free exploration
+            from any owning surface. */}
+        {guidedTitle && (
+          <div
+            className="px-4 md:px-8 pt-4 md:sticky md:z-10"
+            style={{ top: 48, background: TOK.bg }}
+          >
+            <div
+              className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 rounded-lg px-4 py-3"
+              style={{
+                border: `1px solid ${TOK.border}`,
+                background: TOK.surface,
+              }}
+            >
+              <span className="flex items-center gap-3 min-w-0">
+                <Compass
+                  size={14}
+                  style={{ color: TOK.accent, flexShrink: 0 }}
+                />
+                <span className="flex flex-col gap-0.5 min-w-0">
+                  <span
+                    className="text-[10px] uppercase tracking-[0.13em]"
+                    style={{ color: TOK.textMuted }}
+                  >
+                    Guided analysis
+                  </span>
+                  <span
+                    className="text-xs truncate"
+                    style={{ color: TOK.textSecondary }}
+                  >
+                    {guidedTitle}
+                  </span>
+                </span>
+              </span>
+              {briefSubject && (
+                <GuidedProgress
+                  current={2}
+                  answerHref={`${base}/brief/${briefSubject}`}
+                />
+              )}
+              <span className="flex items-center gap-2 flex-wrap shrink-0">
+                <Link
+                  href={
+                    briefSubject
+                      ? `${base}/brief/${briefSubject}`
+                      : `${base}/brief`
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] transition"
+                  style={{
+                    border: `1px solid ${TOK.border}`,
+                    color: TOK.textSecondary,
+                  }}
+                >
+                  <ArrowLeft size={12} />
+                  {briefSubject ? "Back to answer" : "Change goal"}
+                </Link>
+                <Link
+                  href={continueHref}
+                  className="rounded-md px-2.5 py-1.5 text-[11px] transition"
+                  style={{ color: TOK.textMuted }}
+                >
+                  {briefSubject
+                    ? "Continue in workspace"
+                    : "Continue in Faultline"}
+                </Link>
+              </span>
+            </div>
+          </div>
+        )}
 
         <main className="flex-1 min-w-0">{children}</main>
       </div>
@@ -841,7 +943,10 @@ function VerdictPin({
         }}
         title="See the four lenses' combined grade"
       >
-        <Gauge size={14} style={{ color: active ? TOK.accentOn : TOK.accent }} />
+        <Gauge
+          size={14}
+          style={{ color: active ? TOK.accentOn : TOK.accent }}
+        />
         <span className="text-sm font-medium flex-1">Final grade</span>
       </Link>
     </div>

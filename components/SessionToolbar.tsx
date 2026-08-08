@@ -195,8 +195,8 @@ export function SessionToolbar({
       className="border-b sticky top-0 z-30"
       style={{ borderColor: TOK.border, background: TOK.bgDeep }}
     >
-      <div className="px-5 h-12 flex items-center gap-3">
-        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+      <div className="px-3 sm:px-5 h-12 flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-2.5 flex-1 min-w-0">
           {/* Logo doubles as a home link — clickable from any session
            *  page back to the landing / workspace. Sized large enough
            *  to make the Baron mascot's detail (top hat, moustache,
@@ -235,12 +235,13 @@ export function SessionToolbar({
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center justify-end gap-1.5 w-full sm:w-auto shrink-0">
           {/* Share dropdown */}
           <div ref={shareMenuRef} className="relative">
             <button
               onClick={() => setShareMenuOpen((v) => !v)}
-              className="h-8 px-3 rounded-md text-xs transition flex items-center gap-1.5"
+              className="h-8 px-2 sm:px-3 rounded-md text-xs transition flex items-center gap-1.5"
+              aria-label="Share"
               style={{
                 background: TOK.surface,
                 border: `1px solid ${TOK.border}`,
@@ -254,7 +255,7 @@ export function SessionToolbar({
               }}
             >
               <Share2 size={14} />
-              <span>Share</span>
+              <span className="hidden sm:inline">Share</span>
               <ChevronDown size={12} style={{ color: TOK.textMuted }} />
             </button>
             {shareMenuOpen && (
@@ -337,21 +338,23 @@ export function SessionToolbar({
 
           <button
             onClick={() => setFeedbackOpen(true)}
-            className="h-8 px-3 rounded-md text-xs transition flex items-center gap-1.5 hover:bg-white/5"
+            className="h-8 px-2 sm:px-3 rounded-md text-xs transition flex items-center gap-1.5 hover:bg-white/5"
+            aria-label="Send feedback"
             style={{
               color: TOK.textSecondary,
               border: `1px solid rgba(255, 255, 255, 0.1)`,
             }}
           >
             <MessageSquarePlus size={13} />
-            <span>Feedback</span>
+            <span className="hidden sm:inline">Feedback</span>
           </button>
 
           {/* Refresh — primary */}
           <button
             onClick={refresh}
             disabled={refreshing}
-            className="h-8 px-3 rounded-md text-xs font-medium transition flex items-center gap-1.5 disabled:opacity-40 hover:brightness-110"
+            className="h-8 px-2 sm:px-3 rounded-md text-xs font-medium transition flex items-center gap-1.5 disabled:opacity-40 hover:brightness-110"
+            aria-label={refreshing ? "Refreshing analysis" : "Refresh analysis"}
             style={{
               background: TOK.accent,
               color: TOK.accentOn,
@@ -361,7 +364,9 @@ export function SessionToolbar({
               size={13}
               className={refreshing ? "animate-spin" : ""}
             />
-            <span>{refreshing ? "Refreshing…" : "Refresh"}</span>
+            <span className="hidden sm:inline">
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </span>
           </button>
 
           {/* Overflow */}
