@@ -1,11 +1,11 @@
 import path from "node:path";
 import { ALL_PLUGINS } from "../lib/codeAnalysis/plugins/all";
 import { analyzeDirectory } from "../lib/codeAnalysis/analyze";
-import { findDuplicateGroups } from "../lib/codeAnalysis/duplicates";
+import { allDuplicateGroups } from "../lib/codeAnalysis/duplicates";
 (async () => {
   for (const d of process.argv.slice(2)) {
     const { codeGraph: cg } = await analyzeDirectory(path.resolve(d), ALL_PLUGINS);
-    const all = findDuplicateGroups(cg, { limit: 1e9 });
+    const all = allDuplicateGroups(cg);
     const byName = new Map<string, number[]>();
     for (const g of all) {
       const n = g.members[0].name;

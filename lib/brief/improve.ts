@@ -13,8 +13,8 @@
 import type { AnalysisSnapshot } from "../types";
 import { computeRefactorSafety } from "../refactorSafety";
 import {
-  findDuplicateGroups,
-  summarizeDuplicates,
+  countDuplicateGroups,
+  topDuplicateGroups,
 } from "../codeAnalysis/duplicates";
 import { buildCoverageReport } from "../coverage";
 import { assemble, type Brief, type BriefItem } from "./types";
@@ -45,20 +45,29 @@ export function buildImproveBrief(
   const risky: BriefItem[] = [];
   const duplicated: BriefItem[] = [];
   const weak: BriefItem[] = [];
+  // Totals, kept apart from the section arrays on purpose: the sections are
+  // capped at MAX_PER_SECTION, and the answer sentence is a claim about the
+  // repository rather than about the list underneath it.
+  let riskyTotal = 0;
+  let duplicatedTotal = 0;
 
   if (cg) {
     const safety = computeRefactorSafety(cg, { withTests: true });
 
     // The intersection that matters: depended upon AND untested. Either alone
     // is ordinary; together it is a silent break waiting for a Tuesday.
-    const exposed = safety.files
+    const allExposed = safety.files
       .filter((f) => !f.tested && f.dependents > 0)
       .sort(
         (a, b) =>
           b.untestedDependents - a.untestedDependents ||
           b.dependents - a.dependents,
-      )
-      .slice(0, MAX_PER_SECTION);
+      );
+    // The section shows the worst few; the ANSWER states how many there are.
+    // Reading a section's length as the repo's total is what made the guided
+    // card say "5 files" on a repo with 185.
+    riskyTotal = allExposed.length;
+    const exposed = allExposed.slice(0, MAX_PER_SECTION);
     for (const [i, f] of exposed.entries()) {
       const earnsRecommendation = qualifiesForImproveRecommendation(f, i);
       risky.push({
@@ -81,10 +90,10 @@ export function buildImproveBrief(
       });
     }
 
-    const groups = findDuplicateGroups(cg, { limit: 50 });
-    const summary = summarizeDuplicates(groups);
-    if (summary.totalGroups > 0) {
-      for (const [i, g] of groups.slice(0, MAX_PER_SECTION).entries()) {
+    const groups = topDuplicateGroups(cg, { limit: MAX_PER_SECTION });
+    duplicatedTotal = countDuplicateGroups(cg);
+    if (duplicatedTotal > 0) {
+      for (const [i, g] of groups.entries()) {
         const files = [...new Set(g.members.map((f) => f.filePath))];
         duplicated.push({
           id: `dup:${i}:${g.members[0]?.name ?? i}`,
@@ -150,11 +159,14 @@ export function buildImproveBrief(
       detail:
         "No untested file has anything depending on it, no code is duplicated, and every test suite checks something. On a small or well-covered repo that is a real answer.",
     },
-    answerFor(risky.length, duplicated.length, weak.length, gaps),
+    answerFor(riskyTotal, duplicatedTotal, weak.length, gaps),
   );
 }
 
-/** The answer, from the same counts the sections were built from. */
+/** The answer, from the repository's TOTALS — not from the lengths of the
+ *  capped sections below it. Those two were the same number until a repo grew
+ *  past MAX_PER_SECTION, at which point the sentence quietly became a
+ *  description of the list rather than of the code. */
 function answerFor(
   risky: number,
   duplicated: number,

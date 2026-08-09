@@ -132,7 +132,7 @@ describe("duplicate navigation", () => {
   const dcg = graph({
     contentHashes: { "a.ts": "1", "b.ts": "2", "c.ts": "3" },
     functions: [
-      // Complexity >= 5 (findDuplicateGroups' floor — trivial one-liners are ignored).
+      // Complexity >= 2 (the duplicate floor — trivial one-liners are ignored).
       { filePath: "a.ts", name: "f", startRow: 4, endRow: 8, complexity: 6, bodyHash: "DUP" },
       { filePath: "b.ts", name: "g", startRow: 10, endRow: 14, complexity: 6, bodyHash: "DUP" },
       { filePath: "c.ts", name: "h", startRow: 0, endRow: 2, complexity: 6, bodyHash: "DUP" },

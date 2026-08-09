@@ -16,7 +16,7 @@
 
 import type { AnalysisSnapshot, CodeGraph } from "../types";
 import type { FunctionDef } from "../codeAnalysis/types";
-import { findDuplicateGroups } from "../codeAnalysis/duplicates";
+import { allDuplicateGroups } from "../codeAnalysis/duplicates";
 import { computeTestCoverage } from "../codeAnalysis/testCoverage";
 import { cmpStr } from "../deterministicSort";
 
@@ -195,8 +195,11 @@ function diffDuplicateGroups(
   prev: CodeGraph,
   curr: CodeGraph
 ): DuplicateDiffResult {
-  const prevHashes = new Set(findDuplicateGroups(prev).map((g) => g.hash));
-  const currHashes = new Set(findDuplicateGroups(curr).map((g) => g.hash));
+  // Uncapped on BOTH sides. Set-diffing two top-15 lists reports a group as
+  // "dissolved" when a new higher-ranked group merely pushed it off the end —
+  // a refactor the reader never did, in the since-last-visit panel.
+  const prevHashes = new Set(allDuplicateGroups(prev).map((g) => g.hash));
+  const currHashes = new Set(allDuplicateGroups(curr).map((g) => g.hash));
   let added = 0;
   let dissolved = 0;
   for (const h of currHashes) if (!prevHashes.has(h)) added++;

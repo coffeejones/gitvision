@@ -12,7 +12,7 @@ import type { CodeGraph } from "./codeAnalysis/types";
 import type { AnalysisSnapshot } from "./types";
 import { computeTestCoverage } from "./codeAnalysis/testCoverage";
 import {
-  findDuplicateGroups,
+  allDuplicateGroups,
   summarizeDuplicates,
 } from "./codeAnalysis/duplicates";
 
@@ -51,7 +51,7 @@ export function computeDriftMetrics(cg: CodeGraph): DriftMetrics {
   // All duplicate groups (uncapped) so the percentage is accurate, not the
   // top-15 the panel shows.
   const dup = summarizeDuplicates(
-    findDuplicateGroups(cg, { limit: 1_000_000 })
+    allDuplicateGroups(cg)
   );
   const duplicationPct =
     functions > 0

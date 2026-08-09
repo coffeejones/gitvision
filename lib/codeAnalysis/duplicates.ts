@@ -9,11 +9,12 @@
 //   - complexity floor: skip functions below MIN_COMPLEXITY (default 2)
 //     so we don't surface "every getter is a duplicate" noise.
 //   - file-spread floor: a group must span MIN_FILE_SPREAD distinct files
-//     (default 3). Complexity alone was the wrong knob — measured below.
+//     (default 2). Complexity alone was the wrong knob — measured below.
 //   - group size floor: a "group" needs ≥2 members to be a duplicate.
 //   - sort key: groupSize × maxComplexity, so the worst tech-debt
 //     finds (many copies of complex code) rise to the top.
-//   - hard cap: keep the panel scannable on screen — top N groups only.
+//   - page size: `topDuplicateGroups` keeps the panel scannable at 15. It is a
+//     PAGE — `countDuplicateGroups` is what a number on screen must come from.
 //
 // Hash semantics: see astHash.ts. Two functions hashing identically are
 // AST-structurally identical modulo identifier names and literal values.
@@ -35,16 +36,20 @@ export interface DuplicateGroup {
   maxComplexity: number;
 }
 
-export interface FindDuplicatesOptions {
-  /** Skip functions below this McCabe complexity. Default 5. Lower
-   *  values surface trivial accessors / one-liners that are
-   *  duplicates by accident, not design. */
+/** What counts as a duplicate. Shared by every entry point below, so the list,
+ *  the count and the diff can never disagree about which groups exist. */
+export interface DuplicateFilterOptions {
+  /** Skip functions below this McCabe complexity. Default 2 — see the note on
+   *  DEFAULT_MIN_COMPLEXITY for why it is not 5 any more. */
   minComplexity?: number;
-  /** Cap the result list. Default 15 — enough for an actionable
-   *  panel, short enough to scan. */
-  limit?: number;
-  /** Distinct files a group must span. Default 3. Set to 1 to disable. */
+  /** Distinct files a group must span. Default 2. Set to 1 to disable. */
   minFileSpread?: number;
+}
+
+export interface TopDuplicatesOptions extends DuplicateFilterOptions {
+  /** Page size. Default 15 — enough for an actionable panel, short enough to
+   *  scan. This is a PAGE, not a total: `countDuplicateGroups` is the total. */
+  limit?: number;
 }
 
 // Complexity alone cannot tell copy-paste from convention, and the two errors
@@ -77,7 +82,21 @@ const DEFAULT_MIN_COMPLEXITY = 2;
 const DEFAULT_MIN_FILE_SPREAD = 2;
 const DEFAULT_LIMIT = 15;
 
-/** How many groups exist BEFORE the panel's cap.
+// There used to be ONE function here, `findDuplicateGroups`, capped at 15 by
+// default. Callers who wanted the panel's list and callers who wanted the
+// repo's total called it identically, and four of them rendered `.length` as a
+// total: the Overview card said "15 duplicate groups" while the Code page one
+// click away said 37, the headline put the capped number above the fold, the
+// since-last-visit diff set-compared two truncated lists and reported groups
+// "resolved" that had merely been pushed off the end, and the MCP tool handed
+// an agent groupCount: 15.
+//
+// Splitting the name fixes it where the bug actually lives — at the call site,
+// in the reader's head. `topDuplicateGroups(...).length` cannot be mistaken for
+// a total, because the word "top" is right there. The old name is gone rather
+// than deprecated, so the compiler walks every caller exactly once.
+
+/** How many groups exist, uncapped. THE number to render.
  *
  *  The cap became binding once file spread replaced the complexity floor —
  *  this repo and NetBox both fill all 15 slots where they previously produced
@@ -86,20 +105,37 @@ const DEFAULT_LIMIT = 15;
  *  number the reader cannot reconcile costs more than the truncation saves. */
 export function countDuplicateGroups(
   codeGraph: CodeGraph,
-  opts: FindDuplicatesOptions = {}
+  opts: DuplicateFilterOptions = {}
 ): number {
-  return findDuplicateGroups(codeGraph, { ...opts, limit: Number.MAX_SAFE_INTEGER }).length;
+  return allDuplicateGroups(codeGraph, opts).length;
+}
+
+/** Every group, in rank order. For anything that counts, diffs or aggregates —
+ *  a capped list is the wrong input to all three. */
+export function allDuplicateGroups(
+  codeGraph: CodeGraph,
+  opts: DuplicateFilterOptions = {}
+): DuplicateGroup[] {
+  return rankDuplicateGroups(codeGraph, opts);
+}
+
+/** The highest-ranked groups, for a list somebody reads. Capped, and the name
+ *  says so. Pair it with `countDuplicateGroups` whenever a number is shown. */
+export function topDuplicateGroups(
+  codeGraph: CodeGraph,
+  opts: TopDuplicatesOptions = {}
+): DuplicateGroup[] {
+  return rankDuplicateGroups(codeGraph, opts).slice(0, opts.limit ?? DEFAULT_LIMIT);
 }
 
 /** Group functions by structural bodyHash. Returns groups with ≥2
  *  members where every member meets the complexity floor. Sorted by
  *  groupSize × maxComplexity descending — biggest fish first. */
-export function findDuplicateGroups(
+function rankDuplicateGroups(
   codeGraph: CodeGraph,
-  opts: FindDuplicatesOptions = {}
+  opts: DuplicateFilterOptions = {}
 ): DuplicateGroup[] {
   const minComplexity = opts.minComplexity ?? DEFAULT_MIN_COMPLEXITY;
-  const limit = opts.limit ?? DEFAULT_LIMIT;
   const minFileSpread = opts.minFileSpread ?? DEFAULT_MIN_FILE_SPREAD;
 
   // Bucket by hash. Functions without a bodyHash (legacy snapshots,
@@ -141,13 +177,13 @@ export function findDuplicateGroups(
     return cmpStr(a.members[0].filePath, b.members[0].filePath);
   });
 
-  return groups.slice(0, limit);
+  return groups;
 }
 
 /** Aggregate stats useful for the UI's panel header. Counts total
  *  duplicate functions across all groups, total groups, and the most-
  *  duplicated group's size. Computed from the same options as
- *  findDuplicateGroups so numbers in the header match the rendered list. */
+ *  the group builders so numbers in the header match the rendered list. */
 export function summarizeDuplicates(groups: DuplicateGroup[]): {
   totalGroups: number;
   totalDuplicateFunctions: number;

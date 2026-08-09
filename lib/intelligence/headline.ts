@@ -29,7 +29,7 @@
 // Pure function: easy to unit-test, easy to call server-side (no
 // browser deps), no AI calls (deterministic).
 
-import { findDuplicateGroups } from "../codeAnalysis/duplicates";
+import { allDuplicateGroups } from "../codeAnalysis/duplicates";
 import { unsupportedLanguageNote } from "../codeAnalysis/languageSupport";
 import { computeTestCoverage } from "../codeAnalysis/testCoverage";
 import { isCodeFile } from "../signals";
@@ -150,7 +150,15 @@ export function pickHeadline(snap: AnalysisSnapshot): Headline {
   }
 
   // 1. Critical duplicates — high-complexity duplicate groups.
-  const duplicateGroups = findDuplicateGroups(cg);
+  //
+  // Uncapped, for two reasons that both bite. The count below is the single
+  // most prominent number on the Overview, and the panel's top-15 slice would
+  // print 15 on a repo with 37. Worse, the search for the critical group ran
+  // inside that slice: the sort key is groupSize x maxComplexity, so one
+  // complexity-60 pair scores 120 and can rank below sixteen forty-copy
+  // one-liners — the exact finding this rung exists to raise, dropped for
+  // being small.
+  const duplicateGroups = allDuplicateGroups(cg);
   const criticalGroup = duplicateGroups.find(
     (g) => g.maxComplexity >= CRITICAL_DUPLICATE_COMPLEXITY
   );

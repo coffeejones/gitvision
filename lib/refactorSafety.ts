@@ -11,7 +11,7 @@
 
 import type { CodeGraph } from "./codeAnalysis/types";
 import { isTestFile } from "./codeAnalysis/testCoverage";
-import { findDuplicateGroups } from "./codeAnalysis/duplicates";
+import { allDuplicateGroups } from "./codeAnalysis/duplicates";
 import { deriveTestedFiles } from "./impact";
 import { cmpStr } from "./deterministicSort";
 
@@ -186,7 +186,7 @@ export function computeRefactorSafety(
 
   // 3. Duplicated-function count per file (structural bodyHash duplicates).
   const duplicatedByFile = new Map<string, number>();
-  for (const group of findDuplicateGroups(cg, { limit: 1_000_000 })) {
+  for (const group of allDuplicateGroups(cg)) {
     for (const m of group.members) {
       duplicatedByFile.set(m.filePath, (duplicatedByFile.get(m.filePath) ?? 0) + 1);
     }

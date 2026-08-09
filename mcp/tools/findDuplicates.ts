@@ -7,7 +7,10 @@
 // use this to propose specific extraction PRs.
 
 import * as z from "zod/v4";
-import { findDuplicateGroups } from "../../lib/codeAnalysis/duplicates";
+import {
+  countDuplicateGroups,
+  topDuplicateGroups,
+} from "../../lib/codeAnalysis/duplicates";
 import { getCached } from "../cache";
 
 export const findDuplicatesInputSchema = {
@@ -49,14 +52,22 @@ export async function handleFindDuplicates(input: Input) {
     );
   }
 
-  const groups = findDuplicateGroups(snapshot.codeGraph, {
+  const groups = topDuplicateGroups(snapshot.codeGraph, {
     minComplexity: input.minComplexity,
     limit: input.limit,
+  });
+  // The page and the total, separately. `groupCount: groups.length` handed the
+  // agent the page size — 15 on a repo with 37 — and its only clue that the
+  // list had been cut was that the number happened to equal the default limit.
+  const totalGroups = countDuplicateGroups(snapshot.codeGraph, {
+    minComplexity: input.minComplexity,
   });
 
   return jsonResult({
     sessionId: input.sessionId,
-    groupCount: groups.length,
+    totalGroups,
+    returnedGroups: groups.length,
+    truncated: groups.length < totalGroups,
     // Drop the bodyHash from each member — it's an internal detail
     // that would just bloat the agent's context window.
     groups: groups.map((g) => ({

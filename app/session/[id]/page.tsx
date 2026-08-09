@@ -57,7 +57,7 @@ import { headers } from "next/headers";
 import { getSessionCached, getDriftReport } from "@/lib/sessionCache";
 import { markSeen } from "@/lib/seen";
 import { diffSnapshots } from "@/lib/diff";
-import { findDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
+import { countDuplicateGroups } from "@/lib/codeAnalysis/duplicates";
 import { computeTestCoverage } from "@/lib/codeAnalysis/testCoverage";
 import { rankFunctionsByBlast } from "@/lib/codeAnalysis/blastRanking";
 import { pickHeadline } from "@/lib/intelligence/headline";
@@ -130,7 +130,10 @@ export default async function OverviewPage({
   // Derive the per-tab preview stats. Server-side compute is fine
   // for these — they're pure functions over the snapshot.
   const codeGraph = current.codeGraph;
-  const duplicateGroups = codeGraph ? findDuplicateGroups(codeGraph) : [];
+  // The TOTAL, not the panel's page. This card said "15 duplicate groups"
+  // while /code — one click away, same snapshot — said 37, because both read
+  // the same helper and only one of them passed a limit.
+  const duplicateGroups = codeGraph ? countDuplicateGroups(codeGraph) : 0;
   const coverage = codeGraph ? computeTestCoverage(codeGraph) : null;
   const fileGraph = current.fileGraph;
   const hotspotCount = current.hotspots?.length ?? 0;
@@ -455,14 +458,14 @@ export default async function OverviewPage({
                 codeGraph
                   ? formatCodeStat(
                       codeGraph.functions.length,
-                      duplicateGroups.length,
+                      duplicateGroups,
                       coverage,
                     )
                   : "Refresh to populate"
               }
               description="Blast radius · untested hotspots · structural duplicates"
               accent={
-                duplicateGroups.length > 0 ||
+                duplicateGroups > 0 ||
                 !!(coverage && coverage.totals.testFiles > 0)
               }
             />

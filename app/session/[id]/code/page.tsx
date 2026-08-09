@@ -38,7 +38,7 @@ export default async function CodeRoute({
     // Own-call resolution, not the raw rate: most call edges in any file point
     // at libraries, and judging the analyser on those undersells it ~10x.
     const resolvedPct = computeOwnCallResolution(cg).ownPct;
-    // Uncapped. findDuplicateGroups returns the panel's top 15, so counting
+    // Uncapped. topDuplicateGroups returns the panel's page, so counting
     // its length told the reader NetBox has 15 duplicate groups when it has 43.
     const dupGroups = countDuplicateGroups(cg);
     const cov = computeTestCoverage(cg).totals;

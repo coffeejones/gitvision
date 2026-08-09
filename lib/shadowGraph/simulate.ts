@@ -9,7 +9,7 @@
 // so base and patched come from the SAME buildCodeGraph pass — a clean diff.
 
 import { buildCodeGraph } from "../codeAnalysis/codeGraph";
-import { findDuplicateGroups } from "../codeAnalysis/duplicates";
+import { allDuplicateGroups } from "../codeAnalysis/duplicates";
 import { computeBlastRadius } from "../codeAnalysis/blastRadius";
 import { isTestFile } from "../codeAnalysis/testCoverage";
 import type { CodeGraph } from "../codeAnalysis/types";
@@ -128,7 +128,7 @@ function baseGraphOf(layer: ParseLayer): CodeGraph {
 const asSnapshot = (codeGraph: CodeGraph) => ({ codeGraph }) as AnalysisSnapshot;
 
 function dupMemberCount(g: CodeGraph): number {
-  return findDuplicateGroups(g, { limit: 1_000_000 }).reduce(
+  return allDuplicateGroups(g).reduce(
     (n, grp) => n + grp.members.length,
     0,
   );

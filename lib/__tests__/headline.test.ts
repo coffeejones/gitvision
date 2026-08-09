@@ -2,10 +2,10 @@
 // concrete actionable signal per session for the Overview page.
 //
 // We hand-build minimal CodeGraph fixtures rather than mocking
-// findDuplicateGroups / computeTestCoverage. Two reasons:
+// allDuplicateGroups / computeTestCoverage. Two reasons:
 //   1. The repo doesn't use vi.mock anywhere — keeps the test style
 //      consistent with the rest of the suite.
-//   2. The fixtures double as integration coverage: if findDuplicateGroups
+//   2. The fixtures double as integration coverage: if allDuplicateGroups
 //      or computeTestCoverage change semantics in a way that breaks
 //      headline picking, these tests catch it.
 //

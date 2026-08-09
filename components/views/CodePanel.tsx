@@ -62,7 +62,7 @@ import {
 } from "@/lib/codeAnalysis/testCoverage";
 import {
   countDuplicateGroups,
-  findDuplicateGroups,
+  topDuplicateGroups,
   summarizeDuplicates,
   type DuplicateGroup,
 } from "@/lib/codeAnalysis/duplicates";
@@ -291,7 +291,7 @@ function CodePanelInner({
 
   // v0.30: structural duplicate detection. Runs in browser; the heavy
   // lifting (AST hashing) already happened server-side at analysis time.
-  const duplicateGroups = useMemo(() => findDuplicateGroups(cg), [cg]);
+  const duplicateGroups = useMemo(() => topDuplicateGroups(cg), [cg]);
   // The panel shows the worst 15. Saying "15 groups" when there are 43 tells
   // the reader the repo has 15, which is false — and the cap only became
   // binding once file spread replaced the complexity floor.

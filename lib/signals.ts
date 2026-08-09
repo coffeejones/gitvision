@@ -14,7 +14,7 @@ import {
   buildAuthorIndex,
   resolveHotspotAuthors,
 } from "./authorIdentity";
-import { findDuplicateGroups } from "./codeAnalysis/duplicates";
+import { allDuplicateGroups } from "./codeAnalysis/duplicates";
 import { computeTestCoverage } from "./codeAnalysis/testCoverage";
 import { detectKnownIncidents } from "./security/knownIncidents";
 import type {
@@ -1340,7 +1340,10 @@ function detectDuplicateImplementations(snap: AnalysisSnapshot): HealthSignal[] 
   // disagree. Keeping the old explicit `minComplexity: 5` here would have
   // silently killed the signal once file-spread became a requirement: cx5 AND
   // spread3 finds 2 groups on this repo and 0 on NetBox.
-  const groups = findDuplicateGroups(cg, { limit: 50 });
+  // Uncapped: the detail below renders both the group count and the copy
+  // count, and a list that stopped at 50 would understate a large repo in
+  // the sentence AND drop it a severity band.
+  const groups = allDuplicateGroups(cg);
   if (groups.length < DUPLICATE_MIN_GROUPS) return [];
 
   const copies = groups.reduce((n, g) => n + g.members.length, 0);

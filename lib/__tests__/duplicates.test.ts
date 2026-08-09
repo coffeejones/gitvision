@@ -2,7 +2,7 @@
 //   - astHash._fnv1a64ForTest: FNV-1a hash determinism + distribution
 //   - hashSubtree end-to-end: walks an actual tree-sitter AST and
 //     verifies the structural-hash invariants we documented.
-//   - findDuplicateGroups: filtering, sorting, cap, edge cases.
+//   - allDuplicateGroups / topDuplicateGroups: filtering, sorting, cap, edge cases.
 //
 // We need a real tree-sitter parser for hashSubtree because the
 // input shape (TsNode) isn't easily mockable. Using the JavaScript
@@ -17,7 +17,8 @@ import {
 } from "../codeAnalysis/astHash";
 import {
   countDuplicateGroups,
-  findDuplicateGroups,
+  allDuplicateGroups,
+  topDuplicateGroups,
   summarizeDuplicates,
 } from "../codeAnalysis/duplicates";
 import { javascriptPlugin } from "../codeAnalysis/plugins/javascript";
@@ -158,11 +159,11 @@ describe("hashSubtree", () => {
   });
 });
 
-// ------------------- findDuplicateGroups -------------------
+// ------------------- allDuplicateGroups / topDuplicateGroups -------------------
 
-describe("findDuplicateGroups — basics", () => {
+describe("allDuplicateGroups — basics", () => {
   it("returns an empty array for an empty code graph", () => {
-    expect(findDuplicateGroups(emptyCodeGraph(), { minFileSpread: 1 })).toEqual([]);
+    expect(allDuplicateGroups(emptyCodeGraph(), { minFileSpread: 1 })).toEqual([]);
   });
 
   it("returns an empty array when no functions share a hash", () => {
@@ -172,7 +173,7 @@ describe("findDuplicateGroups — basics", () => {
       fn({ name: "b", bodyHash: "bbb" }),
       fn({ name: "c", bodyHash: "ccc" }),
     ];
-    expect(findDuplicateGroups(cg, { minFileSpread: 1 })).toEqual([]);
+    expect(allDuplicateGroups(cg, { minFileSpread: 1 })).toEqual([]);
   });
 
   it("groups functions sharing the same bodyHash", () => {
@@ -182,13 +183,13 @@ describe("findDuplicateGroups — basics", () => {
       fn({ name: "b", filePath: "src/b.ts", bodyHash: "shared" }),
       fn({ name: "c", filePath: "src/c.ts", bodyHash: "unique" }),
     ];
-    const groups = findDuplicateGroups(cg, { minFileSpread: 1 });
+    const groups = allDuplicateGroups(cg, { minFileSpread: 1 });
     expect(groups).toHaveLength(1);
     expect(groups[0].members.map((m) => m.name).sort()).toEqual(["a", "b"]);
   });
 });
 
-describe("findDuplicateGroups — filtering", () => {
+describe("allDuplicateGroups — filtering", () => {
   it("excludes functions below the complexity floor (default 2)", () => {
     // The default moved 5 -> 2 when file spread became the primary
     // discriminator: complexity alone could not tell a copied helper from a
@@ -198,7 +199,7 @@ describe("findDuplicateGroups — filtering", () => {
       fn({ name: "trivial1", complexity: 1, bodyHash: "shape" }),
       fn({ name: "trivial2", complexity: 1, bodyHash: "shape" }),
     ];
-    expect(findDuplicateGroups(cg, { minFileSpread: 1 })).toEqual([]);
+    expect(allDuplicateGroups(cg, { minFileSpread: 1 })).toEqual([]);
   });
 
   it("includes functions exactly at the complexity floor", () => {
@@ -207,7 +208,7 @@ describe("findDuplicateGroups — filtering", () => {
       fn({ name: "a", complexity: 5, bodyHash: "shape" }),
       fn({ name: "b", complexity: 5, bodyHash: "shape" }),
     ];
-    const groups = findDuplicateGroups(cg, { minFileSpread: 1 });
+    const groups = allDuplicateGroups(cg, { minFileSpread: 1 });
     expect(groups).toHaveLength(1);
   });
 
@@ -217,8 +218,8 @@ describe("findDuplicateGroups — filtering", () => {
       fn({ name: "a", complexity: 3, bodyHash: "shape" }),
       fn({ name: "b", complexity: 3, bodyHash: "shape" }),
     ];
-    expect(findDuplicateGroups(cg, { minComplexity: 3, minFileSpread: 1 })).toHaveLength(1);
-    expect(findDuplicateGroups(cg, { minComplexity: 10, minFileSpread: 1 })).toEqual([]);
+    expect(allDuplicateGroups(cg, { minComplexity: 3, minFileSpread: 1 })).toHaveLength(1);
+    expect(allDuplicateGroups(cg, { minComplexity: 10, minFileSpread: 1 })).toEqual([]);
   });
 
   it("excludes functions without a bodyHash (legacy / missing data)", () => {
@@ -229,7 +230,7 @@ describe("findDuplicateGroups — filtering", () => {
       fn({ name: "c", bodyHash: "shape" }),
       fn({ name: "d", bodyHash: "shape" }),
     ];
-    const groups = findDuplicateGroups(cg, { minFileSpread: 1 });
+    const groups = allDuplicateGroups(cg, { minFileSpread: 1 });
     expect(groups).toHaveLength(1);
     expect(groups[0].members.map((m) => m.name).sort()).toEqual(["c", "d"]);
   });
@@ -237,7 +238,7 @@ describe("findDuplicateGroups — filtering", () => {
   it("filters out single-member buckets (not duplicates)", () => {
     const cg = emptyCodeGraph();
     cg.functions = [fn({ name: "lonely", bodyHash: "shape" })];
-    expect(findDuplicateGroups(cg, { minFileSpread: 1 })).toEqual([]);
+    expect(allDuplicateGroups(cg, { minFileSpread: 1 })).toEqual([]);
   });
 
   it("groups same-file overloads as duplicates too (not just cross-file)", () => {
@@ -258,13 +259,13 @@ describe("findDuplicateGroups — filtering", () => {
         bodyHash: "shape",
       }),
     ];
-    const groups = findDuplicateGroups(cg, { minFileSpread: 1 });
+    const groups = allDuplicateGroups(cg, { minFileSpread: 1 });
     expect(groups).toHaveLength(1);
     expect(groups[0].members).toHaveLength(2);
   });
 });
 
-describe("findDuplicateGroups — sorting", () => {
+describe("allDuplicateGroups — sorting", () => {
   it("sorts by groupSize × maxComplexity descending (biggest fish first)", () => {
     const cg = emptyCodeGraph();
     cg.functions = [
@@ -282,7 +283,7 @@ describe("findDuplicateGroups — sorting", () => {
         fn({ name: `c${i}`, complexity: 6, bodyHash: "C" })
       ),
     ];
-    const groups = findDuplicateGroups(cg, { minFileSpread: 1 });
+    const groups = allDuplicateGroups(cg, { minFileSpread: 1 });
     // C and A both score 60; tiebreaker is maxComplexity (A=30 wins)
     expect(groups[0].members[0].name.startsWith("a")).toBe(true);
     // C comes second (score 60, lower maxComplexity)
@@ -302,13 +303,13 @@ describe("findDuplicateGroups — sorting", () => {
     ];
     // Same score, same maxComplexity, same group size — tie broken by
     // first member's filePath alphabetically (a.ts < z.ts → Y first)
-    const groups = findDuplicateGroups(cg, { minFileSpread: 1 });
+    const groups = allDuplicateGroups(cg, { minFileSpread: 1 });
     expect(groups[0].members[0].filePath).toBe("src/a.ts");
     expect(groups[1].members[0].filePath).toBe("src/z.ts");
   });
 });
 
-describe("findDuplicateGroups — capping", () => {
+describe("topDuplicateGroups — capping", () => {
   it("caps the result at the default limit (15)", () => {
     const cg = emptyCodeGraph();
     // 20 distinct duplicate groups
@@ -318,7 +319,7 @@ describe("findDuplicateGroups — capping", () => {
         fn({ name: `${i}_b`, complexity: 100 - i, bodyHash: `g${i}` })
       );
     }
-    expect(findDuplicateGroups(cg, { minFileSpread: 1 })).toHaveLength(15);
+    expect(topDuplicateGroups(cg, { minFileSpread: 1 })).toHaveLength(15);
   });
 
   it("respects a custom limit option", () => {
@@ -329,8 +330,8 @@ describe("findDuplicateGroups — capping", () => {
         fn({ name: `${i}_b`, complexity: 50 - i, bodyHash: `g${i}` })
       );
     }
-    expect(findDuplicateGroups(cg, { limit: 3, minFileSpread: 1 })).toHaveLength(3);
-    expect(findDuplicateGroups(cg, { limit: 100, minFileSpread: 1 })).toHaveLength(10);
+    expect(topDuplicateGroups(cg, { limit: 3, minFileSpread: 1 })).toHaveLength(3);
+    expect(topDuplicateGroups(cg, { limit: 100, minFileSpread: 1 })).toHaveLength(10);
   });
 });
 
@@ -372,7 +373,7 @@ describe("summarizeDuplicates", () => {
 // "group" of 288 identical test_name() methods — Django's own convention. At a
 // floor of 5 the panel misses fileBasename() written eleven times in eleven
 // files. Requiring both catches the second and rejects the first.
-describe("findDuplicateGroups — copy-paste vs convention", () => {
+describe("allDuplicateGroups — copy-paste vs convention", () => {
   const fn = (name: string, filePath: string, hash: string, complexity = 3) => ({
     name, filePath, bodyHash: hash, complexity,
     startRow: 1, endRow: 5,
@@ -381,7 +382,7 @@ describe("findDuplicateGroups — copy-paste vs convention", () => {
     ({ functions, calls: [], imports: [], fileComplexity: {}, filesByExt: {}, byPlugin: {}, generatedAt: "" }) as never;
 
   it("reports a helper duplicated across many files", () => {
-    const g = findDuplicateGroups(
+    const g = allDuplicateGroups(
       graph(["a", "b", "c", "d"].map((f) => fn("fileBasename", `components/${f}.tsx`, "H"))),
     );
     expect(g).toHaveLength(1);
@@ -391,19 +392,19 @@ describe("findDuplicateGroups — copy-paste vs convention", () => {
   it("does NOT report an idiom repeated inside one file", () => {
     // 288 copies of test_name() in one Django test module is a convention.
     const many = Array.from({ length: 20 }, (_, i) => fn(`test_${i}`, "tests/test_filtersets.py", "H", 1));
-    expect(findDuplicateGroups(graph(many))).toEqual([]);
+    expect(allDuplicateGroups(graph(many))).toEqual([]);
   });
 
   it("needs BOTH conditions — spread alone lets the pile-up through", () => {
     // Trivial one-liners spread across files are still not worth extracting.
     const trivial = ["a", "b", "c", "d"].map((f) => fn("getName", `src/${f}.ts`, "H", 1));
-    expect(findDuplicateGroups(graph(trivial))).toEqual([]);
+    expect(allDuplicateGroups(graph(trivial))).toEqual([]);
   });
 
   it("keeps both floors configurable", () => {
     const one = ["a", "a"].map((f) => fn("helper", `src/${f}.ts`, "H"));
-    expect(findDuplicateGroups(graph(one))).toEqual([]);              // spread 1 < 2
-    expect(findDuplicateGroups(graph(one), { minFileSpread: 1 })).toHaveLength(1);
+    expect(allDuplicateGroups(graph(one))).toEqual([]);              // spread 1 < 2
+    expect(allDuplicateGroups(graph(one), { minFileSpread: 1 })).toHaveLength(1);
   });
 
   it("counts a helper copied into exactly two files", () => {
@@ -411,7 +412,7 @@ describe("findDuplicateGroups — copy-paste vs convention", () => {
     // panel's top 15 is identical at spread 2 and 3, so raising it only trims
     // real two-file clones out of the tail.
     const two = ["a", "b"].map((f) => fn("helper", `src/${f}.ts`, "H"));
-    expect(findDuplicateGroups(graph(two))).toHaveLength(1);
+    expect(allDuplicateGroups(graph(two))).toHaveLength(1);
   });
 });
 
@@ -428,12 +429,12 @@ describe("countDuplicateGroups", () => {
       fn(`h${i}`, `src/a${i}.ts`, `H${i}`),
       fn(`h${i}`, `src/b${i}.ts`, `H${i}`),
     ]).flat();
-    expect(findDuplicateGroups(graph(fns))).toHaveLength(15); // capped
+    expect(topDuplicateGroups(graph(fns))).toHaveLength(15); // capped
     expect(countDuplicateGroups(graph(fns))).toBe(20);        // the truth
   });
 
   it("agrees with the list when nothing was truncated", () => {
     const fns = [fn("h", "src/a.ts", "H"), fn("h", "src/b.ts", "H")];
-    expect(countDuplicateGroups(graph(fns))).toBe(findDuplicateGroups(graph(fns)).length);
+    expect(countDuplicateGroups(graph(fns))).toBe(topDuplicateGroups(graph(fns)).length);
   });
 });

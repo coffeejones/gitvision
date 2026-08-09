@@ -9,7 +9,7 @@
 // The cost is not the JSON: computeDriftTrends compares the OLDEST and NEWEST
 // measurable snapshots, and when a snapshot has no persisted driftMetrics
 // fingerprint it derives one by walking that snapshot's whole code graph
-// (findDuplicateGroups + computeTestCoverage). 55 of the 57 snapshots on disk
+// (allDuplicateGroups + computeTestCoverage). 55 of the 57 snapshots on disk
 // lack the fingerprint, so the fallback was the normal path, not the exception.
 // Measured per page load: 2.1 ms on gin, 7.9 ms on zod, 8.5 ms on our own repo.
 //

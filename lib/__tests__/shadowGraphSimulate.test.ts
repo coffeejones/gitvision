@@ -131,7 +131,7 @@ describe("simulateChange verdict layer", () => {
   });
 
   it("flags a new structural duplicate introduced by the diff", async () => {
-    // Complexity must clear findDuplicateGroups' minComplexity floor (5) — the
+    // Complexity must clear the duplicate detector's minComplexity floor (2) — the
     // product's tuned threshold, which the verdict layer reuses.
     const body = `export function process(items: number[]) {
   let total = 0;

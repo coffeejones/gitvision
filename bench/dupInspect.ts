@@ -4,12 +4,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { ALL_PLUGINS } from "../lib/codeAnalysis/plugins/all";
 import { analyzeDirectory } from "../lib/codeAnalysis/analyze";
-import { findDuplicateGroups } from "../lib/codeAnalysis/duplicates";
+import { topDuplicateGroups } from "../lib/codeAnalysis/duplicates";
 (async () => {
   const root = path.resolve(process.argv[2]);
   const n = Number(process.argv[3] ?? 3);
   const { codeGraph: cg } = await analyzeDirectory(root, ALL_PLUGINS);
-  const groups = findDuplicateGroups(cg);
+  const groups = topDuplicateGroups(cg);
   for (const g of groups.slice(0, n)) {
     console.log(`\n=== x${g.members.length} cx${g.maxComplexity}  ${g.members[0].name}() ===`);
     for (const m of g.members.slice(0, 2)) {
