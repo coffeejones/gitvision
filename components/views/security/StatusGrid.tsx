@@ -26,6 +26,9 @@ interface StatusCardProps {
    *  matched", "no matches in source or config". Required for `clean`: the
    *  word alone is a verdict on the repo rather than a result from a check. */
   cleanLabel?: string;
+  /** Why it did not run, when that is knowable. "Not scanned" is honest but
+   *  unhelpful; "no packages to compare" tells the reader what to fix. */
+  notScannedLabel?: string;
 }
 
 interface Props {
@@ -50,14 +53,21 @@ export function StatusGrid({ incidents, secrets, patterns, sinks }: Props) {
   );
 }
 
-function StatusCard({ title, subtitle, state, countLabel, cleanLabel }: StatusCardProps) {
+function StatusCard({
+  title,
+  subtitle,
+  state,
+  countLabel,
+  cleanLabel,
+  notScannedLabel,
+}: StatusCardProps) {
   const palette = paletteFor(state);
   const pillText =
     state === "clean"
       ? (cleanLabel ?? "No matches")
       : state === "findings"
         ? (countLabel ?? "Findings")
-        : "Not scanned";
+        : (notScannedLabel ?? "Not scanned");
 
   return (
     <div

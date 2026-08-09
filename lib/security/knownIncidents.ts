@@ -281,6 +281,19 @@ function packagesFromSnapshot(snap: AnalysisSnapshot): Array<{
   return out;
 }
 
+/** How many packages the incident list was actually compared against.
+ *
+ *  Zero and "no match" are different answers, and the panel could not tell them
+ *  apart: it printed "0 of 10 matched" whenever findIncidentMatches came back
+ *  empty, including when there was nothing to compare — a Go or Java repo whose
+ *  manifest we do not read, or an npm repo whose dependencies are all current
+ *  (only outdated/vulnerable/deprecated entries carry a version here). The
+ *  healthiest repos got the most confident-sounding sentence about a check that
+ *  never ran. */
+export function comparablePackageCount(snap: AnalysisSnapshot): number {
+  return packagesFromSnapshot(snap).length;
+}
+
 /** Pure match walker — returns per-incident matches without
  *  wrapping them in signal shape. Used by:
  *    - detectKnownIncidents (wraps result into a single aggregated

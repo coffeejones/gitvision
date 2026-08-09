@@ -14,7 +14,10 @@
 // them. Matches the pattern Snyk + GitHub Dependabot use.
 
 import type { ClientSnapshot } from "@/lib/clientSnapshot";
-import { findIncidentMatches } from "@/lib/security/knownIncidents";
+import {
+  comparablePackageCount,
+  findIncidentMatches,
+} from "@/lib/security/knownIncidents";
 import { KNOWN_INCIDENTS } from "@/lib/security/knownIncidents";
 import { TOK } from "@/lib/sessionTheme";
 import { RollupBar } from "@/components/views/RollupBar";
@@ -47,12 +50,25 @@ export function SecurityPanel({ snapshot, sessionId, unchecked }: Props) {
     (f) => f.reachability !== "unreachable",
   );
 
-  // Per-scanner status state derivation. "Not scanned" only applies
-  // to scanners that NEED a data field that's missing from the
-  // snapshot (pre-v0.81 / scan-failed cases). Incidents always have
-  // a "scanned" state — they only depend on the deps data which
-  // every modern snapshot carries.
-  const incidentsState = incidentMatches.length > 0 ? "findings" : "clean";
+  // Per-scanner status state derivation. "Not scanned" applies to scanners that
+  // NEED a data field missing from the snapshot (pre-v0.81 / scan-failed
+  // cases) — and to incidents when there was nothing to compare against.
+  //
+  // That last case used to be invisible. The comment here said incidents
+  // "always have a scanned state", which was wrong twice over: a Go, Java or C#
+  // repo has no dependencyHealths at all, and even an npm repo contributes
+  // packages only from its outdated/vulnerable/deprecated lists. Either way
+  // findIncidentMatches returns [] before touching a single incident, and the
+  // card said "0 of 10 matched" — a result from a comparison that never
+  // happened, shown most confidently to the repos with the least wrong with
+  // them.
+  const comparablePackages = comparablePackageCount(snapshot);
+  const incidentsState =
+    incidentMatches.length > 0
+      ? "findings"
+      : comparablePackages === 0
+        ? "not-scanned"
+        : "clean";
   const secretsState =
     snapshot.secretFindings === undefined
       ? "not-scanned"
@@ -152,8 +168,10 @@ export function SecurityPanel({ snapshot, sessionId, unchecked }: Props) {
           subtitle: `${KNOWN_INCIDENTS.length} curated supply-chain attacks`,
           state: incidentsState,
           // The denominator is the point: "0 of 10" cannot be read as "no
-          // supply-chain risk" the way a tick can.
-          cleanLabel: `0 of ${KNOWN_INCIDENTS.length} matched`,
+          // supply-chain risk" the way a tick can. It is also a claim that the
+          // comparison ran, so it is only shown when packages went into it.
+          cleanLabel: `0 of ${KNOWN_INCIDENTS.length} matched across ${comparablePackages} package${comparablePackages === 1 ? "" : "s"}`,
+          notScannedLabel: "no packages to compare",
           countLabel:
             incidentMatches.length === 1
               ? "1 match"
@@ -232,7 +250,13 @@ export function SecurityPanel({ snapshot, sessionId, unchecked }: Props) {
 /** The named gap. This sits between the scanner grid and the findings because
  *  an empty grid is exactly when a reader most needs to know what was never
  *  checked — and because the one thing that can spend a "we never invent
- *  findings" reputation is an omission the reader mistook for a result. */
+ *  findings" reputation is an omission the reader mistook for a result.
+ *
+ *  It used to say findings were "reported only where a path from an entry point
+ *  can be shown", which the same page contradicted: the rollup one screen up
+ *  says "N more listed below without a traced path", and secrets, patterns and
+ *  incidents have no path concept at all. Overstating our own rigour is the
+ *  same failure as overstating a finding — it just flatters us instead. */
 function ScopeLimits() {
   return (
     <p
@@ -244,8 +268,10 @@ function ScopeLimits() {
         These four scanners are not a security review.
       </span>{" "}
       They look for injection, unsafe deserialisation, committed credentials,
-      dangerous dynamic execution and known supply-chain incidents — reported
-      only where a path from an entry point can be shown. They do{" "}
+      dangerous dynamic execution and known supply-chain incidents. Everything
+      found is listed, and each dangerous call says whether a path from a way
+      into the app was traced to it — many are listed without one, which means
+      we could not follow the route, not that nothing can reach it. They do{" "}
       <span style={{ color: TOK.textPrimary }}>not</span> check access control,
       authorisation or IDOR, rate limiting and brute-force protection, user
       enumeration, file-upload restrictions, session and cookie configuration,
