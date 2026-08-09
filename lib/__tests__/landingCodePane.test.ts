@@ -12,6 +12,7 @@
 // about it.
 
 import { describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -140,6 +141,40 @@ describe("the shown slice stays true to the file it names", () => {
       .slice(LANDING_SOURCE.firstLine - 1, LANDING_SOURCE.firstLine - 1 + LANDING_SOURCE.code.split("\n").length)
       .join("\n");
     expect(slice).toBe(LANDING_SOURCE.code);
+  });
+
+  it("is verbatim in the commit it names, not only in the working tree", () => {
+    // The assertion above compares the slice to HEAD, which is what the reader
+    // sees — but it says nothing about `commit`, and that claim had already
+    // rotted unnoticed: the fixture recorded c68004a with firstLine 913, while
+    // at c68004a the function sat at line 828. The code was genuinely verbatim
+    // from that commit; only the pointer was wrong, and nothing could tell.
+    //
+    // So the provenance is checked the way it is actually meant: find the
+    // function BY NAME in the recorded commit and compare the text. Line
+    // numbers move on every edit above; the transcription does not.
+    let atCommit: string;
+    try {
+      atCommit = execFileSync(
+        "git",
+        ["show", `${LANDING_SOURCE.commit}:${LANDING_SOURCE.path}`],
+        { cwd: process.cwd(), encoding: "utf-8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] },
+      );
+    } catch {
+      // Shallow clone (CI checks out depth 1) — the object is not here. This
+      // guard protects the machine where the pin is EDITED, which is where the
+      // rot happens; it cannot protect a checkout that lacks the history.
+      return;
+    }
+    const lines = atCommit.split("\n");
+    const start = lines.findIndex((l) => l.includes(`function ${LANDING_SOURCE.fn.name}(`));
+    expect(start, `${LANDING_SOURCE.fn.name} is not in ${LANDING_SOURCE.commit}`).toBeGreaterThan(-1);
+    const slice = lines
+      .slice(start, start + LANDING_SOURCE.code.split("\n").length)
+      .join("\n");
+    expect(slice, "the slice is not verbatim from the commit it credits").toBe(
+      LANDING_SOURCE.code,
+    );
   });
 
   it("fits the column it is rendered in", () => {
