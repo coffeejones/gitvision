@@ -262,3 +262,109 @@ describe("weakSuite — assertions behind a helper", () => {
     expect(m?.cases[0].assertions).toBe(0);
   });
 });
+
+// The helper lookup, once it had to survive real test files.
+//
+// Two defects shipped with the helper pass in 1c212f1, both from the same
+// simplification: a flat name→helper map over the whole file, with no notion of
+// where a name is visible or where its assertions actually run.
+//
+// Neither changes a number on this repo — measured, 2,482 cases, byte-identical
+// before and after — nor on the 773 third-party cases inside node_modules. They
+// are latent, and the shape is not exotic: 20 of this repo's 642 source files
+// already declare the same local function name in more than one scope. None of
+// those collisions happens to involve an asserting helper. That is luck.
+describe("weakSuite — the helper lookup respects scope and execution", () => {
+  const meta = (src: string) => {
+    const file: SourceFile = { rel: "x.test.ts", ext: "ts", content: src };
+    return parseFile(javascriptPlugin, file, makeIndex([file])).testMeta;
+  };
+  const byName = (src: string) =>
+    new Map((meta(src)?.cases ?? []).map((c) => [c.name, c]));
+
+  it("does not credit one describe's helper to another describe's calls", () => {
+    // Sibling blocks each declaring `check` is ordinary test-file writing. The
+    // flat map kept whichever was registered and handed it to both, so the
+    // hollow case scored 1 assertion with a meaningful oracle.
+    const m = byName(
+      'describe("a", () => {\n' +
+        '  const check = (x) => expect(x).toBe(1);\n' +
+        '  it("real", () => { check(1); });\n' +
+        '});\n' +
+        'describe("b", () => {\n' +
+        '  const check = (x) => x;\n' +
+        '  it("hollow", () => { check(1); });\n' +
+        '});\n',
+    );
+    expect(m.get("real")).toMatchObject({ assertions: 1, hasMeaningfulOracle: true });
+    expect(
+      m.get("hollow"),
+      "a hollow case borrowed a sibling block's helper",
+    ).toMatchObject({ assertions: 0, hasMeaningfulOracle: false });
+  });
+
+  it("prefers the innermost declaration when a name is shadowed", () => {
+    // The other direction: an outer helper asserts trivially, the inner one
+    // meaningfully. Whichever wins must be the one the call actually reaches.
+    const m = byName(
+      'const check = (x) => expect(x).toBeDefined();\n' +
+        'describe("inner", () => {\n' +
+        '  const check = (x) => expect(x).toBe(1);\n' +
+        '  it("uses the inner one", () => { check(1); });\n' +
+        '});\n' +
+        'it("uses the outer one", () => { check(1); });\n',
+    );
+    expect(m.get("uses the inner one")).toMatchObject({ hasMeaningfulOracle: true });
+    expect(m.get("uses the outer one")).toMatchObject({
+      trivialAssertions: 1,
+      hasMeaningfulOracle: false,
+    });
+  });
+
+  it("counts a helper declared inside its own case exactly once per call", () => {
+    // The declaration sits in the case body, so the lexical walk counted its
+    // expect AND the call counted again: defined once, called once scored 2.
+    const m = meta(
+      'it("a", () => {\n' +
+        '  const check = (v) => expect(v).toBe(1);\n' +
+        '  check(2);\n' +
+        '});\n',
+    );
+    expect(m?.cases[0].assertions).toBe(1);
+  });
+
+  it("does not let the overcount scale with the number of calls", () => {
+    const m = meta(
+      'it("a", () => {\n' +
+        '  const check = (v) => expect(v).toBe(1);\n' +
+        '  check(1); check(2); check(3);\n' +
+        '});\n',
+    );
+    expect(m?.cases[0].assertions, "one lexical expect plus three calls").toBe(3);
+  });
+
+  it("still counts a function the case defines but never calls by name", () => {
+    // MEASURED, not assumed: zod's v3/tests/error.test.ts:154 declares
+    // `errorMap`, asserts inside it, and hands it to safeParse — which invokes
+    // it. Skipping every declaration scored that case 2 where it asserts 3
+    // times. Undercounting is the dangerous direction here, because a false
+    // hollow verdict blocks the conscience gate and reads as "delete this test".
+    const m = meta(
+      'it("a", () => {\n' +
+        '  const cb = (e) => { expect(e.path.length).toBe(2); return 1; };\n' +
+        '  const r = parse(input, { cb });\n' +
+        '  expect(r.ok).toEqual(false);\n' +
+        '});\n',
+    );
+    expect(m?.cases[0].assertions).toBe(2);
+  });
+
+  it("leaves a helper declared outside every case exactly as it was", () => {
+    // The path 1c212f1 was written for. It must not move.
+    const m = meta(
+      'const check = (v) => expect(v).toBe(1);\n' + 'it("a", () => { check(1); });\n',
+    );
+    expect(m?.cases[0].assertions).toBe(1);
+    expect(m?.cases[0].hasMeaningfulOracle).toBe(true);
+  });
+});

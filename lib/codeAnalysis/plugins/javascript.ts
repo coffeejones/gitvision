@@ -574,17 +574,46 @@ function stringLiteralText(node: TsNode): string {
   return "";
 }
 
-/** Named functions in this file whose body asserts.
+/** One local function declaration, with the region of source it is visible in.
+ *
+ *  The scope is what makes this safe. A flat name→helper map treats every
+ *  `check` in a file as the same `check`, and test files are full of small
+ *  same-named helpers in sibling `describe` blocks — so a genuinely hollow case
+ *  scored as asserting because a DIFFERENT block's helper carried the name. */
+interface LocalFunction {
+  /** Byte range of the block this declaration is visible in. Innermost wins,
+   *  which is how shadowing resolves. */
+  scopeStart: number;
+  scopeEnd: number;
+  /** False for a local function that asserts nothing. Recorded anyway: it is
+   *  what proves an outer helper of the same name is SHADOWED here, and
+   *  therefore not what this call reaches. */
+  asserts: boolean;
+  meaningful: boolean;
+  matcher: string | null;
+}
+
+/** Named functions in this file, with where each one is visible.
  *
  *  Deliberately shallow: one level, same file, and a helper's character is
  *  decided by the STRONGEST matcher it uses — a helper that ends in `toBe` is
  *  a meaningful oracle even if it also touches `toBeDefined` on the way. It
  *  does not follow imports; a shared helper in another module still reads as
  *  no assertion, which is a known remaining gap rather than a solved one. */
-function collectAssertionHelpers(
-  root: TsNode
-): Map<string, { meaningful: boolean; matcher: string | null }> {
-  const out = new Map<string, { meaningful: boolean; matcher: string | null }>();
+function collectAssertionHelpers(root: TsNode): Map<string, LocalFunction[]> {
+  const out = new Map<string, LocalFunction[]>();
+
+  /** The block a declaration is visible in: nearest enclosing statement block,
+   *  or the whole file. Good enough for how test files are written, and it is
+   *  the unit `describe` callbacks create. */
+  const scopeOf = (node: TsNode): TsNode => {
+    let p: TsNode | null = node.parent;
+    while (p) {
+      if (p.type === "statement_block" || p.type === "program") return p;
+      p = p.parent;
+    }
+    return root;
+  };
 
   const characterise = (body: TsNode) => {
     let meaningful = false;
@@ -625,13 +654,78 @@ function collectAssertionHelpers(
     }
     if (name && body) {
       const c = characterise(body);
-      if (c.found) out.set(name, { meaningful: c.meaningful, matcher: c.matcher });
+      const scope = scopeOf(node);
+      const arr = out.get(name) ?? [];
+      arr.push({
+        scopeStart: scope.startIndex,
+        scopeEnd: scope.endIndex,
+        asserts: c.found,
+        meaningful: c.meaningful,
+        matcher: c.matcher,
+      });
+      out.set(name, arr);
     }
     for (const child of node.namedChildren) visit(child);
   };
 
   visit(root);
   return out;
+}
+
+/** The name a node DEFINES as a local function, or null. Same two shapes
+ *  collectAssertionHelpers records. A definition's body is not the enclosing
+ *  case's work — whoever calls it owns those assertions. */
+function localFunctionName(node: TsNode): string | null {
+  if (node.type === "function_declaration") {
+    return node.childForFieldName("name")?.text ?? null;
+  }
+  if (node.type !== "variable_declarator") return null;
+  const v = node.childForFieldName("value");
+  if (v?.type !== "arrow_function" && v?.type !== "function_expression") return null;
+  return node.childForFieldName("name")?.text ?? null;
+}
+
+/** Names this case calls directly, so a declaration whose calls we can SEE is
+ *  attributed to the calls rather than counted twice.
+ *
+ *  Stops at a nested case opener for the same reason scanBody does: that case's
+ *  calls are its own. Anything not in here — a function handed to a runner, a
+ *  callback invoked by the library under test — keeps the old lexical count,
+ *  because we cannot see its invocation and must not assume it never happens. */
+function namesCalledIn(body: TsNode): Set<string> {
+  const out = new Set<string>();
+  const walk = (n: TsNode) => {
+    if (n.type === "call_expression") {
+      const fn = n.childForFieldName("function");
+      if (fn) {
+        if (caseOpenerRoot(fn)) return;
+        if (fn.type === "identifier") out.add(fn.text);
+      }
+    }
+    for (const c of n.namedChildren) walk(c);
+  };
+  walk(body);
+  return out;
+}
+
+/** Which declaration of `name` a call at `offset` actually reaches: the
+ *  innermost one whose scope contains it. Returns null when the name is not
+ *  declared in this file at all — an import, or a runner global. */
+function resolveLocalFunction(
+  helpers: Map<string, LocalFunction[]>,
+  name: string,
+  offset: number
+): LocalFunction | null {
+  const candidates = helpers.get(name);
+  if (!candidates) return null;
+  let best: LocalFunction | null = null;
+  for (const c of candidates) {
+    if (offset < c.scopeStart || offset > c.scopeEnd) continue;
+    if (!best || c.scopeEnd - c.scopeStart < best.scopeEnd - best.scopeStart) {
+      best = c;
+    }
+  }
+  return best;
 }
 
 /** Extract per-test-case assertion quality for one file. Self-contained walk
@@ -721,7 +815,21 @@ function extractTestMeta(root: TsNode): TestFileMeta | undefined {
   /** Scan one test-case callback body, tallying assertions into `tc`. Stops at
    *  a nested CASE opener (its assertions are its own); `test.step` and hooks
    *  are NOT case openers, so their assertions count toward the enclosing case. */
-  function scanBody(node: TsNode, tc: TestCaseMeta) {
+  function scanBody(node: TsNode, tc: TestCaseMeta, calledHere: Set<string>) {
+    // A helper DECLARED inside the case it serves is a definition, not an
+    // execution. Descending into it counted its `expect` lexically AND counted
+    // every call to it — `check` defined and called three times scored 4.
+    //
+    // Only when the case CALLS it by name, though. Measured on zod's
+    // v3/tests/error.test.ts:154: `errorMap` is declared in the case, asserts
+    // inside, and is never called by name — it is handed to safeParse, which
+    // invokes it. Skipping every declaration scored that case 2 where it
+    // asserts 3 times. When we cannot see the call, counting the body is the
+    // safer error: a false HOLLOW verdict is in the conscience gate's
+    // BLOCKING_KINDS and reads as an instruction to delete working coverage.
+    const declName = localFunctionName(node);
+    if (declName && calledHere.has(declName)) return;
+
     if (node.type === "call_expression") {
       const fn = node.childForFieldName("function");
       if (fn) {
@@ -730,17 +838,23 @@ function extractTestMeta(root: TsNode): TestFileMeta | undefined {
         // the helper's internal count, which would inflate a case that calls a
         // three-assertion helper once.
         if (fn.type === "identifier") {
-          const h = helpers.get(fn.text);
+          // Resolved by SCOPE, not by name alone: sibling describe blocks
+          // routinely each declare their own `check`, and a flat lookup handed
+          // one block's helper to the other block's calls.
+          const h = resolveLocalFunction(helpers, fn.text, fn.startIndex);
           if (h) {
-            record(tc, h.matcher, !h.meaningful);
-            for (const child of node.namedChildren) scanBody(child, tc);
+            // A local function that asserts nothing records nothing — and,
+            // because it was found, it also stops an outer helper of the same
+            // name from being credited for a call it never receives.
+            if (h.asserts) record(tc, h.matcher, !h.meaningful);
+            for (const child of node.namedChildren) scanBody(child, tc, calledHere);
             return;
           }
         }
         classifyAssertion(node, fn, tc);
       }
     }
-    for (const child of node.namedChildren) scanBody(child, tc);
+    for (const child of node.namedChildren) scanBody(child, tc, calledHere);
   }
 
   /** Top-level walk: open a case for each case-opening runner with a callback. */
@@ -762,7 +876,7 @@ function extractTestMeta(root: TsNode): TestFileMeta | undefined {
             hasMeaningfulOracle: false,
           };
           const body = callback.childForFieldName("body");
-          if (body) scanBody(body, tc);
+          if (body) scanBody(body, tc, namesCalledIn(body));
           cases.push(tc);
         }
       }
