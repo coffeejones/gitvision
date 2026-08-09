@@ -15,14 +15,14 @@ import {
 } from "../brief/guidance";
 import { getWorkspaceGoals, withBriefContext } from "../brief/goals";
 import { qualifiesForImproveRecommendation } from "../brief/improve";
+import { loadSnapshot } from "./helpers/sessionFixture";
 
-const session = (id: string): AnalysisSnapshot =>
-  JSON.parse(
-    readFileSync(
-      path.join(process.cwd(), ".gitvision", "sessions", `${id}.json`),
-      "utf-8",
-    ),
-  ).snapshots.at(-1);
+// Through the fixture loader, never straight off the gitignored session
+// directory — reading that directly passes on the machine that captured the
+// analysis and throws ENOENT on CI. It did: run 31256876872 went red on
+// PGlVvQRlAh.json the day after the fixtures were committed to stop exactly
+// this. lib/__tests__/fixtureDiscipline.test.ts now holds the line.
+const session = (id: string): AnalysisSnapshot => loadSnapshot<AnalysisSnapshot>(id);
 
 function brief(
   subject: SubjectId,
