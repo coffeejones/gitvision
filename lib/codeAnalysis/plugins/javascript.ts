@@ -24,6 +24,7 @@ import type {
   ParsedClass,
   ParsedField,
   ParsedFile,
+  EntryPointInfo,
   ParsedFunction,
   ParsedImport,
   PluginQueries,
@@ -461,6 +462,97 @@ const GETTER_TRIVIAL = new Set([
   "empty",
   "NaN",
 ]);
+
+// ------------------- Route handlers (entry-point reader) -------------------
+//
+// Next.js App Router declares an HTTP route by FILE LOCATION plus an exported
+// function named after the method:
+//
+//   app/api/sessions/[id]/route.ts
+//     export async function GET(req: Request) { ... }
+//
+// Routing is not a call edge, so the graph cannot see this — a route handler
+// typically has zero inbound callers and looks like dead code. Marking it is
+// what lets reachability start somewhere real.
+//
+// DISCRIMINATOR, and it has to be all three at once: the file is named
+// `route.<ext>`, it sits under an `app/` segment, and the export's name is
+// exactly an HTTP verb. Next.js reserves that filename inside `app/`, so the
+// three together ARE the declaration — the same standing this plugin gives a
+// Python decorator, not a guess about intent.
+//
+// Each part is load-bearing. Keyed on "under app/" alone it would stamp
+// app/sitemap.ts, app/robots.ts and app/manifest.ts, which all export a default
+// named function and serve no route. Without the verb check it would stamp any
+// helper that happens to live in a route file. Without the export check it
+// would stamp a local `function GET()` that Next.js never sees.
+//
+// WHAT THIS DOES NOT READ, deliberately, and measured before deciding:
+// `app.get("/x", handler)` — Express, Koa-router, Hono, Fastify. Two reasons,
+// both counted on the corpora available here rather than guessed:
+//
+//   1. Yield. Of 42 real registrations in node_modules, 30 pass an INLINE
+//      anonymous arrow. This plugin does not emit anonymous functions, so there
+//      is no function node to stamp — 71% of the shape is unreachable without
+//      changing what counts as a function, which would move complexity,
+//      duplicate and blast-radius numbers everywhere.
+//   2. False positives. An HTTP CLIENT call is syntactically identical:
+//      `api.post("/messages", body)` against an axios instance appears 114
+//      times in two-argument form across the bench repos, and
+//      `this._client.post("/v1/complete", ...)` 43 times in the Anthropic SDK.
+//      A receiver-name allowlist does not separate them — the axios instance is
+//      literally named `api`. Telling them apart needs receiver-origin analysis
+//      (was it assigned from `express()` / `new Hono()`?), which is real work
+//      and is not this change.
+//
+// A wrong entry point invents reachability, and reachability is what the
+// security layer suppresses findings with. Declining is the cheap error.
+
+/** Exported names Next.js treats as route handlers. `default` is NOT one:
+ *  a default export in a route file is not a method and Next ignores it. */
+const NEXT_ROUTE_VERBS = new Set([
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "HEAD",
+  "OPTIONS",
+]);
+
+/** The URL path a Next.js App Router route file serves, or null when the file
+ *  is not one.
+ *
+ *  The path IS the declaration in this framework, the way the string inside
+ *  `@app.get("/x")` is in Flask. Two transformations, both Next's own
+ *  documented rules rather than inference: everything up to and including the
+ *  `app` segment is chrome, and a `(group)` segment is organisational and does
+ *  not appear in the URL. Dynamic segments are left exactly as written —
+ *  `[id]` stays `[id]`, because rewriting it to `:id` would be us inventing a
+ *  spelling the repo never used. */
+function nextRouteFilePath(rel: string): string | null {
+  const parts = rel.split("/");
+  const base = parts[parts.length - 1];
+  if (!/^route\.[cm]?[jt]sx?$/.test(base)) return null;
+  const dirs = parts.slice(0, -1);
+  const appAt = dirs.lastIndexOf("app");
+  if (appAt === -1) return null;
+  const segments = dirs
+    .slice(appAt + 1)
+    .filter((s) => !(s.startsWith("(") && s.endsWith(")")));
+  return `/${segments.join("/")}`;
+}
+
+/** Is this declaration exported? Next.js only serves exported handlers, so a
+ *  local helper named `GET` in a route file is not a route. The node is either
+ *  a direct child of an `export_statement` (function declarations) or a
+ *  declarator two levels down (`export const GET = ...`). */
+function isExportedDeclaration(node: TsNode): boolean {
+  const parent = node.parent;
+  if (!parent) return false;
+  if (parent.type === "export_statement") return true;
+  return parent.parent?.type === "export_statement";
+}
 
 /** Cheap path gate so the extra walk only runs on plausible JS/TS test files.
  *  Path-based, hence language-neutral. */
@@ -906,6 +998,26 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
 
   const imports: ParsedImport[] = [];
   const functions: ParsedFunction[] = [];
+  // Cheap path gate, computed once: null for every file that is not a Next.js
+  // App Router route file, which is almost all of them.
+  const routePath = nextRouteFilePath(file.rel);
+  /** The route stamp for an exported handler named after an HTTP verb in this
+   *  file, or undefined. Node-local: no cross-file state, so an incremental
+   *  re-parse produces the same graph as a full one. */
+  const routeEntryPoint = (
+    name: string,
+    node: TsNode
+  ): EntryPointInfo | undefined =>
+    routePath !== null &&
+    NEXT_ROUTE_VERBS.has(name) &&
+    isExportedDeclaration(node)
+      ? {
+          kind: "http-route",
+          methods: [name],
+          route: routePath,
+          via: `export ${name} in route${file.ext ? `.${file.ext}` : ""}`,
+        }
+      : undefined;
   const calls: ParsedCall[] = [];
   const sinks: SinkFinding[] = [];
   const moduleTainted = new Map<string, TaintEvidence>();
@@ -1655,6 +1767,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
           complexity: 1 + ms.decisionPoints,
           containerType: currentClass()?.name,
           bodyHash: body ? hashSubtree(body) : undefined,
+          entryPoint: routeEntryPoint(fnName, node),
         });
         return;
       }
@@ -1720,6 +1833,7 @@ function parseJsDirect(file: SourceFile, ix: FileIndex): ParsedFile {
             complexity: 1 + ms.decisionPoints,
             containerType: currentClass()?.name,
             bodyHash: body ? hashSubtree(body) : undefined,
+            entryPoint: routeEntryPoint(fnName, node),
           });
           return; // already visited the body above
         }

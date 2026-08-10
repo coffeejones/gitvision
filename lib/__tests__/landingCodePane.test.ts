@@ -140,7 +140,17 @@ describe("the shown slice stays true to the file it names", () => {
     const slice = file
       .slice(LANDING_SOURCE.firstLine - 1, LANDING_SOURCE.firstLine - 1 + LANDING_SOURCE.code.split("\n").length)
       .join("\n");
-    expect(slice).toBe(LANDING_SOURCE.code);
+    // Editing anything ABOVE the pinned function moves it, and then the only
+    // repair is a new line number. Say which one, so the fix is mechanical
+    // rather than a hunt — this failed three times in one afternoon and every
+    // hunt is a chance to write down the wrong number.
+    const actual = file.findIndex((l) => l.includes(`function ${LANDING_SOURCE.fn.name}(`));
+    expect(
+      slice,
+      actual >= 0 && actual + 1 !== LANDING_SOURCE.firstLine
+        ? `${LANDING_SOURCE.fn.name} is now at line ${actual + 1}, not ${LANDING_SOURCE.firstLine} — update fn.line and firstLine in lib/landingSource.ts`
+        : "the pinned slice no longer matches the file",
+    ).toBe(LANDING_SOURCE.code);
   });
 
   it("is verbatim in the commit it names, not only in the working tree", () => {

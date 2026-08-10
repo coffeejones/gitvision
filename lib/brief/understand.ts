@@ -38,11 +38,24 @@ export function buildUnderstandBrief(
       .sort((a, b) => b.score - a.score)
       .slice(0, MAX_PER_SECTION);
     for (const [i, e] of entries.entries()) {
+      // The URL, when the declaration carried one. "GET /api/sessions" is the
+      // thing the reader recognises; the function's name is our word for it.
+      // Showing "a declared route-like" while holding the actual path was
+      // hiding the best evidence we have behind a category name.
+      const method = e.declared?.methods?.join("/");
+      const label =
+        e.declared?.route !== undefined
+          ? `${method ? `${method} ` : ""}${e.declared.route}`
+          : e.name;
       doors.push({
         id: `entry:${i}:${e.id}`,
         soWhat: `When something outside calls this project, this is one of the places it lands.`,
-        title: `${e.name} — ${e.filePath}`,
-        evidence: `A declared ${e.kind} — the code says so, we did not guess it. From here you can follow ${e.fanOut} function${e.fanOut === 1 ? "" : "s"} in this repo.`,
+        title: `${label} — ${e.filePath}`,
+        evidence:
+          (e.declared?.via
+            ? `Declared by \`${e.declared.via}\` — the code says so, we did not guess it.`
+            : `A declared entry point — the code says so, we did not guess it.`) +
+          ` From here you can follow ${e.fanOut} function${e.fanOut === 1 ? "" : "s"} in this repo.`,
         href: `${base}/flows`,
         term: "fan-out",
       });
