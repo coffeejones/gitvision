@@ -128,3 +128,50 @@ describe("the one exemption still earns itself", () => {
     expect(ALLOWED.size, "a new exemption needs a reason written next to it").toBe(1);
   });
 });
+
+describe("the fixtures are documented as they actually are", () => {
+  // The helper's header spent four months arguing that committing these was
+  // infeasible — 61 MB raw, 10 MB trimmed — while ten of them sat in the
+  // directory next to it. Both numbers were measured uncompressed, which was the
+  // whole error, and the same false rationale had been copied verbatim into four
+  // test files. A comment that argues against work already done sends the next
+  // reader to redo the analysis that produced it.
+  const FIXTURE_DIR = path.join(TEST_DIR, "fixtures", "sessions");
+
+  const DISPROVEN = [
+    "far too much to commit",
+    "~300 KB for all three",
+    "Committed, trimmed",
+  ];
+
+  it("does not repeat a rationale the repository disproved", () => {
+    const offenders: string[] = [];
+    for (const file of testFiles(TEST_DIR)) {
+      const src = readFileSync(path.join(TEST_DIR, file), "utf-8");
+      for (const claim of DISPROVEN) {
+        if (src.includes(claim) && file !== SELF) offenders.push(`${file}: "${claim}"`);
+      }
+    }
+    expect(offenders, "a disproven claim about the fixtures is back").toEqual([]);
+  });
+
+  it("has fixtures to be wrong about", () => {
+    const files = readdirSync(FIXTURE_DIR).filter((f) => f.endsWith(".json.gz"));
+    expect(files.length, "no fixtures — the guard above would pass vacuously")
+      .toBeGreaterThan(3);
+  });
+
+  it("stores whole snapshots, and the helper says so", () => {
+    // The generator and the helper have to agree, or the next person trims.
+    const generator = readFileSync(
+      path.join(process.cwd(), "bench", "makeSessionFixtures.ts"),
+      "utf-8",
+    );
+    expect(generator).toContain("The WHOLE snapshot is stored, not a trimmed one");
+    const helper = readFileSync(path.join(TEST_DIR, OWNER), "utf-8");
+    expect(helper).toMatch(/WHOLE, gzipped snapshots/);
+    expect(helper, "the helper claims a trim the generator does not do").not.toMatch(
+      /Committed, trimmed/,
+    );
+  });
+});

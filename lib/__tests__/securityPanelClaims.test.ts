@@ -32,6 +32,7 @@ import {
   findIncidentMatches,
 } from "../security/knownIncidents";
 import { loadSnapshot } from "./helpers/sessionFixture";
+import { securityGapsShown } from "@/components/views/security/FindingsList";
 
 const session = (id: string): AnalysisSnapshot => loadSnapshot<AnalysisSnapshot>(id);
 
@@ -148,5 +149,84 @@ describe("the scope note does not claim more rigour than the page shows", () => 
     // honesty on the page and must survive edits to its neighbour.
     expect(panelSrc).toContain("These four scanners are not a security review");
     expect(panelSrc).toMatch(/outnumber the ones we report roughly two to one/);
+  });
+});
+
+describe("the empty-findings card names what was not checked", () => {
+  // c68004a took the green tick off the tiles. The same claim survived twenty
+  // inches further down the page: an empty findings list rendered a ShieldCheck
+  // and "The deterministic scanners ran on this snapshot and surfaced nothing
+  // actionable" — gated on `unchecked.none` alone, so it fired on a page that
+  // was simultaneously showing NOT SCANNED pills.
+  //
+  // Two live shapes. All 22 stored sessions lack sinkFindings and 20 lack
+  // riskyPatternFindings, so a clean JS/TS repo hit it every time. And no stored
+  // session is mixed-language, which is why the rule is tested here as a
+  // function rather than asserted from a screenshot.
+
+  it("carries the scanners that produced no data", () => {
+    expect(securityGapsShown(null, ["code paths", "patterns"])).toEqual([
+      "code paths",
+      "patterns",
+    ]);
+  });
+
+  it("carries a language with no rules even when another language had them", () => {
+    // `none === false` is the mixed case: JS got rules, Java did not. The old
+    // condition treated it as fully checked.
+    const gaps = securityGapsShown(
+      { plugins: ["java"], files: 210, none: false },
+      [],
+    );
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]).toContain("java");
+    expect(gaps[0]).toContain("no rules for it");
+  });
+
+  it("pluralises when several languages went unruled", () => {
+    const gaps = securityGapsShown(
+      { plugins: ["java", "go"], files: 400, none: false },
+      [],
+    );
+    expect(gaps[0]).toContain("java + go");
+    expect(gaps[0]).toContain("no rules for them");
+  });
+
+  it("does not repeat the no-rules-at-all case, which has its own paragraph", () => {
+    // `none === true` gets the fuller explanation above; listing it here would
+    // say the same thing twice in two voices.
+    expect(securityGapsShown({ plugins: ["go"], files: 99, none: true }, [])).toEqual(
+      [],
+    );
+  });
+
+  it("is empty only when everything really did run", () => {
+    expect(securityGapsShown(null, [])).toEqual([]);
+    expect(securityGapsShown(undefined, [])).toEqual([]);
+  });
+
+  it("keeps the confident sentence behind that emptiness", () => {
+    const src = readFileSync(
+      path.join(process.cwd(), "components", "views", "security", "FindingsList.tsx"),
+      "utf-8",
+    );
+    // The claim may still exist — it is true when nothing is missing. What must
+    // not exist is a path to it that skips the check.
+    expect(src).toContain("The deterministic scanners ran on this snapshot");
+    expect(src).toMatch(/gapsHere\.length > 0/);
+    expect(src, "the honest branch must come first").toMatch(
+      /gapsHere\.length > 0 \? \(/,
+    );
+  });
+
+  it("hands the card the same list the rollup line prints", () => {
+    // The contradiction was two components deriving "what is missing"
+    // independently. One list, passed down.
+    const panel = readFileSync(
+      path.join(process.cwd(), "components", "views", "security", "SecurityPanel.tsx"),
+      "utf-8",
+    );
+    expect(panel).toContain("notScanned={notScanned}");
+    expect(panel).toMatch(/notScanned\.join\(" \+ "\)/);
   });
 });

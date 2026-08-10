@@ -24,9 +24,11 @@ import {
 // Resolved through the shared helper: cwd first, then the main checkout, so
 // this works from a git worktree. See helpers/sessionFixture.ts.
 
-// These assert against REAL captured analyses — a synthetic graph would
-// defeat the point — and the four total 61 MB, far too much to commit. A
-// machine without them reports skipped rather than broken.
+// These assert against REAL captured analyses — a synthetic graph would defeat
+// the point. They are committed, gzipped, under lib/__tests__/fixtures/sessions
+// (~250-360 KB each, a code graph compresses about 20:1), so CI runs the same
+// assertions instead of skipping them. Regenerate with
+// `npx tsx bench/makeSessionFixtures.ts`.
 const HAVE = hasSessions("gx1lLA07kO", "yAwwHY_ShB", "o5QTmaYTwE", "DBtU3d_Gfk");
 const session = (id: string): AnalysisSnapshot => loadSnapshot<AnalysisSnapshot>(id);
 
@@ -41,9 +43,11 @@ const REPOS = [
   ["DBtU3d_Gfk", "colinhacks/zod"],
 ] as const;
 
-// o5QTmaYTwE is this repo and ships no fixture — see helpers/sessionFixture.ts.
-// Drop what this machine cannot load instead of skipping the whole file: three
-// real repos of different shapes still answer the question these tests ask.
+// Every REPOS entry ships a committed fixture, so this filter removes nothing
+// today — it is here so a machine that somehow cannot load one still runs the
+// other three rather than skipping the file. The comment that used to sit here
+// claimed o5QTmaYTwE ships no fixture; the same commit that wrote it committed
+// o5QTmaYTwE.json.gz.
 const AVAILABLE = REPOS.filter(([id]) => hasSessions(id));
 
 describe("the registry is the only list of subjects", () => {

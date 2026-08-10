@@ -125,11 +125,14 @@ export function SecurityPanel({ snapshot, sessionId, unchecked }: Props) {
   const unproven = sinkFindings.filter(
     (f) => f.reachability !== "reachable",
   ).length;
+  // Narrowed rather than `.filter(Boolean)`, because this list is now handed to
+  // the empty-findings card as well as to the rollup line — the two must name
+  // the same gaps or the page contradicts itself, which is the bug this fixes.
   const notScanned = [
     sinksState === "not-scanned" ? "code paths" : null,
     secretsState === "not-scanned" ? "secrets" : null,
     patternsState === "not-scanned" ? "patterns" : null,
-  ].filter(Boolean);
+  ].filter((s): s is string => s !== null);
 
   return (
     <div className="flex flex-col gap-8">
@@ -240,6 +243,7 @@ export function SecurityPanel({ snapshot, sessionId, unchecked }: Props) {
           sinkFindings={sinkFindings}
           sessionId={sessionId}
           unchecked={unchecked}
+          notScanned={notScanned}
           repoPrivate={snapshot.repo.private === true}
         />
       </div>

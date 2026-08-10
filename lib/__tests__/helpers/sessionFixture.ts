@@ -1,9 +1,19 @@
 // Locating the stored sessions these tests read.
 //
-// They assert against REAL analyses on purpose — "agrees on a real session,
-// not just a fixture" — so a synthetic graph would defeat the point, and the
-// four they use total 61 MB (10 MB even trimmed to the fields the code reads),
-// which is far too much to commit.
+// They assert against REAL analyses on purpose — "agrees on a real session, not
+// just a fixture" — so a synthetic graph would defeat the point.
+//
+// This header used to argue that committing them was infeasible: 61 MB raw, or
+// 10 MB trimmed to the fields the code reads. Both numbers were measured
+// UNCOMPRESSED, and that was the whole error — a code graph is mostly repeated
+// key names and gzips about 20:1. Ten snapshots are 2.4 MB on disk. The
+// rationale survived the commit that disproved it, which is how a comment
+// becomes an argument against work that has already been done.
+//
+// Trimming was tried and rejected on its own merits, not on size: a hand-kept
+// list of "fields the tests need" saved 600 KB and broke eight assertions that
+// reach snapshot fields through helpers. bench/makeSessionFixtures.ts stores the
+// WHOLE snapshot and says so.
 //
 // What broke was never the data, it was the lookup: the helpers resolved
 // `process.cwd()/.gitvision/sessions`, and in a git WORKTREE that is the
@@ -17,8 +27,9 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 
-/** Committed, trimmed, gzipped snapshots — the same real analyses, ~300 KB for
- *  all three, so CI runs the same assertions instead of skipping them.
+/** Committed, WHOLE, gzipped snapshots — the same real analyses, ten of them at
+ *  roughly 250-360 KB each, so CI runs the same assertions instead of skipping
+ *  them. Not trimmed: see the header.
  *  Regenerate with `npx tsx bench/makeSessionFixtures.ts`. */
 const FIXTURE_DIR = path.join(__dirname, "..", "fixtures", "sessions");
 

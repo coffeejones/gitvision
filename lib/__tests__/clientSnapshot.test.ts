@@ -24,6 +24,8 @@ import path from "node:path";
 
 import type { AnalysisSnapshot } from "../types";
 import type { CodeGraph } from "../codeAnalysis/types";
+import { computeTestCoverage } from "../codeAnalysis/testCoverage";
+import { loadSnapshot } from "./helpers/sessionFixture";
 import {
   toClientSnapshot,
   computeShellGraphCounts,
@@ -32,6 +34,17 @@ import {
   MAX_PALETTE_FUNCTIONS,
   toCodeTabSnapshot,
 } from "../clientSnapshot";
+
+/** The committed fixtures, by id. Real analyses of real repos — the constructed
+ *  graphs below cannot produce the shape this bug lived in (a test file with no
+ *  entry in cg.functions, known only by its unresolved outgoing calls). */
+const FIXTURE_IDS = [
+  "DBtU3d_Gfk", // colinhacks/zod — 172 test files, 80 of them lost to the trim
+  "yAwwHY_ShB", // pallets/flask
+  "xEHUPsZ73L", // rspec/rspec-core
+  "XmCB5--NkT", // serilog/serilog
+  "6xw0IjzqRh", // coffeejones/gitvision
+];
 
 const ROOT = process.cwd();
 const ROUTES_DIR = path.join(ROOT, "app", "session", "[id]");
@@ -296,7 +309,7 @@ describe("toCodeTabSnapshot", () => {
   const snap = (graph: CodeGraph): AnalysisSnapshot =>
     ({ codeGraph: graph }) as unknown as AnalysisSnapshot;
 
-  it("drops the unresolved call edges", () => {
+  it("drops the bulk of the unresolved call edges", () => {
     // Measured on NetBox: 81,013 edges, 8,230 resolved. `calls` is 17 MB of the
     // graph's 23 MB, and the Code tab is the one page that needs the graph
     // client-side at all.
@@ -307,13 +320,71 @@ describe("toCodeTabSnapshot", () => {
         { fromFile: "a.ts", calleeName: "parseInt" },
       ])),
     );
-    expect(out.codeGraph!.calls).toHaveLength(1);
-    expect(out.codeGraph!.calls[0].toFile).toBe("b.ts");
+    // One resolved edge, plus ONE unresolved edge standing in for a.ts.
+    expect(out.codeGraph!.calls).toHaveLength(2);
+    expect(out.codeGraph!.calls.filter((c) => c.toFile === "b.ts")).toHaveLength(1);
+  });
+
+  it("keeps one unresolved edge per caller file, and no more", () => {
+    // The exception that makes the coverage pass survive the trim. It is per
+    // distinct PATH, because that is the granularity computeTestCoverage
+    // classifies at — anything finer is payload for nothing.
+    const out = toCodeTabSnapshot(
+      snap(cg([
+        { fromFile: "a.test.ts", toFile: null, calleeName: "x" },
+        { fromFile: "a.test.ts", toFile: null, calleeName: "y" },
+        { fromFile: "a.test.ts", toFile: null, calleeName: "z" },
+        { fromFile: "b.test.ts", toFile: null, calleeName: "x" },
+      ])),
+    );
+    expect(out.codeGraph!.calls).toHaveLength(2);
+    expect(out.codeGraph!.calls.map((c) => c.fromFile).sort()).toEqual([
+      "a.test.ts",
+      "b.test.ts",
+    ]);
   });
 
   it("keeps everything else on the graph", () => {
     const out = toCodeTabSnapshot(snap(cg([], { fileComplexity: { "a.ts": 9 } })));
     expect(out.codeGraph!.fileComplexity).toEqual({ "a.ts": 9 });
+  });
+
+  it("leaves the Code tab's coverage totals identical to the server's", () => {
+    // The one that matters, and the one the constructed cases above cannot
+    // reach. computeTestCoverage classifies a file as test-or-prod from EVERY
+    // edge's fromFile, resolved or not — a test file whose own defs never landed
+    // in cg.functions is known only by its outgoing calls. Dropping unresolved
+    // edges therefore deleted test files from the browser's pass while the
+    // server's pass on the same page still counted them.
+    //
+    // Measured before the fix: zod 172 test files -> 92, flask 44 -> 37,
+    // rspec-core 103 -> 98, serilog 96 -> 93. CodePanel renders that number in
+    // the Untested-hotspots tooltip and gates the whole panel on it.
+    for (const id of FIXTURE_IDS) {
+      const snapshot = loadSnapshot<AnalysisSnapshot>(id);
+      if (!snapshot.codeGraph) continue;
+      const server = computeTestCoverage(snapshot.codeGraph);
+      const client = computeTestCoverage(toCodeTabSnapshot(snapshot).codeGraph!);
+      expect(client.totals, `${id} sees a different repo than the server does`).toEqual(
+        server.totals,
+      );
+    }
+  });
+
+  it("pays for that in edges, not in the whole graph", () => {
+    // The exception has to stay bounded by file count, or it quietly undoes the
+    // reason this function exists. Measured across the committed fixtures: the
+    // unresolved representatives are a small fraction of what is dropped.
+    let all = 0;
+    let kept = 0;
+    for (const id of FIXTURE_IDS) {
+      const snapshot = loadSnapshot<AnalysisSnapshot>(id);
+      if (!snapshot.codeGraph) continue;
+      all += snapshot.codeGraph.calls.length;
+      kept += toCodeTabSnapshot(snapshot).codeGraph!.calls.length;
+    }
+    expect(all).toBeGreaterThan(0);
+    expect(kept / all, "the trim stopped trimming").toBeLessThan(0.5);
   });
 
   it("passes a graph-free snapshot through untouched", () => {

@@ -49,6 +49,17 @@ interface Props {
    *  state must not claim the scanners ran — on a Go or Java repo they did not,
    *  and this card was the loudest false statement on the page. */
   unchecked?: UncheckedLanguages | null;
+  /** Scanners that produced no data at all on this snapshot, already named by
+   *  SecurityPanel for the rollup line ("code paths", "patterns").
+   *
+   *  The empty-findings card used to be gated on `unchecked.none` alone, so it
+   *  claimed "the deterministic scanners ran on this snapshot" on a page that
+   *  was, three inches higher, showing NOT SCANNED pills for those same
+   *  scanners. Two ways to be wrong, both live: a pure JS/TS repo leaves
+   *  `unchecked` null while sinkFindings is absent (true of all 22 stored
+   *  sessions), and a mixed JS+Java repo has `none === false` while every Java
+   *  file went unexamined. */
+  notScanned?: string[];
 }
 
 export function FindingsList({
@@ -59,6 +70,7 @@ export function FindingsList({
   sinkFindings = [],
   sessionId,
   repoPrivate = false,
+  notScanned = [],
 }: Props) {
   const all = buildUnifiedFindings(
     incidentMatches,
@@ -68,7 +80,7 @@ export function FindingsList({
   );
 
   if (all.length === 0) {
-    return <CleanListState unchecked={unchecked} />;
+    return <CleanListState unchecked={unchecked} notScanned={notScanned} />;
   }
 
   return (
@@ -358,7 +370,45 @@ function PatternRowContent({
 
 // ─── Clean state ─────────────────────────────────────────────────
 
-function CleanListState({ unchecked }: { unchecked?: UncheckedLanguages | null }) {
+/** Join a list the way a person would: "a", "a and b", "a, b and c". */
+function sentence(parts: string[]): string {
+  if (parts.length === 1) return `${parts[0]} was not checked`;
+  const last = parts[parts.length - 1];
+  return `${parts.slice(0, -1).join(", ")} and ${last} were not checked`;
+}
+
+/** Everything the empty-findings card knows it did not look at.
+ *
+ *  Exported because it is the load-bearing part and the shapes that matter are
+ *  not all reachable from the stored sessions: none of them is a mixed-language
+ *  repo (`unchecked` non-null with `none === false`), which is exactly the case
+ *  that used to fall through to "the deterministic scanners ran".
+ *
+ *  `none === true` is deliberately NOT listed here — that case has its own,
+ *  fuller paragraph, and repeating it would say the same thing twice. */
+export function securityGapsShown(
+  unchecked: UncheckedLanguages | null | undefined,
+  notScanned: string[],
+): string[] {
+  const mixed =
+    unchecked && !unchecked.none
+      ? [
+          `${unchecked.plugins.join(" + ")} (no rules for ${
+            unchecked.plugins.length === 1 ? "it" : "them"
+          })`,
+        ]
+      : [];
+  return [...notScanned, ...mixed];
+}
+
+function CleanListState({
+  unchecked,
+  notScanned = [],
+}: {
+  unchecked?: UncheckedLanguages | null;
+  notScanned?: string[];
+}) {
+  const gapsHere = securityGapsShown(unchecked, notScanned);
   return (
     <div
       className="flex items-center gap-3 px-4 py-6 rounded-lg"
@@ -378,7 +428,9 @@ function CleanListState({ unchecked }: { unchecked?: UncheckedLanguages | null }
         >
           {unchecked?.none
             ? "No findings — and no rules ran on this language."
-            : "No findings across any scanner."}
+            : gapsHere.length > 0
+              ? "No findings — and not everything was checked."
+              : "No findings across any scanner."}
         </p>
         <p className="text-xs" style={{ color: TOK.textMuted }}>
           {unchecked?.none ? (
@@ -388,6 +440,15 @@ function CleanListState({ unchecked }: { unchecked?: UncheckedLanguages | null }
               dangerous-call rules exist for Python and JavaScript/TypeScript
               only. Nothing here was examined for injection, deserialisation
               or path traversal.
+            </>
+          ) : gapsHere.length > 0 ? (
+            // The honest version of the sentence below. Naming the gap is the
+            // whole difference between "we looked and it is fine" and "some of
+            // this was never looked at" — and the page already says so in the
+            // rollup, so the two must not disagree.
+            <>
+              {sentence(gapsHere)}. Everything else ran and surfaced nothing
+              actionable. Refreshing the session re-runs all of them.
             </>
           ) : (
             <>

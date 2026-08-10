@@ -76,10 +76,28 @@ export const MAX_PALETTE_FUNCTIONS = 200;
  *  it recomputes duplicates and blast radius as the reader picks files, so the
  *  ClientSnapshot boundary above cannot apply to it.
  *
- *  What it does NOT need is the unresolved call edges. Blast radius skips them
- *  explicitly (`if (c.toFile === null) continue`), test coverage only reads
- *  edges with a toFile, and the one consumer that does need them — the
- *  own-call-resolution percentage — is already computed server-side.
+ *  What it does NOT need is the BULK of the unresolved call edges. Blast radius
+ *  skips them explicitly (`if (c.toFile === null) continue`), and the one
+ *  consumer that needs them all — the own-call-resolution percentage — is
+ *  already computed server-side.
+ *
+ *  One unresolved edge per distinct caller FILE is kept, though, and that
+ *  exception is the whole point of this function having a doc comment.
+ *
+ *  This used to drop them outright, on the stated grounds that "test coverage
+ *  only reads edges with a toFile". It does not: computeTestCoverage's step 1
+ *  calls `classify(c.fromFile)` for EVERY edge, resolved or not, precisely
+ *  because a test file's own function defs sometimes never land in
+ *  cg.functions — its outgoing calls are the only evidence the file exists. So
+ *  dropping unresolved edges deleted test files from the client-side pass while
+ *  the server-side pass on the same page still counted them. Measured on stored
+ *  sessions: zod 172 -> 92, flask 44 -> 37, rspec-core 103 -> 98, serilog
+ *  96 -> 93. The Untested-hotspots tooltip renders that number, and
+ *  CodePanel.tsx gates the entire panel on it being above zero.
+ *
+ *  Classification is per distinct PATH, so one edge per path restores it
+ *  exactly. The cost is bounded by the file count rather than the edge count —
+ *  on NetBox that is a few thousand edges against the 72,783 dropped.
  *
  *  Measured on NetBox: 81,013 call edges, of which 8,230 resolve. `calls` is
  *  17 MB of the graph's 23 MB, and dropping the unresolved ones takes it to
@@ -87,10 +105,14 @@ export const MAX_PALETTE_FUNCTIONS = 200;
 export function toCodeTabSnapshot(snapshot: AnalysisSnapshot): AnalysisSnapshot {
   const cg = snapshot.codeGraph;
   if (!cg) return snapshot;
-  return {
-    ...snapshot,
-    codeGraph: { ...cg, calls: cg.calls.filter((c) => c.toFile !== null && c.toFile !== undefined) },
-  };
+  const seenUnresolvedFrom = new Set<string>();
+  const calls = cg.calls.filter((c) => {
+    if (c.toFile !== null && c.toFile !== undefined) return true;
+    if (seenUnresolvedFrom.has(c.fromFile)) return false;
+    seenUnresolvedFrom.add(c.fromFile);
+    return true;
+  });
+  return { ...snapshot, codeGraph: { ...cg, calls } };
 }
 
 export function toClientSnapshot(snapshot: AnalysisSnapshot): ClientSnapshot {

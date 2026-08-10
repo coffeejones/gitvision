@@ -29,9 +29,11 @@ import { buildReadingInput } from "../brief/reading";
 // Resolved through the shared helper: cwd first, then the main checkout, so
 // this works from a git worktree. See helpers/sessionFixture.ts.
 
-// These assert against REAL captured analyses — a synthetic graph would
-// defeat the point — and the four total 61 MB, far too much to commit. A
-// machine without them reports skipped rather than broken.
+// These assert against REAL captured analyses — a synthetic graph would defeat
+// the point. They are committed, gzipped, under lib/__tests__/fixtures/sessions
+// (~250-360 KB each, a code graph compresses about 20:1), so CI runs the same
+// assertions instead of skipping them. Regenerate with
+// `npx tsx bench/makeSessionFixtures.ts`.
 const HAVE = hasSessions("gx1lLA07kO", "yAwwHY_ShB", "o5QTmaYTwE", "DBtU3d_Gfk");
 const session = (id: string): AnalysisSnapshot => loadSnapshot<AnalysisSnapshot>(id);
 
