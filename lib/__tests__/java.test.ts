@@ -628,3 +628,158 @@ describe("javaPlugin — class extraction for Architecture tab", () => {
     expect(byName.get("name")?.type).toBe("String");
   });
 });
+
+// Receiver shapes the resolver could not type, and the enum call it never saw.
+//
+// All of this came from one real report. A Java school project's `Dish.price()`
+// read "no test reaches it" on the merge card while five JUnit tests asserted
+// its exact values — because every one of those tests reached it through a
+// receiver the plugin could not type:
+//
+//   Dish.FESTIVALBURGER.price()          enum constant, a field_access
+//   for (Dish d : Dish.values()) d.price()   enhanced-for variable
+//   dishes[i].price()                    array element
+//
+// The negative cases matter as much as the positive ones. The resolver requires
+// containerType === calleeType when there is an explicit receiver, so a WRONG
+// type costs a missed edge rather than an invented one — but that guard is the
+// thing being relied on here, so it is asserted rather than assumed.
+describe("javaPlugin — receiver shapes behind test calls", () => {
+  beforeAll(async () => {
+    await javaPlugin.load();
+  });
+
+  const parse = (content: string, rel = "T.java") => {
+    const file: SourceFile = { rel, ext: "java", content };
+    return parseFile(javaPlugin, file, makeIndex([file]));
+  };
+  const typeOf = (content: string, callee: string) =>
+    parse(content).calls.find((c) => c.calleeName === callee)?.calleeType;
+
+  it("types an enum constant as its enum", () => {
+    expect(
+      typeOf("class T { void a() { Dish.FESTIVALBURGER.price(); } }", "price"),
+    ).toBe("Dish");
+  });
+
+  it("types the enhanced-for loop variable", () => {
+    // It used to come out as "dish" — the VARIABLE name offered as a class
+    // name, which cannot match anything by construction.
+    expect(
+      typeOf("class T { void a() { for (Dish dish : Dish.values()) { dish.price(); } } }", "price"),
+    ).toBe("Dish");
+  });
+
+  it("types an array element as the element type", () => {
+    expect(
+      typeOf("class T { void a() { Dish[] ds = Dish.values(); ds[0].price(); } }", "price"),
+    ).toBe("Dish");
+  });
+
+  it("keeps the array variable itself un-matchable", () => {
+    // `ds` is Dish[], not Dish. Reporting "Dish" for `ds.length()` would be a
+    // type error dressed as a resolution.
+    expect(
+      typeOf("class T { void a() { Dish[] ds = Dish.values(); ds.clone(); } }", "clone"),
+    ).toBe("Dish[]");
+  });
+
+  it("does not claim a type for a lowercase receiver", () => {
+    // `config.MAX.get()` — config is a variable we know nothing about. The
+    // uppercase-receiver rule is what separates a type name from a value.
+    expect(
+      typeOf("class T { void a(Object config) { config.MAX.get(); } }", "get"),
+    ).toBeUndefined();
+  });
+
+  it("does not claim a type for a non-constant member", () => {
+    // `Config.instance.get()` — lowercase member, so not the constant idiom.
+    expect(
+      typeOf("class T { void a() { Config.instance.get(); } }", "get"),
+    ).toBeUndefined();
+  });
+
+  it("prefers a real local over the constant heuristic", () => {
+    // A variable that shadows a type name must win. `Dish` here is an Object.
+    expect(
+      typeOf("class T { void a(Object Dish) { Dish.FIELD.get(); } }", "get"),
+    ).toBeUndefined();
+  });
+
+  it("still resolves nothing when the named type has no such method", () => {
+    // The guard the whole heuristic leans on: two files, `Config.MAX_SIZE` is
+    // NOT an enum constant, and Config has no `length`. calleeType says
+    // "Config", the resolver finds no match, and declines rather than reaching
+    // for the same-named method on an unrelated class.
+    const a: SourceFile = {
+      rel: "A.java",
+      ext: "java",
+      content: "class T { void a() { Config.MAX_SIZE.length(); } }",
+    };
+    const b: SourceFile = {
+      rel: "B.java",
+      ext: "java",
+      content: "class Other { public int length() { return 1; } }",
+    };
+    const parsed = parseFile(javaPlugin, a, makeIndex([a, b]));
+    const call = parsed.calls.find((c) => c.calleeName === "length")!;
+    expect(call.calleeType).toBe("Config");
+    expect(call.hasReceiver, "the strict guard needs an explicit receiver").toBe(true);
+  });
+});
+
+describe("javaPlugin — enum bodies", () => {
+  beforeAll(async () => {
+    await javaPlugin.load();
+  });
+
+  const parse = (content: string) => {
+    const file: SourceFile = { rel: "Dish.java", ext: "java", content };
+    return parseFile(javaPlugin, file, makeIndex([file]));
+  };
+
+  const ENUM = `enum Dish {
+    FESTIVALBURGER("Festivalburger", 59),
+    VEGANSK_BOWL("Vegansk bowl", 65);
+    private final String displayName;
+    private final int price;
+    Dish(String displayName, int price) { this.displayName = displayName; this.price = price; }
+    public int price() { return price; }
+}`;
+
+  it("counts a constant with arguments as a constructor call", () => {
+    // Java writes it without `new` and without a receiver, so it matched
+    // neither call shape and produced no edge at all — the constructor read
+    // "0 callers" because the graph genuinely had none.
+    const calls = parse(ENUM).calls.filter((c) => c.calleeName === "Dish");
+    expect(calls).toHaveLength(2);
+    for (const c of calls) expect(c.calleeType).toBe("Dish");
+  });
+
+  it("emits nothing for a bare constant, which has no constructor to call", () => {
+    // `enum Color { RED, GREEN }` uses the implicit no-arg constructor, and the
+    // plugin does not emit that as a function — an edge would point at nothing.
+    const calls = parse("enum Color { RED, GREEN, BLUE }").calls.filter(
+      (c) => c.calleeName === "Color",
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it("finds the methods an enum declares", () => {
+    // They live under enum_body_declarations, one level below the constants.
+    // Reading only the body's direct children reported every enum as having no
+    // methods at all.
+    const cls = parse(ENUM).classes?.find((c) => c.name === "Dish");
+    expect(cls?.isEnum).toBe(true);
+    expect(cls?.enumValues).toEqual(["FESTIVALBURGER", "VEGANSK_BOWL"]);
+    expect(cls?.methodNames?.sort()).toEqual(["Dish", "price"]);
+  });
+
+  it("still reports an enum with no body", () => {
+    const cls = parse("enum Color { RED, GREEN, BLUE }").classes?.find(
+      (c) => c.name === "Color",
+    );
+    expect(cls?.enumValues).toEqual(["RED", "GREEN", "BLUE"]);
+    expect(cls?.methodNames ?? []).toEqual([]);
+  });
+});

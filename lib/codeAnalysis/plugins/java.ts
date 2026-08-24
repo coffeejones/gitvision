@@ -183,8 +183,17 @@ function extractTypeName(node: TsNode): string | null {
       const parts = node.text.split(".");
       return parts[parts.length - 1] ?? null;
     }
-    // Arrays → null (would need element-type tracking for method resolution
-    // to be useful). Other shapes also drop through.
+    case "array_type": {
+      // "Dish[]". Kept WITH the suffix so it can never match a containerType by
+      // accident, and so `array_access` below has something to strip. Before
+      // this an array local was simply untyped, which is why
+      // `dishes[i].price()` in a JUnit test resolved to nothing and the price
+      // method read as untested.
+      const el = node.childForFieldName("element");
+      const inner = el ? extractTypeName(el) : null;
+      return inner ? `${inner}[]` : null;
+    }
+    // Other shapes drop through.
     default:
       return null;
   }
@@ -477,8 +486,35 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
         if (objField?.type === "this") {
           return cls?.fields.get(fieldName);
         }
+        // `Dish.FESTIVALBURGER.price()` — an enum constant. The value's type is
+        // the enum itself, which is the one static-field shape where the type
+        // is knowable without reading the other file.
+        //
+        // Recognised by Java's own two conventions rather than by knowing the
+        // declaration: a receiver that starts uppercase is a type name, and a
+        // SCREAMING_SNAKE member is a constant. That does misfire on a non-enum
+        // constant — `Config.MAX_SIZE.length()` reports calleeType "Config" —
+        // but the resolver requires containerType === calleeType with an
+        // explicit receiver, so a wrong type costs a MISSED edge, never an
+        // invented one. Asserted both ways in java.test.ts.
+        if (
+          objField?.type === "identifier" &&
+          !lookupVariableType(objField.text) &&
+          /^[A-Z]/.test(objField.text) &&
+          /^[A-Z][A-Z0-9_]*$/.test(fieldName)
+        ) {
+          return objField.text;
+        }
         // Other shapes (chained, etc.) — out of scope
         return undefined;
+      }
+
+      case "array_access": {
+        // `dishes[i].price()` — the element type is the array type minus "[]".
+        const arrayNode = objectNode.childForFieldName("array");
+        if (arrayNode?.type !== "identifier") return undefined;
+        const arrayType = lookupVariableType(arrayNode.text);
+        return arrayType?.endsWith("[]") ? arrayType.slice(0, -2) : undefined;
       }
       // method_invocation, parenthesized_expression, etc. — we'd need return-
       // type tracking. Skip in v1.
@@ -527,7 +563,17 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
         // entries by (containerType, name).
         const methodNames: string[] = [];
         if (bodyNode) {
-          for (const member of bodyNode.namedChildren) {
+          // An ENUM keeps its methods one level deeper, under
+          // enum_body_declarations, after the constant list. Reading only the
+          // direct children left every enum with zero methods — Dish declared
+          // four and reported none, so the aggregator had nothing to match
+          // against the FunctionDefs carrying containerType "Dish". The
+          // existing test used `enum Color { RED, GREEN, BLUE }`, an enum with
+          // no body at all, which is why it never showed.
+          const members = bodyNode.namedChildren.flatMap((m) =>
+            m.type === "enum_body_declarations" ? m.namedChildren : [m]
+          );
+          for (const member of members) {
             if (
               member.type !== "method_declaration" &&
               member.type !== "constructor_declaration"
@@ -650,6 +696,35 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
         return;
       }
 
+      case "enum_constant": {
+        // `FESTIVALBURGER("Festivalburger", 59)` invokes the enum's
+        // constructor. Java writes it without `new` and without a receiver, so
+        // it matched neither call shape below and produced no edge at all —
+        // the constructor came out with zero inbound callers of any kind, which
+        // is a different failure from the unresolved-receiver one above: there
+        // was nothing to resolve.
+        //
+        // Only when arguments are present. A bare `RED` in `enum Color { RED }`
+        // uses the implicit no-arg constructor, which the plugin does not emit
+        // as a function, so an edge would point at nothing.
+        const args = node.namedChildren.find((c) => c.type === "argument_list");
+        const enumName = currentClass()?.name;
+        if (args && enumName) {
+          calls.push({
+            calleeName: enumName,
+            // Class-scope: a constant is not written inside a method. The graph
+            // keeps the edge; blastRadius skips module-scope callers, so this
+            // does not by itself move the caller COUNT on a card.
+            inFunction: currentMethod()?.name ?? null,
+            fromContainerType: enumName,
+            calleeType: enumName,
+            hasReceiver: true,
+          });
+        }
+        for (const child of node.namedChildren) visit(child);
+        return;
+      }
+
       case "object_creation_expression": {
         // `new Foo()` / `new Foo<>()` — calleeName is the class itself.
         // calleeType = same class (you're calling its constructor).
@@ -672,10 +747,25 @@ function parseJavaDirect(file: SourceFile, _ix: FileIndex): ParsedFile {
         return;
       }
 
+      case "enhanced_for_statement": {
+        // `for (Dish dish : Dish.values())` declares a typed local, and it was
+        // the only declaration form the plugin never recorded. The old path
+        // fell through to the identifier branch of resolveCalleeType, which
+        // returns the identifier itself as a possible class name — so
+        // `dish.price()` went out with calleeType "dish", the VARIABLE name
+        // used as a type. Unresolvable by construction.
+        countDecisionPoint();
+        const loopType = node.childForFieldName("type");
+        const loopName = node.childForFieldName("name")?.text;
+        const typeName = loopType ? extractTypeName(loopType) : null;
+        if (loopName && typeName) currentMethod()?.locals.set(loopName, typeName);
+        for (const child of node.namedChildren) visit(child);
+        return;
+      }
+
       case "if_statement":
       case "while_statement":
       case "for_statement":
-      case "enhanced_for_statement":
       case "do_statement":
       case "catch_clause":
       case "ternary_expression":
