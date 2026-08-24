@@ -20,7 +20,7 @@
 import type { CodeGraph } from "../codeAnalysis/types";
 import { computeDiff, type DiffResult, type DiffSummary } from "../codeAnalysis/diffAware";
 import { computeFunctionBlastRadius } from "../codeAnalysis/blastRadius";
-import { computeTestCoverage } from "../codeAnalysis/testCoverage";
+import { computeTestCoverage, isTestFile } from "../codeAnalysis/testCoverage";
 import {
   evaluateVerificationRules,
   type VerificationSuggestion,
@@ -39,12 +39,31 @@ export interface RiskyFunction {
   callers: number;
   /** Direct (1-hop) callers. */
   directCallers: number;
-  /** Callers living outside the function's own module/dir. */
+  /** Callers living outside the function's own module/dir.
+   *
+   *  Computed, and deliberately NOT rendered on the merge card any more. A
+   *  "module" here is blastRadius's same-directory heuristic, which on a
+   *  standard Maven layout makes every src/test -> src/main dependent
+   *  cross-module: measured on a real repo, 70 of 70 were exactly that, and the
+   *  glossary's rationale — "a break that jumps modules surfaces where you
+   *  weren't looking" — is the opposite of what a failing test does. The Impact
+   *  Explorer still renders it, with a TermInfo the merge card never had. Kept
+   *  on the type because the signal is real where it is defined. */
   crossModule: number;
   complexity: number;
   complexityDelta?: number;
   /** No direct test caller reaches this function. */
   untested: boolean;
+  /** We could not TELL. A test file calls something by this name and the edge
+   *  stayed unresolved, so "no test reaches it" would be a claim about our
+   *  resolver dressed up as a claim about the repository.
+   *
+   *  Found on a real report: a Java enum's `price()` read "no test reaches it"
+   *  while five tests asserted its exact values — the calls came through
+   *  `Dish.FESTIVALBURGER.price()`, an enhanced-for variable and an array
+   *  element, none of which the Java plugin could type. A resolver gap must
+   *  cost us an UNKNOWN, never a false statement. */
+  coverageUnknown: boolean;
   riskScore: number;
 }
 
@@ -55,6 +74,10 @@ export interface MergeConfidenceRead {
   riskiest: RiskyFunction[];
   /** "N of M touched functions look low-risk." Omitted when nothing changed. */
   safeParts?: string;
+  /** How many of the touched functions crossed a risk rule. Zero means the list
+   *  below is "what changed", not "what is risky" — and the heading has to say
+   *  so, or six rows under "Riskiest changes" imply six risks. */
+  flaggedCount: number;
   summary: DiffSummary;
   /** The PR-bot's own prioritized verification suggestions, expanded. */
   suggestions: VerificationSuggestion[];
@@ -95,6 +118,23 @@ function untestedKeySet(graph: CodeGraph): Set<string> {
   );
 }
 
+/** Callee names a TEST file calls without us resolving where they land.
+ *
+ *  Deliberately name-only, and deliberately not used to claim coverage — a name
+ *  match is far too weak for that. It is only strong enough to withhold the
+ *  opposite claim, which is exactly the job: when a test calls something called
+ *  `price` and we lost the edge, "no test reaches it" is a statement about our
+ *  resolver, not about the repository. */
+function unresolvedTestCallNames(graph: CodeGraph): Set<string> {
+  const out = new Set<string>();
+  for (const c of graph.calls) {
+    if (c.toFile) continue; // resolved — computeTestCoverage already saw it
+    if (!isTestFile(c.fromFile)) continue;
+    out.add(c.calleeName);
+  }
+  return out;
+}
+
 const HEADLINE: Record<MergeConfidenceLevel, string> = {
   "SAFE TO MERGE": "Low blast radius — this looks safe to merge.",
   "REVIEW CLOSELY": "Mergeable, but a few touched areas deserve a closer look.",
@@ -110,13 +150,32 @@ export function computeMergeConfidenceRead(
   headGraph: CodeGraph
 ): MergeConfidenceRead {
   const diff: DiffResult = computeDiff(baseGraph, headGraph);
-  const touched = diff.changes.filter((c) => c.status !== "unchanged");
+  // Test files are excluded from the RISK list, not from the diff summary.
+  //
+  // Every term in the score is meaningless for a test method: JUnit, vitest and
+  // pytest invoke them reflectively, so they always have 0 callers; and they are
+  // never in untestedHotspots (computeTestCoverage skips test files), so they
+  // are labelled "test-covered" by omission rather than by evidence. Measured on
+  // a real Java PR: 7 of 11 touched functions were @Test methods, and two of
+  // them took the last two slots on a six-slot list — "0 callers · cx 2 ·
+  // test-covered", which says nothing and displaces something that might.
+  const touched = diff.changes.filter(
+    (c) => c.status !== "unchanged" && !isTestFile(c.filePath)
+  );
 
   if (touched.length === 0) {
+    // Two different empty states, and they must not read the same. Filtering
+    // test files out of the risk list means a tests-only PR lands here, and
+    // telling someone who just wrote ten tests that nothing changed is a worse
+    // lie than the padding this filter removed.
+    const anyChange = diff.changes.some((c) => c.status !== "unchanged");
     return {
       read: "SAFE TO MERGE",
-      headline: "No function-level changes between these refs.",
+      headline: anyChange
+        ? "Only test code changed — nothing in production was touched."
+        : "No function-level changes between these refs.",
       riskiest: [],
+      flaggedCount: 0,
       summary: diff.summary,
       suggestions: evaluateVerificationRules({ diff }, { maxResults: 5 }),
     };
@@ -124,6 +183,8 @@ export function computeMergeConfidenceRead(
 
   const headUntested = untestedKeySet(headGraph);
   const baseUntested = untestedKeySet(baseGraph);
+  const headBlindNames = unresolvedTestCallNames(headGraph);
+  const baseBlindNames = unresolvedTestCallNames(baseGraph);
 
   // Bound the BFS cost: only the most-complex touched functions get a blast
   // walk; the long tail of trivial edits is assumed low-risk.
@@ -152,6 +213,12 @@ export function computeMergeConfidenceRead(
     const untested = (c.status === "removed" ? baseUntested : headUntested).has(
       key
     );
+    const coverageUnknown =
+      untested &&
+      (c.status === "removed" ? baseBlindNames : headBlindNames).has(c.name);
+    // The score still treats unknown as untested. That asymmetry is deliberate:
+    // being cautious about RISK costs a closer look, while being confident about
+    // a CLAIM costs the reader's trust. Only the wording softens.
     const riskScore =
       (1 + callers) *
       (1 + complexity / 10) *
@@ -169,6 +236,7 @@ export function computeMergeConfidenceRead(
       complexity,
       complexityDelta: c.complexityDelta,
       untested,
+      coverageUnknown,
       riskScore,
     };
   });
@@ -214,6 +282,7 @@ export function computeMergeConfidenceRead(
     headline: HEADLINE[read],
     riskiest,
     safeParts,
+    flaggedCount: flagged,
     summary: diff.summary,
     suggestions: evaluateVerificationRules({ diff }, { maxResults: 5 }),
     // Orange is rationed: a critical (orange) function only on a HIGH BLAST read.

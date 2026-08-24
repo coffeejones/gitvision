@@ -37,11 +37,34 @@ function RiskyRow({ fn, critical }: { fn: RiskyFunction; critical?: boolean }) {
     : fn.untested
       ? TOK.textSecondary
       : TOK.textMuted;
+  // Two numbers, said as two numbers.
+  //
+  // This row used to read "6 callers · no test reaches it" about a function with
+  // ONE direct caller. `callers` is transitive fan-in to three hops; `untested`
+  // is direct-only, and testCoverage's header says so deliberately. Printing
+  // them in one sentence with "callers" unqualified invited the obvious reading
+  // — that six things call it and none of them is a test — and on the report
+  // that surfaced this, two of those six WERE tests, two hops out.
+  const reach =
+    fn.callers === fn.directCallers
+      ? `${fn.callers} caller${fn.callers === 1 ? "" : "s"}`
+      : `${fn.directCallers} direct caller${fn.directCallers === 1 ? "" : "s"} · ${fn.callers} within 3 hops`;
+  // "cross-module" is gone from this card on purpose. A module here is just the
+  // file's DIRECTORY (blastRadius.modulePathOf), which on a standard Maven
+  // layout makes every src/test -> src/main dependent "cross-module" — measured
+  // on a real repo, 70 of 70 were exactly that. The glossary's rationale is "a
+  // break that jumps modules surfaces where you weren't looking", and a failing
+  // test is the opposite of that. The term also has no TermInfo on this
+  // surface, so a Maven user reads it as <module> in the POM. It survives on the
+  // Impact Explorer, where it is defined.
   const stats = [
-    `${fn.callers} caller${fn.callers === 1 ? "" : "s"}`,
-    fn.crossModule > 0 ? `${fn.crossModule} cross-module` : null,
+    reach,
     `cx ${fn.complexity}`,
-    fn.untested ? "no test reaches it" : "test-covered",
+    fn.untested
+      ? fn.coverageUnknown
+        ? "no test call we could follow"
+        : "no test reaches it"
+      : "test-covered",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -150,7 +173,10 @@ export function MergeConfidenceReadCard({ read }: { read: MergeConfidenceRead })
           style={{ color: TOK.textMuted }}
         >
           <AlertTriangle size={14} style={{ color: headColor }} aria-hidden />
-          Riskiest changes
+          {/* Nothing crossed a rule ⇒ this is a list of what CHANGED, and
+              calling it "riskiest" would manufacture six risks out of six
+              ordinary edits. */}
+          {read.flaggedCount > 0 ? "Riskiest changes" : "What this PR touches"}
         </div>
         {read.riskiest.length > 0 ? (
           read.riskiest.map((fn) => (
